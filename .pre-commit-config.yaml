@@ -1,0 +1,30 @@
+repos:
+  # All files basic formatter
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.1
+    hooks:
+      - id: ruff-format
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python]
+        require_serial: true
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.11.1'
+    hooks:
+    -   id: mypy
+        additional_dependencies: [types-pytz==2024.1.0.20240417]
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker

@@ -1,0 +1,9 @@
+aiohttp
+apscheduler
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-sdk
+prometheus-client
+pydantic
+pyroscope-io
+pyroscope-otel
+remerkleable

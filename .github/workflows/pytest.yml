@@ -1,0 +1,28 @@
+name: pytest
+
+on:
+  pull_request:
+    branches: [ "master" ]
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.12"
+    - name: Install dependencies
+      run: |
+        pip install --no-cache-dir uv==0.3.0
+        uv pip sync --system requirements.txt requirements-dev.txt
+    - name: Test with pytest
+      run: |
+        pytest --cov=src --cov-report=term-missing tests

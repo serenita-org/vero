@@ -1,0 +1,17 @@
+# Vero
+
+- [Why Vero?](./why_vero.md)
+	- [Feature comparison](./why_vero.md#feature-comparison)
+- [Compatibility](./compatibility.md)
+- [Risks](./risks.md)
+- [Running Vero](./running_vero.md)
+	- [Using multiple beacon nodes](./using_multiple_beacon_nodes.md)
+		- [Setup recommendations](./using_multiple_beacon_nodes.md#setup-recommendations)
+	- [Slashing protection](./slashing_protection.md)
+		- [Prevention](./slashing_protection.md#prevention)
+		- [Detection](./slashing_protection.md#detection)
+	- [Monitoring & Instrumentation](./instrumentation.md)
+		- [Metrics](./instrumentation.md#metrics)
+		- [Tracing](./instrumentation.md#tracing)
+		- [Profiling](./instrumentation.md#profiling)
+    - [CLI Reference](./running_vero.md#cli-reference)

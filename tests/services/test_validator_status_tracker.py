@@ -1,0 +1,140 @@
+import pytest
+
+from schemas import SchemaBeaconAPI
+from services import (
+    ValidatorStatusTrackerService,
+    AttestationService,
+    BlockProposalService,
+)
+from services.validator_status_tracker import _SLASHING_DETECTED
+
+
+@pytest.fixture
+def _reset_slashing_detected_metric():
+    # Resets the value of this metric
+    # before each test
+    _SLASHING_DETECTED.set(0)
+
+
+@pytest.mark.parametrize(
+    ["event", "our_validator_affected"],
+    [
+        pytest.param(
+            SchemaBeaconAPI.AttesterSlashingEvent(
+                attestation_1=SchemaBeaconAPI.AttesterSlashingEventAttestation(
+                    attesting_indices=[1, 2, 3, 4, 5], data=dict(), signature=b""
+                ),
+                attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
+                    attesting_indices=[4, 8, 9, 10], data=dict(), signature=b""
+                ),
+            ),
+            True,
+            id="Attester slashing for 'our' validator (#4)",
+        ),
+        pytest.param(
+            SchemaBeaconAPI.AttesterSlashingEvent(
+                attestation_1=SchemaBeaconAPI.AttesterSlashingEventAttestation(
+                    attesting_indices=[1, 2, 3, 4, 5, 10, 11],
+                    data=dict(),
+                    signature=b"",
+                ),
+                attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
+                    attesting_indices=[10, 11], data=dict(), signature=b""
+                ),
+            ),
+            False,
+            id="Attester slashings for a validator not managed by 'us' (#10, #11)",
+        ),
+        pytest.param(
+            SchemaBeaconAPI.ProposerSlashingEvent(
+                signed_header_1=SchemaBeaconAPI.ProposerSlashingEventData(
+                    message=SchemaBeaconAPI.ProposerSlashingEventMessage(
+                        slot=123,
+                        proposer_index=4,
+                        parent_root="0xabc",
+                        state_root="0xabc",
+                        body_root="0xabc",
+                    ),
+                    signature=b"",
+                ),
+                signed_header_2=SchemaBeaconAPI.ProposerSlashingEventData(
+                    message=SchemaBeaconAPI.ProposerSlashingEventMessage(
+                        slot=123,
+                        proposer_index=4,
+                        parent_root="0xabc",
+                        state_root="0xabc",
+                        body_root="0xdef",
+                    ),
+                    signature=b"",
+                ),
+            ),
+            True,
+            id="Proposer slashing for 'our' validator (#4)",
+        ),
+        pytest.param(
+            SchemaBeaconAPI.ProposerSlashingEvent(
+                signed_header_1=SchemaBeaconAPI.ProposerSlashingEventData(
+                    message=SchemaBeaconAPI.ProposerSlashingEventMessage(
+                        slot=123,
+                        proposer_index=10,
+                        parent_root="0xabc",
+                        state_root="0xabc",
+                        body_root="0xabc",
+                    ),
+                    signature=b"",
+                ),
+                signed_header_2=SchemaBeaconAPI.ProposerSlashingEventData(
+                    message=SchemaBeaconAPI.ProposerSlashingEventMessage(
+                        slot=123,
+                        proposer_index=10,
+                        parent_root="0xabc",
+                        state_root="0xabc",
+                        body_root="0xdef",
+                    ),
+                    signature=b"",
+                ),
+            ),
+            False,
+            id="Proposer slashing for 'our' validator (#4)",
+        ),
+    ],
+)
+async def test_handle_slashing_event(
+    event: SchemaBeaconAPI.AttesterSlashingEvent
+    | SchemaBeaconAPI.ProposerSlashingEvent,
+    our_validator_affected: bool,
+    validator_status_tracker: ValidatorStatusTrackerService,
+    attestation_service: AttestationService,
+    block_proposal_service: BlockProposalService,
+    _reset_slashing_detected_metric,
+    caplog,
+):
+    validator_status_tracker.handle_slashing_event(event=event)
+
+    event_type = (
+        "attester"
+        if isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent)
+        else "proposer"
+    )
+    assert any(f"Processed {event_type} slashing event" in m for m in caplog.messages)
+
+    if not our_validator_affected:
+        assert validator_status_tracker.slashing_detected is False
+        assert _SLASHING_DETECTED._value.get() == 0
+
+    if our_validator_affected:
+        assert any("Slashing detected" in m for m in caplog.messages)
+        assert any(record.levelname == "ERROR" for record in caplog.records)
+
+        # ValidatorStatusTracker property value should be set
+        assert validator_status_tracker.slashing_detected is True
+
+        # Metric value should be set
+        assert _SLASHING_DETECTED._value.get() == 1
+
+        # Slashable services should stop performing duties
+        with pytest.raises(RuntimeError, match="Slashing detected"):
+            await attestation_service.attest_if_not_yet_attested(slot=124)
+
+        with pytest.raises(RuntimeError, match="Slashing detected"):
+            await block_proposal_service.propose_block(slot=124)

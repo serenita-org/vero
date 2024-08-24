@@ -1,0 +1,100 @@
+"""
+Provides information about the beacon chain - current slot, epoch, fork, genesis and spec data.
+"""
+
+import datetime
+import logging
+from math import floor
+from typing import TYPE_CHECKING
+
+import pytz
+
+from schemas import SchemaRemoteSigner
+from spec.base import Fork, Genesis, Spec
+
+if TYPE_CHECKING:
+    from providers import MultiBeaconNode
+
+
+class BeaconChain:
+    def __init__(self, multi_beacon_node: "MultiBeaconNode"):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger.setLevel(logging.getLogger().level)
+
+        self.multi_beacon_node = multi_beacon_node
+
+    @property
+    def genesis(self) -> Genesis:
+        return next(
+            bn.genesis for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
+        )
+
+    @property
+    def spec(self) -> "Spec":
+        return next(
+            bn.spec for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
+        )
+
+    def get_fork(self, slot: int) -> Fork:
+        spec = self.multi_beacon_node.best_beacon_node.spec
+
+        if (
+            hasattr(spec, "ELECTRA_FORK_EPOCH")
+            and self.current_epoch >= spec.ELECTRA_FORK_EPOCH
+        ):
+            return Fork(
+                previous_version=spec.DENEB_FORK_VERSION,
+                current_version=spec.ELECTRA_FORK_VERSION,
+                epoch=spec.ELECTRA_FORK_EPOCH,
+            )
+        if (
+            hasattr(spec, "DENEB_FORK_EPOCH")
+            and self.current_epoch >= spec.DENEB_FORK_EPOCH
+        ):
+            return Fork(
+                previous_version=spec.CAPELLA_FORK_VERSION,
+                current_version=spec.DENEB_FORK_VERSION,
+                epoch=spec.DENEB_FORK_EPOCH,
+            )
+        raise ValueError(f"Unsupported fork for epoch {self.current_epoch}")
+
+    def get_fork_info(self, slot: int) -> SchemaRemoteSigner.ForkInfo:
+        return SchemaRemoteSigner.ForkInfo(
+            fork=self.get_fork(slot=slot).to_obj(),
+            genesis_validators_root=self.genesis.genesis_validators_root.to_obj(),
+        )
+
+    def get_datetime_for_slot(self, slot: int) -> datetime.datetime:
+        slot_timestamp = self.genesis.genesis_time + slot * self.spec.SECONDS_PER_SLOT
+        return datetime.datetime.fromtimestamp(slot_timestamp, tz=pytz.UTC)
+
+    def _get_slots_since_genesis(self) -> int:
+        seconds_elapsed = (
+            floor(datetime.datetime.now().timestamp()) - self.genesis.genesis_time
+        )
+        seconds_elapsed = max(0, seconds_elapsed)
+        return seconds_elapsed // self.spec.SECONDS_PER_SLOT
+
+    @property
+    def current_slot(self) -> int:
+        return self._get_slots_since_genesis()
+
+    def time_since_slot_start(self, slot: int) -> float:
+        return (
+            datetime.datetime.now(tz=pytz.UTC) - self.get_datetime_for_slot(slot)
+        ).total_seconds()
+
+    @property
+    def current_epoch(self) -> int:
+        return self.current_slot // self.spec.SLOTS_PER_EPOCH
+
+    def compute_start_slot_at_epoch(self, epoch: int) -> int:
+        return epoch * self.spec.SLOTS_PER_EPOCH
+
+    def compute_sync_period_for_epoch(self, epoch: int) -> int:
+        return epoch // self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+
+    def compute_sync_period_for_slot(self, slot: int) -> int:
+        return self.compute_sync_period_for_epoch(
+            epoch=slot // self.spec.SLOTS_PER_EPOCH
+        )

@@ -1,0 +1,10 @@
+services:
+  validator-client:
+    container_name: validator-client
+    image: ghcr.io/serenita-org/vero:master
+    command:
+      - "--remote-signer-url=http://remote-signer:9000"
+      - "--beacon-node-urls=http://beacon-node-1:1234,http://beacon-node-2:1234,http://beacon-node-3:1234"
+      - "--fee-recipient=0x0000000000000000000000000000000000000000"
+    volumes:
+      - "./data:/vero/data"
