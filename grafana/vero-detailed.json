@@ -3727,14 +3727,14 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(event_loop_lag_seconds_sum{instance=\"$instance\"}[$__rate_interval])\n/\nrate(event_loop_lag_seconds_count[$__rate_interval])",
+              "expr": "histogram_quantile(0.99, event_loop_lag_seconds_bucket{instance=\"$instance\"})",
               "instant": false,
-              "legendFormat": "Event Loop Lag",
+              "legendFormat": "Event Loop Lag - 99% quantile",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Event Loop Lag",
+          "title": "Event Loop Lag - 99% quantile",
           "type": "timeseries"
         },
         {

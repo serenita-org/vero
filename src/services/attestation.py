@@ -441,23 +441,26 @@ class AttestationService(ValidatorDutyService):
             )
 
             # Gather aggregation duty selection proofs
-            selection_proofs_coroutines = []
             # Fork info for all slots in the same epoch will be the same
             _fork_slot = next(d.slot for d in fetched_duties)
             _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
-            for duty in fetched_duties:
-                selection_proofs_coroutines.append(
-                    self.remote_signer.sign(
-                        message=SchemaRemoteSigner.AggregationSlotSignableMessage(
-                            fork_info=_fork_info,
-                            aggregation_slot=dict(slot=duty.slot),
-                        ),
-                        identifier=duty.pubkey,
-                    )
-                )
 
             try:
-                signatures = await asyncio.gather(*selection_proofs_coroutines)
+                signable_messages = []
+                identifiers = []
+
+                for duty in fetched_duties:
+                    signable_messages.append(
+                        SchemaRemoteSigner.AggregationSlotSignableMessage(
+                            fork_info=_fork_info,
+                            aggregation_slot=dict(slot=duty.slot),
+                        )
+                    )
+                    identifiers.append(duty.pubkey)
+
+                signatures = await self.remote_signer.sign_in_batches(
+                    messages=signable_messages, identifiers=identifiers
+                )
             except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ERROR_TYPE.SIGNATURE.value).inc()
                 self.logger.exception(

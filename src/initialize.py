@@ -168,6 +168,10 @@ async def run_services(cli_args: CLIArgs) -> None:
 
         while True:
             await asyncio.sleep(_interval)
-            EVENT_LOOP_LAG.observe(event_loop.time() - _start - _interval)
+
+            lag = event_loop.time() - _start - _interval
+            if lag > 0.5:
+                _logger.warning(f"Event loop lag high: {lag}")
+            EVENT_LOOP_LAG.observe(lag)
             EVENT_LOOP_TASKS.set(len(asyncio.all_tasks(event_loop)))
             _start = event_loop.time()
