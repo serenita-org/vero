@@ -32,6 +32,9 @@ You can build the image yourself using the included [Dockerfile](../Dockerfile) 
  docker run ghcr.io/serenita-org/vero:<version> <arguments>
  ```
 
+Check out the [example docker compose file](../compose-example.yaml).
+
+
 # CLI Reference
 
 #### `--remote-signer-url`
