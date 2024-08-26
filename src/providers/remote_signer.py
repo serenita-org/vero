@@ -2,6 +2,7 @@
 Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api).
 """
 
+import asyncio
 import logging
 from types import SimpleNamespace
 
@@ -124,3 +125,45 @@ class RemoteSigner:
 
             _SIGNED_MESSAGES.labels(signable_message_type=type(message).__name__).inc()
             return message, (await resp.json())["signature"], identifier
+
+    async def sign_in_batches(
+        self,
+        messages: list[SchemaRemoteSigner.SignableMessage],
+        identifiers: list[str],
+        batch_size: int = 100,
+    ) -> list[tuple[SchemaRemoteSigner.SignableMessage, str, str]]:
+        """
+        Signs messages in batches and returns a list of tuples containing the message,
+        its signature, and the corresponding identifier.
+
+        :param messages: List of SignableMessage objects to sign.
+        :param identifiers: List of corresponding identifiers that should be used to
+                            sign the messages.
+        :param batch_size: Size of the batch of messages to sign in each iteration.
+        :return: List of tuples (SignableMessage, signature, identifier).
+
+        Batching requests helps prevent the event loop from being blocked for too long
+        when processing many requests simultaneously.
+        """
+        if len(messages) != len(identifiers):
+            raise ValueError(
+                "Number of messages does not match the number of identifiers"
+            )
+
+        results = []
+        for i in range(0, len(messages), batch_size):
+            messages_batch = messages[i : i + batch_size]
+            identifiers_batch = identifiers[i : i + batch_size]
+
+            results.extend(
+                await asyncio.gather(
+                    *(
+                        self.sign(message, identifier)
+                        for message, identifier in zip(
+                            messages_batch, identifiers_batch
+                        )
+                    )
+                )
+            )
+
+        return results
