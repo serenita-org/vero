@@ -52,6 +52,10 @@ from spec.block import BeaconBlockClass
 from spec.sync_committee import SyncCommitteeContributionClass
 
 
+class AttestationConsensusFailure(BaseException):
+    pass
+
+
 class MultiBeaconNode:
     def __init__(
         self,
@@ -385,34 +389,64 @@ class MultiBeaconNode:
             func_name="prepare_beacon_committee_subscriptions", **kwargs
         )
 
-    async def _produce_attestation_data(
+    async def _produce_attestation_data_from_head_event(
         self,
         slot: int,
         committee_index: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None,
-    ):
-        # 1 beacon node - get data from it
-        if len(self.beacon_nodes) == 1:
-            return await self.best_beacon_node.produce_attestation_data(
-                slot=slot,
-                committee_index=committee_index,
+        deadline: datetime.datetime,
+        head_event: SchemaBeaconAPI.HeadEvent,
+    ) -> AttestationData:
+        tasks = [
+            asyncio.create_task(
+                bn.wait_for_attestation_data(
+                    expected_head_block_root=head_event.block,
+                    slot=slot,
+                    committee_index=committee_index,
+                )
             )
+            for bn in self.beacon_nodes
+            if bn.initialized
+        ]
+        head_match_count = 0
+        for coro in asyncio.as_completed(
+            tasks,
+            timeout=(deadline - datetime.datetime.now(tz=pytz.UTC)).total_seconds(),
+        ):
+            try:
+                att_data = await coro
+                head_match_count += 1
+                if head_match_count >= self._majority_threshold:
+                    # Cancel pending tasks
+                    for task in tasks:
+                        task.cancel()
+                    return att_data
+            except TimeoutError:
+                # Deadline reached
+                continue
+            except Exception as e:
+                self.logger.exception(e)
+                continue
 
-        # Multiple beacon nodes
-        # Slightly different algorithms depending on whether
-        # a head event has been emitted.
-        # A) A head event was emitted
-        #    We wait for a majority of beacon nodes to report the same
-        #    head block root as the event.
-        # B) No head event was emitted
-        #    We repeatedly ask all beacon nodes for attestation data until
-        #    a majority of them reports the same head block root.
+        # Cancel pending tasks
+        for task in tasks:
+            task.cancel()
+        raise AttestationConsensusFailure(
+            f"Failed to reach consensus on attestation data among connected beacon nodes. Expected head block root: {head_event.block}"
+        )
 
-        if head_event:
+    async def _produce_attestation_data_without_head_event(
+        self,
+        slot: int,
+        committee_index: int,
+        deadline: datetime.datetime,
+    ) -> AttestationData:
+        while datetime.datetime.now(pytz.UTC) < deadline:
+            _round_start = asyncio.get_event_loop().time()
+            head_block_root_counter: Counter[str] = Counter()
+
             tasks = [
                 asyncio.create_task(
-                    bn.wait_for_attestation_data(
-                        expected_head_block_root=head_event.block,
+                    bn.produce_attestation_data(
                         slot=slot,
                         committee_index=committee_index,
                     )
@@ -420,16 +454,10 @@ class MultiBeaconNode:
                 for bn in self.beacon_nodes
                 if bn.initialized
             ]
-            head_match_count = 0
+
             for coro in asyncio.as_completed(tasks):
                 try:
                     att_data = await coro
-                    head_match_count += 1
-                    if head_match_count >= self._majority_threshold:
-                        # Cancel pending tasks
-                        for task in tasks:
-                            task.cancel()
-                        return att_data
                 except BeaconNodeNotReady:
                     self.logger.debug(
                         "Beacon node returned 503 not ready while requesting attestation data"
@@ -438,50 +466,51 @@ class MultiBeaconNode:
                 except Exception as e:
                     self.logger.exception(e)
                     continue
-            else:
-                raise RuntimeError(
-                    f"Failed to get attestation data matching head event block root {head_event.block}"
-                )
+
+                block_root = att_data.beacon_block_root.to_obj()
+                head_block_root_counter[block_root] += 1
+                if head_block_root_counter[block_root] >= self._majority_threshold:
+                    # Cancel pending tasks
+                    for task in tasks:
+                        task.cancel()
+                    return att_data
+
+            # Rate-limiting - wait at least 30ms in between requests
+            await asyncio.sleep(
+                max(0.03 - (asyncio.get_event_loop().time() - _round_start), 0)
+            )
+        raise AttestationConsensusFailure(
+            "Failed to reach consensus on attestation data among connected beacon nodes."
+        )
+
+    async def _produce_attestation_data(
+        self,
+        slot: int,
+        committee_index: int,
+        deadline: datetime.datetime,
+        head_event: SchemaBeaconAPI.HeadEvent | None,
+    ) -> AttestationData:
+        # Slightly different algorithms depending on whether
+        # a head event has been emitted.
+        # A) A head event was emitted
+        #    We wait for a majority of beacon nodes to report the same
+        #    head block root as is present in the head event.
+        # B) No head event was emitted
+        #    We wait for a majority of beacon nodes to report the same
+        #    head block root.
+        if head_event:
+            return await self._produce_attestation_data_from_head_event(
+                slot=slot,
+                committee_index=committee_index,
+                deadline=deadline,
+                head_event=head_event,
+            )
         else:
-            while True:
-                _round_start = asyncio.get_event_loop().time()
-                head_block_root_counter: Counter[str] = Counter()
-
-                tasks = [
-                    asyncio.create_task(
-                        bn.produce_attestation_data(
-                            slot=slot,
-                            committee_index=committee_index,
-                        )
-                    )
-                    for bn in self.beacon_nodes
-                    if bn.initialized
-                ]
-
-                for coro in asyncio.as_completed(tasks):
-                    try:
-                        att_data = await coro
-                    except BeaconNodeNotReady:
-                        self.logger.debug(
-                            "Beacon node returned 503 not ready while requesting attestation data"
-                        )
-                        continue
-                    except Exception as e:
-                        self.logger.exception(e)
-                        continue
-
-                    block_root = att_data.beacon_block_root.to_obj()
-                    head_block_root_counter[block_root] += 1
-                    if head_block_root_counter[block_root] >= self._majority_threshold:
-                        # Cancel pending tasks
-                        for task in tasks:
-                            task.cancel()
-                        return att_data
-
-                # Rate-limiting - wait at least 30ms in between requests
-                await asyncio.sleep(
-                    max(0.03 - (asyncio.get_event_loop().time() - _round_start), 0)
-                )
+            return await self._produce_attestation_data_without_head_event(
+                slot=slot,
+                committee_index=committee_index,
+                deadline=deadline,
+            )
 
     async def produce_attestation_data(
         self,
@@ -513,22 +542,12 @@ class MultiBeaconNode:
                 else str(None)
             },
         ):
-            _exc_message_base = "Failed to reach consensus on attestation data among connected beacon nodes"
-            try:
-                async with asyncio.timeout(
-                    delay=(
-                        deadline - datetime.datetime.now(tz=pytz.UTC)
-                    ).total_seconds()
-                ):
-                    return await self._produce_attestation_data(
-                        slot=slot,
-                        committee_index=committee_index,
-                        head_event=head_event,
-                    )
-            except TimeoutError:
-                raise RuntimeError(f"{_exc_message_base} - timeout")
-            except Exception as e:
-                raise RuntimeError(f"{_exc_message_base} - {e}")
+            return await self._produce_attestation_data(
+                slot=slot,
+                committee_index=committee_index,
+                deadline=deadline,
+                head_event=head_event,
+            )
 
     async def publish_attestations(self, **kwargs) -> None:
         await self._get_all_beacon_node_responses(
