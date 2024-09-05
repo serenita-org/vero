@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 
@@ -29,9 +30,10 @@ async def test_attest_if_not_yet_attested(
     caplog,
 ) -> None:
     # Populate the service with an attester duty
-    duty_slot = beacon_chain.current_slot
+    duty_slot = beacon_chain.current_slot + 1
+    duty_epoch = duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
 
-    attestation_service.attester_duties[beacon_chain.current_epoch].add(
+    attestation_service.attester_duties[duty_epoch].add(
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
             pubkey=random_active_validator.pubkey,
             validator_index=random_active_validator.index,
@@ -41,7 +43,7 @@ async def test_attest_if_not_yet_attested(
             committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
             committees_at_slot=random.randint(0, 10),
             validator_committee_index=random.randint(
-                0, spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE
+                0, spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1
             ),
             slot=duty_slot,
             is_aggregator=False,
@@ -50,7 +52,10 @@ async def test_attest_if_not_yet_attested(
     )
 
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
-    await attestation_service.attest_if_not_yet_attested(slot=beacon_chain.current_slot)
+
+    # Wait for slot to start
+    await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
+    await attestation_service.attest_if_not_yet_attested(slot=duty_slot)
 
     assert any("Published attestations" in m for m in caplog.messages)
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1

@@ -22,7 +22,7 @@ def beacon_node_url() -> str:
 def spec_deneb() -> SpecDeneb:
     return SpecDeneb(
         INTERVALS_PER_SLOT=3,
-        SECONDS_PER_SLOT=12,
+        SECONDS_PER_SLOT=1,
         SLOTS_PER_EPOCH=32,
         MAX_WITHDRAWALS_PER_PAYLOAD=16,
         MAX_BLOB_COMMITMENTS_PER_BLOCK=4096,

@@ -225,7 +225,7 @@ class BeaconNodeResponseSequence(TypedDict):
                                 data=dict(),
                             ),
                             exception=None,
-                            delay=0.1,
+                            delay=0.05,
                         )
                     ],
                 ),
@@ -241,7 +241,7 @@ class BeaconNodeResponseSequence(TypedDict):
                                 data=dict(),
                             ),
                             exception=None,
-                            delay=0.3,
+                            delay=0.06,
                         )
                     ],
                 ),
@@ -257,7 +257,7 @@ class BeaconNodeResponseSequence(TypedDict):
                                 data=dict(),
                             ),
                             exception=None,
-                            delay=5,
+                            delay=0.2,
                         )
                     ],
                 ),
