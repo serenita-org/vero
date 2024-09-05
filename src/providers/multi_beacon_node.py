@@ -138,7 +138,7 @@ class MultiBeaconNode:
     def best_beacon_node(self):
         return next(
             bn
-            for bn in sorted(self.beacon_nodes, key=lambda bn: bn.score)
+            for bn in sorted(self.beacon_nodes, key=lambda bn: bn.score, reverse=True)
             if bn.initialized
         )
 
