@@ -96,6 +96,11 @@ ___
 The metrics server listen port. Defaults to `8000`.
 ___
 
+#### `--metrics-multiprocess-mode`
+
+Provide this flag to collect metrics from all processes. This comes with some limitations, notably no cpu and memory metrics. See https://prometheus.github.io/client_python/multiprocess/ .
+___
+
 #### `--log-level`
 
 The logging level to use, one of `CRITICAL,ERROR,WARNING,INFO,DEBUG`. Defaults to `INFO`.

@@ -34,10 +34,16 @@ _SCORE_DELTA_FAILURE = 5
 
 
 _BEACON_NODE_SCORE = Gauge(
-    "beacon_node_score", "Beacon node score", labelnames=["host"]
+    "beacon_node_score",
+    "Beacon node score",
+    labelnames=["host"],
+    multiprocess_mode="max",
 )
 _BEACON_NODE_VERSION = Gauge(
-    "beacon_node_version", "Beacon node score", labelnames=["host", "version"]
+    "beacon_node_version",
+    "Beacon node score",
+    labelnames=["host", "version"],
+    multiprocess_mode="max",
 )
 
 

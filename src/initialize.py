@@ -8,7 +8,7 @@ import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from observability.event_loop import EVENT_LOOP_LAG, EVENT_LOOP_TASKS
+from observability.event_loop import monitor_event_loop
 from providers import RemoteSigner, MultiBeaconNode, BeaconChain
 from schemas import SchemaBeaconAPI
 from services import (
@@ -162,16 +162,5 @@ async def run_services(cli_args: CLIArgs) -> None:
         scheduler.add_job(event_consumer_service.handle_events)
         _logger.info("Started event consumer")
 
-        event_loop = asyncio.get_event_loop()
-        _start = event_loop.time()
-        _interval = 1
-
-        while True:
-            await asyncio.sleep(_interval)
-
-            lag = event_loop.time() - _start - _interval
-            if lag > 0.5:
-                _logger.warning(f"Event loop lag high: {lag}")
-            EVENT_LOOP_LAG.observe(lag)
-            EVENT_LOOP_TASKS.set(len(asyncio.all_tasks(event_loop)))
-            _start = event_loop.time()
+        # Run forever while monitoring the event loop
+        await monitor_event_loop()

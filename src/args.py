@@ -18,6 +18,7 @@ class CLIArgs(BaseModel):
     builder_boost_factor: int
     metrics_address: str
     metrics_port: int
+    metrics_multiprocess_mode: bool = False
     log_level: str
 
     @staticmethod
@@ -129,6 +130,11 @@ def parse_cli_args() -> CLIArgs:
         required=False,
         default=8000,
         help="The metrics server port number. Defaults to 8000.",
+    )
+    parser.add_argument(
+        "--metrics-multiprocess-mode",
+        action="store_true",
+        help="Provide this flag to collect metrics from all processes. This comes with some limitations, notably no cpu and memory metrics. See https://prometheus.github.io/client_python/multiprocess/ .",
     )
     parser.add_argument(
         "--log-level",

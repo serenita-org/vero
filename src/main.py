@@ -4,7 +4,6 @@ import signal
 from pathlib import Path
 from types import FrameType
 
-from prometheus_client import start_http_server
 
 from args import parse_cli_args, CLIArgs
 from initialize import check_data_dir_permissions, run_services
@@ -38,8 +37,12 @@ def sigterm_handler(signum: int, frame: FrameType | None):
 
 if __name__ == "__main__":
     cli_args = parse_cli_args()
-    init_observability(log_level=cli_args.log_level)
-    start_http_server(port=cli_args.metrics_port, addr=cli_args.metrics_address)
+    init_observability(
+        metrics_address=cli_args.metrics_address,
+        metrics_port=cli_args.metrics_port,
+        metrics_multiprocess_mode=cli_args.metrics_multiprocess_mode,
+        log_level=cli_args.log_level,
+    )
 
     signal.signal(signal.SIGTERM, sigterm_handler)
 

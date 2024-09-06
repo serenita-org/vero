@@ -3,7 +3,9 @@ Provides methods for interacting with a remote signer through the [Remote Signin
 """
 
 import asyncio
+import functools
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from types import SimpleNamespace
 
 import aiohttp
@@ -21,11 +23,36 @@ _SIGNED_MESSAGES = Counter(
 )
 
 
+def _sign_messages_in_separate_process(
+    remote_signer_url: HttpUrl,
+    messages: list[SchemaRemoteSigner.SignableMessage],
+    identifiers: list[str],
+    batch_size: int,
+) -> list[tuple[SchemaRemoteSigner.SignableMessage, str, str]]:
+    async def _sign_messages():
+        results = []
+        async with RemoteSigner(url=remote_signer_url) as signer:
+            for i in range(0, len(messages), batch_size):
+                messages_batch = messages[i : i + batch_size]
+                identifiers_batch = identifiers[i : i + batch_size]
+                tasks = [
+                    signer.sign(msg, identifier)
+                    for msg, identifier in zip(messages_batch, identifiers_batch)
+                ]
+                results.extend(await asyncio.gather(*tasks))
+        return results
+
+    results = asyncio.run(_sign_messages())
+    return results
+
+
 class RemoteSigner:
     def __init__(self, url: HttpUrl):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
         self.url = url
+
+        self.process_pool_executor = ProcessPoolExecutor()
 
     async def __aenter__(self) -> "RemoteSigner":
         if not self.url.host:
@@ -70,6 +97,7 @@ class RemoteSigner:
         ):
             if not session.closed:
                 await session.close()
+        self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
     async def get_public_keys(self):
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -142,28 +170,33 @@ class RemoteSigner:
         :param batch_size: Size of the batch of messages to sign in each iteration.
         :return: List of tuples (SignableMessage, signature, identifier).
 
-        Batching requests helps prevent the event loop from being blocked for too long
-        when processing many requests simultaneously.
+        Large amounts of messages (more than `batch_size`) are signed in a separate
+        process to avoid blocking the event loop.
         """
         if len(messages) != len(identifiers):
             raise ValueError(
                 "Number of messages does not match the number of identifiers"
             )
 
-        results = []
-        for i in range(0, len(messages), batch_size):
-            messages_batch = messages[i : i + batch_size]
-            identifiers_batch = identifiers[i : i + batch_size]
-
-            results.extend(
-                await asyncio.gather(
-                    *(
-                        self.sign(message, identifier)
-                        for message, identifier in zip(
-                            messages_batch, identifiers_batch
-                        )
-                    )
+        if len(messages) <= batch_size:
+            return await asyncio.gather(
+                *(
+                    self.sign(message, identifier)
+                    for message, identifier in zip(messages, identifiers)
                 )
             )
 
-        return results
+        # For large amounts of messages, run the signing process in a separate
+        # process to avoid blocking the event loop for too long
+        loop = asyncio.get_running_loop()
+        self.logger.debug(f"Signing {len(messages)} messages in a separate process")
+        return await loop.run_in_executor(
+            self.process_pool_executor,
+            functools.partial(
+                _sign_messages_in_separate_process,
+                remote_signer_url=self.url,
+                messages=messages,
+                identifiers=identifiers,
+                batch_size=batch_size,
+            ),
+        )
