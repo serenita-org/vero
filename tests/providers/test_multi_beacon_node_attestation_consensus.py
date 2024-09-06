@@ -15,6 +15,7 @@ from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
 
 from providers import MultiBeaconNode
+from providers.multi_beacon_node import AttestationConsensusFailure
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData
 
@@ -154,7 +155,8 @@ async def test_produce_attestation_data(
             for block_root_count in _br_ctr.values()
         ):
             with pytest.raises(
-                RuntimeError, match="Failed to reach consensus on attestation data"
+                AttestationConsensusFailure,
+                match="Failed to reach consensus on attestation data",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.produce_attestation_data(
                     deadline=datetime.datetime.now(tz=pytz.UTC)
