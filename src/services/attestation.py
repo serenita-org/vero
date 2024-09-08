@@ -13,6 +13,7 @@ from opentelemetry.trace import (
     NonRecordingSpan,
 )
 
+from schemas.beacon_api import AttesterDuty
 from spec.attestation import AttestationData, AggregateAndProof, Attestation
 from spec.common import (
     MAX_VALIDATORS_PER_COMMITTEE,
@@ -171,7 +172,7 @@ class AttestationService(ValidatorDutyService):
 
             consensus_time = asyncio.get_event_loop().time() - consensus_start
             self.logger.debug(
-                f"Reached consensus on attestation data in {consensus_time:.1f} seconds"
+                f"Reached consensus on attestation data in {consensus_time:.3f} seconds"
             )
             _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
 
@@ -392,6 +393,98 @@ class AttestationService(ValidatorDutyService):
                 amount=len(signed_aggregate_and_proofs)
             )
 
+    async def _prep_and_schedule_duties(
+        self, duties: list[AttesterDuty]
+    ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
+        if len(duties) == 0:
+            return []
+
+        # Fork info for all slots in the same epoch will be the same
+        _fork_slot = next(d.slot for d in duties)
+        _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
+
+        # Schedule attestation job at the attestation deadline in case
+        # it is not triggered earlier by a new HeadEvent
+        for duty_slot in set([duty.slot for duty in duties]):
+            self.logger.debug(f"Adding attest_if_not_yet job for slot {duty_slot}")
+            self.scheduler.add_job(
+                self.attest_if_not_yet_attested,
+                "date",
+                next_run_time=self.beacon_chain.get_datetime_for_slot(slot=duty_slot)
+                + datetime.timedelta(
+                    seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+                    / int(self.beacon_chain.spec.INTERVALS_PER_SLOT)
+                ),
+                kwargs={"slot": duty_slot},
+                id=_PRODUCE_JOB_ID.format(duty_slot=duty_slot),
+                replace_existing=True,
+            )
+
+        # Gather aggregation duty selection proofs
+        try:
+            signable_messages = []
+            identifiers = []
+
+            for duty in duties:
+                signable_messages.append(
+                    SchemaRemoteSigner.AggregationSlotSignableMessage(
+                        fork_info=_fork_info,
+                        aggregation_slot=dict(slot=duty.slot),
+                    )
+                )
+                identifiers.append(duty.pubkey)
+
+            signatures = await self.remote_signer.sign_in_batches(
+                messages=signable_messages, identifiers=identifiers
+            )
+        except Exception as e:
+            _ERRORS_METRIC.labels(error_type=ERROR_TYPE.SIGNATURE.value).inc()
+            self.logger.exception(
+                f"Failed to get signatures for aggregation selection proofs: {e}"
+            )
+            raise
+
+        pubkey_to_selection_proof = {
+            pubkey: bytes.fromhex(sig[2:]) for _, sig, pubkey in signatures
+        }
+
+        duties_with_proofs = []
+        for duty in duties:
+            selection_proof = pubkey_to_selection_proof[duty.pubkey]
+            is_aggregator = self._is_aggregator_by_committee_length(
+                committee_length=duty.committee_length,
+                slot_signature=selection_proof,
+            )
+
+            duties_with_proofs.append(
+                SchemaBeaconAPI.AttesterDutyWithSelectionProof(
+                    **duty.model_dump(),
+                    is_aggregator=is_aggregator,
+                    selection_proof=selection_proof,
+                )
+            )
+
+        # Prepare beacon node subnet subscriptions for aggregation duties
+        beacon_committee_subscriptions_data = []
+        for duty in duties_with_proofs:
+            if duty.is_aggregator:
+                beacon_committee_subscriptions_data.append(
+                    dict(
+                        validator_index=str(duty.validator_index),
+                        committee_index=str(duty.committee_index),
+                        committees_at_slot=str(duty.committees_at_slot),
+                        slot=str(duty.slot),
+                        is_aggregator=duty.is_aggregator,
+                    )
+                )
+
+        self.scheduler.add_job(
+            self.multi_beacon_node.prepare_beacon_committee_subscriptions,
+            kwargs=dict(data=beacon_committee_subscriptions_data),
+        )
+
+        return duties_with_proofs
+
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
         for epoch in list(self.attester_duties.keys()):
@@ -424,7 +517,6 @@ class AttestationService(ValidatorDutyService):
                 epoch=epoch,
                 indices=_validator_indices,
             )
-            fetched_duties = response.data
 
             if response.dependent_root == self.attester_duties_dependent_roots.get(
                 epoch, None
@@ -439,96 +531,31 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(
                 f"Dependent root for attester duties for epoch {epoch} - {response.dependent_root}"
             )
-
-            # Gather aggregation duty selection proofs
-            # Fork info for all slots in the same epoch will be the same
-            _fork_slot = next(d.slot for d in fetched_duties)
-            _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
-
-            try:
-                signable_messages = []
-                identifiers = []
-
-                for duty in fetched_duties:
-                    signable_messages.append(
-                        SchemaRemoteSigner.AggregationSlotSignableMessage(
-                            fork_info=_fork_info,
-                            aggregation_slot=dict(slot=duty.slot),
-                        )
-                    )
-                    identifiers.append(duty.pubkey)
-
-                signatures = await self.remote_signer.sign_in_batches(
-                    messages=signable_messages, identifiers=identifiers
-                )
-            except Exception as e:
-                _ERRORS_METRIC.labels(error_type=ERROR_TYPE.SIGNATURE.value).inc()
-                self.logger.exception(
-                    f"Failed to get signatures for aggregation slot selection proofs: {e}"
-                )
-                raise e
-
-            pubkey_to_selection_proof = {
-                pubkey: bytes.fromhex(sig[2:]) for _, sig, pubkey in signatures
-            }
-
-            current_slot = self.beacon_chain.current_slot
             self.attester_duties[epoch] = set()
+
+            # For large amounts of validators, the `_prep_and_schedule_duties`
+            # can take quite a while since aggregation duty selection proofs
+            # are computed in there.
+            # Run `_prep_and_schedule_duties` for the next couple of slots first,
+            # and only worry about the rest of the duties once we are ready to
+            # perform the duties that are due soon.
+            current_slot = self.beacon_chain.current_slot
+            duties_due_soon = []
+            duties_due_later = []
+            fetched_duties = response.data
             for duty in fetched_duties:
                 if duty.slot < current_slot:
                     continue
+                if duty.slot <= current_slot + 1:
+                    duties_due_soon.append(duty)
+                else:
+                    duties_due_later.append(duty)
 
-                selection_proof = pubkey_to_selection_proof[duty.pubkey]
-                is_aggregator = self._is_aggregator_by_committee_length(
-                    committee_length=duty.committee_length,
-                    slot_signature=selection_proof,
-                )
-
-                self.attester_duties[epoch].add(
-                    SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-                        **duty.model_dump(),
-                        is_aggregator=is_aggregator,
-                        selection_proof=selection_proof,
-                    )
-                )
-
-            # Schedule attestation job at the deadline in case it is not triggered earlier
-            # by a new HeadEvent
-            for duty_slot in set([duty.slot for duty in self.attester_duties[epoch]]):
-                self.logger.debug(f"Adding attest_if_not_yet job for slot {duty_slot}")
-                self.scheduler.add_job(
-                    self.attest_if_not_yet_attested,
-                    "date",
-                    next_run_time=self.beacon_chain.get_datetime_for_slot(
-                        slot=duty_slot
-                    )
-                    + datetime.timedelta(
-                        seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-                        / int(self.beacon_chain.spec.INTERVALS_PER_SLOT)
-                    ),
-                    kwargs={"slot": duty_slot},
-                    id=_PRODUCE_JOB_ID.format(duty_slot=duty_slot),
-                    replace_existing=True,
-                )
-
-            # Prepare beacon node subnet subscriptions for aggregation duties
-            beacon_committee_subscriptions_data = []
-            for duty in self.attester_duties[epoch]:
-                if duty.is_aggregator:
-                    beacon_committee_subscriptions_data.append(
-                        dict(
-                            validator_index=str(duty.validator_index),
-                            committee_index=str(duty.committee_index),
-                            committees_at_slot=str(duty.committees_at_slot),
-                            slot=str(duty.slot),
-                            is_aggregator=duty.is_aggregator,
-                        )
-                    )
-
-            self.scheduler.add_job(
-                self.multi_beacon_node.prepare_beacon_committee_subscriptions,
-                kwargs=dict(data=beacon_committee_subscriptions_data),
-            )
+            for list_of_duties in (duties_due_soon, duties_due_later):
+                for duty_with_proof in await self._prep_and_schedule_duties(
+                    duties=list_of_duties
+                ):
+                    self.attester_duties[epoch].add(duty_with_proof)
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])}"
