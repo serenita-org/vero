@@ -3375,7 +3375,7 @@
               "refId": "A"
             }
           ],
-          "title": "CPU Usage - rate",
+          "title": "CPU Usage - rate (Main Process)",
           "type": "timeseries"
         },
         {
@@ -3471,7 +3471,7 @@
               "refId": "A"
             }
           ],
-          "title": "CPU Usage - irate",
+          "title": "CPU Usage - irate (Main Process)",
           "type": "timeseries"
         },
         {
@@ -3563,7 +3563,7 @@
               "refId": "A"
             }
           ],
-          "title": "Resident Memory",
+          "title": "Resident Memory (Main Process)",
           "type": "timeseries"
         },
         {
@@ -3638,7 +3638,7 @@
               "refId": "A"
             }
           ],
-          "title": "Uptime",
+          "title": "Uptime (Main Process)",
           "type": "stat"
         },
         {
@@ -3734,7 +3734,7 @@
               "refId": "A"
             }
           ],
-          "title": "Event Loop Lag - 99% quantile",
+          "title": "Event Loop Lag - 99% quantile (Main Process)",
           "type": "timeseries"
         },
         {
@@ -3820,14 +3820,14 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "event_loop_tasks{instance=\"$instance\"}",
+              "expr": "event_loop_tasks{instance=\"$instance\", pid=\"\"}",
               "instant": false,
               "legendFormat": "Event Loop Tasks",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Event Loop Tasks",
+          "title": "Event Loop Tasks (Main Process)",
           "type": "timeseries"
         },
         {
@@ -3922,7 +3922,7 @@
               "refId": "A"
             }
           ],
-          "title": "GC Objects Collected",
+          "title": "GC Objects Collected (Main Process)",
           "type": "timeseries"
         }
       ],

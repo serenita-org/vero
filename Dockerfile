@@ -2,7 +2,7 @@ ARG PYTHON_IMAGE_TAG="3.12-slim@sha256:105e9d85a67db1602e70fa2bbb49c1e66bae7e3bd
 ARG VENV_LOCATION="/opt/venv"
 
 # Build image
-FROM docker.io/library/python:${PYTHON_IMAGE_TAG} as build
+FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
 WORKDIR /build
 
@@ -26,6 +26,10 @@ WORKDIR /vero
 RUN groupadd -g 1000 vero && \
     useradd --no-create-home --shell /bin/false -u 1000 -g vero vero && \
     chown -R vero:vero /vero
+
+# Create directory for prometheus in multiprocess mode
+RUN mkdir /tmp/multiprocessing && chown -R vero:vero /tmp/multiprocessing
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/multiprocessing
 
 COPY src .
 

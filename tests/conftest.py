@@ -53,7 +53,12 @@ def cli_args(
 
 @pytest.fixture(autouse=True, scope="session")
 def _init_observability():
-    init_observability(log_level="INFO")
+    init_observability(
+        metrics_address="localhost",
+        metrics_port=8080,
+        metrics_multiprocess_mode=False,
+        log_level="INFO",
+    )
 
 
 @pytest.fixture(scope="session")
