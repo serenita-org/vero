@@ -1,32 +1,32 @@
 from remerkleable.basic import uint256
 from remerkleable.bitfields import Bitvector
-from remerkleable.byte_arrays import Bytes32, ByteVector, ByteList, Bytes48
+from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
 from remerkleable.core import ObjType
 
 from spec.attestation import Attestation, AttestationData
 from spec.base import Spec
 from spec.common import (
-    BLSSignature,
-    MAX_ATTESTER_SLASHINGS,
-    MAX_PROPOSER_SLASHINGS,
-    MAX_ATTESTATIONS,
-    MAX_DEPOSITS,
-    MAX_VOLUNTARY_EXITS,
-    Hash32,
     BYTES_PER_LOGS_BLOOM,
-    MAX_EXTRA_DATA_BYTES,
-    MAX_TRANSACTIONS_PER_PAYLOAD,
-    MAX_BLS_TO_EXECUTION_CHANGES,
-    Slot,
-    ValidatorIndex,
-    Root,
-    BLSPubkey,
     DEPOSIT_CONTRACT_TREE_DEPTH,
-    MAX_VALIDATORS_PER_COMMITTEE,
-    Epoch,
+    MAX_ATTESTATIONS,
+    MAX_ATTESTER_SLASHINGS,
+    MAX_BLS_TO_EXECUTION_CHANGES,
     MAX_BYTES_PER_TRANSACTION,
+    MAX_DEPOSITS,
+    MAX_EXTRA_DATA_BYTES,
+    MAX_PROPOSER_SLASHINGS,
+    MAX_TRANSACTIONS_PER_PAYLOAD,
+    MAX_VALIDATORS_PER_COMMITTEE,
+    MAX_VOLUNTARY_EXITS,
+    BLSPubkey,
+    BLSSignature,
+    Epoch,
+    Hash32,
+    Root,
+    Slot,
     UInt64SerializedAsString,
+    ValidatorIndex,
 )
 
 
@@ -49,7 +49,8 @@ class DepositData(Container):
 
 class Deposit(Container):
     proof: Vector[
-        Bytes32, DEPOSIT_CONTRACT_TREE_DEPTH + 1
+        Bytes32,
+        DEPOSIT_CONTRACT_TREE_DEPTH + 1,
     ]  # Merkle path to deposit root
     data: DepositData
 
@@ -207,11 +208,13 @@ class BeaconBlockClass:
             )
             # Capella operations
             bls_to_execution_changes: List[
-                SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES
+                SignedBLSToExecutionChange,
+                MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
             # Execution
             blob_kzg_commitments: List[
-                KZGCommitment, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK
+                KZGCommitment,
+                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
             ]  # [New in Deneb:EIP4844]
 
         class BlindedBeaconBlockBodyDeneb(Container):
@@ -232,11 +235,13 @@ class BeaconBlockClass:
             )
             # Capella operations
             bls_to_execution_changes: List[
-                SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES
+                SignedBLSToExecutionChange,
+                MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
             # Execution
             blob_kzg_commitments: List[
-                KZGCommitment, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK
+                KZGCommitment,
+                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
             ]  # [New in Deneb:EIP4844]
 
         class BeaconBlockDeneb(Container):

@@ -2,11 +2,11 @@ import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import MultiBeaconNode, BeaconChain, RemoteSigner
+from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from services import (
-    ValidatorStatusTrackerService,
     AttestationService,
     BlockProposalService,
+    ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
 

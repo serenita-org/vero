@@ -68,7 +68,8 @@ class ValidatorStatusTrackerService:
         _SLASHING_DETECTED.set(int(value))
 
     async def handle_slashing_event(
-        self, event: SchemaBeaconAPI.BeaconNodeEvent
+        self,
+        event: SchemaBeaconAPI.BeaconNodeEvent,
     ) -> None:
         our_validator_indices = {
             validator.index
@@ -77,27 +78,27 @@ class ValidatorStatusTrackerService:
 
         if isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent):
             slashed_validator_indices = set(
-                event.attestation_1.attesting_indices
+                event.attestation_1.attesting_indices,
             ) & set(event.attestation_2.attesting_indices)
             our_slashed_indices = slashed_validator_indices & our_validator_indices
 
             if len(our_slashed_indices) > 0:
                 self.slashing_detected = True
                 self.logger.error(
-                    f"Slashing detected for validator indices {our_slashed_indices}"
+                    f"Slashing detected for validator indices {our_slashed_indices}",
                 )
             self.logger.info(
-                f"Processed attester slashing event affecting validator indices {slashed_validator_indices}"
+                f"Processed attester slashing event affecting validator indices {slashed_validator_indices}",
             )
         elif isinstance(event, SchemaBeaconAPI.ProposerSlashingEvent):
             slashed_validator_index = event.signed_header_1.message.proposer_index
             if slashed_validator_index in our_validator_indices:
                 self.slashing_detected = True
                 self.logger.error(
-                    f"Slashing detected for validator index {slashed_validator_index}"
+                    f"Slashing detected for validator index {slashed_validator_index}",
                 )
             self.logger.info(
-                f"Processed proposer slashing event affecting validator index {slashed_validator_index}"
+                f"Processed proposer slashing event affecting validator index {slashed_validator_index}",
             )
         else:
             raise NotImplementedError(f"Unexpected event type {type(event)}")
@@ -108,22 +109,25 @@ class ValidatorStatusTrackerService:
         remote_signer_pubkeys = set(await self.remote_signer.get_public_keys())
 
         slashed_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys), statuses=SLASHED_STATUSES
+            ids=list(remote_signer_pubkeys),
+            statuses=SLASHED_STATUSES,
         )
 
         if len(slashed_validators) > 0:
             self.slashing_detected = True
             self.logger.error(
-                f"Slashed validators detected while updating validator statuses. Slashed validators: {slashed_validators}"
+                f"Slashed validators detected while updating validator statuses. Slashed validators: {slashed_validators}",
             )
 
         self.active_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys), statuses=ACTIVE_STATUSES
+            ids=list(remote_signer_pubkeys),
+            statuses=ACTIVE_STATUSES,
         )
         active_pubkeys = {v.pubkey for v in self.active_validators}
 
         self.pending_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys - active_pubkeys), statuses=PENDING_STATUSES
+            ids=list(remote_signer_pubkeys - active_pubkeys),
+            statuses=PENDING_STATUSES,
         )
         pending_pubkeys = {v.pubkey for v in self.pending_validators}
 
@@ -138,7 +142,7 @@ class ValidatorStatusTrackerService:
             f"Updated validator statuses."
             f" {len(active_pubkeys)} active,"
             f" {len(pending_pubkeys)} pending,"
-            f" {len(other_status_pubkeys)} others."
+            f" {len(other_status_pubkeys)} others.",
         )
         _VALIDATORS_COUNT.labels(status="active").set(len(active_pubkeys))
         _VALIDATORS_COUNT.labels(status="pending").set(len(pending_pubkeys))
@@ -150,8 +154,8 @@ class ValidatorStatusTrackerService:
     async def update_validator_statuses(self) -> None:
         try:
             await self._update_validator_statuses()
-        except Exception as e:
-            self.logger.exception(e)
+        except Exception:
+            self.logger.exception("Failed to update validator statuses")
 
         # Schedule the update of validator statuses
         # one slot before the next epoch starts
@@ -159,10 +163,10 @@ class ValidatorStatusTrackerService:
         next_run_time = self.beacon_chain.get_datetime_for_slot(
             slot=(self.beacon_chain.current_epoch + 2)
             * self.beacon_chain.spec.SLOTS_PER_EPOCH
-            - 1
+            - 1,
         )
         self.logger.debug(
-            f"Next update_validator_statuses job run time: {next_run_time}"
+            f"Next update_validator_statuses job run time: {next_run_time}",
         )
         self.scheduler.add_job(
             self.update_validator_statuses,

@@ -2,7 +2,7 @@ import re
 from collections.abc import AsyncGenerator
 
 import pytest
-from aioresponses import aioresponses, CallbackResult
+from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from pydantic import HttpUrl
 
@@ -33,21 +33,21 @@ async def multi_beacon_node_three_inited_nodes(
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_fork_response
+                payload=mocked_fork_response,
             ),
             repeat=True,
         )
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_genesis_response
+                payload=mocked_genesis_response,
             ),
             repeat=True,
         )
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=dict(data=spec_deneb.to_obj())
+                payload=dict(data=spec_deneb.to_obj()),
             ),
             repeat=True,
         )

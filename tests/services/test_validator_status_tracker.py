@@ -2,9 +2,9 @@ import pytest
 
 from schemas import SchemaBeaconAPI
 from services import (
-    ValidatorStatusTrackerService,
     AttestationService,
     BlockProposalService,
+    ValidatorStatusTrackerService,
 )
 from services.validator_status_tracker import _SLASHING_DETECTED
 
@@ -17,15 +17,19 @@ def _reset_slashing_detected_metric() -> None:
 
 
 @pytest.mark.parametrize(
-    ["event", "our_validator_affected"],
+    ("event", "our_validator_affected"),
     [
         pytest.param(
             SchemaBeaconAPI.AttesterSlashingEvent(
                 attestation_1=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[1, 2, 3, 4, 5], data=dict(), signature=b""
+                    attesting_indices=[1, 2, 3, 4, 5],
+                    data=dict(),
+                    signature=b"",
                 ),
                 attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[4, 8, 9, 10], data=dict(), signature=b""
+                    attesting_indices=[4, 8, 9, 10],
+                    data=dict(),
+                    signature=b"",
                 ),
             ),
             True,
@@ -39,7 +43,9 @@ def _reset_slashing_detected_metric() -> None:
                     signature=b"",
                 ),
                 attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[10, 11], data=dict(), signature=b""
+                    attesting_indices=[10, 11],
+                    data=dict(),
+                    signature=b"",
                 ),
             ),
             False,

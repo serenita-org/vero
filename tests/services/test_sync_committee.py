@@ -7,8 +7,8 @@ from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import SyncCommitteeService
 from services.sync_committee import (
-    _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
     _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS,
+    _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
 from spec.base import SpecDeneb
@@ -45,7 +45,7 @@ async def test_produce_sync_message_if_not_yet_produced(
             pubkey=random_active_validator.pubkey,
             validator_index=random_active_validator.index,
             validator_sync_committee_indices=[1, 3],
-        )
+        ),
     ]
 
     sync_messages_published_before = _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES._value.get()
@@ -82,9 +82,9 @@ async def test_aggregate_sync_messages(
                     is_aggregator=True,
                     selection_proof=os.urandom(96),
                 )
-                for subcommittee_index in range(0, 5)
+                for subcommittee_index in range(5)
             ],
-        )
+        ),
     ]
 
     contributions_produced_before = (

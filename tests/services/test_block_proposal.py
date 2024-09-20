@@ -13,7 +13,8 @@ from services.block_proposal import _VC_PUBLISHED_BLOCKS
 
 
 async def test_update_duties(
-    block_proposal_service: BlockProposalService, caplog: pytest.LogCaptureFixture
+    block_proposal_service: BlockProposalService,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # This test just checks that no exception is thrown
     assert len(block_proposal_service.proposer_duties) == 0
@@ -58,12 +59,12 @@ async def test_publish_block(
             pubkey=random_active_validator.pubkey,
             validator_index=random_active_validator.index,
             slot=duty_slot,
-        )
+        ),
     )
 
     # Wait for duty slot
     time_to_slot = datetime.datetime.now(
-        tz=pytz.UTC
+        tz=pytz.UTC,
     ) - beacon_chain.get_datetime_for_slot(duty_slot)
     await asyncio.sleep(time_to_slot.total_seconds())
 
@@ -96,9 +97,8 @@ async def test_block_proposal_beacon_node_urls_proposal(
     beacon_node_urls_proposal: list[HttpUrl],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """
-    The provided proposal beacon node URLs should be exclusively used for block proposals,
-     if specified.
+    """The provided proposal beacon node URLs should be exclusively used for block proposals,
+    if specified.
     """
     # Populate the service with a proposal duty
     duty_slot = beacon_chain.current_slot + 1
@@ -110,12 +110,12 @@ async def test_block_proposal_beacon_node_urls_proposal(
             pubkey=random_active_validator.pubkey,
             validator_index=random_active_validator.index,
             slot=duty_slot,
-        )
+        ),
     )
 
     # Wait for duty slot
     time_to_slot = datetime.datetime.now(
-        tz=pytz.UTC
+        tz=pytz.UTC,
     ) - beacon_chain.get_datetime_for_slot(duty_slot)
     await asyncio.sleep(time_to_slot.total_seconds())
 

@@ -1,5 +1,4 @@
-"""
-API response models for the Beacon Node API.
+"""API response models for the Beacon Node API.
 
 Useful links:
 

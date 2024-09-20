@@ -1,9 +1,10 @@
-import asyncio
+import datetime
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
-from typing import Type, Any
+from typing import Any
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter
 
@@ -31,14 +32,14 @@ class EventConsumerService:
         self.logger.setLevel(logging.getLogger().level)
 
         self.event_handlers: dict[
-            Type[SchemaBeaconAPI.BeaconNodeEvent],
+            type[SchemaBeaconAPI.BeaconNodeEvent],
             list[Callable[[Any], Coroutine[Any, Any, None]]],
         ] = defaultdict(list)
 
     def add_event_handler(
         self,
         event_handler: Callable[[Any], Coroutine[Any, Any, None]],
-        event_type: Type[SchemaBeaconAPI.BeaconNodeEvent],
+        event_type: type[SchemaBeaconAPI.BeaconNodeEvent],
     ) -> None:
         self.event_handlers[event_type].append(event_handler)
 
@@ -59,7 +60,7 @@ class EventConsumerService:
                     and event.execution_optimistic
                 ):
                     self.logger.error(
-                        f"Execution optimistic for event {event}, ignoring..."
+                        f"Execution optimistic for event {event}, ignoring...",
                     )
                     beacon_node.score -= _SCORE_DELTA_FAILURE
                     continue
@@ -68,14 +69,14 @@ class EventConsumerService:
                     self.logger.debug(f"New head @ {event.slot} : {event.block}")
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
                     self.logger.info(
-                        f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}"
+                        f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
                     )
                 elif isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent):
                     self.logger.debug(f"AttesterSlashingEvent: {event}")
                 elif isinstance(event, SchemaBeaconAPI.ProposerSlashingEvent):
                     self.logger.debug(f"ProposerSlashingEvent: {event}")
                 else:
-                    raise NotImplementedError(f"Unsupported event type: {type(event)}")
+                    raise NotImplementedError(f"Unsupported event type: {type(event)}")  # noqa: TRY301
 
                 for event_type, handlers in self.event_handlers.items():
                     if isinstance(event, event_type):
@@ -87,10 +88,13 @@ class EventConsumerService:
                     event_type=type(event).__name__,
                 ).inc()
 
-        except Exception as e:
-            self.logger.error(
-                "Error occurred while processing beacon node events, reconnecting in 1 second..."
+        except Exception:
+            self.logger.exception(
+                "Error occurred while processing beacon node events. Reconnecting in 1 second..."
             )
-            self.logger.exception(e)
-            await asyncio.sleep(1)
-            self.scheduler.add_job(self.handle_events)
+            self.scheduler.add_job(
+                self.handle_events,
+                "date",
+                next_run_time=datetime.datetime.now(tz=pytz.UTC)
+                + datetime.timedelta(seconds=1),
+            )

@@ -15,7 +15,7 @@ def remote_signer_url() -> str:
 
 
 @pytest.fixture
-def mocked_remote_signer_endpoints(
+def _mocked_remote_signer_endpoints(
     validators: list[ValidatorIndexPubkey],
     mocked_responses: aioresponses,
 ) -> None:

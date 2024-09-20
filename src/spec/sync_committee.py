@@ -3,9 +3,9 @@ from remerkleable.complex import Container
 
 from spec.base import Spec
 from spec.common import (
-    Slot,
-    Root,
     BLSSignature,
+    Root,
+    Slot,
     UInt64SerializedAsString,
     ValidatorIndex,
 )

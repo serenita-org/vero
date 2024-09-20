@@ -9,8 +9,8 @@ from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 from services.attestation import (
-    _VC_PUBLISHED_ATTESTATIONS,
     _VC_PUBLISHED_AGGREGATE_ATTESTATIONS,
+    _VC_PUBLISHED_ATTESTATIONS,
 )
 from spec.attestation import AttestationData
 from spec.base import SpecDeneb
@@ -39,17 +39,19 @@ async def test_attest_if_not_yet_attested(
             pubkey=random_active_validator.pubkey,
             validator_index=random_active_validator.index,
             committee_index=random.randint(
-                0, spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE
+                0,
+                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
             ),
             committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
             committees_at_slot=random.randint(0, 10),
             validator_committee_index=random.randint(
-                0, spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1
+                0,
+                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1,
             ),
             slot=duty_slot,
             is_aggregator=False,
             selection_proof=os.urandom(96),
-        )
+        ),
     )
 
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
@@ -80,21 +82,25 @@ async def test_aggregate_attestations(
             committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
             committees_at_slot=random.randint(0, 10),
             validator_committee_index=random.randint(
-                0, spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE
+                0,
+                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
             ),
             slot=duty_slot,
             is_aggregator=True,
             selection_proof=os.urandom(96),
-        )
+        ),
     }
 
     att_data = AttestationData(
-        slot=duty_slot, index=0, beacon_block_root="0x" + os.urandom(32).hex()
+        slot=duty_slot,
+        index=0,
+        beacon_block_root="0x" + os.urandom(32).hex(),
     )
 
     aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
     await attestation_service.aggregate_attestations(
-        att_data=att_data, slot_attester_duties=slot_attester_duties
+        att_data=att_data,
+        slot_attester_duties=slot_attester_duties,
     )
 
     assert any("Published aggregate and proofs" in m for m in caplog.messages)

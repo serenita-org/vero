@@ -1,13 +1,12 @@
-"""
-Provides methods for interacting with a beacon node through the [Beacon Node API](https://github.com/ethereum/beacon-APIs).
-"""
+"""Provides methods for interacting with a beacon node through the [Beacon Node API](https://github.com/ethereum/beacon-APIs)."""
 
 import asyncio
 import datetime
 import json
 import logging
+from collections.abc import AsyncIterable
+from typing import Any
 from urllib.parse import urlparse
-from typing import AsyncIterable, Any, Type
 
 import aiohttp
 import pytz
@@ -15,15 +14,15 @@ from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from remerkleable.complex import Container
 from prometheus_client import Gauge
+from remerkleable.complex import Container
 from yarl import URL
 
 from observability import get_service_name, get_service_version
-from spec.attestation import Attestation, AttestationData
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec.base import Spec, parse_spec, Genesis
+from spec.attestation import Attestation, AttestationData
+from spec.base import Genesis, Spec, parse_spec
 from spec.sync_committee import SyncCommitteeContributionClass
 
 _TIMEOUT_DEFAULT_CONNECT = 1
@@ -80,7 +79,8 @@ class BeaconNode:
 
         self.client_session = aiohttp.ClientSession(
             timeout=ClientTimeout(
-                connect=_TIMEOUT_DEFAULT_CONNECT, total=_TIMEOUT_DEFAULT_TOTAL
+                connect=_TIMEOUT_DEFAULT_CONNECT,
+                total=_TIMEOUT_DEFAULT_TOTAL,
             ),
             headers={
                 "Accept": "application/json",
@@ -88,7 +88,7 @@ class BeaconNode:
                 "User-Agent": f"{get_service_name()}/{get_service_version()}",
             },
             trace_configs=[
-                RequestLatency(host=self.host, service_type=ServiceType.BEACON_NODE)
+                RequestLatency(host=self.host, service_type=ServiceType.BEACON_NODE),
             ],
         )
 
@@ -117,15 +117,15 @@ class BeaconNode:
         try:
             await self._initialize_full()
             self.logger.info(
-                f"Initialized beacon node at {self.base_url}{f' [{function}]' if function else ''}"
+                f"Initialized beacon node at {self.base_url}{f' [{function}]' if function else ''}",
             )
         except Exception:
             self.logger.exception(
-                f"Failed to initialize beacon node at {self.base_url}"
+                f"Failed to initialize beacon node at {self.base_url}",
             )
             # Retry initializing every 30 seconds
             next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
-                seconds=30
+                seconds=30,
             )
             self.scheduler.add_job(
                 self.initialize_full,
@@ -141,13 +141,12 @@ class BeaconNode:
 
         if response.status == 503:
             raise BeaconNodeNotReady(await response.text())
-        elif response.status == 405:
+        if response.status == 405:
             raise BeaconNodeUnsupportedEndpoint(await response.text())
-        else:
-            raise ValueError(
-                f"Unexpected status code received: {response.status} for request to {response.request_info.url}"
-                f"\nResponse text: {await response.text()}"
-            )
+        raise ValueError(
+            f"Unexpected status code received: {response.status} for request to {response.request_info.url}"
+            f"\nResponse text: {await response.text()}",
+        )
 
     async def _make_request(
         self,
@@ -170,7 +169,9 @@ class BeaconNode:
         self.logger.debug(f"Making {method} request to {url}")
         try:
             async with self.client_session.request(
-                method=method, url=url, **kwargs
+                method=method,
+                url=url,
+                **kwargs,
             ) as resp:
                 await self._handle_nok_status_code(response=resp)
 
@@ -184,7 +185,8 @@ class BeaconNode:
             raise
 
     def _raise_if_optimistic(
-        self, response: SchemaBeaconAPI.ExecutionOptimisticResponse
+        self,
+        response: SchemaBeaconAPI.ExecutionOptimisticResponse,
     ) -> None:
         if response.execution_optimistic:
             raise ValueError(f"Execution optimistic on {self.host}")
@@ -212,20 +214,22 @@ class BeaconNode:
 
         try:
             version = json.loads(resp)["data"]["version"]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.warning(f"Failed to parse beacon node version: {e}")
             version = "unknown"
 
         if not isinstance(version, str):
             raise TypeError(
-                f"Beacon node did not return a string version: {type(version)} : {version}"
+                f"Beacon node did not return a string version: {type(version)} : {version}",
             )
 
         _BEACON_NODE_VERSION.labels(host=self.host, version=version).set(1)
         return version
 
     async def produce_attestation_data(
-        self, slot: int, committee_index: int
+        self,
+        slot: int,
+        committee_index: int,
     ) -> AttestationData:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.produce_attestation_data",
@@ -242,7 +246,8 @@ class BeaconNode:
                     committee_index=committee_index,
                 ),
                 timeout=ClientTimeout(
-                    connect=self.client_session.timeout.connect, total=0.3
+                    connect=self.client_session.timeout.connect,
+                    total=0.3,
                 ),
             )
 
@@ -256,7 +261,10 @@ class BeaconNode:
             return att_data  # type: ignore[no-any-return]
 
     async def wait_for_attestation_data(
-        self, expected_head_block_root: str, slot: int, committee_index: int
+        self,
+        expected_head_block_root: str,
+        slot: int,
+        committee_index: int,
     ) -> AttestationData:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.wait_for_attestation_data",
@@ -274,8 +282,8 @@ class BeaconNode:
                     )
                     if att_data.beacon_block_root.to_obj() == expected_head_block_root:
                         return att_data
-                except Exception as e:
-                    self.logger.exception(e)
+                except Exception:
+                    self.logger.exception("Failed to produce attestation data")
 
                 # Rate-limiting - wait at least 50ms in between requests
                 elapsed_time = asyncio.get_event_loop().time() - _request_start_time
@@ -308,11 +316,11 @@ class BeaconNode:
 
         _endpoint = "/eth/v1/beacon/states/{state_id}/validators"
 
-        _BATCH_SIZE = 64
+        _batch_size = 64
 
         results = []
-        for i in range(0, len(ids), _BATCH_SIZE):
-            ids_batch = ids[i : i + _BATCH_SIZE]
+        for i in range(0, len(ids), _batch_size):
+            ids_batch = ids[i : i + _batch_size]
 
             resp = await self._make_request(
                 method="GET",
@@ -357,18 +365,24 @@ class BeaconNode:
             # Grandine doesn't support the POST endpoint yet
             # -> fall back to GET endpoint
             return await self._get_validators_fallback(
-                ids=ids, statuses=statuses, state_id=state_id
+                ids=ids,
+                statuses=statuses,
+                state_id=state_id,
             )
 
         return [
             SchemaValidator.ValidatorIndexPubkey(
-                index=v["index"], pubkey=v["validator"]["pubkey"], status=v["status"]
+                index=v["index"],
+                pubkey=v["validator"]["pubkey"],
+                status=v["status"],
             )
             for v in json.loads(resp)["data"]
         ]
 
     async def get_attester_duties(
-        self, epoch: int, indices: list[int]
+        self,
+        epoch: int,
+        indices: list[int],
     ) -> SchemaBeaconAPI.GetAttesterDutiesResponse:
         resp = await self._make_request(
             method="POST",
@@ -383,7 +397,8 @@ class BeaconNode:
         return response
 
     async def get_proposer_duties(
-        self, epoch: int
+        self,
+        epoch: int,
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
         resp = await self._make_request(
             method="GET",
@@ -397,7 +412,9 @@ class BeaconNode:
         return response
 
     async def get_sync_duties(
-        self, epoch: int, indices: list[int]
+        self,
+        epoch: int,
+        indices: list[int],
     ) -> SchemaBeaconAPI.GetSyncDutiesResponse:
         resp = await self._make_request(
             method="POST",
@@ -411,7 +428,8 @@ class BeaconNode:
         return response
 
     async def publish_sync_committee_messages(
-        self, messages: list[dict[str, str]]
+        self,
+        messages: list[dict[str, str]],
     ) -> None:
         await self._make_request(
             method="POST",
@@ -441,7 +459,8 @@ class BeaconNode:
         )
 
     async def get_aggregate_attestation(
-        self, attestation_data: AttestationData
+        self,
+        attestation_data: AttestationData,
     ) -> Attestation:
         resp = await self._make_request(
             method="GET",
@@ -494,7 +513,7 @@ class BeaconNode:
         )
 
         return SyncCommitteeContributionClass.Contribution.from_obj(
-            json.loads(resp)["data"]
+            json.loads(resp)["data"],
         )
 
     async def publish_sync_committee_contribution_and_proofs(
@@ -539,8 +558,7 @@ class BeaconNode:
         builder_boost_factor: int,
         randao_reveal: str,
     ) -> SchemaBeaconAPI.ProduceBlockV3Response:
-        """
-        Requests a beacon node to produce a valid block, which can then be signed by a validator.
+        """Requests a beacon node to produce a valid block, which can then be signed by a validator.
         The returned block may be blinded or unblinded, depending on the current state of the network
         as decided by the execution and beacon nodes.
 
@@ -552,7 +570,8 @@ class BeaconNode:
         of blocks will be extended to as forks progress.
         """
         params = dict(
-            randao_reveal=randao_reveal, builder_boost_factor=str(builder_boost_factor)
+            randao_reveal=randao_reveal,
+            builder_boost_factor=str(builder_boost_factor),
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
@@ -609,7 +628,7 @@ class BeaconNode:
         self.logger.debug(
             f"Publishing block for slot {block.slot},"
             f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}"
+            f" body root {block.body.hash_tree_root().hex()}",
         )
 
         await self._make_request(
@@ -636,7 +655,7 @@ class BeaconNode:
         self.logger.debug(
             f"Publishing blinded block for slot {block.slot},"
             f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}"
+            f" body root {block.body.hash_tree_root().hex()}",
         )
 
         await self._make_request(
@@ -646,18 +665,19 @@ class BeaconNode:
             headers={"Eth-Consensus-Version": block_version.value},
         )
 
-    _event_name_to_model_mapping: dict[str, Type[SchemaBeaconAPI.BeaconNodeEvent]] = (
-        dict(
+    async def subscribe_to_events(
+        self,
+        topics: list[str],
+    ) -> AsyncIterable[SchemaBeaconAPI.BeaconNodeEvent]:
+        _event_name_to_model_mapping: dict[
+            str, type[SchemaBeaconAPI.BeaconNodeEvent]
+        ] = dict(
             head=SchemaBeaconAPI.HeadEvent,
             chain_reorg=SchemaBeaconAPI.ChainReorgEvent,
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
         )
-    )
 
-    async def subscribe_to_events(
-        self, topics: list[str]
-    ) -> AsyncIterable[SchemaBeaconAPI.BeaconNodeEvent]:
         async with self.client_session.get(
             url=self.base_url.join(URL("/eth/v1/events")),
             params={"topics": ",".join(topics)},
@@ -677,15 +697,15 @@ class BeaconNode:
                         # Just a keep-alive message
                         continue
                     self.logger.warning(
-                        f"Unexpected message in beacon node event stream: {repr(decoded)}"
+                        f"Unexpected message in beacon node event stream: {decoded!r}",
                     )
                     continue
 
                 try:
                     event_name = decoded.split(":")[1].strip()
                 except Exception:
-                    self.logger.error(
-                        f"Failed to parse event name from {decoded} -> ignoring event..."
+                    self.logger.exception(
+                        f"Failed to parse event name from {decoded} -> ignoring event...",
                     )
                     continue
                 event_data = []
@@ -695,9 +715,9 @@ class BeaconNode:
                     next_line = (await anext(events_iter)).decode()
 
                 try:
-                    event_model = self._event_name_to_model_mapping[event_name]
+                    event_model = _event_name_to_model_mapping[event_name]
                 except KeyError:
                     raise NotImplementedError(
-                        f"Unable to process event with name {event_name}, event_data {event_data}!"
-                    )
-                yield event_model.model_validate_json((event_data[0].split("data:")[1]))
+                        f"Unable to process event with name {event_name}, event_data {event_data}!",
+                    ) from None
+                yield event_model.model_validate_json(event_data[0].split("data:")[1])

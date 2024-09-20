@@ -1,10 +1,10 @@
 import logging
-from typing import Type, TypeVar
+from typing import TypeVar
 
 from remerkleable.basic import uint64
 from remerkleable.byte_arrays import Bytes4
 from remerkleable.complex import Container
-from remerkleable.core import ObjType, ObjParseException
+from remerkleable.core import ObjParseException, ObjType
 
 from spec.common import Root
 
@@ -35,7 +35,7 @@ class Spec(Container):
     MIN_GENESIS_TIME: uint64
 
     @classmethod
-    def from_obj(cls: Type[SpecV], obj: ObjType) -> SpecV:
+    def from_obj(cls: type[SpecV], obj: ObjType) -> SpecV:
         if not isinstance(obj, dict):
             raise ObjParseException(f"obj '{obj}' is not a dict")
         fields = cls.fields()
@@ -47,8 +47,8 @@ class Spec(Container):
         # TODO report and get rid of this workaround?
         logger = logging.getLogger("spec-parser")
         if "INTERVALS_PER_SLOT" not in obj:
-            logger.warning(
-                "Missing spec value for INTERVALS_PER_SLOT, using default of 3"
+            logger.debug(
+                "Missing spec value for INTERVALS_PER_SLOT, using default of 3",
             )
             obj["INTERVALS_PER_SLOT"] = 3
 
@@ -56,14 +56,14 @@ class Spec(Container):
         # TODO report and get rid of this workaround?
         if "MAX_BLOB_COMMITMENTS_PER_BLOCK" not in obj:
             logger.warning(
-                "Missing spec value for MAX_BLOB_COMMITMENTS_PER_BLOCK, using default of 4096"
+                "Missing spec value for MAX_BLOB_COMMITMENTS_PER_BLOCK, using default of 4096",
             )
             obj["MAX_BLOB_COMMITMENTS_PER_BLOCK"] = 4096
 
         if any(field not in obj for field in fields):
             missing = set(fields.keys()) - set(obj.keys())
             raise ObjParseException(
-                f"obj '{obj}' is missing required field(s): {missing}"
+                f"obj '{obj}' is missing required field(s): {missing}",
             )
 
         return cls(**{k: fields[k].from_obj(v) for k, v in obj.items()})

@@ -1,5 +1,4 @@
-"""
-These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
+"""These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
 when multiple beacon nodes are provided to it. That includes:
 - coming to consensus on attestation data to sign
 """
@@ -11,14 +10,13 @@ from functools import partial
 
 import pytest
 import pytz
-from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
+from aioresponses import CallbackResult, aioresponses
 
 from providers import MultiBeaconNode
 from providers.multi_beacon_node import AttestationConsensusFailure
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData
-
 
 # TODO add some more test scenarios
 #  Currently the beacon nodes only provide a single response.
@@ -107,8 +105,7 @@ async def test_produce_attestation_data(
     head_event: SchemaBeaconAPI.HeadEvent,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
 ) -> None:
-    """
-    Tests that the multi-beacon requests attestation data from all beacon nodes
+    """Tests that the multi-beacon requests attestation data from all beacon nodes
     and only returns attestation data if a majority of the beacon nodes
     agree on the latest head block root.
     """
@@ -118,26 +115,26 @@ async def test_produce_attestation_data(
                 _callback = partial(
                     lambda _root, *args, **kwargs: CallbackResult(
                         payload=dict(
-                            data=AttestationData(beacon_block_root=_root).to_obj()
-                        )
+                            data=AttestationData(beacon_block_root=_root).to_obj(),
+                        ),
                     ),
                     block_root,
                 )
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/attestation_data"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/attestation_data",
                     ),
                     callback=_callback,
                 )
             elif isinstance(block_root, Exception):
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/attestation_data"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/attestation_data",
                     ),
                     exception=block_root,
                 )
             else:
-                raise NotImplementedError()
+                raise NotImplementedError
 
         # We expect to fail reaching consensus if none of the returned
         # block roots reaches a majority

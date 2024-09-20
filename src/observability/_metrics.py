@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from prometheus_client import multiprocess, start_http_server, REGISTRY
+from prometheus_client import REGISTRY, multiprocess, start_http_server
 
 
 def setup_metrics(addr: str, port: int, multiprocess_mode: bool = False) -> None:
@@ -15,11 +15,11 @@ def setup_metrics(addr: str, port: int, multiprocess_mode: bool = False) -> None
         _multiprocessing_data_path = Path(_multiprocessing_data_dir)
         if not _multiprocessing_data_path.is_dir():
             raise ValueError(
-                f"PROMETHEUS_MULTIPROC_DIR {_multiprocessing_data_path} does not exist"
+                f"PROMETHEUS_MULTIPROC_DIR {_multiprocessing_data_path} does not exist",
             )
 
         for file in _multiprocessing_data_path.iterdir():
-            os.remove(_multiprocessing_data_dir / file)
+            Path.unlink(_multiprocessing_data_dir / file)
 
         multiprocess.MultiProcessCollector(REGISTRY)
 

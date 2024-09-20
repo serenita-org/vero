@@ -3,12 +3,13 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, TypedDict, Unpack
 
+import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from prometheus_client import Histogram
 
 from args import CLIArgs
-from observability import get_shared_metrics, ERROR_TYPE
+from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
 
@@ -87,32 +88,34 @@ class ValidatorDutyService:
     def start(self) -> None:
         # Every service should start its
         # reocurring scheduled jobs here.
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def handle_reorg_event(self, _: SchemaBeaconAPI.ChainReorgEvent) -> None:
         self.scheduler.add_job(self.update_duties)
 
     async def _update_duties(self) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     async def update_duties(self) -> None:
         # Calls self._update_duties once per epoch
         next_run_time = None
         try:
             await self._update_duties()
-        except Exception as e:
-            _ERRORS_METRIC.labels(error_type=ERROR_TYPE.DUTIES_UPDATE.value).inc()
-            self.logger.exception(e)
-            next_run_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+        except Exception:
+            _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
+            self.logger.exception("Failed to update duties")
+            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
+                seconds=1,
+            )
         finally:
             # Schedule the next update of duties
             if next_run_time is None:
                 next_run_time = self.beacon_chain.get_datetime_for_slot(
                     slot=(self.beacon_chain.current_epoch + 1)
-                    * self.beacon_chain.spec.SLOTS_PER_EPOCH
+                    * self.beacon_chain.spec.SLOTS_PER_EPOCH,
                 )
             self.logger.debug(f"Next update_duties job run time: {next_run_time}")
             self.scheduler.add_job(

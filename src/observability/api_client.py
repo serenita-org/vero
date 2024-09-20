@@ -1,6 +1,4 @@
-"""
-Helper that provides observability into API requests - request count and duration.
-"""
+"""Helper that provides observability into API requests - request count and duration."""
 
 import asyncio
 import logging
@@ -26,15 +24,15 @@ _logger = logging.getLogger(__name__)
 
 
 async def _on_request_start(
-    session: aiohttp.ClientSession,
+    _session: aiohttp.ClientSession,
     trace_config_ctx: SimpleNamespace,
-    params: aiohttp.TraceRequestStartParams,
+    _params: aiohttp.TraceRequestStartParams,
 ) -> None:
     trace_config_ctx.start = asyncio.get_event_loop().time()
 
 
 async def _on_request_end(
-    session: aiohttp.ClientSession,
+    _session: aiohttp.ClientSession,
     trace_config_ctx: SimpleNamespace,
     params: aiohttp.TraceRequestEndParams,
 ) -> None:
@@ -83,8 +81,8 @@ class RequestLatency(aiohttp.TraceConfig):
                     trace_request_ctx=trace_request_ctx,
                     host=host,
                     service_type=service_type.value,
-                )
-            )
+                ),
+            ),
         )
 
         self.on_request_start.append(_on_request_start)
