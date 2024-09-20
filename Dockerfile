@@ -6,12 +6,12 @@ FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install --no-install-recommends -y git=1:2.39.2-1.1 && \
+RUN apt-get update && apt-get install --no-install-recommends -y git=1:2.39.5-0+deb12u1 && \
    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG VENV_LOCATION
 ENV PATH="$VENV_LOCATION/bin:$PATH"
-RUN pip install --no-cache-dir uv==0.3.0 && uv venv ${VENV_LOCATION}
+RUN pip install --no-cache-dir uv==0.4.13 && uv venv ${VENV_LOCATION}
 COPY requirements.txt .
 RUN uv pip sync requirements.txt
 

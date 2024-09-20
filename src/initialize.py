@@ -102,13 +102,14 @@ async def run_services(cli_args: CLIArgs) -> None:
     )
     scheduler.start()
 
-    async with RemoteSigner(
-        url=cli_args.remote_signer_url
-    ) as remote_signer, MultiBeaconNode(
-        beacon_node_urls=cli_args.beacon_node_urls,
-        beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-        scheduler=scheduler,
-    ) as multi_beacon_node:
+    async with (
+        RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
+        MultiBeaconNode(
+            beacon_node_urls=cli_args.beacon_node_urls,
+            beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
+            scheduler=scheduler,
+        ) as multi_beacon_node,
+    ):
         beacon_chain = BeaconChain(multi_beacon_node=multi_beacon_node)
 
         await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
