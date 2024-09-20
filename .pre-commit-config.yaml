@@ -1,3 +1,6 @@
+default_language_version:
+    python: python3.12
+
 repos:
   # All files basic formatter
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -22,7 +25,14 @@ repos:
     rev: 'v1.11.2'
     hooks:
     -   id: mypy
-        additional_dependencies: [types-pytz==2024.2.0.20240913]
+        additional_dependencies:
+          [
+          aiohttp==3.10.5,
+          pydantic==2.9.2,
+          pytest==8.3.3,
+          remerkleable==0.1.28,
+          types-pytz==2024.2.0.20240913
+          ]
 
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0

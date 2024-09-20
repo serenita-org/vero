@@ -1,8 +1,12 @@
 import os
 import re
+from typing import Any
 
 import pytest
-from aioresponses import CallbackResult
+from aioresponses import CallbackResult, aioresponses
+from yarl import URL
+
+from schemas.validator import ValidatorIndexPubkey
 
 
 @pytest.fixture(scope="session")
@@ -12,13 +16,13 @@ def remote_signer_url() -> str:
 
 @pytest.fixture
 def mocked_remote_signer_endpoints(
-    validators,
-    mocked_responses,
+    validators: list[ValidatorIndexPubkey],
+    mocked_responses: aioresponses,
 ) -> None:
-    def _mocked_pubkeys_endpoint(url, **kwargs) -> CallbackResult:
+    def _mocked_pubkeys_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
         return CallbackResult(payload=[v.pubkey for v in validators])
 
-    def _mocked_sign_endpoint(url, **kwargs) -> CallbackResult:
+    def _mocked_sign_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
         return CallbackResult(payload={"signature": f"0x{os.urandom(96).hex()}"})
 
     mocked_responses.get(

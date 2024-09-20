@@ -1,12 +1,15 @@
 import os
 import random
 import re
+from typing import Any
 
 import pytest
-from aioresponses import CallbackResult
+from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist
+from yarl import URL
 
 from schemas import SchemaBeaconAPI
+from schemas.validator import ValidatorIndexPubkey
 from spec.attestation import AttestationData, Attestation, Checkpoint
 from spec.base import Fork, SpecDeneb, Genesis
 from spec.block import BeaconBlockClass
@@ -36,7 +39,7 @@ def spec_deneb() -> SpecDeneb:
 
 
 @pytest.fixture
-def execution_payload_blinded(request) -> bool:
+def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
 
 
@@ -51,7 +54,7 @@ def sync_committee_contribution_class_init(spec_deneb: SpecDeneb) -> None:
 
 
 @pytest.fixture(scope="session")
-def mocked_fork_response() -> dict:
+def mocked_fork_response() -> dict:  # type: ignore[type-arg]
     return dict(
         data=Fork.from_obj(
             dict(
@@ -64,7 +67,7 @@ def mocked_fork_response() -> dict:
 
 
 @pytest.fixture(scope="session")
-def mocked_genesis_response() -> dict:
+def mocked_genesis_response() -> dict:  # type: ignore[type-arg]
     return dict(
         data=Genesis.from_obj(
             dict(
@@ -78,16 +81,16 @@ def mocked_genesis_response() -> dict:
 
 @pytest.fixture
 def mocked_beacon_node_endpoints(
-    validators,
-    spec_deneb,
-    beacon_block_class_init,
-    sync_committee_contribution_class_init,
-    mocked_fork_response,
-    mocked_genesis_response,
-    mocked_responses,
-    execution_payload_blinded,
+    validators: list[ValidatorIndexPubkey],
+    spec_deneb: SpecDeneb,
+    beacon_block_class_init: None,
+    sync_committee_contribution_class_init: None,
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    mocked_responses: aioresponses,
+    execution_payload_blinded: bool,
 ) -> None:
-    def _mocked_beacon_api_endpoints_get(url, **kwargs) -> CallbackResult:
+    def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match(r"/eth/v1/beacon/states/\w+/fork", url.raw_path):
             return CallbackResult(payload=mocked_fork_response)
 
@@ -139,7 +142,7 @@ def mocked_beacon_node_endpoints(
                 )
 
             response = SchemaBeaconAPI.ProduceBlockV3Response(
-                version=SchemaBeaconAPI.BeaconBlockVersion.DENEB.value,
+                version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                 execution_payload_blinded=execution_payload_blinded,
                 execution_payload_value=random.randint(0, 10_000_000),
                 consensus_block_value=random.randint(0, 10_000_000),
@@ -183,7 +186,7 @@ def mocked_beacon_node_endpoints(
                 payload=SchemaBeaconAPI.GetBlockRootResponse(
                     execution_optimistic=False,
                     finalized=False,
-                    data=dict(root="0x" + os.urandom(32).hex()),
+                    data=SchemaBeaconAPI.BlockRoot(root="0x" + os.urandom(32).hex()),
                 ).model_dump()
             )
 
@@ -207,7 +210,7 @@ def mocked_beacon_node_endpoints(
             f"Beacon API response for GET {url} does not have a mock handler"
         )
 
-    def _mocked_beacon_api_endpoints_post(url, **kwargs) -> CallbackResult:
+    def _mocked_beacon_api_endpoints_post(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match(r"/eth/v1/beacon/states/\w*/validators", url.raw_path):
             return_data = []
 
@@ -244,12 +247,12 @@ def mocked_beacon_node_endpoints(
 
             # This endpoint returns only duties for the validators
             # specified in the response
-            duties = []
+            attester_duties = []
             for v in validators:
                 duty_slot = epoch_no * spec_deneb.SLOTS_PER_EPOCH + random.randint(
                     0, spec_deneb.SLOTS_PER_EPOCH
                 )
-                duties.append(
+                attester_duties.append(
                     SchemaBeaconAPI.AttesterDuty(
                         pubkey=v.pubkey,
                         validator_index=v.index,
@@ -269,7 +272,7 @@ def mocked_beacon_node_endpoints(
                 payload=SchemaBeaconAPI.GetAttesterDutiesResponse(
                     dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
                     execution_optimistic=False,
-                    data=duties,
+                    data=attester_duties,
                 ).model_dump()
             )
 
@@ -287,9 +290,9 @@ def mocked_beacon_node_endpoints(
 
             # This endpoint returns only duties for the validators
             # specified in the response
-            duties = []
+            sync_duties = []
             for v in validators:
-                duties.append(
+                sync_duties.append(
                     SchemaBeaconAPI.SyncDuty(
                         pubkey=v.pubkey,
                         validator_index=v.index,
@@ -300,7 +303,7 @@ def mocked_beacon_node_endpoints(
             return CallbackResult(
                 payload=SchemaBeaconAPI.GetSyncDutiesResponse(
                     execution_optimistic=False,
-                    data=duties,
+                    data=sync_duties,
                 ).model_dump()
             )
 

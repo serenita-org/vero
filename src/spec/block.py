@@ -164,7 +164,7 @@ class BeaconBlockClass:
     def initialize(
         cls,
         spec: Spec,
-    ):
+    ) -> None:
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
             sync_committee_signature: BLSSignature

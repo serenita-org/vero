@@ -10,12 +10,15 @@ from services.sync_committee import (
     _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
     _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS,
 )
+from services.validator_duty_service import ValidatorDutyServiceOptions
 from spec.base import SpecDeneb
 
 
 @pytest.fixture
-def sync_committee_service(validator_service_kwargs) -> SyncCommitteeService:
-    return SyncCommitteeService(**validator_service_kwargs)
+def sync_committee_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> SyncCommitteeService:
+    return SyncCommitteeService(**validator_duty_service_options)
 
 
 async def test_update_duties(sync_committee_service: SyncCommitteeService) -> None:
@@ -29,7 +32,7 @@ async def test_produce_sync_message_if_not_yet_produced(
     sync_committee_service: SyncCommitteeService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with a sync duty
     duty_slot = beacon_chain.current_slot
@@ -62,7 +65,7 @@ async def test_aggregate_sync_messages(
     beacon_chain: BeaconChain,
     spec_deneb: SpecDeneb,
     random_active_validator: ValidatorIndexPubkey,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with a sync contribution duty
     duty_slot = beacon_chain.current_slot

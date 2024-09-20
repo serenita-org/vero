@@ -1,6 +1,8 @@
 import asyncio
 import logging
-from typing import Callable, Type
+from collections import defaultdict
+from collections.abc import Callable, Coroutine
+from typing import Type, Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter
@@ -8,7 +10,6 @@ from prometheus_client import Counter
 from providers import MultiBeaconNode
 from providers.beacon_node import _SCORE_DELTA_FAILURE
 from schemas import SchemaBeaconAPI
-
 
 _VC_PROCESSED_BEACON_NODE_EVENTS = Counter(
     "vc_processed_beacon_node_events",
@@ -24,23 +25,24 @@ class EventConsumerService:
         scheduler: AsyncIOScheduler,
     ):
         self.multi_beacon_node = multi_beacon_node
+        self.scheduler = scheduler
+
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
 
-        self.event_handlers: list[
-            tuple[Callable, list[Type[SchemaBeaconAPI.BeaconNodeEvent]]]
-        ] = []
-
-        self.scheduler = scheduler
+        self.event_handlers: dict[
+            Type[SchemaBeaconAPI.BeaconNodeEvent],
+            list[Callable[[Any], Coroutine[Any, Any, None]]],
+        ] = defaultdict(list)
 
     def add_event_handler(
         self,
-        event_handler: Callable,
-        event_types: list[Type[SchemaBeaconAPI.BeaconNodeEvent]],
-    ):
-        self.event_handlers.append((event_handler, event_types))
+        event_handler: Callable[[Any], Coroutine[Any, Any, None]],
+        event_type: Type[SchemaBeaconAPI.BeaconNodeEvent],
+    ) -> None:
+        self.event_handlers[event_type].append(event_handler)
 
-    async def handle_events(self):
+    async def handle_events(self) -> None:
         try:
             beacon_node = self.multi_beacon_node.best_beacon_node
             self.logger.info(f"Subscribing to events from {beacon_node.host}")
@@ -64,28 +66,21 @@ class EventConsumerService:
 
                 if isinstance(event, SchemaBeaconAPI.HeadEvent):
                     self.logger.debug(f"New head @ {event.slot} : {event.block}")
-                    for handler, event_types in self.event_handlers:
-                        if SchemaBeaconAPI.HeadEvent in event_types:
-                            self.scheduler.add_job(handler, kwargs=dict(event=event))
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
                     self.logger.info(
                         f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}"
                     )
-                    for handler, event_types in self.event_handlers:
-                        if SchemaBeaconAPI.ChainReorgEvent in event_types:
-                            self.scheduler.add_job(handler)
                 elif isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent):
                     self.logger.debug(f"AttesterSlashingEvent: {event}")
-                    for handler, event_types in self.event_handlers:
-                        if SchemaBeaconAPI.AttesterSlashingEvent in event_types:
-                            self.scheduler.add_job(handler, kwargs=dict(event=event))
                 elif isinstance(event, SchemaBeaconAPI.ProposerSlashingEvent):
                     self.logger.debug(f"ProposerSlashingEvent: {event}")
-                    for handler, event_types in self.event_handlers:
-                        if SchemaBeaconAPI.ProposerSlashingEvent in event_types:
-                            self.scheduler.add_job(handler, kwargs=dict(event=event))
                 else:
                     raise NotImplementedError(f"Unsupported event type: {type(event)}")
+
+                for event_type, handlers in self.event_handlers.items():
+                    if isinstance(event, event_type):
+                        for handler in handlers:
+                            self.scheduler.add_job(handler, kwargs=dict(event=event))
 
                 _VC_PROCESSED_BEACON_NODE_EVENTS.labels(
                     host=beacon_node.host,

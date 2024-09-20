@@ -9,10 +9,11 @@ from observability._vero_info import get_service_name
 
 
 def setup_profiling() -> None:
-    if not os.getenv("PYROSCOPE_SERVER_ADDRESS"):
+    pyroscope_address = os.getenv("PYROSCOPE_SERVER_ADDRESS")
+    if not pyroscope_address:
         return
 
-    pyroscope_server_address = HttpUrl(os.getenv("PYROSCOPE_SERVER_ADDRESS"))
+    pyroscope_server_address = HttpUrl(pyroscope_address)
 
     tags = {
         key_value_pair.split("=")[0]: key_value_pair.split("=")[1]

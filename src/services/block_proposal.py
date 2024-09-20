@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 from collections import defaultdict
+from typing import Unpack
 
 import pytz
 from opentelemetry import trace
@@ -15,7 +16,11 @@ from prometheus_client import Counter
 
 from spec.block import BeaconBlockHeader
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
-from services.validator_duty_service import ValidatorDutyService, ValidatorDuty
+from services.validator_duty_service import (
+    ValidatorDutyService,
+    ValidatorDuty,
+    ValidatorDutyServiceOptions,
+)
 from observability import get_shared_metrics, ERROR_TYPE
 
 _VC_PUBLISHED_BLOCKS = Counter(
@@ -27,7 +32,7 @@ _VC_PUBLISHED_BLOCKS.reset()
 
 
 class BlockProposalService(ValidatorDutyService):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
         # Proposer duty by epoch
@@ -36,13 +41,13 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-    def start(self):
+    def start(self) -> None:
         self.scheduler.add_job(self.update_duties)
         self.scheduler.add_job(self.prepare_beacon_proposer)
         if self.cli_args.use_external_builder:
             self.scheduler.add_job(self.register_validators)
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent):
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             event.current_duty_dependent_root
             not in self.proposer_duties_dependent_roots.values()
@@ -62,7 +67,7 @@ class BlockProposalService(ValidatorDutyService):
             if epoch < current_epoch:
                 del self.proposer_duties_dependent_roots[epoch]
 
-    async def _update_duties(self):
+    async def _update_duties(self) -> None:
         if not self.validator_status_tracker_service.any_active_or_pending_validators:
             self.logger.warning(
                 "Not updating proposer duties - no active or pending validators"
@@ -119,7 +124,7 @@ class BlockProposalService(ValidatorDutyService):
 
         self._prune_duties()
 
-    async def _prepare_beacon_proposer(self):
+    async def _prepare_beacon_proposer(self) -> None:
         self.logger.debug("Calling prepare beacon proposer")
 
         our_indices = [
@@ -141,7 +146,7 @@ class BlockProposalService(ValidatorDutyService):
             ]
         )
 
-    async def prepare_beacon_proposer(self):
+    async def prepare_beacon_proposer(self) -> None:
         # TODO we have a lot of functions like this one, where we try something,
         # and schedule the next run time while catching exceptions and retrying
         # earlier than planned if an exception occurs. See if we can abstract
@@ -170,7 +175,7 @@ class BlockProposalService(ValidatorDutyService):
                 replace_existing=True,
             )
 
-    async def _register_validators(self):
+    async def _register_validators(self) -> None:
         _BATCH_SIZE = 512
 
         active_and_pending_validators = (
@@ -226,7 +231,7 @@ class BlockProposalService(ValidatorDutyService):
 
             self.logger.info(f"Published {len(responses)} validator registrations")
 
-    async def register_validators(self):
+    async def register_validators(self) -> None:
         next_run_time = None
         try:
             await self._register_validators()
@@ -254,7 +259,7 @@ class BlockProposalService(ValidatorDutyService):
                 replace_existing=True,
             )
 
-    async def propose_block(self, slot: int):
+    async def propose_block(self, slot: int) -> None:
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context

@@ -21,7 +21,7 @@ class SyncCommitteeContributionClass:
     def initialize(
         cls,
         spec: Spec,
-    ):
+    ) -> None:
         class SyncCommitteeContribution(Container):
             # Slot to which this contribution pertains
             slot: Slot

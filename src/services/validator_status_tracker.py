@@ -46,7 +46,7 @@ class ValidatorStatusTrackerService:
         self.active_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
         self.pending_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         # Call the internal _update function explicitly at initialization time.
         # If we fail to retrieve our validator statuses, it doesn't make sense
         # to continue initializing the validator client since we don't know
@@ -67,11 +67,9 @@ class ValidatorStatusTrackerService:
         self._slashing_detected = value
         _SLASHING_DETECTED.set(int(value))
 
-    def handle_slashing_event(
-        self,
-        event: SchemaBeaconAPI.AttesterSlashingEvent
-        | SchemaBeaconAPI.ProposerSlashingEvent,
-    ):
+    async def handle_slashing_event(
+        self, event: SchemaBeaconAPI.BeaconNodeEvent
+    ) -> None:
         our_validator_indices = {
             validator.index
             for validator in self.active_validators + self.pending_validators
@@ -104,7 +102,7 @@ class ValidatorStatusTrackerService:
         else:
             raise NotImplementedError(f"Unexpected event type {type(event)}")
 
-    async def _update_validator_statuses(self):
+    async def _update_validator_statuses(self) -> None:
         self.logger.debug("Updating validator statuses")
 
         remote_signer_pubkeys = set(await self.remote_signer.get_public_keys())
@@ -149,7 +147,7 @@ class ValidatorStatusTrackerService:
         if len(self.active_validators + self.pending_validators) == 0:
             self.logger.warning("No active or pending validators detected")
 
-    async def update_validator_statuses(self):
+    async def update_validator_statuses(self) -> None:
         try:
             await self._update_validator_statuses()
         except Exception as e:

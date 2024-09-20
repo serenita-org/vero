@@ -3,19 +3,28 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from aioresponses import aioresponses, CallbackResult
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pydantic import HttpUrl
 
 from providers import MultiBeaconNode
+from spec.base import SpecDeneb
 
 
 @pytest.fixture
 async def multi_beacon_node_three_inited_nodes(
-    mocked_fork_response, mocked_genesis_response, spec_deneb, scheduler
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    spec_deneb: SpecDeneb,
+    scheduler: AsyncIOScheduler,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(
         beacon_node_urls=[
-            "http://beacon-node-a:1234",
-            "http://beacon-node-b:1234",
-            "http://beacon-node-c:1234",
+            HttpUrl(u)
+            for u in (
+                "http://beacon-node-a:1234",
+                "http://beacon-node-b:1234",
+                "http://beacon-node-c:1234",
+            )
         ],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,

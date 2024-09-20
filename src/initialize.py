@@ -16,6 +16,7 @@ from services import (
     BlockProposalService,
     SyncCommitteeService,
     EventConsumerService,
+    ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
 )
 
@@ -46,7 +47,7 @@ def _register_event_handlers(
     ):
         event_consumer_service.add_event_handler(
             event_handler=head_handler_service.handle_head_event,
-            event_types=[SchemaBeaconAPI.HeadEvent],
+            event_type=SchemaBeaconAPI.HeadEvent,
         )
 
     for reorg_handler_service in (
@@ -56,16 +57,17 @@ def _register_event_handlers(
     ):
         event_consumer_service.add_event_handler(
             event_handler=reorg_handler_service.handle_reorg_event,
-            event_types=[SchemaBeaconAPI.ChainReorgEvent],
+            event_type=SchemaBeaconAPI.ChainReorgEvent,
         )
 
-    event_consumer_service.add_event_handler(
-        event_handler=validator_status_tracker_service.handle_slashing_event,
-        event_types=[
-            SchemaBeaconAPI.AttesterSlashingEvent,
-            SchemaBeaconAPI.ProposerSlashingEvent,
-        ],
-    )
+    for event_type in (
+        SchemaBeaconAPI.AttesterSlashingEvent,
+        SchemaBeaconAPI.ProposerSlashingEvent,
+    ):
+        event_consumer_service.add_event_handler(
+            event_handler=validator_status_tracker_service.handle_slashing_event,
+            event_type=event_type,
+        )
 
 
 def check_data_dir_permissions(cli_args: CLIArgs) -> None:
@@ -126,7 +128,7 @@ async def run_services(cli_args: CLIArgs) -> None:
         await validator_status_tracker_service.initialize()
         _logger.info("Initialized validator status tracker")
 
-        validator_service_args = dict(
+        validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
             remote_signer=remote_signer,

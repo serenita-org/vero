@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 from collections import defaultdict
+from typing import cast, Unpack
 
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
@@ -13,7 +14,6 @@ from opentelemetry.trace import (
     NonRecordingSpan,
 )
 
-from schemas.beacon_api import AttesterDuty
 from spec.attestation import AttestationData, AggregateAndProof, Attestation
 from spec.common import (
     MAX_VALIDATORS_PER_COMMITTEE,
@@ -24,7 +24,11 @@ from remerkleable.bitfields import Bitlist
 from prometheus_client import Counter as CounterMetric, Histogram
 
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
-from services.validator_duty_service import ValidatorDutyService, ValidatorDuty
+from services.validator_duty_service import (
+    ValidatorDutyService,
+    ValidatorDuty,
+    ValidatorDutyServiceOptions,
+)
 from observability import get_shared_metrics, ERROR_TYPE
 
 logging.basicConfig()
@@ -55,7 +59,7 @@ _PRODUCE_JOB_ID = "attest_if_not_yet_job_for_slot_{duty_slot}"
 
 
 class AttestationService(ValidatorDutyService):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
         # Attester duties by epoch
@@ -64,10 +68,10 @@ class AttestationService(ValidatorDutyService):
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
 
-    def start(self):
+    def start(self) -> None:
         self.scheduler.add_job(self.update_duties)
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent):
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             any(
                 root not in self.attester_duties_dependent_roots.values()
@@ -86,7 +90,7 @@ class AttestationService(ValidatorDutyService):
 
     async def attest_if_not_yet_attested(
         self, slot: int, head_event: SchemaBeaconAPI.HeadEvent | None = None
-    ):
+    ) -> None:
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context
@@ -183,11 +187,12 @@ class AttestationService(ValidatorDutyService):
             )
 
             # Sign the attestation data
-            attestations_objects_to_publish: list[dict] = []
+            attestations_objects_to_publish: list[dict] = []  # type: ignore[type-arg]
 
             def _att_data_for_committee_idx(
-                _orig_att_data_obj: dict, committee_index: int
-            ) -> dict:
+                _orig_att_data_obj: dict,  # type: ignore[type-arg]
+                committee_index: int,
+            ) -> dict:  # type: ignore[type-arg]
                 # This updates the attestation data's index field
                 # to the correct, committee-specific value.
                 return {**_orig_att_data_obj, "index": str(committee_index)}
@@ -298,7 +303,9 @@ class AttestationService(ValidatorDutyService):
             1,
             committee_length // self.beacon_chain.spec.TARGET_AGGREGATORS_PER_COMMITTEE,
         )
-        return bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0
+        return cast(
+            bool, bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0
+        )
 
     async def aggregate_attestations(
         self,
@@ -394,7 +401,7 @@ class AttestationService(ValidatorDutyService):
             )
 
     async def _prep_and_schedule_duties(
-        self, duties: list[AttesterDuty]
+        self, duties: list[SchemaBeaconAPI.AttesterDuty]
     ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
         if len(duties) == 0:
             return []
@@ -429,7 +436,7 @@ class AttestationService(ValidatorDutyService):
                 signable_messages.append(
                     SchemaRemoteSigner.AggregationSlotSignableMessage(
                         fork_info=_fork_info,
-                        aggregation_slot=dict(slot=duty.slot),
+                        aggregation_slot=SchemaRemoteSigner.Slot(slot=duty.slot),
                     )
                 )
                 identifiers.append(duty.pubkey)
@@ -495,7 +502,7 @@ class AttestationService(ValidatorDutyService):
             if epoch < current_epoch:
                 del self.attester_duties_dependent_roots[epoch]
 
-    async def _update_duties(self):
+    async def _update_duties(self) -> None:
         if not self.validator_status_tracker_service.any_active_or_pending_validators:
             self.logger.warning(
                 "Not updating attester duties - no active or pending validators"

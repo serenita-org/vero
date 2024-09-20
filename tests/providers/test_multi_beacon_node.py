@@ -13,10 +13,13 @@ from functools import partial
 import pytest
 from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pydantic import HttpUrl
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from providers import MultiBeaconNode
 from spec.attestation import Attestation, AttestationData
+from spec.base import SpecDeneb
 from spec.sync_committee import SyncCommitteeContributionClass
 
 
@@ -60,14 +63,14 @@ from spec.sync_committee import SyncCommitteeContributionClass
     ],
 )
 async def test_initialize(
-    beacon_node_base_urls,
-    beacon_node_availabilities,
-    expected_initialization_success,
-    mocked_fork_response,
-    mocked_genesis_response,
-    spec_deneb,
-    scheduler,
-):
+    beacon_node_base_urls: list[str],
+    beacon_node_availabilities: list[bool],
+    expected_initialization_success: bool,
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    spec_deneb: SpecDeneb,
+    scheduler: AsyncIOScheduler,
+) -> None:
     """
     Tests that the multi-beacon node is able to initialize if a majority
     of its supplied beacon nodes is available.
@@ -75,7 +78,7 @@ async def test_initialize(
     assert len(beacon_node_base_urls) == len(beacon_node_availabilities)
 
     mbn = MultiBeaconNode(
-        beacon_node_urls=beacon_node_base_urls,
+        beacon_node_urls=[HttpUrl(u) for u in beacon_node_base_urls],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
     )
@@ -165,11 +168,11 @@ async def test_initialize(
     ],
 )
 async def test_get_aggregate_attestation(
-    numbers_of_attesting_indices,
-    best_aggregate_score,
-    multi_beacon_node_three_inited_nodes,
-    spec_deneb,
-):
+    numbers_of_attesting_indices: list[BaseException | int],
+    best_aggregate_score: int,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    spec_deneb: SpecDeneb,
+) -> None:
     """
     Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
@@ -258,12 +261,12 @@ async def test_get_aggregate_attestation(
     ],
 )
 async def test_get_sync_committee_contribution(
-    numbers_of_root_matching_indices,
-    best_contribution_score,
-    multi_beacon_node_three_inited_nodes,
-    sync_committee_contribution_class_init,
-    spec_deneb,
-):
+    numbers_of_root_matching_indices: list[BaseException | int],
+    best_contribution_score: int,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    sync_committee_contribution_class_init: None,
+    spec_deneb: SpecDeneb,
+) -> None:
     """
     Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.

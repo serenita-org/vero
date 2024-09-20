@@ -2,17 +2,20 @@ import asyncio
 import datetime
 import logging
 from collections import defaultdict
+from typing import cast, Unpack
 
 from apscheduler.jobstores.base import JobLookupError
 
-from schemas.validator import ValidatorStatus
 from spec.common import bytes_to_uint64, hash_function
 from spec.sync_committee import SyncCommitteeContributionClass
 from prometheus_client import Counter
 
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner
-from schemas import SchemaValidator
-from services.validator_duty_service import ValidatorDutyService, ValidatorDuty
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
+from services.validator_duty_service import (
+    ValidatorDutyService,
+    ValidatorDuty,
+    ValidatorDutyServiceOptions,
+)
 from observability import get_shared_metrics, ERROR_TYPE
 
 logging.basicConfig()
@@ -35,7 +38,7 @@ _PRODUCE_JOB_ID = "produce_sync_message_if_not_yet_job_for_slot_{duty_slot}"
 
 
 class SyncCommitteeService(ValidatorDutyService):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
         # Sync duties by sync committee period
@@ -43,10 +46,10 @@ class SyncCommitteeService(ValidatorDutyService):
             defaultdict(list)
         )
 
-    def start(self):
+    def start(self) -> None:
         self.scheduler.add_job(self.update_duties)
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent):
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if not isinstance(event, SchemaBeaconAPI.HeadEvent):
             raise NotImplementedError(f"Expected HeadEvent but got {type(event)}")
         await self.produce_sync_message_if_not_yet_produced(
@@ -58,7 +61,7 @@ class SyncCommitteeService(ValidatorDutyService):
         self,
         duty_slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
-    ):
+    ) -> None:
         if self.validator_status_tracker_service.slashing_detected:
             raise RuntimeError(
                 "Slashing detected, not producing sync committee message"
@@ -78,7 +81,7 @@ class SyncCommitteeService(ValidatorDutyService):
             SchemaValidator.ValidatorIndexPubkey(
                 index=d.validator_index,
                 pubkey=d.pubkey,
-                status=ValidatorStatus.ACTIVE_ONGOING,
+                status=SchemaValidator.ValidatorStatus.ACTIVE_ONGOING,
             )
             for d in self.sync_duties[sync_period]
         )
@@ -211,7 +214,7 @@ class SyncCommitteeService(ValidatorDutyService):
         duties_with_proofs = []
         for duty in self.sync_duties[sync_period]:
             duty_sync_committee_selection_proofs = []
-            for msg, sig, identifier in selection_proofs:
+            for sel_proof_msg, sig, identifier in selection_proofs:
                 if identifier != duty.pubkey:
                     continue
 
@@ -219,8 +222,8 @@ class SyncCommitteeService(ValidatorDutyService):
 
                 duty_sync_committee_selection_proofs.append(
                     SchemaBeaconAPI.SyncDutySubCommitteeSelectionProof(
-                        slot=msg.sync_aggregator_selection_data.slot,
-                        subcommittee_index=msg.sync_aggregator_selection_data.subcommittee_index,
+                        slot=sel_proof_msg.sync_aggregator_selection_data.slot,
+                        subcommittee_index=sel_proof_msg.sync_aggregator_selection_data.subcommittee_index,
                         is_aggregator=self._is_aggregator(selection_proof),
                         selection_proof=selection_proof,
                     )
@@ -387,7 +390,9 @@ class SyncCommitteeService(ValidatorDutyService):
             // self.beacon_chain.spec.SYNC_COMMITTEE_SUBNET_COUNT
             // self.beacon_chain.spec.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
-        return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0
+        return cast(
+            bool, bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0
+        )
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
@@ -398,7 +403,7 @@ class SyncCommitteeService(ValidatorDutyService):
             if sync_period < current_sync_period:
                 del self.sync_duties[sync_period]
 
-    async def _update_duties(self):
+    async def _update_duties(self) -> None:
         if not self.validator_status_tracker_service.any_active_or_pending_validators:
             self.logger.warning(
                 "Not updating sync committee duties - no active or pending validators"

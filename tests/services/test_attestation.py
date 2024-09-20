@@ -2,6 +2,7 @@ import asyncio
 import os
 import random
 
+import pytest
 
 from providers import BeaconChain
 from schemas import SchemaBeaconAPI
@@ -27,7 +28,7 @@ async def test_attest_if_not_yet_attested(
     beacon_chain: BeaconChain,
     spec_deneb: SpecDeneb,
     random_active_validator: ValidatorIndexPubkey,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with an attester duty
     duty_slot = beacon_chain.current_slot + 1
@@ -66,7 +67,7 @@ async def test_aggregate_attestations(
     beacon_chain: BeaconChain,
     spec_deneb: SpecDeneb,
     random_active_validator: ValidatorIndexPubkey,
-    caplog,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Create an attester aggregation duty
     duty_slot = beacon_chain.current_slot

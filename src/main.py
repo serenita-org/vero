@@ -30,7 +30,7 @@ async def main(cli_args: CLIArgs) -> None:
     await run_services(cli_args=cli_args)
 
 
-def sigterm_handler(signum: int, frame: FrameType | None):
+def sigterm_handler(signum: int, frame: FrameType | None) -> None:
     print("Received SIGTERM. Exiting.")
     exit(0)
 

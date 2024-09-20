@@ -7,12 +7,13 @@ when multiple beacon nodes are provided to it. That includes:
 import asyncio
 import re
 from functools import partial
-from typing import TypedDict
+from typing import TypedDict, Any
 
 import pytest
 from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
 
+from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from spec.block import BeaconBlockClass
 
@@ -269,10 +270,10 @@ class BeaconNodeResponseSequence(TypedDict):
 )
 async def test_produce_block_v3(
     bn_response_sequences: list[BeaconNodeResponseSequence],
-    returned_block_value,
-    beacon_block_class_init,
-    multi_beacon_node_three_inited_nodes,
-):
+    returned_block_value: int,
+    beacon_block_class_init: None,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+) -> None:
     """
     Tests that the multi-beacon requests blocks from all beacon nodes
     and returns the one with the highest value.
@@ -292,11 +293,20 @@ async def test_produce_block_v3(
                 if response:
                     response.data["block"] = _empty_beacon_block
 
-                async def _f(_response, _exception, _delay, *args, **kwargs):
+                async def _f(
+                    _response: SchemaBeaconAPI.ProduceBlockV3Response | None,
+                    _exception: BaseException | None,
+                    _delay: float | int,
+                    *args: Any,
+                    **kwargs: Any,
+                ) -> CallbackResult:
                     await asyncio.sleep(_delay)
                     if _exception:
                         raise _exception
-                    return CallbackResult(payload=_response.model_dump())
+                    elif _response:
+                        return CallbackResult(payload=_response.model_dump())
+                    else:
+                        raise ValueError("No exception or response to return")
 
                 _callback = partial(
                     _f,

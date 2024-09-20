@@ -108,7 +108,7 @@ class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
 
 class AttesterSlashingEventAttestation(BaseModel):
     attesting_indices: list[int]
-    data: dict
+    data: dict  # type: ignore[type-arg]
     signature: bytes
 
 
@@ -152,11 +152,11 @@ class ProduceBlockV3Response(BaseModel):
     execution_payload_blinded: bool
     execution_payload_value: int
     consensus_block_value: int
-    data: dict
+    data: dict  # type: ignore[type-arg]
 
     # Intentionally not using ConfigDict(use_enum_values=True)
     # here for version so that we can more easily work with
     # the Enum in the rest of the codebase
     @field_serializer("version")
-    def serialize_version(self, version: BeaconBlockVersion, _info):
+    def serialize_version(self, version: BeaconBlockVersion) -> str:
         return version.value

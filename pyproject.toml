@@ -1,7 +1,20 @@
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+
+[[tool.mypy.overrides]]
+module = 'spec.*'
+# Subclassing from remerkleable results in mypy errors:
+# > Class cannot subclass "Container" (has type "Any")
+# Possibly because the exports are not in the
+# module's `__all__`
+disallow_subclassing_any = false
+
 [tool.pytest.ini_options]
 pythonpath = ["./src", "."]
 asyncio_mode = "auto"
 
 [tool.ruff]
-# Assume Python 3.11+
-target-version = "py311"
+# Assume Python 3.12+
+target-version = "py312"

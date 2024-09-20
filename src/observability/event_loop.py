@@ -13,7 +13,7 @@ EVENT_LOOP_TASKS = Gauge(
 )
 
 
-async def monitor_event_loop():
+async def monitor_event_loop() -> None:
     _logger = logging.getLogger("event-loop")
     event_loop = asyncio.get_event_loop()
     _start = event_loop.time()

@@ -1,9 +1,9 @@
 import logging
-from typing import Type
+from typing import Type, TypeVar
 
 from remerkleable.basic import uint64
 from remerkleable.byte_arrays import Bytes4
-from remerkleable.complex import Container, CV
+from remerkleable.complex import Container
 from remerkleable.core import ObjType, ObjParseException
 
 from spec.common import Root
@@ -25,6 +25,9 @@ class Genesis(Container):
     genesis_fork_version: Version
 
 
+SpecV = TypeVar("SpecV", bound="Spec")
+
+
 class Spec(Container):
     # This value is not used anywhere but
     # the Container subclass creation fails without
@@ -32,7 +35,7 @@ class Spec(Container):
     MIN_GENESIS_TIME: uint64
 
     @classmethod
-    def from_obj(cls: Type[CV], obj: ObjType) -> CV:
+    def from_obj(cls: Type[SpecV], obj: ObjType) -> SpecV:
         if not isinstance(obj, dict):
             raise ObjParseException(f"obj '{obj}' is not a dict")
         fields = cls.fields()
@@ -63,7 +66,7 @@ class Spec(Container):
                 f"obj '{obj}' is missing required field(s): {missing}"
             )
 
-        return cls(**{k: fields[k].from_obj(v) for k, v in obj.items()})  # type: ignore
+        return cls(**{k: fields[k].from_obj(v) for k, v in obj.items()})
 
 
 class SpecPhase0(Spec):
@@ -107,7 +110,7 @@ class SpecElectra(SpecDeneb):
     ELECTRA_FORK_VERSION: Version
 
 
-def parse_spec(data: dict) -> Spec:
+def parse_spec(data: dict[str, str]) -> Spec:
     # TODO add SpecElectra once all CLs return it
     #  not added yet because right now this causes
     #  MultiBeaconNode to fail if there is a spec

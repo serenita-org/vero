@@ -38,6 +38,8 @@ import asyncio
 import datetime
 import logging
 from collections import Counter
+from types import TracebackType
+from typing import Type, Any
 
 import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -45,7 +47,10 @@ from opentelemetry import trace
 from pydantic import HttpUrl
 from remerkleable.complex import Container
 
-from providers.beacon_node import BeaconNode, BeaconNodeNotReady
+from providers.beacon_node import (
+    BeaconNode,
+    BeaconNodeNotReady,
+)
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
@@ -85,7 +90,7 @@ class MultiBeaconNode:
         #  them to attest quickly yet still avoid single-client bugs.
         self._majority_threshold = len(self.beacon_nodes) // 2 + 1
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         # Attempt to fully initialize the connected beacon nodes
         await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
 
@@ -123,11 +128,16 @@ class MultiBeaconNode:
         BeaconBlockClass.initialize(spec=spec)
         SyncCommitteeContributionClass.initialize(spec=spec)
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "MultiBeaconNode":
         await self.initialize()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         all_beacon_nodes = self.beacon_nodes + self.beacon_nodes_proposal
 
         await asyncio.gather(
@@ -139,14 +149,16 @@ class MultiBeaconNode:
         )
 
     @property
-    def best_beacon_node(self):
+    def best_beacon_node(self) -> BeaconNode:
         return next(
             bn
             for bn in sorted(self.beacon_nodes, key=lambda bn: bn.score, reverse=True)
             if bn.initialized
         )
 
-    async def _get_first_beacon_node_response(self, func_name: str, **kwargs):
+    async def _get_first_beacon_node_response(
+        self, func_name: str, **kwargs: Any
+    ) -> Any:
         tasks = [
             asyncio.create_task(getattr(bn, func_name)(**kwargs))
             for bn in self.beacon_nodes
@@ -173,19 +185,19 @@ class MultiBeaconNode:
         self,
         func_name: str,
         beacon_nodes: list[BeaconNode] | None = None,
-        **kwargs,
-    ) -> list:
+        **kwargs: Any,
+    ) -> list[Any]:
         # Returns a list of successful responses
         beacon_nodes_to_use = beacon_nodes or [
             bn for bn in self.beacon_nodes if bn.initialized
         ]
 
-        responses = []
+        responses: list[Any] = []
         for res in await asyncio.gather(
             *[getattr(bn, func_name)(**kwargs) for bn in beacon_nodes_to_use],
             return_exceptions=True,
         ):
-            if isinstance(res, Exception):
+            if isinstance(res, BaseException):
                 self.logger.exception(
                     f"Failed to get beacon node response for {func_name}", exc_info=res
                 )
@@ -200,23 +212,26 @@ class MultiBeaconNode:
         return responses
 
     async def get_validators(
-        self, **kwargs
+        self, **kwargs: Any
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
-        return await self._get_first_beacon_node_response(
+        resp: list[
+            SchemaValidator.ValidatorIndexPubkey
+        ] = await self._get_first_beacon_node_response(
             func_name="get_validators", **kwargs
         )
+        return resp
 
     async def get_proposer_duties(
-        self, **kwargs
+        self, **kwargs: Any
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
         return await self.best_beacon_node.get_proposer_duties(**kwargs)
 
-    async def prepare_beacon_proposer(self, **kwargs) -> None:
+    async def prepare_beacon_proposer(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="prepare_beacon_proposer", **kwargs
         )
 
-    async def register_validator(self, **kwargs) -> None:
+    async def register_validator(self, **kwargs: Any) -> None:
         # Only ask one of the beacon nodes to register the validators with
         # MEV relays - no need to overwhelm them with duplicate registrations
         await self.best_beacon_node.register_validator(**kwargs)
@@ -246,7 +261,11 @@ class MultiBeaconNode:
         )
 
     async def _produce_best_block(
-        self, **kwargs
+        self,
+        slot: int,
+        graffiti: bytes,
+        builder_boost_factor: int,
+        randao_reveal: str,
     ) -> SchemaBeaconAPI.ProduceBlockV3Response:
         """
         Gets the produce block response from all beacon nodes and returns the
@@ -271,7 +290,14 @@ class MultiBeaconNode:
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
         tasks = {
-            asyncio.create_task(bn.produce_block_v3(**kwargs))
+            asyncio.create_task(
+                bn.produce_block_v3(
+                    slot=slot,
+                    graffiti=graffiti,
+                    builder_boost_factor=builder_boost_factor,
+                    randao_reveal=randao_reveal,
+                )
+            )
             for bn in beacon_nodes_to_use
         }
         pending = tasks
@@ -348,7 +374,11 @@ class MultiBeaconNode:
         return best_block_response
 
     async def produce_block_v3(
-        self, **kwargs
+        self,
+        slot: int,
+        graffiti: bytes,
+        builder_boost_factor: int,
+        randao_reveal: str,
     ) -> tuple[Container, SchemaBeaconAPI.ProduceBlockV3Response]:
         # TODO small room for improvement here.
         #  We are currently choosing the best block based on total
@@ -356,14 +386,19 @@ class MultiBeaconNode:
         #  We could however take the best beacon block
         #  and combine it with the best execution payload.
         #  That would take up some extra processing time though.
-        best_block_response = await self._produce_best_block(**kwargs)
+        best_block_response = await self._produce_best_block(
+            slot=slot,
+            graffiti=graffiti,
+            builder_boost_factor=builder_boost_factor,
+            randao_reveal=randao_reveal,
+        )
 
         # Parse block
         return self._parse_block_response(
             response=best_block_response
         ), best_block_response
 
-    async def publish_block_v2(self, **kwargs) -> None:
+    async def publish_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:
             kwargs["beacon_nodes"] = self.beacon_nodes_proposal
 
@@ -371,7 +406,7 @@ class MultiBeaconNode:
             func_name="publish_block_v2", **kwargs
         )
 
-    async def publish_blinded_block_v2(self, **kwargs) -> None:
+    async def publish_blinded_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:
             kwargs["beacon_nodes"] = self.beacon_nodes_proposal
 
@@ -380,11 +415,11 @@ class MultiBeaconNode:
         )
 
     async def get_attester_duties(
-        self, **kwargs
+        self, **kwargs: Any
     ) -> SchemaBeaconAPI.GetAttesterDutiesResponse:
         return await self.best_beacon_node.get_attester_duties(**kwargs)
 
-    async def prepare_beacon_committee_subscriptions(self, **kwargs) -> None:
+    async def prepare_beacon_committee_subscriptions(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="prepare_beacon_committee_subscriptions", **kwargs
         )
@@ -518,7 +553,7 @@ class MultiBeaconNode:
         committee_index: int,
         deadline: datetime.datetime,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
-    ):
+    ) -> AttestationData:
         """
         Returns attestation data from the connected beacon nodes.
 
@@ -549,7 +584,7 @@ class MultiBeaconNode:
                 head_event=head_event,
             )
 
-    async def publish_attestations(self, **kwargs) -> None:
+    async def publish_attestations(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations", **kwargs
         )
@@ -581,28 +616,30 @@ class MultiBeaconNode:
 
         return best_aggregate
 
-    async def publish_aggregate_and_proofs(self, **kwargs) -> None:
+    async def publish_aggregate_and_proofs(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs", **kwargs
         )
 
-    async def get_sync_duties(self, **kwargs) -> SchemaBeaconAPI.GetSyncDutiesResponse:
+    async def get_sync_duties(
+        self, **kwargs: Any
+    ) -> SchemaBeaconAPI.GetSyncDutiesResponse:
         return await self.best_beacon_node.get_sync_duties(**kwargs)
 
-    async def prepare_sync_committee_subscriptions(self, **kwargs) -> None:
+    async def prepare_sync_committee_subscriptions(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="prepare_sync_committee_subscriptions", **kwargs
         )
 
-    async def get_block_root(self, **kwargs) -> str:
-        return await self.best_beacon_node.get_block_root(**kwargs)
+    async def get_block_root(self, block_id: str) -> str:
+        return await self.best_beacon_node.get_block_root(block_id=block_id)
 
-    async def publish_sync_committee_messages(self, **kwargs) -> None:
+    async def publish_sync_committee_messages(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_messages", **kwargs
         )
 
-    async def get_sync_committee_contribution(self, **kwargs) -> Container:
+    async def get_sync_committee_contribution(self, **kwargs: Any) -> Container:
         contributions: list[Container] = await self._get_all_beacon_node_responses(
             func_name="get_sync_committee_contribution", **kwargs
         )
@@ -626,7 +663,9 @@ class MultiBeaconNode:
 
         return best_contribution
 
-    async def publish_sync_committee_contribution_and_proofs(self, **kwargs) -> None:
+    async def publish_sync_committee_contribution_and_proofs(
+        self, **kwargs: Any
+    ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs", **kwargs
         )

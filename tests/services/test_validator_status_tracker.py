@@ -10,7 +10,7 @@ from services.validator_status_tracker import _SLASHING_DETECTED
 
 
 @pytest.fixture
-def _reset_slashing_detected_metric():
+def _reset_slashing_detected_metric() -> None:
     # Resets the value of this metric
     # before each test
     _SLASHING_DETECTED.set(0)
@@ -99,6 +99,7 @@ def _reset_slashing_detected_metric():
         ),
     ],
 )
+@pytest.mark.usefixtures("_reset_slashing_detected_metric")
 async def test_handle_slashing_event(
     event: SchemaBeaconAPI.AttesterSlashingEvent
     | SchemaBeaconAPI.ProposerSlashingEvent,
@@ -106,10 +107,9 @@ async def test_handle_slashing_event(
     validator_status_tracker: ValidatorStatusTrackerService,
     attestation_service: AttestationService,
     block_proposal_service: BlockProposalService,
-    _reset_slashing_detected_metric,
-    caplog,
-):
-    validator_status_tracker.handle_slashing_event(event=event)
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    await validator_status_tracker.handle_slashing_event(event=event)
 
     event_type = (
         "attester"

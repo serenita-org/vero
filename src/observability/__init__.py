@@ -11,7 +11,7 @@ def init_observability(
     metrics_port: int,
     metrics_multiprocess_mode: bool,
     log_level: str,
-):
+) -> None:
     setup_logging(log_level=log_level)
     setup_metrics(
         addr=metrics_address,

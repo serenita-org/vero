@@ -106,7 +106,7 @@ async def test_produce_attestation_data(
     bn_head_block_roots: list[str],
     head_event: SchemaBeaconAPI.HeadEvent,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-):
+) -> None:
     """
     Tests that the multi-beacon requests attestation data from all beacon nodes
     and only returns attestation data if a majority of the beacon nodes
