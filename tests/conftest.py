@@ -1,6 +1,7 @@
 import asyncio
 import random
-from collections.abc import AsyncGenerator
+from asyncio import AbstractEventLoop
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -8,18 +9,24 @@ from pydantic import HttpUrl
 
 from args import CLIArgs
 from observability import init_observability
-from providers import MultiBeaconNode, BeaconChain, RemoteSigner
-from schemas.validator import ValidatorIndexPubkey, ValidatorStatus, ACTIVE_STATUSES
+from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey, ValidatorStatus
 from services import ValidatorStatusTrackerService
 
 # A few more global fixtures defined separately
-from tests.mock_api.base import *  # noqa: F403
-from tests.mock_api.beacon_node import *  # noqa: F403
-from tests.mock_api.remote_signer import *  # noqa: F403
+from tests.mock_api.base import *
+from tests.mock_api.beacon_node import *
+from tests.mock_api.beacon_node import (
+    _beacon_block_class_init,
+    _mocked_beacon_node_endpoints,
+    _sync_committee_contribution_class_init,
+)
+from tests.mock_api.remote_signer import *
+from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
 
 
 @pytest.fixture
-def beacon_node_urls_proposal(request) -> list[HttpUrl]:
+def beacon_node_urls_proposal(request: pytest.FixtureRequest) -> list[HttpUrl]:
     return getattr(request, "param", [])
 
 
@@ -48,11 +55,11 @@ def cli_args(
             str(url) for url in beacon_node_urls_proposal
         )
 
-    return CLIArgs(**kwargs)
+    return CLIArgs.model_validate(kwargs)
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _init_observability():
+def _init_observability() -> None:
     init_observability(
         metrics_address="localhost",
         metrics_port=8080,
@@ -101,7 +108,8 @@ def random_active_validator(
 
 @pytest.fixture
 async def remote_signer(
-    cli_args: CLIArgs, mocked_remote_signer_endpoints
+    cli_args: CLIArgs,
+    _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[RemoteSigner, None]:
     async with RemoteSigner(url=cli_args.remote_signer_url) as remote_signer:
         yield remote_signer
@@ -133,7 +141,9 @@ async def validator_status_tracker(
 
 @pytest.fixture
 async def multi_beacon_node(
-    cli_args: CLIArgs, mocked_beacon_node_endpoints, scheduler
+    cli_args: CLIArgs,
+    _mocked_beacon_node_endpoints: None,
+    scheduler: AsyncIOScheduler,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     async with MultiBeaconNode(
         beacon_node_urls=cli_args.beacon_node_urls,
@@ -145,12 +155,11 @@ async def multi_beacon_node(
 
 @pytest.fixture
 async def beacon_chain(multi_beacon_node: MultiBeaconNode) -> BeaconChain:
-    beacon_chain = BeaconChain(multi_beacon_node=multi_beacon_node)
-    return beacon_chain
+    return BeaconChain(multi_beacon_node=multi_beacon_node)
 
 
 @pytest.fixture(scope="session")
-def event_loop():
+def event_loop() -> Generator[AbstractEventLoop, None, None]:
     loop = asyncio.get_event_loop()
     yield loop
     loop.close()

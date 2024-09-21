@@ -3,9 +3,9 @@ from remerkleable.complex import Container
 
 from spec.base import Spec
 from spec.common import (
-    Slot,
-    Root,
     BLSSignature,
+    Root,
+    Slot,
     UInt64SerializedAsString,
     ValidatorIndex,
 )
@@ -21,7 +21,7 @@ class SyncCommitteeContributionClass:
     def initialize(
         cls,
         spec: Spec,
-    ):
+    ) -> None:
         class SyncCommitteeContribution(Container):
             # Slot to which this contribution pertains
             slot: Slot

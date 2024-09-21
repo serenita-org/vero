@@ -6,7 +6,7 @@ _ERRORS_METRIC = None
 _METRICS_INITIATED = False
 
 
-class ERROR_TYPE(Enum):
+class ErrorType(Enum):
     ATTESTATION_CONSENSUS = "attestation-consensus"
     ATTESTATION_PUBLISH = "attestation-publish"
     AGGREGATE_ATTESTATION_PRODUCE = "aggregate-attestation-produce"
@@ -30,7 +30,7 @@ def get_shared_metrics() -> tuple[Counter]:
             "Number of errors",
             labelnames=["error_type"],
         )
-        for enum_type in ERROR_TYPE:
+        for enum_type in ErrorType:
             _ERRORS_METRIC.labels(enum_type.value).reset()
 
         _METRICS_INITIATED = True

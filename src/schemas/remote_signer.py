@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import TypeVar
 
 from pydantic import BaseModel, ConfigDict, field_serializer
 
@@ -28,13 +29,16 @@ class SignableMessage(BaseModel):
     type: SigningRequestType
 
 
+SignableMessageT = TypeVar("SignableMessageT", bound="SignableMessage")
+
+
 class SignableMessageWithForkInfo(SignableMessage):
     fork_info: ForkInfo
 
 
 class AttestationSignableMessage(SignableMessageWithForkInfo):
     type: SigningRequestType = SigningRequestType.ATTESTATION
-    attestation: dict
+    attestation: dict  # type: ignore[type-arg]
 
 
 class Slot(BaseModel):
@@ -48,7 +52,7 @@ class AggregationSlotSignableMessage(SignableMessageWithForkInfo):
 
 class AggregateAndProofSignableMessage(SignableMessageWithForkInfo):
     type: SigningRequestType = SigningRequestType.AGGREGATE_AND_PROOF
-    aggregate_and_proof: dict
+    aggregate_and_proof: dict  # type: ignore[type-arg]
 
 
 class RandaoReveal(BaseModel):
@@ -73,8 +77,8 @@ class BeaconBlock(BaseModel):
     block_header: BeaconBlockHeader
 
     @field_serializer("version")
-    def serialize_version(self, version: Enum, _info):
-        return version.value.upper()
+    def serialize_version(self, version: Enum) -> str:
+        return version.value.upper()  # type: ignore[no-any-return]
 
 
 class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo):
@@ -104,7 +108,7 @@ class SyncCommitteeSelectionProofSignableMessage(SignableMessageWithForkInfo):
 
 class SyncCommitteeContributionAndProofSignableMessage(SignableMessageWithForkInfo):
     type: SigningRequestType = SigningRequestType.SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF
-    contribution_and_proof: dict
+    contribution_and_proof: dict  # type: ignore[type-arg]
 
 
 class ValidatorRegistration(BaseModel):

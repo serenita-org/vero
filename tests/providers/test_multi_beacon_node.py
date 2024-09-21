@@ -1,5 +1,4 @@
-"""
-These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
+"""These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
 when multiple beacon nodes are provided to it. That includes:
 - initialization
 - requesting attestation aggregates from all beacon nodes and returning the best one
@@ -11,12 +10,15 @@ import re
 from functools import partial
 
 import pytest
-from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
+from aioresponses import CallbackResult, aioresponses
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pydantic import HttpUrl
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from providers import MultiBeaconNode
 from spec.attestation import Attestation, AttestationData
+from spec.base import SpecDeneb
 from spec.sync_committee import SyncCommitteeContributionClass
 
 
@@ -60,49 +62,50 @@ from spec.sync_committee import SyncCommitteeContributionClass
     ],
 )
 async def test_initialize(
-    beacon_node_base_urls,
-    beacon_node_availabilities,
-    expected_initialization_success,
-    mocked_fork_response,
-    mocked_genesis_response,
-    spec_deneb,
-    scheduler,
-):
-    """
-    Tests that the multi-beacon node is able to initialize if a majority
+    beacon_node_base_urls: list[str],
+    beacon_node_availabilities: list[bool],
+    expected_initialization_success: bool,
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    spec_deneb: SpecDeneb,
+    scheduler: AsyncIOScheduler,
+) -> None:
+    """Tests that the multi-beacon node is able to initialize if a majority
     of its supplied beacon nodes is available.
     """
     assert len(beacon_node_base_urls) == len(beacon_node_availabilities)
 
     mbn = MultiBeaconNode(
-        beacon_node_urls=beacon_node_base_urls,
+        beacon_node_urls=[HttpUrl(u) for u in beacon_node_base_urls],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
     )
 
     with aioresponses() as m:
-        for url, beacon_node_available in zip(
-            beacon_node_base_urls, beacon_node_availabilities
+        for _url, beacon_node_available in zip(
+            beacon_node_base_urls,
+            beacon_node_availabilities,
+            strict=True,
         ):
             if beacon_node_available:
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"
+                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork",
                     ),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=mocked_fork_response
+                        payload=mocked_fork_response,
                     ),
                 )
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=mocked_genesis_response
+                        payload=mocked_genesis_response,
                     ),
                 )
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=spec_deneb.to_obj())
+                        payload=dict(data=spec_deneb.to_obj()),
                     ),
                 )
                 m.get(
@@ -115,7 +118,7 @@ async def test_initialize(
                 # Fail the first request that is made during initialization
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"
+                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork",
                     ),
                     exception=ValueError("Beacon node unavailable"),
                 )
@@ -165,13 +168,12 @@ async def test_initialize(
     ],
 )
 async def test_get_aggregate_attestation(
-    numbers_of_attesting_indices,
-    best_aggregate_score,
-    multi_beacon_node_three_inited_nodes,
-    spec_deneb,
-):
-    """
-    Tests that the multi-beacon requests aggregate attestations from all beacon nodes
+    numbers_of_attesting_indices: list[BaseException | int],
+    best_aggregate_score: int,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    spec_deneb: SpecDeneb,
+) -> None:
+    """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
     """
     with aioresponses() as m:
@@ -187,38 +189,41 @@ async def test_get_aggregate_attestation(
                         payload=dict(
                             data=Attestation(
                                 aggregation_bits=_bits,
-                            ).to_obj()
-                        )
+                            ).to_obj(),
+                        ),
                     ),
                     agg_bits_to_return,
                 )
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
                     ),
                     callback=_callback,
                 )
             elif isinstance(number_of_attesting_indices, Exception):
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
                     ),
                     exception=number_of_attesting_indices,
                 )
             else:
-                raise NotImplementedError()
+                raise NotImplementedError
 
         if all(isinstance(n, Exception) for n in numbers_of_attesting_indices):
             with pytest.raises(
-                RuntimeError, match="Failed to get a response from all beacon nodes"
+                RuntimeError,
+                match="Failed to get a response from all beacon nodes",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
-                    attestation_data=AttestationData(), committee_index=3
+                    attestation_data=AttestationData(),
+                    committee_index=3,
                 )
         else:
             returned_aggregate = (
                 await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
-                    attestation_data=AttestationData(), committee_index=3
+                    attestation_data=AttestationData(),
+                    committee_index=3,
                 )
             )
             assert sum(returned_aggregate.aggregation_bits) == best_aggregate_score
@@ -257,15 +262,14 @@ async def test_get_aggregate_attestation(
         ),
     ],
 )
+@pytest.mark.usefixtures("_sync_committee_contribution_class_init")
 async def test_get_sync_committee_contribution(
-    numbers_of_root_matching_indices,
-    best_contribution_score,
-    multi_beacon_node_three_inited_nodes,
-    sync_committee_contribution_class_init,
-    spec_deneb,
-):
-    """
-    Tests that the multi-beacon requests sync committee contributions from all beacon nodes
+    numbers_of_root_matching_indices: list[BaseException | int],
+    best_contribution_score: int,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    spec_deneb: SpecDeneb,
+) -> None:
+    """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
     """
     with aioresponses() as m:
@@ -284,31 +288,32 @@ async def test_get_sync_committee_contribution(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
                             data=SyncCommitteeContributionClass.Contribution(
-                                aggregation_bits=_bits
-                            ).to_obj()
-                        )
+                                aggregation_bits=_bits,
+                            ).to_obj(),
+                        ),
                     ),
                     agg_bits_to_return,
                 )
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution",
                     ),
                     callback=_callback,
                 )
             elif isinstance(number_of_root_matching_indices, Exception):
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution"
+                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution",
                     ),
                     exception=number_of_root_matching_indices,
                 )
             else:
-                raise NotImplementedError()
+                raise NotImplementedError
 
         if all(isinstance(n, Exception) for n in numbers_of_root_matching_indices):
             with pytest.raises(
-                RuntimeError, match="Failed to get a response from all beacon nodes"
+                RuntimeError,
+                match="Failed to get a response from all beacon nodes",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.get_sync_committee_contribution(
                     slot=123,

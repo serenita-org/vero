@@ -1,26 +1,25 @@
-from typing import Any
-
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import MultiBeaconNode, BeaconChain, RemoteSigner
+from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from services import (
-    ValidatorStatusTrackerService,
     AttestationService,
     BlockProposalService,
+    ValidatorStatusTrackerService,
 )
+from services.validator_duty_service import ValidatorDutyServiceOptions
 
 
 @pytest.fixture
-def validator_service_kwargs(
+def validator_duty_service_options(
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
     remote_signer: RemoteSigner,
     validator_status_tracker: ValidatorStatusTrackerService,
     scheduler: AsyncIOScheduler,
     cli_args: CLIArgs,
-) -> dict[str, Any]:
+) -> ValidatorDutyServiceOptions:
     return dict(
         multi_beacon_node=multi_beacon_node,
         beacon_chain=beacon_chain,
@@ -32,10 +31,14 @@ def validator_service_kwargs(
 
 
 @pytest.fixture
-def attestation_service(validator_service_kwargs) -> AttestationService:
-    return AttestationService(**validator_service_kwargs)
+def attestation_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> AttestationService:
+    return AttestationService(**validator_duty_service_options)
 
 
 @pytest.fixture
-def block_proposal_service(validator_service_kwargs) -> BlockProposalService:
-    return BlockProposalService(**validator_service_kwargs)
+def block_proposal_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> BlockProposalService:
+    return BlockProposalService(**validator_duty_service_options)

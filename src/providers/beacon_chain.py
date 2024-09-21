@@ -1,6 +1,4 @@
-"""
-Provides information about the beacon chain - current slot, epoch, fork, genesis and spec data.
-"""
+"""Provides information about the beacon chain - current slot, epoch, fork, genesis and spec data."""
 
 import datetime
 import logging
@@ -30,27 +28,25 @@ class BeaconChain:
         )
 
     @property
-    def spec(self) -> "Spec":
+    def spec(self) -> Spec:
         return next(
             bn.spec for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
         )
 
     def get_fork(self, slot: int) -> Fork:
         spec = self.multi_beacon_node.best_beacon_node.spec
+        slot_epoch = slot // spec.SLOTS_PER_EPOCH
 
         if (
             hasattr(spec, "ELECTRA_FORK_EPOCH")
-            and self.current_epoch >= spec.ELECTRA_FORK_EPOCH
+            and slot_epoch >= spec.ELECTRA_FORK_EPOCH
         ):
             return Fork(
                 previous_version=spec.DENEB_FORK_VERSION,
                 current_version=spec.ELECTRA_FORK_VERSION,
                 epoch=spec.ELECTRA_FORK_EPOCH,
             )
-        if (
-            hasattr(spec, "DENEB_FORK_EPOCH")
-            and self.current_epoch >= spec.DENEB_FORK_EPOCH
-        ):
+        if hasattr(spec, "DENEB_FORK_EPOCH") and slot_epoch >= spec.DENEB_FORK_EPOCH:
             return Fork(
                 previous_version=spec.CAPELLA_FORK_VERSION,
                 current_version=spec.DENEB_FORK_VERSION,
@@ -70,10 +66,11 @@ class BeaconChain:
 
     def _get_slots_since_genesis(self) -> int:
         seconds_elapsed = (
-            floor(datetime.datetime.now().timestamp()) - self.genesis.genesis_time
+            floor(datetime.datetime.now(tz=pytz.UTC).timestamp())
+            - self.genesis.genesis_time
         )
         seconds_elapsed = max(0, seconds_elapsed)
-        return seconds_elapsed // self.spec.SECONDS_PER_SLOT
+        return seconds_elapsed // self.spec.SECONDS_PER_SLOT  # type: ignore[no-any-return]
 
     @property
     def current_slot(self) -> int:
@@ -86,15 +83,15 @@ class BeaconChain:
 
     @property
     def current_epoch(self) -> int:
-        return self.current_slot // self.spec.SLOTS_PER_EPOCH
+        return self.current_slot // self.spec.SLOTS_PER_EPOCH  # type: ignore[no-any-return]
 
     def compute_start_slot_at_epoch(self, epoch: int) -> int:
-        return epoch * self.spec.SLOTS_PER_EPOCH
+        return epoch * self.spec.SLOTS_PER_EPOCH  # type: ignore[no-any-return]
 
     def compute_sync_period_for_epoch(self, epoch: int) -> int:
-        return epoch // self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        return epoch // self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD  # type: ignore[no-any-return]
 
     def compute_sync_period_for_slot(self, slot: int) -> int:
         return self.compute_sync_period_for_epoch(
-            epoch=slot // self.spec.SLOTS_PER_EPOCH
+            epoch=slot // self.spec.SLOTS_PER_EPOCH,
         )

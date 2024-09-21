@@ -1,22 +1,27 @@
 import asyncio
 import datetime
 from collections import defaultdict
+from typing import Unpack
 
 import pytz
 from opentelemetry import trace
 from opentelemetry.trace import (
+    NonRecordingSpan,
+    SpanContext,
     Status,
     StatusCode,
-    SpanContext,
     TraceFlags,
-    NonRecordingSpan,
 )
 from prometheus_client import Counter
 
-from spec.block import BeaconBlockHeader
+from observability import ErrorType, get_shared_metrics
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
-from services.validator_duty_service import ValidatorDutyService, ValidatorDuty
-from observability import get_shared_metrics, ERROR_TYPE
+from services.validator_duty_service import (
+    ValidatorDuty,
+    ValidatorDutyService,
+    ValidatorDutyServiceOptions,
+)
+from spec.block import BeaconBlockHeader
 
 _VC_PUBLISHED_BLOCKS = Counter(
     "vc_published_blocks",
@@ -27,7 +32,7 @@ _VC_PUBLISHED_BLOCKS.reset()
 
 
 class BlockProposalService(ValidatorDutyService):
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
         # Proposer duty by epoch
@@ -36,19 +41,19 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-    def start(self):
+    def start(self) -> None:
         self.scheduler.add_job(self.update_duties)
         self.scheduler.add_job(self.prepare_beacon_proposer)
         if self.cli_args.use_external_builder:
             self.scheduler.add_job(self.register_validators)
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent):
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             event.current_duty_dependent_root
             not in self.proposer_duties_dependent_roots.values()
         ) and len(self.proposer_duties_dependent_roots) > 0:
             self.logger.info(
-                "Head event duty dependent root mismatch -> updating duties"
+                "Head event duty dependent root mismatch -> updating duties",
             )
             self.scheduler.add_job(self.update_duties)
 
@@ -62,10 +67,10 @@ class BlockProposalService(ValidatorDutyService):
             if epoch < current_epoch:
                 del self.proposer_duties_dependent_roots[epoch]
 
-    async def _update_duties(self):
+    async def _update_duties(self) -> None:
         if not self.validator_status_tracker_service.any_active_or_pending_validators:
             self.logger.warning(
-                "Not updating proposer duties - no active or pending validators"
+                "Not updating proposer duties - no active or pending validators",
             )
             return
 
@@ -87,7 +92,7 @@ class BlockProposalService(ValidatorDutyService):
 
             self.proposer_duties_dependent_roots[epoch] = response.dependent_root
             self.logger.debug(
-                f"Dependent root for proposer duties for epoch {epoch} - {response.dependent_root}"
+                f"Dependent root for proposer duties for epoch {epoch} - {response.dependent_root}",
             )
 
             current_slot = self.beacon_chain.current_slot
@@ -99,14 +104,14 @@ class BlockProposalService(ValidatorDutyService):
                     self.proposer_duties[epoch].add(duty)
 
                     self.logger.info(
-                        f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}"
+                        f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}",
                     )
 
                     self.scheduler.add_job(
                         self.propose_block,
                         "date",
                         next_run_time=self.beacon_chain.get_datetime_for_slot(
-                            slot=duty.slot
+                            slot=duty.slot,
                         ),
                         kwargs=dict(slot=duty.slot),
                         id=f"propose_block_job_for_slot_{duty.slot}",
@@ -114,12 +119,12 @@ class BlockProposalService(ValidatorDutyService):
                     )
 
             self.logger.debug(
-                f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}"
+                f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
             )
 
         self._prune_duties()
 
-    async def _prepare_beacon_proposer(self):
+    async def _prepare_beacon_proposer(self) -> None:
         self.logger.debug("Calling prepare beacon proposer")
 
         our_indices = [
@@ -138,10 +143,10 @@ class BlockProposalService(ValidatorDutyService):
                     "fee_recipient": self.cli_args.fee_recipient,
                 }
                 for val_idx in our_indices
-            ]
+            ],
         )
 
-    async def prepare_beacon_proposer(self):
+    async def prepare_beacon_proposer(self) -> None:
         # TODO we have a lot of functions like this one, where we try something,
         # and schedule the next run time while catching exceptions and retrying
         # earlier than planned if an exception occurs. See if we can abstract
@@ -149,18 +154,20 @@ class BlockProposalService(ValidatorDutyService):
         next_run_time = None
         try:
             await self._prepare_beacon_proposer()
-        except Exception as e:
-            self.logger.exception(e)
-            next_run_time = datetime.datetime.now() + datetime.timedelta(seconds=1)
+        except Exception:
+            self.logger.exception("Failed to prepare beacon proposer")
+            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
+                seconds=1,
+            )
         finally:
             # Schedule the next prepare_beacon_proposer call
             if next_run_time is None:
                 next_run_time = self.beacon_chain.get_datetime_for_slot(
                     slot=(self.beacon_chain.current_epoch + 1)
-                    * self.beacon_chain.spec.SLOTS_PER_EPOCH
+                    * self.beacon_chain.spec.SLOTS_PER_EPOCH,
                 )
             self.logger.debug(
-                f"Next prepare_beacon_proposer job run time: {next_run_time}"
+                f"Next prepare_beacon_proposer job run time: {next_run_time}",
             )
             self.scheduler.add_job(
                 self.prepare_beacon_proposer,
@@ -170,8 +177,8 @@ class BlockProposalService(ValidatorDutyService):
                 replace_existing=True,
             )
 
-    async def _register_validators(self):
-        _BATCH_SIZE = 512
+    async def _register_validators(self) -> None:
+        _batch_size = 512
 
         active_and_pending_validators = (
             self.validator_status_tracker_service.active_validators
@@ -191,8 +198,8 @@ class BlockProposalService(ValidatorDutyService):
 
         _timestamp = int(datetime.datetime.now(tz=pytz.UTC).timestamp())
 
-        for i in range(0, len(validators_to_register), _BATCH_SIZE):
-            validator_batch = validators_to_register[i : i + _BATCH_SIZE]
+        for i in range(0, len(validators_to_register), _batch_size):
+            validator_batch = validators_to_register[i : i + _batch_size]
 
             try:
                 responses = await asyncio.gather(
@@ -209,31 +216,33 @@ class BlockProposalService(ValidatorDutyService):
                             identifier=v.pubkey,
                         )
                         for v in validator_batch
-                    ]
+                    ],
                 )
-            except Exception as e:
-                _ERRORS_METRIC.labels(error_type=ERROR_TYPE.SIGNATURE.value).inc()
+            except Exception:
+                _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
                 self.logger.exception(
-                    f"Failed to get signature for validator registrations: {e}"
+                    "Failed to get signature for validator registrations",
                 )
                 continue
 
             await self.multi_beacon_node.register_validator(
                 signed_registrations=[
                     (msg.validator_registration, sig) for msg, sig, _ in responses
-                ]
+                ],
             )
 
             self.logger.info(f"Published {len(responses)} validator registrations")
 
-    async def register_validators(self):
+    async def register_validators(self) -> None:
         next_run_time = None
         try:
             await self._register_validators()
-        except Exception as e:
-            self.logger.exception(e)
+        except Exception:
+            self.logger.exception("Failed to register validators")
             # On registration errors we retry every 60 seconds
-            next_run_time = datetime.datetime.now() + datetime.timedelta(seconds=60)
+            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
+                seconds=60,
+            )
         finally:
             # Schedule the next register_validators call
             # The job runs every slot, and inside the job,
@@ -243,7 +252,7 @@ class BlockProposalService(ValidatorDutyService):
             # signatures at once (when running large numbers of validators).
             if next_run_time is None:
                 next_run_time = self.beacon_chain.get_datetime_for_slot(
-                    slot=self.beacon_chain.current_slot + 1
+                    slot=self.beacon_chain.current_slot + 1,
                 )
             self.logger.debug(f"Next register_validators job run time: {next_run_time}")
             self.scheduler.add_job(
@@ -254,7 +263,7 @@ class BlockProposalService(ValidatorDutyService):
                 replace_existing=True,
             )
 
-    async def propose_block(self, slot: int):
+    async def propose_block(self, slot: int) -> None:
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context
@@ -274,7 +283,7 @@ class BlockProposalService(ValidatorDutyService):
 
             if slot <= self._last_slot_duty_performed_for:
                 self.logger.debug(
-                    f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})"
+                    f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})",
                 )
                 return
             self._last_slot_duty_performed_for = slot
@@ -293,36 +302,36 @@ class BlockProposalService(ValidatorDutyService):
 
             self.logger.info(f"Producing block for slot {slot}")
             self._duty_start_time_metric.labels(
-                duty=ValidatorDuty.BLOCK_PROPOSAL.value
+                duty=ValidatorDuty.BLOCK_PROPOSAL.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
             for duty in slot_proposer_duties:
                 with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.sign_randao"
+                    name=f"{self.__class__.__name__}.sign_randao",
                 ) as sign_randao_span:
                     try:
                         _, randao_reveal, _ = await self.remote_signer.sign(
                             message=SchemaRemoteSigner.RandaoRevealSignableMessage(
                                 fork_info=self.beacon_chain.get_fork_info(slot=slot),
                                 randao_reveal=SchemaRemoteSigner.RandaoReveal(
-                                    epoch=epoch
+                                    epoch=epoch,
                                 ),
                             ),
                             identifier=duty.pubkey,
                         )
                     except Exception as e:
                         _ERRORS_METRIC.labels(
-                            error_type=ERROR_TYPE.SIGNATURE.value
+                            error_type=ErrorType.SIGNATURE.value,
                         ).inc()
                         self.logger.exception(
-                            f"Failed to get signature for RANDAO reveal: {e}"
+                            "Failed to get signature for RANDAO reveal",
                         )
                         sign_randao_span.set_status(Status(StatusCode.ERROR))
                         sign_randao_span.record_exception(e)
                         continue
 
                 with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.produce_block"
+                    name=f"{self.__class__.__name__}.produce_block",
                 ):
                     try:
                         (
@@ -334,11 +343,11 @@ class BlockProposalService(ValidatorDutyService):
                             builder_boost_factor=self.cli_args.builder_boost_factor,
                             randao_reveal=randao_reveal,
                         )
-                    except Exception as e:
+                    except Exception:
                         _ERRORS_METRIC.labels(
-                            error_type=ERROR_TYPE.BLOCK_PRODUCE.value
+                            error_type=ErrorType.BLOCK_PRODUCE.value,
                         ).inc()
-                        raise e
+                        raise
 
                 beacon_block_header = BeaconBlockHeader(
                     slot=beacon_block.slot,
@@ -349,7 +358,7 @@ class BlockProposalService(ValidatorDutyService):
                 )
 
                 with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.sign_block"
+                    name=f"{self.__class__.__name__}.sign_block",
                 ) as sign_block_span:
                     try:
                         _, signature, _ = await self.remote_signer.sign(
@@ -364,22 +373,22 @@ class BlockProposalService(ValidatorDutyService):
                         )
                     except Exception as e:
                         _ERRORS_METRIC.labels(
-                            error_type=ERROR_TYPE.SIGNATURE.value
+                            error_type=ErrorType.SIGNATURE.value,
                         ).inc()
-                        self.logger.exception(f"Failed to get signature for block: {e}")
+                        self.logger.exception("Failed to get signature for block")
                         sign_block_span.set_status(Status(StatusCode.ERROR))
                         sign_block_span.record_exception(e)
                         continue
 
                 self.logger.info(
-                    f"Publishing block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}"
+                    f"Publishing block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
                 )
                 self._duty_submission_time_metric.labels(
-                    duty=ValidatorDuty.BLOCK_PROPOSAL.value
+                    duty=ValidatorDuty.BLOCK_PROPOSAL.value,
                 ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
                 with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.publish_block"
+                    name=f"{self.__class__.__name__}.publish_block",
                 ):
                     try:
                         if not full_response.execution_payload_blinded:
@@ -397,15 +406,17 @@ class BlockProposalService(ValidatorDutyService):
                                 block=beacon_block,
                                 signature=signature,
                             )
-                    except Exception as e:
+                    except Exception:
                         _ERRORS_METRIC.labels(
-                            error_type=ERROR_TYPE.BLOCK_PUBLISH.value
+                            error_type=ErrorType.BLOCK_PUBLISH.value,
                         ).inc()
-                        self.logger.error(f"Failed to publish block for slot {slot}")
-                        raise e
+                        self.logger.exception(
+                            f"Failed to publish block for slot {slot}"
+                        )
+                        raise
                     else:
                         self.logger.info(
-                            f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}"
+                            f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
                         )
 
                         _VC_PUBLISHED_BLOCKS.inc()

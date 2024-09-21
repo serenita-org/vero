@@ -2,13 +2,13 @@ from remerkleable.bitfields import Bitlist
 from remerkleable.complex import Container
 
 from spec.common import (
-    Slot,
-    Root,
-    BLSSignature,
     MAX_VALIDATORS_PER_COMMITTEE,
+    BLSSignature,
     Epoch,
-    ValidatorIndex,
+    Root,
+    Slot,
     UInt64SerializedAsString,
+    ValidatorIndex,
 )
 
 

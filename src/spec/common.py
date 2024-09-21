@@ -2,7 +2,7 @@ from hashlib import sha256
 from typing import Literal
 
 from remerkleable.basic import uint64
-from remerkleable.byte_arrays import Bytes96, Bytes32, Bytes48
+from remerkleable.byte_arrays import Bytes32, Bytes48, Bytes96
 from remerkleable.core import ObjType
 
 # Some spec values are the same for mainnet, holesky, gnosis
@@ -21,11 +21,10 @@ MAX_BLS_TO_EXECUTION_CHANGES = 16
 
 
 def bytes_to_uint64(
-    data: bytes, _endianness: Literal["little"] | Literal["big"] = "little"
+    data: bytes,
+    _endianness: Literal["little", "big"] = "little",
 ) -> uint64:
-    """
-    Return the integer deserialization of ``data`` interpreted as ``ENDIANNESS``-endian.
-    """
+    """Return the integer deserialization of ``data`` interpreted as ``ENDIANNESS``-endian."""
     return uint64(int.from_bytes(data, _endianness))
 
 

@@ -2,20 +2,29 @@ import re
 from collections.abc import AsyncGenerator
 
 import pytest
-from aioresponses import aioresponses, CallbackResult
+from aioresponses import CallbackResult, aioresponses
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from pydantic import HttpUrl
 
 from providers import MultiBeaconNode
+from spec.base import SpecDeneb
 
 
 @pytest.fixture
 async def multi_beacon_node_three_inited_nodes(
-    mocked_fork_response, mocked_genesis_response, spec_deneb, scheduler
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    spec_deneb: SpecDeneb,
+    scheduler: AsyncIOScheduler,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(
         beacon_node_urls=[
-            "http://beacon-node-a:1234",
-            "http://beacon-node-b:1234",
-            "http://beacon-node-c:1234",
+            HttpUrl(u)
+            for u in (
+                "http://beacon-node-a:1234",
+                "http://beacon-node-b:1234",
+                "http://beacon-node-c:1234",
+            )
         ],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
@@ -24,21 +33,21 @@ async def multi_beacon_node_three_inited_nodes(
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_fork_response
+                payload=mocked_fork_response,
             ),
             repeat=True,
         )
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_genesis_response
+                payload=mocked_genesis_response,
             ),
             repeat=True,
         )
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=dict(data=spec_deneb.to_obj())
+                payload=dict(data=spec_deneb.to_obj()),
             ),
             repeat=True,
         )

@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import logging
-import os
 from pathlib import Path
 
 import pytz
@@ -9,13 +8,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from observability.event_loop import monitor_event_loop
-from providers import RemoteSigner, MultiBeaconNode, BeaconChain
+from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
     BlockProposalService,
-    SyncCommitteeService,
     EventConsumerService,
+    SyncCommitteeService,
+    ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
 )
 
@@ -46,7 +46,7 @@ def _register_event_handlers(
     ):
         event_consumer_service.add_event_handler(
             event_handler=head_handler_service.handle_head_event,
-            event_types=[SchemaBeaconAPI.HeadEvent],
+            event_type=SchemaBeaconAPI.HeadEvent,
         )
 
     for reorg_handler_service in (
@@ -56,49 +56,48 @@ def _register_event_handlers(
     ):
         event_consumer_service.add_event_handler(
             event_handler=reorg_handler_service.handle_reorg_event,
-            event_types=[SchemaBeaconAPI.ChainReorgEvent],
+            event_type=SchemaBeaconAPI.ChainReorgEvent,
         )
 
-    event_consumer_service.add_event_handler(
-        event_handler=validator_status_tracker_service.handle_slashing_event,
-        event_types=[
-            SchemaBeaconAPI.AttesterSlashingEvent,
-            SchemaBeaconAPI.ProposerSlashingEvent,
-        ],
-    )
+    for event_type in (
+        SchemaBeaconAPI.AttesterSlashingEvent,
+        SchemaBeaconAPI.ProposerSlashingEvent,
+    ):
+        event_consumer_service.add_event_handler(
+            event_handler=validator_status_tracker_service.handle_slashing_event,
+            event_type=event_type,
+        )
 
 
 def check_data_dir_permissions(cli_args: CLIArgs) -> None:
-    if not os.path.isdir(cli_args.data_dir):
+    if not Path.is_dir(cli_args.data_dir):
         _logger.info("Data directory does not exist, attempting to create it")
         try:
-            os.makedirs(cli_args.data_dir)
+            Path.mkdir(cli_args.data_dir, parents=True)
         except Exception as e:
             raise RuntimeError(
-                f"Failed to create data directory: {cli_args.data_dir} - {e}"
-            )
+                f"Failed to create data directory at {cli_args.data_dir}",
+            ) from e
 
     # Attempt to write a file and reading from it
-    try:
-        test_filename = ".vero_test_permissions"
-        test_file_path = Path(cli_args.data_dir) / test_filename
-        test_file_content = "test_permissions"
-        with open(test_file_path, "w") as f:
-            f.write(test_file_content)
-        with open(test_file_path, "r") as f:
-            content_read = f.read()
-        os.remove(test_file_path)
-        if content_read != test_file_content:
-            raise PermissionError(
-                f"Mismatch between data written {test_file_content} and read {content_read} into test file"
-            )
-    except Exception:
-        raise
+    test_filename = ".vero_test_permissions"
+    test_file_path = Path(cli_args.data_dir) / test_filename
+    test_file_content = "test_permissions"
+    with Path.open(test_file_path, "w") as f:
+        f.write(test_file_content)
+    with Path.open(test_file_path) as f:
+        content_read = f.read()
+    Path.unlink(test_file_path)
+    if content_read != test_file_content:
+        raise PermissionError(
+            f"Mismatch between data written {test_file_content} and read {content_read} into test file",
+        )
 
 
 async def run_services(cli_args: CLIArgs) -> None:
     scheduler = AsyncIOScheduler(
-        timezone=pytz.UTC, job_defaults=dict(misfire_grace_time=1)
+        timezone=pytz.UTC,
+        job_defaults=dict(misfire_grace_time=1),
     )
     scheduler.start()
 
@@ -126,7 +125,7 @@ async def run_services(cli_args: CLIArgs) -> None:
         await validator_status_tracker_service.initialize()
         _logger.info("Initialized validator status tracker")
 
-        validator_service_args = dict(
+        validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
             remote_signer=remote_signer,

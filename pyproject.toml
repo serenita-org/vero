@@ -1,7 +1,30 @@
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+
+[[tool.mypy.overrides]]
+module = 'spec.*'
+# Subclassing from remerkleable results in mypy errors:
+# > Class cannot subclass "Container" (has type "Any")
+# Possibly because the exports are not in the
+# module's `__all__`
+disallow_subclassing_any = false
+
 [tool.pytest.ini_options]
 pythonpath = ["./src", "."]
 asyncio_mode = "auto"
 
 [tool.ruff]
-# Assume Python 3.11+
-target-version = "py311"
+# Assume Python 3.12+
+target-version = "py312"
+
+[tool.ruff.lint]
+# Enable all rules and explicitly disable some that we don't comply with (yet?)
+select = ["ALL"]
+ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM812", "ERA001", "E501", "FBT", "G004", "ISC001", "N805", "N812", "N818","TRY003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/mock_api/beacon_node.py" = ["C901"]
+"tests/*" = ["S", "SLF", "ARG", "INP", "FBT"]
+"tests/conftest.py" = ["F401", "F403", "F811", "I"]

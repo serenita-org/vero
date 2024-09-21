@@ -1,12 +1,10 @@
-"""
-Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api).
-"""
+"""Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api)."""
 
 import asyncio
 import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
-from types import SimpleNamespace
+from types import TracebackType
 
 import aiohttp
 from prometheus_client import Counter
@@ -25,11 +23,13 @@ _SIGNED_MESSAGES = Counter(
 
 def _sign_messages_in_separate_process(
     remote_signer_url: HttpUrl,
-    messages: list[SchemaRemoteSigner.SignableMessage],
+    messages: list[SchemaRemoteSigner.SignableMessageT],
     identifiers: list[str],
     batch_size: int,
-) -> list[tuple[SchemaRemoteSigner.SignableMessage, str, str]]:
-    async def _sign_messages():
+) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
+    async def _sign_messages() -> (
+        list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]
+    ):
         results = []
         async with RemoteSigner(url=remote_signer_url) as signer:
             for i in range(0, len(messages), batch_size):
@@ -37,13 +37,16 @@ def _sign_messages_in_separate_process(
                 identifiers_batch = identifiers[i : i + batch_size]
                 tasks = [
                     signer.sign(msg, identifier)
-                    for msg, identifier in zip(messages_batch, identifiers_batch)
+                    for msg, identifier in zip(
+                        messages_batch,
+                        identifiers_batch,
+                        strict=True,
+                    )
                 ]
                 results.extend(await asyncio.gather(*tasks))
         return results
 
-    results = asyncio.run(_sign_messages())
-    return results
+    return asyncio.run(_sign_messages())
 
 
 class RemoteSigner:
@@ -60,6 +63,11 @@ class RemoteSigner:
 
         _user_agent = f"{get_service_name()}/{get_service_version()}"
 
+        self._trace_default_request_ctx = dict(
+            host=self.url.host or "",
+            service_type=ServiceType.REMOTE_SIGNER.value,
+        )
+
         # web3signer defaults to 20 vertx workers for handling signing requests
         # Using 2 aiohttp ClientSessions here - one for lower priority
         # signing requests like selection proofs, aggregations.
@@ -73,8 +81,9 @@ class RemoteSigner:
             headers={"User-Agent": _user_agent},
             trace_configs=[
                 RequestLatency(
-                    host=self.url.host, service_type=ServiceType.REMOTE_SIGNER
-                )
+                    host=self.url.host,
+                    service_type=ServiceType.REMOTE_SIGNER,
+                ),
             ],
         )
 
@@ -83,14 +92,20 @@ class RemoteSigner:
             headers={"User-Agent": _user_agent},
             trace_configs=[
                 RequestLatency(
-                    host=self.url.host, service_type=ServiceType.REMOTE_SIGNER
-                )
+                    host=self.url.host,
+                    service_type=ServiceType.REMOTE_SIGNER,
+                ),
             ],
         )
 
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
         for session in (
             self.low_priority_client_session,
             self.high_priority_client_session,
@@ -99,20 +114,21 @@ class RemoteSigner:
                 await session.close()
         self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
-    async def get_public_keys(self):
+    async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
 
         async with self.low_priority_client_session.get(_endpoint) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}"
+                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
                 )
 
-            pubkeys = await resp.json()
+            pubkeys: list[str] = await resp.json()
             return pubkeys
 
     def _get_session_for_message(
-        self, message: SchemaRemoteSigner.SignableMessage
+        self,
+        message: SchemaRemoteSigner.SignableMessage,
     ) -> aiohttp.ClientSession:
         high_priority_types = (
             SchemaRemoteSigner.BeaconBlockV2SignableMessage,
@@ -128,11 +144,10 @@ class RemoteSigner:
 
     async def sign(
         self,
-        message: SchemaRemoteSigner.SignableMessage,
+        message: SchemaRemoteSigner.SignableMessageT,
         identifier: str,
-    ) -> tuple[SchemaRemoteSigner.SignableMessage, str, str]:
-        """
-        :param message: SignableMessage to sign
+    ) -> tuple[SchemaRemoteSigner.SignableMessageT, str, str]:
+        """:param message: SignableMessage to sign
         :param identifier: BLS public key in hex format for which data to sign
         :
         """
@@ -141,14 +156,14 @@ class RemoteSigner:
         async with self._get_session_for_message(message).post(
             _endpoint.format(identifier=identifier),
             data=message.model_dump_json(),
-            trace_request_ctx=SimpleNamespace(
+            trace_request_ctx=dict(
                 path=_endpoint,
                 request_type=message.__class__.__name__,
             ),
         ) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}"
+                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
                 )
 
             _SIGNED_MESSAGES.labels(signable_message_type=type(message).__name__).inc()
@@ -156,12 +171,11 @@ class RemoteSigner:
 
     async def sign_in_batches(
         self,
-        messages: list[SchemaRemoteSigner.SignableMessage],
+        messages: list[SchemaRemoteSigner.SignableMessageT],
         identifiers: list[str],
         batch_size: int = 100,
-    ) -> list[tuple[SchemaRemoteSigner.SignableMessage, str, str]]:
-        """
-        Signs messages in batches and returns a list of tuples containing the message,
+    ) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
+        """Signs messages in batches and returns a list of tuples containing the message,
         its signature, and the corresponding identifier.
 
         :param messages: List of SignableMessage objects to sign.
@@ -175,15 +189,15 @@ class RemoteSigner:
         """
         if len(messages) != len(identifiers):
             raise ValueError(
-                "Number of messages does not match the number of identifiers"
+                "Number of messages does not match the number of identifiers",
             )
 
         if len(messages) <= batch_size:
             return await asyncio.gather(
                 *(
                     self.sign(message, identifier)
-                    for message, identifier in zip(messages, identifiers)
-                )
+                    for message, identifier in zip(messages, identifiers, strict=False)
+                ),
             )
 
         # For large amounts of messages, run the signing process in a separate

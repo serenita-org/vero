@@ -3,7 +3,10 @@ import sys
 from logging import getLevelNamesMapping
 from pathlib import Path
 
-from pydantic import BaseModel, HttpUrl, field_validator, ValidationError
+from pydantic import BaseModel, HttpUrl, ValidationError, field_validator
+
+_expected_fee_recipient_input_length = 42
+_graffiti_max_bytes = 32
 
 
 class CLIArgs(BaseModel):
@@ -26,7 +29,7 @@ class CLIArgs(BaseModel):
         urls = [u.strip() for u in input_string.split(",") if len(u.strip()) > 0]
 
         if len(urls) == 0:
-            raise ValueError("no beacon node urls provided")
+            raise ValueError("No beacon node urls provided")
 
         if len(urls) != len(set(urls)):
             raise ValueError(f"Beacon node urls must be unique: {urls}")
@@ -44,18 +47,19 @@ class CLIArgs(BaseModel):
     @field_validator("fee_recipient")
     def validate_fee_recipient(cls, v: str) -> str:
         _error_msg = "fee recipient must be a valid hex string starting with 0x"
-        if len(v) < 42 or not v.startswith("0x"):
+        if len(v) < _expected_fee_recipient_input_length or not v.startswith("0x"):
             raise ValueError(_error_msg)
         try:
             bytes.fromhex(v[2:])
-            return v
         except ValueError:
-            raise ValueError(_error_msg)
+            raise ValueError(_error_msg) from None
+        else:
+            return v
 
     @field_validator("graffiti", mode="before")
     def validate_graffiti(cls, v: str) -> bytes:
-        encoded = v.encode("utf-8").ljust(32, b"\x00")
-        if len(v) > 32:
+        encoded = v.encode("utf-8").ljust(_graffiti_max_bytes, b"\x00")
+        if len(v) > _graffiti_max_bytes:
             raise ValueError("Encoded graffiti exceeds the maximum length of 32 bytes")
         return encoded
 
@@ -64,7 +68,10 @@ def parse_cli_args() -> CLIArgs:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
     parser.add_argument(
-        "--remote-signer-url", type=str, required=True, help="URL of the remote signer."
+        "--remote-signer-url",
+        type=str,
+        required=True,
+        help="URL of the remote signer.",
     )
     parser.add_argument(
         "--beacon-node-urls",
@@ -148,7 +155,6 @@ def parse_cli_args() -> CLIArgs:
 
     try:
         # Convert parsed args to dictionary and validate using Pydantic model
-        validated_args = CLIArgs(**vars(args))
-        return validated_args
+        return CLIArgs(**vars(args))
     except ValidationError as e:
         parser.error(str(e))

@@ -1,5 +1,4 @@
-"""
-These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
+"""These test the additional behavior of MultiBeaconNode (vs the simple BeaconNode)
 when multiple beacon nodes are provided to it. That includes:
 - requesting blocks from all beacon nodes and returning the best one
 """
@@ -7,12 +6,13 @@ when multiple beacon nodes are provided to it. That includes:
 import asyncio
 import re
 from functools import partial
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytest
-from aioresponses import aioresponses, CallbackResult
 from aiohttp.web_exceptions import HTTPRequestTimeout
+from aioresponses import CallbackResult, aioresponses
 
+from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from spec.block import BeaconBlockClass
 
@@ -46,7 +46,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -62,7 +62,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -78,7 +78,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
             ],
@@ -100,7 +100,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -116,7 +116,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -126,7 +126,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
             ],
@@ -148,7 +148,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -158,7 +158,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -168,7 +168,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
             ],
@@ -184,7 +184,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -194,7 +194,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -204,7 +204,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=None,
                             exception=HTTPRequestTimeout(),
                             delay=0,
-                        )
+                        ),
                     ],
                 ),
             ],
@@ -226,7 +226,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0.05,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -242,7 +242,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0.06,
-                        )
+                        ),
                     ],
                 ),
                 dict(
@@ -258,7 +258,7 @@ class BeaconNodeResponseSequence(TypedDict):
                             ),
                             exception=None,
                             delay=0.2,
-                        )
+                        ),
                     ],
                 ),
             ],
@@ -267,14 +267,13 @@ class BeaconNodeResponseSequence(TypedDict):
         ),
     ],
 )
+@pytest.mark.usefixtures("_beacon_block_class_init")
 async def test_produce_block_v3(
     bn_response_sequences: list[BeaconNodeResponseSequence],
-    returned_block_value,
-    beacon_block_class_init,
-    multi_beacon_node_three_inited_nodes,
-):
-    """
-    Tests that the multi-beacon requests blocks from all beacon nodes
+    returned_block_value: int,
+    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+) -> None:
+    """Tests that the multi-beacon requests blocks from all beacon nodes
     and returns the one with the highest value.
     """
     _empty_beacon_block = BeaconBlockClass.Deneb().to_obj()
@@ -283,7 +282,7 @@ async def test_produce_block_v3(
         for sequence in bn_response_sequences:
             bn_host = sequence["host"]
             url_regex_to_mock = re.compile(
-                rf"^http://{bn_host}:1234/eth/v3/validator/blocks/\d+"
+                rf"^http://{bn_host}:1234/eth/v3/validator/blocks/\d+",
             )
 
             for r in sequence["responses"]:
@@ -292,11 +291,19 @@ async def test_produce_block_v3(
                 if response:
                     response.data["block"] = _empty_beacon_block
 
-                async def _f(_response, _exception, _delay, *args, **kwargs):
+                async def _f(
+                    _response: SchemaBeaconAPI.ProduceBlockV3Response | None,
+                    _exception: BaseException | None,
+                    _delay: float,
+                    *args: Any,
+                    **kwargs: Any,
+                ) -> CallbackResult:
                     await asyncio.sleep(_delay)
                     if _exception:
                         raise _exception
-                    return CallbackResult(payload=_response.model_dump())
+                    if _response:
+                        return CallbackResult(payload=_response.model_dump())
+                    raise ValueError("No exception or response to return")
 
                 _callback = partial(
                     _f,
@@ -309,10 +316,16 @@ async def test_produce_block_v3(
                     callback=_callback,
                 )
 
-        try:
+        success_expected = any(
+            response["response"] is not None
+            for sequence in bn_response_sequences
+            for response in sequence["responses"]
+        )
+
+        if success_expected:
             result = await multi_beacon_node_three_inited_nodes.produce_block_v3(
                 slot=1,
-                graffiti="test_produce_block_v3".encode(),
+                graffiti=b"test_produce_block_v3",
                 builder_boost_factor=90,
                 randao_reveal="randao",
             )
@@ -325,15 +338,14 @@ async def test_produce_block_v3(
                 + full_response.execution_payload_value
                 == returned_block_value
             )
-        except RuntimeError as e:
-            # If all beacon nodes returned an exception then we expect to fail
-            if all(
-                [
-                    response["exception"]
-                    for sequence in bn_response_sequences
-                    for response in sequence["responses"]
-                ]
+        else:
+            with pytest.raises(
+                expected_exception=RuntimeError,
+                match="Failed to get a response from all beacon nodes",
             ):
-                assert str(e) == "Failed to get a response from all beacon nodes"
-            else:
-                pytest.fail("Block production failed when it shouldn't have")
+                await multi_beacon_node_three_inited_nodes.produce_block_v3(
+                    slot=1,
+                    graffiti=b"test_produce_block_v3",
+                    builder_boost_factor=90,
+                    randao_reveal="randao",
+                )
