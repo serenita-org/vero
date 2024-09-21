@@ -1099,7 +1099,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 19
+            "y": 27
           },
           "id": 28,
           "options": {
@@ -1232,7 +1232,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 34
           },
           "id": 33,
           "maxDataPoints": 50,
@@ -1300,7 +1300,7 @@
             "h": 14,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 42
           },
           "id": 19,
           "maxDataPoints": 50,
@@ -1381,7 +1381,9 @@
           "fieldConfig": {
             "defaults": {
               "color": {
-                "mode": "palette-classic"
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
               },
               "custom": {
                 "axisBorderShow": false,
@@ -1389,6 +1391,8 @@
                 "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
+                "axisSoftMax": 4,
+                "axisSoftMin": 0,
                 "barAlignment": 0,
                 "drawStyle": "line",
                 "fillOpacity": 0,
@@ -1423,27 +1427,74 @@
                     "color": "green"
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
-            "h": 7,
-            "w": 24,
+            "h": 6,
+            "w": 4,
             "x": 0,
-            "y": 58
+            "y": 3
           },
-          "id": 15,
+          "id": 230,
           "maxDataPoints": 100,
           "options": {
             "legend": {
               "calcs": [],
               "displayMode": "list",
               "placement": "bottom",
-              "showLegend": true
+              "showLegend": false
             },
             "tooltip": {
-              "mode": "single",
+              "mode": "multi",
               "sort": "none"
             }
           },
@@ -1455,14 +1506,725 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(duty_start_time_sum{instance=\"$instance\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
+              "expr": "rate(duty_start_time_sum{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
               "instant": false,
-              "legendFormat": "{{ duty }}",
+              "legendFormat": "Mean",
               "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
             }
           ],
-          "title": "Mean Duty Start Time",
+          "title": "block-proposal",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 8,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 4,
+            "y": 3
+          },
+          "id": 214,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_start_time_sum{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "attestation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 8,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 9,
+            "y": 3
+          },
+          "id": 215,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_start_time_sum{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "sync-committee-message",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 12,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 14,
+            "y": 3
+          },
+          "id": 216,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_start_time_sum{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "attestation-aggregation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 12,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 19,
+            "y": 3
+          },
+          "id": 217,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_start_time_sum{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval])\n/\nrate(duty_start_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_start_time_bucket{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "sync-committee-contribution",
           "type": "timeseries"
         },
         {
@@ -1490,7 +2252,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 65
+            "y": 9
           },
           "id": 24,
           "maxDataPoints": 10,
@@ -1519,7 +2281,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -1528,7 +2290,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -1573,7 +2335,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 65
+            "y": 9
           },
           "id": 18,
           "maxDataPoints": 10,
@@ -1602,7 +2364,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -1611,7 +2373,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -1656,7 +2418,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 65
+            "y": 9
           },
           "id": 22,
           "maxDataPoints": 10,
@@ -1685,7 +2447,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -1694,7 +2456,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -1739,7 +2501,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 65
+            "y": 9
           },
           "id": 26,
           "maxDataPoints": 10,
@@ -1768,7 +2530,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -1777,7 +2539,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -1822,7 +2584,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 65
+            "y": 9
           },
           "id": 23,
           "maxDataPoints": 10,
@@ -1851,7 +2613,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -1860,7 +2622,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -1903,7 +2665,9 @@
           "fieldConfig": {
             "defaults": {
               "color": {
-                "mode": "palette-classic"
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
               },
               "custom": {
                 "axisBorderShow": false,
@@ -1911,6 +2675,8 @@
                 "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
+                "axisSoftMax": 4,
+                "axisSoftMin": 0,
                 "barAlignment": 0,
                 "drawStyle": "line",
                 "fillOpacity": 0,
@@ -1945,27 +2711,74 @@
                     "color": "green"
                   }
                 ]
-              }
+              },
+              "unit": "s"
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
           },
           "gridPos": {
-            "h": 7,
-            "w": 24,
+            "h": 6,
+            "w": 4,
             "x": 0,
-            "y": 58
+            "y": 29
           },
-          "id": 81,
+          "id": 181,
           "maxDataPoints": 100,
           "options": {
             "legend": {
               "calcs": [],
               "displayMode": "list",
               "placement": "bottom",
-              "showLegend": true
+              "showLegend": false
             },
             "tooltip": {
-              "mode": "single",
+              "mode": "multi",
               "sort": "none"
             }
           },
@@ -1977,14 +2790,725 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(duty_submission_time_sum{instance=\"$instance\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
+              "expr": "rate(duty_submission_time_sum{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
               "instant": false,
-              "legendFormat": "{{ duty }}",
+              "legendFormat": "Mean",
               "range": true,
               "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"block-proposal\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
             }
           ],
-          "title": "Mean Duty Submission Time",
+          "title": "block-proposal",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 8,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 4,
+            "y": 29
+          },
+          "id": 198,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_submission_time_sum{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"attestation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "attestation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 8,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 9,
+            "y": 29
+          },
+          "id": 199,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_submission_time_sum{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"sync-committee-message\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "sync-committee-message",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 12,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 14,
+            "y": 29
+          },
+          "id": 200,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_submission_time_sum{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"attestation-aggregation\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "attestation-aggregation",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "fixedColor": "blue",
+                "mode": "fixed",
+                "seriesBy": "max"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMax": 12,
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Mean"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "yellow",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "99% quantile"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Max (estimate) <="
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "red",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 5,
+            "x": 19,
+            "y": 29
+          },
+          "id": 201,
+          "maxDataPoints": 100,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "10.2.6",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "rate(duty_submission_time_sum{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval])\n/\nrate(duty_submission_time_count[$__rate_interval])",
+              "instant": false,
+              "legendFormat": "Mean",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.99, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "interval": "",
+              "legendFormat": "99% quantile",
+              "range": true,
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(1, rate(duty_submission_time_bucket{instance=\"$instance\", duty=\"sync-committee-contribution\"}[$__rate_interval]))",
+              "hide": false,
+              "instant": false,
+              "legendFormat": "Max (estimate) <=",
+              "range": true,
+              "refId": "C"
+            }
+          ],
+          "title": "sync-committee-contribution",
           "type": "timeseries"
         },
         {
@@ -2012,7 +3536,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 65
+            "y": 35
           },
           "id": 82,
           "maxDataPoints": 10,
@@ -2041,7 +3565,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -2050,7 +3574,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -2095,7 +3619,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 65
+            "y": 35
           },
           "id": 83,
           "maxDataPoints": 10,
@@ -2124,7 +3648,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -2133,7 +3657,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -2178,7 +3702,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 65
+            "y": 35
           },
           "id": 84,
           "maxDataPoints": 10,
@@ -2207,7 +3731,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -2216,7 +3740,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -2261,7 +3785,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 65
+            "y": 35
           },
           "id": 85,
           "maxDataPoints": 10,
@@ -2290,7 +3814,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -2299,7 +3823,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -2344,7 +3868,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 65
+            "y": 35
           },
           "id": 86,
           "maxDataPoints": 10,
@@ -2373,7 +3897,7 @@
               "layout": "auto"
             },
             "tooltip": {
-              "show": true,
+              "mode": "single",
               "showColorScale": false,
               "yHistogram": false
             },
@@ -2382,7 +3906,7 @@
               "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.1.1",
           "targets": [
             {
               "datasource": {
@@ -2442,7 +3966,7 @@
             "h": 4,
             "w": 4,
             "x": 0,
-            "y": 22
+            "y": 38
           },
           "id": 131,
           "options": {
@@ -2540,7 +4064,7 @@
             "h": 20,
             "w": 10,
             "x": 4,
-            "y": 22
+            "y": 38
           },
           "id": 7,
           "maxDataPoints": 100,
@@ -2635,7 +4159,7 @@
             "h": 20,
             "w": 10,
             "x": 14,
-            "y": 22
+            "y": 38
           },
           "id": 39,
           "maxDataPoints": 100,
@@ -2739,7 +4263,7 @@
             "h": 16,
             "w": 4,
             "x": 0,
-            "y": 26
+            "y": 42
           },
           "id": 60,
           "options": {
@@ -2823,7 +4347,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 58
           },
           "id": 49,
           "maxDataPoints": 100,
@@ -2937,7 +4461,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 78
+            "y": 94
           },
           "id": 69,
           "maxDataPoints": 100,
@@ -3041,7 +4565,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 78
+            "y": 94
           },
           "id": 42,
           "maxDataPoints": 100,
@@ -3136,7 +4660,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 85
+            "y": 101
           },
           "id": 41,
           "maxDataPoints": 100,
@@ -3232,7 +4756,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 42
           },
           "id": 36,
           "maxDataPoints": 20,
@@ -3346,7 +4870,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 27
+            "y": 35
           },
           "id": 97,
           "options": {
@@ -3442,7 +4966,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 27
+            "y": 35
           },
           "id": 98,
           "options": {
@@ -3534,7 +5058,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 27
+            "y": 35
           },
           "id": 120,
           "options": {
@@ -3602,7 +5126,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 27
+            "y": 35
           },
           "id": 79,
           "options": {
@@ -3705,7 +5229,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 43
           },
           "id": 30,
           "options": {
@@ -3797,7 +5321,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 43
           },
           "id": 32,
           "options": {
@@ -3820,7 +5344,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "event_loop_tasks{instance=\"$instance\", pid=\"\"}",
+              "expr": "event_loop_tasks{instance=\"$instance\"}",
               "instant": false,
               "legendFormat": "Event Loop Tasks",
               "range": true,
@@ -3893,7 +5417,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 43
+            "y": 51
           },
           "id": 78,
           "options": {
@@ -4027,6 +5551,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
