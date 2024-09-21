@@ -36,7 +36,7 @@ def sigterm_handler(_signum: int, _frame: FrameType | None) -> None:
 
 
 if __name__ == "__main__":
-    cli_args = parse_cli_args()
+    cli_args = parse_cli_args(args=sys.argv[1:])
     init_observability(
         metrics_address=cli_args.metrics_address,
         metrics_port=cli_args.metrics_port,
