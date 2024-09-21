@@ -1,11 +1,11 @@
 import argparse
-import sys
+from collections.abc import Sequence
 from logging import getLevelNamesMapping
 from pathlib import Path
 
 from pydantic import BaseModel, HttpUrl, ValidationError, field_validator
 
-_expected_fee_recipient_input_length = 42
+_fee_recipient_bytes = 20
 _graffiti_max_bytes = 32
 
 
@@ -25,53 +25,73 @@ class CLIArgs(BaseModel):
     log_level: str
 
     @staticmethod
-    def _validate_beacon_node_urls(input_string: str) -> list[str]:
-        urls = [u.strip() for u in input_string.split(",") if len(u.strip()) > 0]
+    def _validate_comma_separated_strings(
+        input_string: str, entity_name: str
+    ) -> list[str]:
+        items = [
+            item.strip() for item in input_string.split(",") if len(item.strip()) > 0
+        ]
 
-        if len(urls) == 0:
-            raise ValueError("No beacon node urls provided")
+        if len(items) == 0:
+            raise ValueError(f"no {entity_name}s provided")
 
-        if len(urls) != len(set(urls)):
-            raise ValueError(f"Beacon node urls must be unique: {urls}")
+        if len(items) != len(set(items)):
+            raise ValueError(f"{entity_name}s must be unique: {items}")
 
-        return urls
+        return items
+
+    @staticmethod
+    def _validate_hex_strings(items: list[str], byte_length: int) -> None:
+        invalid_items = []
+        for item in items:
+            if not item.startswith("0x") or len(item) != 2 + 2 * byte_length:
+                invalid_items.append(item)
+                continue
+
+            try:
+                bytes.fromhex(item[2:])
+            except ValueError:
+                invalid_items.append(item)
+
+        if invalid_items:
+            raise ValueError(f"invalid hex inputs: {invalid_items}")
 
     @field_validator("beacon_node_urls", mode="before")
     def validate_beacon_node_urls(cls, v: str) -> list[str]:
-        return cls._validate_beacon_node_urls(input_string=v)
+        return cls._validate_comma_separated_strings(
+            input_string=v, entity_name="beacon node url"
+        )
 
     @field_validator("beacon_node_urls_proposal", mode="before")
     def validate_beacon_node_urls_proposal(cls, v: str | None) -> list[str]:
-        return [] if v is None else cls._validate_beacon_node_urls(input_string=v)
+        return (
+            []
+            if v is None
+            else cls._validate_comma_separated_strings(
+                input_string=v, entity_name="beacon node url"
+            )
+        )
 
     @field_validator("fee_recipient")
     def validate_fee_recipient(cls, v: str) -> str:
-        _error_msg = "fee recipient must be a valid hex string starting with 0x"
-        if len(v) < _expected_fee_recipient_input_length or not v.startswith("0x"):
-            raise ValueError(_error_msg)
-        try:
-            bytes.fromhex(v[2:])
-        except ValueError:
-            raise ValueError(_error_msg) from None
-        else:
-            return v
+        cls._validate_hex_strings(items=[v], byte_length=_fee_recipient_bytes)
+        return v
 
     @field_validator("graffiti", mode="before")
     def validate_graffiti(cls, v: str) -> bytes:
         encoded = v.encode("utf-8").ljust(_graffiti_max_bytes, b"\x00")
         if len(v) > _graffiti_max_bytes:
-            raise ValueError("Encoded graffiti exceeds the maximum length of 32 bytes")
+            raise ValueError(
+                f"encoded graffiti exceeds the maximum length of {_graffiti_max_bytes} bytes"
+            )
         return encoded
 
 
-def parse_cli_args() -> CLIArgs:
+def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
     parser.add_argument(
-        "--remote-signer-url",
-        type=str,
-        required=True,
-        help="URL of the remote signer.",
+        "--remote-signer-url", type=str, required=True, help="URL of the remote signer."
     )
     parser.add_argument(
         "--beacon-node-urls",
@@ -151,10 +171,10 @@ def parse_cli_args() -> CLIArgs:
         help="The logging level to use. Defaults to INFO.",
     )
 
-    args = parser.parse_args(sys.argv[1:])
+    parsed_args = parser.parse_args(args=args)
 
     try:
         # Convert parsed args to dictionary and validate using Pydantic model
-        return CLIArgs(**vars(args))
+        return CLIArgs(**vars(parsed_args))
     except ValidationError as e:
         parser.error(str(e))

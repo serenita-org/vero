@@ -36,10 +36,10 @@ class ValidatorStatusTrackerService:
         self.multi_beacon_node = multi_beacon_node
         self.beacon_chain = beacon_chain
         self.remote_signer = remote_signer
+        self.scheduler = scheduler
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
-        self.scheduler = scheduler
 
         self._slashing_detected = False
 
