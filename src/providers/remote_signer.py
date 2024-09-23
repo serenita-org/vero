@@ -147,7 +147,9 @@ class RemoteSigner:
         message: SchemaRemoteSigner.SignableMessageT,
         identifier: str,
     ) -> tuple[SchemaRemoteSigner.SignableMessageT, str, str]:
-        """:param message: SignableMessage to sign
+        """
+
+        :param message: SignableMessage to sign
         :param identifier: BLS public key in hex format for which data to sign
         :
         """

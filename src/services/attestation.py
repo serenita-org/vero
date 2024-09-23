@@ -25,7 +25,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import AggregateAndProof, Attestation, AttestationData
+from spec.attestation import AggregateAndProof, AttestationData
 from spec.common import (
     MAX_VALIDATORS_PER_COMMITTEE,
     bytes_to_uint64,
@@ -312,6 +312,38 @@ class AttestationService(ValidatorDutyService):
         )
         return bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0  # type: ignore[no-any-return]
 
+    async def _sign_and_publish_aggregates(
+        self,
+        slot: int,
+        messages: list[SchemaRemoteSigner.AggregateAndProofSignableMessage],
+        identifiers: list[str],
+    ) -> None:
+        signed_aggregate_and_proofs = []
+        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(
+            messages=messages,
+            identifiers=identifiers,
+        ):
+            signed_aggregate_and_proofs.append((msg.aggregate_and_proof, sig))
+
+        self._duty_submission_time_metric.labels(
+            duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
+
+        try:
+            await self.multi_beacon_node.publish_aggregate_and_proofs(
+                signed_aggregate_and_proofs=signed_aggregate_and_proofs,
+            )
+            _VC_PUBLISHED_AGGREGATE_ATTESTATIONS.inc(
+                amount=len(signed_aggregate_and_proofs),
+            )
+        except Exception:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
+            ).inc()
+            self.logger.exception(
+                f"Failed to publish aggregate and proofs for slot {slot}",
+            )
+
     async def aggregate_attestations(
         self,
         att_data: AttestationData,
@@ -331,80 +363,46 @@ class AttestationService(ValidatorDutyService):
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
         committee_indices = {d.committee_index for d in aggregator_duties}
-        aggregates: list[Attestation | BaseException] = await asyncio.gather(
-            *(
-                self.multi_beacon_node.get_aggregate_attestation(
-                    attestation_data=att_data,
-                    committee_index=committee_index,
-                )
-                for committee_index in committee_indices
-            ),
-            # We may fail to get an aggregate for a committee index
-            # but succeed for another
-            return_exceptions=True,
-        )
 
-        signing_coroutines = []
+        aggregate_count = 0
+
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
-        for aggregate in aggregates:
-            if isinstance(aggregate, BaseException):
-                _ERRORS_METRIC.labels(
-                    error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
-                ).inc()
-                continue
-
-            signing_coroutines.extend(
-                [
-                    self.remote_signer.sign(
-                        message=SchemaRemoteSigner.AggregateAndProofSignableMessage(
+        _sign_and_publish_tasks = []
+        async for aggregate in self.multi_beacon_node.get_aggregate_attestations(
+            attestation_data=att_data,
+            committee_indices=committee_indices,
+        ):
+            messages = []
+            identifiers = []
+            for duty in aggregator_duties:
+                if duty.committee_index == aggregate.data.index:
+                    aggregate_count += 1
+                    messages.append(
+                        SchemaRemoteSigner.AggregateAndProofSignableMessage(
                             fork_info=_fork_info,
                             aggregate_and_proof=AggregateAndProof(
                                 aggregator_index=duty.validator_index,
                                 aggregate=aggregate,
                                 selection_proof=duty.selection_proof,
                             ).to_obj(),
-                        ),
-                        identifier=duty.pubkey,
+                        )
                     )
-                    for duty in aggregator_duties
-                    if duty.committee_index == aggregate.data.index
-                ],
+                    identifiers.append(duty.pubkey)
+
+            _sign_and_publish_tasks.append(
+                asyncio.create_task(
+                    self._sign_and_publish_aggregates(
+                        slot=slot,
+                        messages=messages,
+                        identifiers=identifiers,
+                    )
+                )
             )
 
-        try:
-            signed_aggregate_and_proofs = await asyncio.gather(*signing_coroutines)
-        except Exception:
-            _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.exception(
-                f"Failed to get signatures for aggregates and proofs for slot {att_data.slot}",
-            )
-            return
-
-        self._duty_submission_time_metric.labels(
-            duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
-        try:
-            await self.multi_beacon_node.publish_aggregate_and_proofs(
-                signed_aggregate_and_proofs=[
-                    (msg.aggregate_and_proof, sig)
-                    for msg, sig, _ in signed_aggregate_and_proofs
-                ],
-            )
-        except Exception:
-            _ERRORS_METRIC.labels(
-                error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
-            ).inc()
-            self.logger.exception(
-                f"Failed to publish aggregate and proofs for slot {att_data.slot}",
-            )
-        else:
-            self.logger.info(
-                f"Published aggregate and proofs for slot {att_data.slot}, count: {len(signed_aggregate_and_proofs)}",
-            )
-
-            _VC_PUBLISHED_AGGREGATE_ATTESTATIONS.inc(
-                amount=len(signed_aggregate_and_proofs),
-            )
+        await asyncio.gather(*_sign_and_publish_tasks)
+        self.logger.info(
+            f"Published aggregate and proofs for slot {att_data.slot}, count: {aggregate_count}",
+        )
 
     async def _prep_and_schedule_duties(
         self,
