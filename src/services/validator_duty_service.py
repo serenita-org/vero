@@ -93,7 +93,10 @@ class ValidatorDutyService:
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         raise NotImplementedError
 
-    async def handle_reorg_event(self, _: SchemaBeaconAPI.ChainReorgEvent) -> None:
+    async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:
+        self.logger.debug(
+            f"Handling reorg event, new head block {event.new_head_block}"
+        )
         self.scheduler.add_job(self.update_duties)
 
     async def _update_duties(self) -> None:
