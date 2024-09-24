@@ -255,6 +255,40 @@ class SyncCommitteeService(ValidatorDutyService):
             next_run_time=aggregation_run_time,
         )
 
+    async def _sign_and_publish_contributions(
+        self,
+        duty_slot: int,
+        messages: list[
+            SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage
+        ],
+        identifiers: list[str],
+    ) -> None:
+        signed_contribution_and_proofs = []
+        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(
+            messages=messages,
+            identifiers=identifiers,
+        ):
+            signed_contribution_and_proofs.append((msg.contribution_and_proof, sig))
+
+        self._duty_submission_time_metric.labels(
+            duty=ValidatorDuty.SYNC_COMMITTEE_CONTRIBUTION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
+
+        try:
+            await self.multi_beacon_node.publish_sync_committee_contribution_and_proofs(
+                signed_contribution_and_proofs=signed_contribution_and_proofs,
+            )
+            _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS.inc(
+                amount=len(signed_contribution_and_proofs),
+            )
+        except Exception:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
+            ).inc()
+            self.logger.exception(
+                f"Failed to publish sync committee contribution and proofs for slot {duty_slot}",
+            )
+
     async def aggregate_sync_messages(
         self,
         duties_with_proofs: list[SchemaBeaconAPI.SyncDutyWithSelectionProofs],
@@ -284,84 +318,53 @@ class SyncCommitteeService(ValidatorDutyService):
             for sp in duty.selection_proofs
             if sp.is_aggregator
         }
-        coroutines = [
-            self.multi_beacon_node.get_sync_committee_contribution(
-                slot=duty_slot,
-                subcommittee_index=subcommittee_index,
-                beacon_block_root=beacon_block_root,
-            )
-            for subcommittee_index in unique_subcommittee_indices
-        ]
 
-        try:
-            contributions = await asyncio.gather(*coroutines)
-        except Exception:
-            _ERRORS_METRIC.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PRODUCE.value,
-            ).inc()
-            raise
+        contribution_count = 0
 
-        coroutines = []
-        for duty in slot_sync_aggregate_duties:
-            slot_agg_selection_proofs = [
-                sp for sp in duty.selection_proofs if sp.is_aggregator
-            ]
+        _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
+        _sign_and_publish_tasks = []
+        async for (
+            contribution
+        ) in self.multi_beacon_node.get_sync_committee_contributions(
+            slot=duty_slot,
+            subcommittee_indices=unique_subcommittee_indices,
+            beacon_block_root=beacon_block_root,
+        ):
+            messages = []
+            identifiers = []
+            for duty in slot_sync_aggregate_duties:
+                for duty_sp in duty.selection_proofs:
+                    if (
+                        duty_sp.subcommittee_index == contribution.subcommittee_index
+                        and duty_sp.is_aggregator
+                    ):
+                        contribution_count += 1
+                        messages.append(
+                            SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
+                                fork_info=_fork_info,
+                                contribution_and_proof=SyncCommitteeContributionClass.ContributionAndProof(
+                                    aggregator_index=duty.validator_index,
+                                    contribution=contribution,
+                                    selection_proof=duty_sp.selection_proof,
+                                ).to_obj(),
+                            )
+                        )
+                        identifiers.append(duty.pubkey)
 
-            for sp in slot_agg_selection_proofs:
-                contribution = next(
-                    c
-                    for c in contributions
-                    if c.subcommittee_index == sp.subcommittee_index
+            _sign_and_publish_tasks.append(
+                asyncio.create_task(
+                    self._sign_and_publish_contributions(
+                        duty_slot=duty_slot,
+                        messages=messages,
+                        identifiers=identifiers,
+                    )
                 )
+            )
 
-                _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
-                coroutines.append(
-                    self.remote_signer.sign(
-                        message=SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
-                            fork_info=_fork_info,
-                            contribution_and_proof=SyncCommitteeContributionClass.ContributionAndProof(
-                                aggregator_index=duty.validator_index,
-                                contribution=contribution,
-                                selection_proof=sp.selection_proof,
-                            ).to_obj(),
-                        ),
-                        identifier=duty.pubkey,
-                    ),
-                )
-
-        try:
-            signed_contribution_and_proofs = [
-                (msg.contribution_and_proof, sig)
-                for msg, sig, identifier in await asyncio.gather(*coroutines)
-            ]
-        except Exception:
-            _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.exception(
-                f"Failed to get signatures for sync contributions and proofs for slot {duty_slot}",
-            )
-            raise
-
-        self._duty_submission_time_metric.labels(
-            duty=ValidatorDuty.SYNC_COMMITTEE_CONTRIBUTION.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
-        try:
-            await self.multi_beacon_node.publish_sync_committee_contribution_and_proofs(
-                signed_contribution_and_proofs=signed_contribution_and_proofs,
-            )
-        except Exception:
-            _ERRORS_METRIC.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
-            ).inc()
-            self.logger.exception(
-                f"Failed to publish sync committee contribution and proofs for slot {duty_slot}",
-            )
-        else:
-            self.logger.info(
-                f"Published sync committee contribution and proofs for slot {duty_slot}, count: {len(signed_contribution_and_proofs)}",
-            )
-            _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS.inc(
-                len(signed_contribution_and_proofs),
-            )
+        await asyncio.gather(*_sign_and_publish_tasks)
+        self.logger.info(
+            f"Published sync committee contribution and proofs for slot {duty_slot}, count: {contribution_count}"
+        )
 
     def _compute_subnets_for_sync_committee(
         self,

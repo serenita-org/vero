@@ -37,6 +37,7 @@ import asyncio
 import datetime
 import logging
 from collections import Counter
+from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Any
 
@@ -46,6 +47,7 @@ from opentelemetry import trace
 from pydantic import HttpUrl
 from remerkleable.complex import Container
 
+from observability import ErrorType, get_shared_metrics
 from providers.beacon_node import (
     BeaconNode,
     BeaconNodeNotReady,
@@ -54,6 +56,8 @@ from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
 from spec.sync_committee import SyncCommitteeContributionClass
+
+(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class AttestationConsensusFailure(BaseException):
@@ -630,10 +634,34 @@ class MultiBeaconNode:
 
         return best_aggregate
 
-    async def publish_aggregate_and_proofs(self, **kwargs: Any) -> None:
+    async def get_aggregate_attestations(
+        self,
+        attestation_data: AttestationData,
+        committee_indices: set[int],
+    ) -> AsyncIterator[AttestationData]:
+        tasks = [
+            self.get_aggregate_attestation(
+                attestation_data=attestation_data,
+                committee_index=committee_index,
+            )
+            for committee_index in committee_indices
+        ]
+
+        for task in asyncio.as_completed(tasks):
+            try:
+                yield await task
+            except Exception:  # noqa: BLE001
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
+                ).inc()
+
+    async def publish_aggregate_and_proofs(
+        self,
+        signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+    ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
-            **kwargs,
+            signed_aggregate_and_proofs=signed_aggregate_and_proofs,
         )
 
     async def get_sync_duties(
@@ -657,10 +685,17 @@ class MultiBeaconNode:
             **kwargs,
         )
 
-    async def get_sync_committee_contribution(self, **kwargs: Any) -> Container:
+    async def get_sync_committee_contribution(
+        self,
+        slot: int,
+        subcommittee_index: int,
+        beacon_block_root: str,
+    ) -> Container:
         contributions: list[Container] = await self._get_all_beacon_node_responses(
             func_name="get_sync_committee_contribution",
-            **kwargs,
+            slot=slot,
+            subcommittee_index=subcommittee_index,
+            beacon_block_root=beacon_block_root,
         )
 
         best_contribution = None
@@ -682,11 +717,34 @@ class MultiBeaconNode:
 
         return best_contribution
 
+    async def get_sync_committee_contributions(
+        self,
+        slot: int,
+        subcommittee_indices: set[int],
+        beacon_block_root: str,
+    ) -> AsyncIterator[Container]:
+        tasks = [
+            self.get_sync_committee_contribution(
+                slot=slot,
+                subcommittee_index=subcommittee_index,
+                beacon_block_root=beacon_block_root,
+            )
+            for subcommittee_index in subcommittee_indices
+        ]
+
+        for task in asyncio.as_completed(tasks):
+            try:
+                yield await task
+            except Exception:  # noqa: BLE001
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PRODUCE.value,
+                ).inc()
+
     async def publish_sync_committee_contribution_and_proofs(
         self,
-        **kwargs: Any,
+        signed_contribution_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs",
-            **kwargs,
+            signed_contribution_and_proofs=signed_contribution_and_proofs,
         )
