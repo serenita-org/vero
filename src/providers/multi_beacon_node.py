@@ -60,7 +60,7 @@ from spec.sync_committee import SyncCommitteeContributionClass
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
-class AttestationConsensusFailure(BaseException):
+class AttestationConsensusFailure(Exception):
     pass
 
 
@@ -204,7 +204,7 @@ class MultiBeaconNode:
             *[getattr(bn, func_name)(**kwargs) for bn in beacon_nodes_to_use],
             return_exceptions=True,
         ):
-            if isinstance(res, BaseException):
+            if isinstance(res, Exception):
                 self.logger.exception(
                     f"Failed to get beacon node response for {func_name}",
                     exc_info=res,
@@ -482,7 +482,7 @@ class MultiBeaconNode:
         for task in tasks:
             task.cancel()
         raise AttestationConsensusFailure(
-            f"Failed to reach consensus on attestation data among connected beacon nodes. Expected head block root: {head_event.block}",
+            f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes. Expected head block root: {head_event.block}",
         )
 
     async def _produce_attestation_data_without_head_event(
@@ -531,7 +531,7 @@ class MultiBeaconNode:
                 max(0.03 - (asyncio.get_event_loop().time() - _round_start), 0),
             )
         raise AttestationConsensusFailure(
-            "Failed to reach consensus on attestation data among connected beacon nodes.",
+            f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes.",
         )
 
     async def _produce_attestation_data(

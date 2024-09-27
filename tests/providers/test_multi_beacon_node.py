@@ -168,7 +168,7 @@ async def test_initialize(
     ],
 )
 async def test_get_aggregate_attestation(
-    numbers_of_attesting_indices: list[BaseException | int],
+    numbers_of_attesting_indices: list[Exception | int],
     best_aggregate_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
     spec_deneb: SpecDeneb,
@@ -264,7 +264,7 @@ async def test_get_aggregate_attestation(
 )
 @pytest.mark.usefixtures("_sync_committee_contribution_class_init")
 async def test_get_sync_committee_contribution(
-    numbers_of_root_matching_indices: list[BaseException | int],
+    numbers_of_root_matching_indices: list[Exception | int],
     best_contribution_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
     spec_deneb: SpecDeneb,
