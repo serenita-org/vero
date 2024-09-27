@@ -19,6 +19,7 @@ from prometheus_client import Histogram
 from remerkleable.bitfields import Bitlist
 
 from observability import ErrorType, get_shared_metrics
+from providers.multi_beacon_node import AttestationConsensusFailure
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -169,7 +170,7 @@ class AttestationService(ValidatorDutyService):
                         slot=slot,
                         committee_index=0,
                     )
-                except Exception:
+                except AttestationConsensusFailure:
                     _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.ATTESTATION_CONSENSUS.value,

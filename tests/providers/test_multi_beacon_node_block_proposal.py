@@ -19,7 +19,7 @@ from spec.block import BeaconBlockClass
 
 class BeaconNodeResponse(TypedDict):
     response: SchemaBeaconAPI.ProduceBlockV3Response | None
-    exception: BaseException | None
+    exception: Exception | None
     delay: float | int
 
 
@@ -293,7 +293,7 @@ async def test_produce_block_v3(
 
                 async def _f(
                     _response: SchemaBeaconAPI.ProduceBlockV3Response | None,
-                    _exception: BaseException | None,
+                    _exception: Exception | None,
                     _delay: float,
                     *args: Any,
                     **kwargs: Any,
