@@ -4,14 +4,14 @@ Vero regularly undergoes thorough testing against various CL and EL client combi
 
 It is currently compatible with all open-source Ethereum clients:
 
-|                | Compatible | Version  | Notes                                                                |
-|----------------|------------|----------|----------------------------------------------------------------------|
-| **Grandine**   | 🟡         | 0.4.0+   | Slashing SSE events not supported yet - slashing detection is slower |
-| **Lighthouse** | ✅          | v4.6.0+  |                                                                      |
-| **Lodestar**   | ✅          | v1.12.0+ |                                                                      |
-| **Nimbus**     | ✅          | v24.1.1+ |                                                                      |
-| **Prysm**      | ✅          | v4.2.0   |                                                                      |
-| **Teku**       | ✅          | 23.11.0+ |                                                                      |
+|                | Compatible | Version  | Notes |
+|----------------|------------|----------|---|
+| **Grandine**   | ✅          | TBD      |   |
+| **Lighthouse** | ✅          | v4.6.0+  |   |
+| **Lodestar**   | ✅          | v1.12.0+ |   |
+| **Nimbus**     | ✅          | v24.1.1+ |   |
+| **Prysm**      | ✅          | v4.2.0   |   |
+| **Teku**       | ✅          | 23.11.0+ |   |
 
 #### Legend
 ✅ Everything works perfectly.
