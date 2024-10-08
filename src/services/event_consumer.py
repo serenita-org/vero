@@ -55,10 +55,6 @@ class EventConsumerService:
         primary_bn = self.multi_beacon_node.primary_beacon_node
 
         topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
-        if "grandine" in beacon_node.node_version.lower():
-            # Grandine doesn't support the slashing SSE events
-            for t in ("attester_slashing", "proposer_slashing"):
-                topics.remove(t)
 
         try:
             async for event in beacon_node.subscribe_to_events(topics=topics):
