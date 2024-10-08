@@ -351,24 +351,15 @@ class BeaconNode:
         if len(ids) == 0:
             return []
 
-        try:
-            resp = await self._make_request(
-                method="POST",
-                endpoint="/eth/v1/beacon/states/{state_id}/validators",
-                formatted_endpoint_string_params=dict(state_id=state_id),
-                json={
-                    "ids": ids,
-                    "statuses": [s.value for s in statuses],
-                },
-            )
-        except BeaconNodeUnsupportedEndpoint:
-            # Grandine doesn't support the POST endpoint yet
-            # -> fall back to GET endpoint
-            return await self._get_validators_fallback(
-                ids=ids,
-                statuses=statuses,
-                state_id=state_id,
-            )
+        resp = await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/beacon/states/{state_id}/validators",
+            formatted_endpoint_string_params=dict(state_id=state_id),
+            json={
+                "ids": ids,
+                "statuses": [s.value for s in statuses],
+            },
+        )
 
         return [
             SchemaValidator.ValidatorIndexPubkey(
