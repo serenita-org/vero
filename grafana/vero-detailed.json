@@ -4870,7 +4870,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 35
+            "y": 10
           },
           "id": 97,
           "options": {
@@ -4892,7 +4892,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(process_cpu_seconds_total{instance=\"$instance\", job=\"$validator_client_job_name\"}[$__rate_interval])",
+              "expr": "rate(process_cpu_seconds_total{instance=\"$instance\"}[$__rate_interval]) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "CPU Usage",
               "range": true,
@@ -4966,7 +4966,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 35
+            "y": 10
           },
           "id": 98,
           "options": {
@@ -4988,7 +4988,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "irate(process_cpu_seconds_total{instance=\"$instance\", job=\"$validator_client_job_name\"}[$__rate_interval])",
+              "expr": "irate(process_cpu_seconds_total{instance=\"$instance\"}[$__rate_interval]) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "CPU Usage",
               "range": true,
@@ -5058,7 +5058,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 35
+            "y": 10
           },
           "id": 120,
           "options": {
@@ -5080,7 +5080,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "process_resident_memory_bytes{instance=\"$instance\", job=\"$validator_client_job_name\"}",
+              "expr": "process_resident_memory_bytes{instance=\"$instance\"} and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "Resident Memory",
               "range": true,
@@ -5126,7 +5126,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 35
+            "y": 10
           },
           "id": 79,
           "options": {
@@ -5155,7 +5155,7 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "time() - process_start_time_seconds{instance=\"$instance\", job=\"$validator_client_job_name\"}",
+              "expr": "time() - process_start_time_seconds{instance=\"$instance\"} and on(instance, job) vero_info",
               "instant": true,
               "legendFormat": "__auto",
               "range": false,
@@ -5229,7 +5229,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 43
+            "y": 18
           },
           "id": 30,
           "options": {
@@ -5251,7 +5251,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, event_loop_lag_seconds_bucket{instance=\"$instance\"})",
+              "expr": "histogram_quantile(0.99, event_loop_lag_seconds_bucket{instance=\"$instance\"}) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "Event Loop Lag - 99% quantile",
               "range": true,
@@ -5321,7 +5321,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 43
+            "y": 18
           },
           "id": 32,
           "options": {
@@ -5344,7 +5344,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "event_loop_tasks{instance=\"$instance\"}",
+              "expr": "event_loop_tasks{instance=\"$instance\"} and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "Event Loop Tasks",
               "range": true,
@@ -5417,7 +5417,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 51
+            "y": 26
           },
           "id": 78,
           "options": {
@@ -5439,7 +5439,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "rate(python_gc_objects_collected_total{instance=\"$instance\"}[$__rate_interval])",
+              "expr": "rate(python_gc_objects_collected_total{instance=\"$instance\"}[$__rate_interval]) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "Generation {{ generation }}",
               "range": true,
@@ -5533,13 +5533,6 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
-      },
-      {
-        "hide": 2,
-        "name": "validator_client_job_name",
-        "query": "validator-client",
-        "skipUrlSync": false,
-        "type": "constant"
       }
     ]
   },
@@ -5551,6 +5544,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
