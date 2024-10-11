@@ -163,4 +163,4 @@ async def run_services(cli_args: CLIArgs) -> None:
         _logger.info("Started event consumer")
 
         # Run forever while monitoring the event loop
-        await monitor_event_loop()
+        await monitor_event_loop(beacon_chain=beacon_chain)

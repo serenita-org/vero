@@ -5240,7 +5240,7 @@
               "showLegend": true
             },
             "tooltip": {
-              "mode": "single",
+              "mode": "multi",
               "sort": "none"
             }
           },
@@ -5253,7 +5253,7 @@
               "editorMode": "code",
               "expr": "histogram_quantile(0.99, event_loop_lag_seconds_bucket{instance=\"$instance\"}) and on(instance, job) vero_info",
               "instant": false,
-              "legendFormat": "Event Loop Lag - 99% quantile",
+              "legendFormat": "{{ time_since_slot_start }}s into slot",
               "range": true,
               "refId": "A"
             }
@@ -5329,7 +5329,7 @@
               "calcs": [],
               "displayMode": "list",
               "placement": "bottom",
-              "showLegend": true
+              "showLegend": false
             },
             "tooltip": {
               "mode": "single",
@@ -5346,7 +5346,7 @@
               "editorMode": "code",
               "expr": "event_loop_tasks{instance=\"$instance\"} and on(instance, job) vero_info",
               "instant": false,
-              "legendFormat": "Event Loop Tasks",
+              "legendFormat": "Tasks",
               "range": true,
               "refId": "A"
             }
@@ -5544,6 +5544,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
