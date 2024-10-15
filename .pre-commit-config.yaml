@@ -4,16 +4,18 @@ default_language_version:
 repos:
   # All files basic formatter
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
+      - id: check-ast
+      - id: check-merge-conflict
       - id: check-yaml
       - id: end-of-file-fixer
-      - id: trailing-whitespace
       - id: mixed-line-ending
-      - id: check-merge-conflict
+      - id: no-commit-to-branch
+      - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.6
+    rev: v0.6.9
     hooks:
       - id: ruff-format
       - id: ruff
@@ -22,12 +24,12 @@ repos:
         require_serial: true
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v1.11.2'
+    rev: 'v1.12.0'
     hooks:
     -   id: mypy
         additional_dependencies:
           [
-          aiohttp==3.10.5,
+          aiohttp==3.10.10,
           pydantic==2.9.2,
           pytest==8.3.3,
           remerkleable==0.1.28,

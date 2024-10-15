@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y git=1:2.39.5-0+
 
 ARG VENV_LOCATION
 ENV PATH="$VENV_LOCATION/bin:$PATH"
-RUN pip install --no-cache-dir uv==0.4.13 && uv venv ${VENV_LOCATION}
+RUN pip install --no-cache-dir uv==0.4.21 && uv venv ${VENV_LOCATION}
 COPY requirements.txt .
 RUN uv pip sync requirements.txt
 
