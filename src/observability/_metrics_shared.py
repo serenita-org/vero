@@ -2,7 +2,7 @@ from enum import Enum
 
 from prometheus_client import Counter
 
-_ERRORS_METRIC = None
+_ERRORS_METRIC: Counter | None = None
 _METRICS_INITIATED = False
 
 
