@@ -14,7 +14,7 @@ from services.attestation import (
     _VC_PUBLISHED_ATTESTATIONS,
 )
 from spec.attestation import AttestationData
-from spec.base import SpecDeneb
+from spec.base import SpecDeneb, SpecElectra
 
 
 async def test_update_duties(attestation_service: AttestationService) -> None:
@@ -24,10 +24,15 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     assert len(attestation_service.attester_duties) > 0
 
 
+@pytest.mark.parametrize(
+    "spec",
+    [pytest.param(SpecDeneb, id="Deneb"), pytest.param(SpecElectra, id="Electra")],
+    indirect=True,
+)
 async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
     validators: list[ValidatorIndexPubkey],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -63,10 +68,15 @@ async def test_attest_if_not_yet_attested(
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1
 
 
+@pytest.mark.parametrize(
+    "spec",
+    [pytest.param(SpecDeneb, id="Deneb"), pytest.param(SpecElectra, id="Electra")],
+    indirect=True,
+)
 async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
     random_active_validator: ValidatorIndexPubkey,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -77,13 +87,13 @@ async def test_aggregate_attestations(
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
             pubkey=random_active_validator.pubkey,
             validator_index=str(random_active_validator.index),
-            committee_index=str(123),
-            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
+            committee_index=str(12),
+            committee_length=str(spec.TARGET_AGGREGATORS_PER_COMMITTEE),
             committees_at_slot=str(random.randint(0, 10)),
             validator_committee_index=str(
                 random.randint(
                     0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                    spec.TARGET_AGGREGATORS_PER_COMMITTEE,
                 )
             ),
             slot=str(duty_slot),

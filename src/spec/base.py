@@ -108,6 +108,9 @@ class SpecDeneb(SpecCapella):
 class SpecElectra(SpecDeneb):
     ELECTRA_FORK_EPOCH: uint64
     ELECTRA_FORK_VERSION: Version
+    MAX_DEPOSIT_REQUESTS_PER_PAYLOAD: uint64
+    MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD: uint64
+    MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD: uint64
 
 
 def parse_spec(data: dict[str, str]) -> Spec:
@@ -117,6 +120,7 @@ def parse_spec(data: dict[str, str]) -> Spec:
     #  mismatch. We could also disable/remove that
     #  spec match check though?
     _specs_descending_order = [
+        SpecElectra,
         SpecDeneb,
         SpecCapella,
         SpecBellatrix,
