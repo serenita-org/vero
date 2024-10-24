@@ -5,7 +5,9 @@ import msgspec
 
 
 class SigningRequestType(Enum):
+    # TODO Post-Electra cleanup - AGGREGATE_AND_PROOF
     AGGREGATE_AND_PROOF = "AGGREGATE_AND_PROOF"
+    AGGREGATE_AND_PROOF_V2 = "AGGREGATE_AND_PROOF_V2"
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
     BLOCK_V2 = "BLOCK_V2"
@@ -51,6 +53,11 @@ class AggregateAndProofSignableMessage(SignableMessageWithForkInfo, kw_only=True
     aggregate_and_proof: dict  # type: ignore[type-arg]
 
 
+class AggregateAndProofV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.AGGREGATE_AND_PROOF_V2
+    aggregate_and_proof: dict  # type: ignore[type-arg]
+
+
 class RandaoReveal(msgspec.Struct):
     epoch: int
 
@@ -70,6 +77,7 @@ class BeaconBlockHeader(msgspec.Struct):
 
 class BeaconBlockVersion(Enum):
     DENEB = "DENEB"
+    ELECTRA = "ELECTRA"
 
 
 class BeaconBlock(msgspec.Struct):

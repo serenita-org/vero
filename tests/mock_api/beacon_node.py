@@ -8,14 +8,20 @@ import msgspec
 import pytest
 import pytz
 from aioresponses import CallbackResult, aioresponses
-from remerkleable.bitfields import Bitlist
+from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
 
 from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
-from spec.attestation import Attestation, AttestationData, Checkpoint
-from spec.base import Fork, Genesis, SpecDeneb
+from spec.attestation import (
+    Attestation,
+    AttestationData,
+    AttestationElectra,
+    Checkpoint,
+)
+from spec.base import Fork, Genesis, SpecDeneb, SpecElectra
 from spec.block import BeaconBlockClass
+from spec.common import MAX_COMMITTEES_PER_SLOT
 from spec.sync_committee import SyncCommitteeContributionClass
 
 
@@ -25,20 +31,46 @@ def beacon_node_url() -> str:
 
 
 @pytest.fixture(scope="session")
-def spec_deneb() -> SpecDeneb:
-    return SpecDeneb(
-        INTERVALS_PER_SLOT=3,
-        SECONDS_PER_SLOT=1,
-        SLOTS_PER_EPOCH=32,
-        MAX_WITHDRAWALS_PER_PAYLOAD=16,
-        MAX_BLOB_COMMITMENTS_PER_BLOCK=4096,
-        TARGET_AGGREGATORS_PER_COMMITTEE=16,
-        MAX_VALIDATORS_PER_COMMITTEE=2048,
-        EPOCHS_PER_SYNC_COMMITTEE_PERIOD=256,
-        SYNC_COMMITTEE_SIZE=512,
-        SYNC_COMMITTEE_SUBNET_COUNT=4,
-        TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE=16,
-    )
+def spec(request: pytest.FixtureRequest) -> SpecDeneb | SpecElectra:
+    spec_version = getattr(request, "param", SpecDeneb)
+
+    if spec_version == SpecDeneb:
+        return SpecDeneb(
+            INTERVALS_PER_SLOT=3,
+            SECONDS_PER_SLOT=1,
+            SLOTS_PER_EPOCH=32,
+            MAX_WITHDRAWALS_PER_PAYLOAD=16,
+            MAX_BLOB_COMMITMENTS_PER_BLOCK=4096,
+            TARGET_AGGREGATORS_PER_COMMITTEE=16,
+            MAX_VALIDATORS_PER_COMMITTEE=2048,
+            EPOCHS_PER_SYNC_COMMITTEE_PERIOD=256,
+            SYNC_COMMITTEE_SIZE=512,
+            SYNC_COMMITTEE_SUBNET_COUNT=4,
+            TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE=16,
+        )
+    if spec_version == SpecElectra:
+        return SpecElectra(
+            INTERVALS_PER_SLOT=3,
+            SECONDS_PER_SLOT=1,
+            SLOTS_PER_EPOCH=32,
+            MAX_WITHDRAWALS_PER_PAYLOAD=16,
+            MAX_BLOB_COMMITMENTS_PER_BLOCK=4096,
+            TARGET_AGGREGATORS_PER_COMMITTEE=16,
+            MAX_VALIDATORS_PER_COMMITTEE=2048,
+            EPOCHS_PER_SYNC_COMMITTEE_PERIOD=256,
+            SYNC_COMMITTEE_SIZE=512,
+            SYNC_COMMITTEE_SUBNET_COUNT=4,
+            TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE=16,
+            MAX_DEPOSIT_REQUESTS_PER_PAYLOAD=8192,
+            MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD=16,
+            MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD=1,
+        )
+    raise ValueError(f"Unsupported value for spec_version: {spec_version}")
+
+
+@pytest.fixture
+def spec_deneb(spec: SpecDeneb) -> SpecDeneb:
+    return spec
 
 
 @pytest.fixture
@@ -89,7 +121,7 @@ def mocked_genesis_response() -> dict:  # type: ignore[type-arg]
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
     _beacon_block_class_init: None,
     _sync_committee_contribution_class_init: None,
     mocked_fork_response: dict,  # type: ignore[type-arg]
@@ -105,7 +137,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(payload=mocked_genesis_response)
 
         if re.match("/eth/v1/config/spec", url.raw_path):
-            return CallbackResult(payload=dict(data=spec_deneb.to_obj()))
+            return CallbackResult(payload=dict(data=spec.to_obj()))
 
         if re.match("/eth/v1/node/version", url.raw_path):
             return CallbackResult(payload=dict(data=dict(version="vero/test")))
@@ -122,17 +154,17 @@ def _mocked_beacon_node_endpoints(
                             SchemaBeaconAPI.ProposerDuty(
                                 pubkey="0x" + os.urandom(48).hex(),
                                 validator_index=str(random.randint(0, 1_000_000)),
-                                slot=str(
-                                    epoch_no * spec_deneb.SLOTS_PER_EPOCH + slot_no
-                                ),
+                                slot=str(epoch_no * spec.SLOTS_PER_EPOCH + slot_no),
                             )
-                            for slot_no in range(spec_deneb.SLOTS_PER_EPOCH)
+                            for slot_no in range(spec.SLOTS_PER_EPOCH)
                         ],
                     )
                 ),
             )
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
+            # TODO - add Electra case!!!
+
             if execution_payload_blinded:
                 _data = BeaconBlockClass.DenebBlinded(
                     slot=int(url.raw_path.split("/")[-1]),
@@ -152,14 +184,17 @@ def _mocked_beacon_node_endpoints(
                     ).to_obj(),
                 )
 
-            response = SchemaBeaconAPI.ProduceBlockV3Response(
-                version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
-                execution_payload_blinded=execution_payload_blinded,
-                execution_payload_value=str(random.randint(0, 10_000_000)),
-                consensus_block_value=str(random.randint(0, 10_000_000)),
-                data=_data,
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.ProduceBlockV3Response(
+                        version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
+                        execution_payload_blinded=execution_payload_blinded,
+                        execution_payload_value=str(random.randint(0, 10_000_000)),
+                        consensus_block_value=str(random.randint(0, 10_000_000)),
+                        data=_data,
+                    )
+                )
             )
-            return CallbackResult(body=msgspec.json.encode(response))
 
         if re.match("/eth/v1/validator/attestation_data", url.raw_path):
             att_data = AttestationData(
@@ -171,9 +206,9 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v1/validator/aggregate_attestation", url.raw_path):
             aggregate_attestation = Attestation(
-                aggregation_bits=Bitlist[spec_deneb.MAX_VALIDATORS_PER_COMMITTEE](
+                aggregation_bits=Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE](
                     random.choice([0, 1])
-                    for _ in range(spec_deneb.MAX_VALIDATORS_PER_COMMITTEE)
+                    for _ in range(spec.MAX_VALIDATORS_PER_COMMITTEE)
                 ),
                 data=AttestationData(
                     slot=int(url.query["slot"]),
@@ -192,6 +227,47 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(payload=dict(data=aggregate_attestation.to_obj()))
 
+        if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
+            # TODO likely requires some changes here
+            _committee_bits = Bitvector[MAX_COMMITTEES_PER_SLOT](
+                False for _ in range(MAX_COMMITTEES_PER_SLOT)
+            )
+            _committee_bits[int(url.query["committee_index"])] = True
+
+            # TODO return Attestation object pre-Electra
+
+            _bitlist_size = spec.MAX_VALIDATORS_PER_COMMITTEE * MAX_COMMITTEES_PER_SLOT
+            aggregate_attestation = AttestationElectra(
+                aggregation_bits=Bitlist[_bitlist_size](
+                    random.choice([0, 1]) for _ in range(_bitlist_size)
+                ),
+                data=AttestationData(
+                    slot=int(url.query["slot"]),
+                    index=0,
+                    beacon_block_root="0x" + os.urandom(32).hex(),
+                    source=Checkpoint(
+                        epoch=2,
+                        root="0x" + os.urandom(32).hex(),
+                    ),
+                    target=Checkpoint(
+                        epoch=3,
+                        root="0x" + os.urandom(32).hex(),
+                    ),
+                ),
+                signature="0x" + os.urandom(96).hex(),
+                # TODO add committee index here somehow
+                committee_bits=_committee_bits,
+            )
+
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetAggregatedAttestationV2Response(
+                        version=SchemaBeaconAPI.ForkVersion.ELECTRA,
+                        data=aggregate_attestation.to_obj(),
+                    )
+                )
+            )
+
         if re.match("/eth/v1/beacon/blocks/head/root", url.raw_path):
             return CallbackResult(
                 body=msgspec.json.encode(
@@ -209,11 +285,9 @@ def _mocked_beacon_node_endpoints(
                 slot=int(url.query["slot"]),
                 beacon_block_root=url.query["beacon_block_root"],
                 subcommittee_index=int(url.query["subcommittee_index"]),
-                aggregation_bits=Bitlist[
-                    spec_deneb.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE
-                ](
+                aggregation_bits=Bitlist[spec.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE](
                     random.choice([0, 1])
-                    for _ in range(spec_deneb.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE)
+                    for _ in range(spec.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE)
                 ),
                 signature="0x" + os.urandom(96).hex(),
             )
@@ -269,9 +343,9 @@ def _mocked_beacon_node_endpoints(
             # specified in the response
             attester_duties = []
             for v in validators:
-                duty_slot = epoch_no * spec_deneb.SLOTS_PER_EPOCH + random.randint(
+                duty_slot = epoch_no * spec.SLOTS_PER_EPOCH + random.randint(
                     0,
-                    spec_deneb.SLOTS_PER_EPOCH,
+                    spec.SLOTS_PER_EPOCH,
                 )
                 attester_duties.append(
                     SchemaBeaconAPI.AttesterDuty(
@@ -280,17 +354,15 @@ def _mocked_beacon_node_endpoints(
                         committee_index=str(
                             random.randint(
                                 0,
-                                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                                spec.TARGET_AGGREGATORS_PER_COMMITTEE,
                             )
                         ),
-                        committee_length=str(
-                            spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE
-                        ),
+                        committee_length=str(spec.TARGET_AGGREGATORS_PER_COMMITTEE),
                         committees_at_slot=str(random.randint(0, 10)),
                         validator_committee_index=str(
                             random.randint(
                                 0,
-                                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                                spec.TARGET_AGGREGATORS_PER_COMMITTEE,
                             )
                         ),
                         slot=str(duty_slot),
