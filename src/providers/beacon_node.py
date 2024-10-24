@@ -22,7 +22,7 @@ from yarl import URL
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec.attestation import Attestation, AttestationData
+from spec.attestation import Attestation, AttestationData, AttestationElectra
 from spec.base import Genesis, Spec, parse_spec
 from spec.sync_committee import SyncCommitteeContributionClass
 
@@ -468,11 +468,16 @@ class BeaconNode:
             data=self.json_encoder.encode(messages),
         )
 
-    async def publish_attestations(self, attestations: list[dict]) -> None:  # type: ignore[type-arg]
+    async def publish_attestations(
+        self,
+        attestations: list[dict],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
         await self._make_request(
             method="POST",
-            endpoint="/eth/v1/beacon/pool/attestations",
+            endpoint="/eth/v2/beacon/pool/attestations",
             data=self.json_encoder.encode(attestations),
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def prepare_beacon_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
@@ -489,6 +494,7 @@ class BeaconNode:
             data=self.json_encoder.encode(data),
         )
 
+    # TODO delete this method, mock, tests, ...
     async def get_aggregate_attestation(
         self,
         attestation_data: AttestationData,
@@ -509,19 +515,51 @@ class BeaconNode:
 
         return Attestation.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
+    async def get_aggregated_attestation_v2(
+        self,
+        attestation_data: AttestationData,
+        committee_index: int,
+    ) -> Attestation | AttestationElectra:
+        resp_text = await self._make_request(
+            method="GET",
+            endpoint="/eth/v2/validator/aggregate_attestation",
+            params=dict(
+                attestation_data_root=f"0x{attestation_data.hash_tree_root().hex()}",
+                slot=attestation_data.slot,
+                committee_index=committee_index,
+            ),
+            timeout=ClientTimeout(
+                connect=self.client_session.timeout.connect,
+                total=int(self.spec.SECONDS_PER_SLOT)
+                / int(self.spec.INTERVALS_PER_SLOT),
+            ),
+        )
+
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
+        )
+
+        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
+            return Attestation.from_obj(response.data)  # type: ignore[no-any-return]
+        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+            return AttestationElectra.from_obj(response.data)  # type: ignore[no-any-return]
+        raise NotImplementedError(f"Unsupported fork version {response.version}")
+
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
-            endpoint="/eth/v1/validator/aggregate_and_proofs",
+            endpoint="/eth/v2/validator/aggregate_and_proofs",
             data=self.json_encoder.encode(
                 [
                     dict(message=msg, signature=sig)
                     for msg, sig in signed_aggregate_and_proofs
                 ]
             ),
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def get_sync_committee_contribution(
@@ -657,7 +695,10 @@ class BeaconNode:
         kzg_proofs: list,  # type: ignore[type-arg]
         signature: str,
     ) -> None:
-        if block_version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if block_version in (
+            SchemaBeaconAPI.BeaconBlockVersion.DENEB,
+            SchemaBeaconAPI.BeaconBlockVersion.ELECTRA,
+        ):
             data = dict(
                 signed_block=dict(
                     message=block.to_obj(),
@@ -693,6 +734,7 @@ class BeaconNode:
                 message=block.to_obj(),
                 signature=signature,
             )
+        # TODO Electra
         else:
             raise NotImplementedError(f"Unsupported block version {block_version}")
 

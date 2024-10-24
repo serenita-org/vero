@@ -49,7 +49,7 @@ from remerkleable.complex import Container
 from observability import ErrorType, get_shared_metrics
 from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
-from spec.attestation import Attestation, AttestationData
+from spec.attestation import Attestation, AttestationData, AttestationElectra
 from spec.block import BeaconBlockClass
 from spec.sync_committee import SyncCommitteeContributionClass
 
@@ -259,6 +259,11 @@ class MultiBeaconNode:
             if response.execution_payload_blinded:
                 return BeaconBlockClass.DenebBlinded.from_obj(response.data)
             return BeaconBlockClass.Deneb.from_obj(response.data["block"])
+        if response.version == SchemaBeaconAPI.BeaconBlockVersion.ELECTRA:
+            if response.execution_payload_blinded:
+                # TODO Electra blinded
+                pass
+            return BeaconBlockClass.Electra.from_obj(response.data["block"])
         raise ValueError(
             f"Unsupported block version {response.version} in response {response}",
         )
@@ -593,17 +598,20 @@ class MultiBeaconNode:
             **kwargs,
         )
 
-    async def get_aggregate_attestation(
+    async def get_aggregate_attestation_v2(
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> Attestation:
+    ) -> Attestation | AttestationElectra:
         _att_data = attestation_data.copy()
         _att_data.index = committee_index
 
-        aggregates: list[Attestation] = await self._get_all_beacon_node_responses(
-            func_name="get_aggregate_attestation",
+        aggregates: list[
+            Attestation | AttestationElectra
+        ] = await self._get_all_beacon_node_responses(
+            func_name="get_aggregated_attestation_v2",
             attestation_data=_att_data,
+            committee_index=committee_index,
         )
 
         best_aggregate = None
@@ -623,13 +631,13 @@ class MultiBeaconNode:
 
         return best_aggregate
 
-    async def get_aggregate_attestations(
+    async def get_aggregate_attestations_v2(
         self,
         attestation_data: AttestationData,
         committee_indices: set[int],
-    ) -> AsyncIterator[AttestationData]:
+    ) -> AsyncIterator[Attestation | AttestationElectra]:
         tasks = [
-            self.get_aggregate_attestation(
+            self.get_aggregate_attestation_v2(
                 attestation_data=attestation_data,
                 committee_index=committee_index,
             )
@@ -647,10 +655,12 @@ class MultiBeaconNode:
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
             signed_aggregate_and_proofs=signed_aggregate_and_proofs,
+            fork_version=fork_version,
         )
 
     async def get_sync_duties(

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytz
 
-from schemas import SchemaRemoteSigner
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec.base import Fork, Genesis, Spec
 
 if TYPE_CHECKING:
@@ -32,6 +32,18 @@ class BeaconChain:
         return next(
             bn.spec for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
         )
+
+    @property
+    def fork(self) -> Fork:
+        return self.get_fork(slot=self.current_slot)
+
+    @property
+    def current_fork_version(self) -> SchemaBeaconAPI.ForkVersion:
+        if self.fork.current_version == self.spec.ELECTRA_FORK_VERSION:
+            return SchemaBeaconAPI.ForkVersion.ELECTRA
+        if self.fork.current_version == self.spec.DENEB_FORK_VERSION:
+            return SchemaBeaconAPI.ForkVersion.DENEB
+        raise ValueError(f"Unsupported fork {self.fork} for slot {self.current_slot}")
 
     def get_fork(self, slot: int) -> Fork:
         spec = self.multi_beacon_node.best_beacon_node.spec

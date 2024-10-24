@@ -47,6 +47,17 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
+# TODO deduplicate these (BeaconBlockVersion -> ForkVersion)
+class ForkVersion(Enum):
+    DENEB = "deneb"
+    ELECTRA = "electra"
+
+
+class GetAggregatedAttestationV2Response(msgspec.Struct):
+    version: ForkVersion
+    data: dict  # type: ignore[type-arg]
+
+
 # Duty endpoints responses
 class ProposerDuty(msgspec.Struct, frozen=True):
     pubkey: str
@@ -106,6 +117,7 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
 # Block production
 class BeaconBlockVersion(Enum):
     DENEB = "deneb"
+    ELECTRA = "electra"
 
 
 class ProduceBlockV3Response(msgspec.Struct):

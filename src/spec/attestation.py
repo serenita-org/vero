@@ -1,7 +1,8 @@
-from remerkleable.bitfields import Bitlist
-from remerkleable.complex import Container
+from remerkleable.bitfields import Bitlist, Bitvector
+from remerkleable.complex import Container, List
 
 from spec.common import (
+    MAX_COMMITTEES_PER_SLOT,
     MAX_VALIDATORS_PER_COMMITTEE,
     BLSSignature,
     Epoch,
@@ -37,7 +38,35 @@ class Attestation(Container):
     signature: BLSSignature
 
 
+class AttestationElectra(Container):
+    aggregation_bits: Bitlist[MAX_VALIDATORS_PER_COMMITTEE * MAX_COMMITTEES_PER_SLOT]
+    data: AttestationData
+    signature: BLSSignature
+    committee_bits: Bitvector[MAX_COMMITTEES_PER_SLOT]
+
+
+# TODO Post-Electra cleanup
 class AggregateAndProof(Container):
     aggregator_index: ValidatorIndex
     aggregate: Attestation
     selection_proof: BLSSignature
+
+
+class AggregateAndProofV2(Container):
+    aggregator_index: ValidatorIndex
+    aggregate: AttestationElectra
+    selection_proof: BLSSignature
+
+
+class IndexedAttestationDeneb(Container):
+    attesting_indices: List[ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE]
+    data: AttestationData
+    signature: BLSSignature
+
+
+class IndexedAttestationElectra(Container):
+    attesting_indices: List[
+        ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE * MAX_COMMITTEES_PER_SLOT
+    ]
+    data: AttestationData
+    signature: BLSSignature
