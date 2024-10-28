@@ -91,9 +91,9 @@ async def test_aggregate_sync_messages(
         _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS._value.get()
     )
     await sync_committee_service.aggregate_sync_messages(
-        duties_with_proofs=duties_with_proofs,
         duty_slot=duty_slot,
         beacon_block_root="0x" + os.urandom(32).hex(),
+        duties_with_proofs=duties_with_proofs,
     )
 
     assert any(

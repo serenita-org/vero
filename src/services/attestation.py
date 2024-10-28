@@ -254,6 +254,20 @@ class AttestationService(ValidatorDutyService):
                         ),
                     )
 
+            # Add the aggregation duty to the schedule *before*
+            # publishing attestations so that any delays in publishing
+            # do not affect the aggregation duty start time
+            self.scheduler.add_job(
+                self.prepare_and_aggregate_attestations,
+                kwargs=dict(
+                    slot=slot,
+                    att_data=att_data,
+                    aggregator_duties=[
+                        d for d in slot_attester_duties if d.is_aggregator
+                    ],
+                ),
+            )
+
             self.logger.debug("Publishing attestations")
             self._duty_submission_time_metric.labels(
                 duty=ValidatorDuty.ATTESTATION.value,
@@ -283,24 +297,29 @@ class AttestationService(ValidatorDutyService):
                         amount=len(attestations_objects_to_publish),
                     )
 
-            # Sign and submit aggregated attestation at 2/3 of the slot
-            aggregation_run_time = self.beacon_chain.get_datetime_for_slot(
-                slot,
-            ) + datetime.timedelta(
-                seconds=2
-                * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-                / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
-            )
-            self.scheduler.add_job(
-                self.aggregate_attestations,
-                kwargs=dict(
-                    att_data=att_data,
-                    slot_attester_duties=[
-                        d for d in slot_attester_duties if d.is_aggregator
-                    ],
-                ),
-                next_run_time=aggregation_run_time,
-            )
+    def prepare_and_aggregate_attestations(
+        self,
+        slot: int,
+        att_data: AttestationData,
+        aggregator_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+    ) -> None:
+        # Schedule aggregated attestation at 2/3 of the slot
+        aggregation_run_time = self.beacon_chain.get_datetime_for_slot(
+            slot,
+        ) + datetime.timedelta(
+            seconds=2
+            * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+        )
+        self.scheduler.add_job(
+            self.aggregate_attestations,
+            kwargs=dict(
+                slot=slot,
+                att_data=att_data,
+                aggregator_duties=aggregator_duties,
+            ),
+            next_run_time=aggregation_run_time,
+        )
 
     def _is_aggregator_by_committee_length(
         self,
@@ -347,14 +366,12 @@ class AttestationService(ValidatorDutyService):
 
     async def aggregate_attestations(
         self,
+        slot: int,
         att_data: AttestationData,
-        slot_attester_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+        aggregator_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
-        aggregator_duties = [d for d in slot_attester_duties if d.is_aggregator]
         if len(aggregator_duties) == 0:
             return
-
-        slot = aggregator_duties[0].slot
 
         self.logger.debug(
             f"Aggregating attestations for slot {slot}, {len(aggregator_duties)} duties",

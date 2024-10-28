@@ -99,8 +99,9 @@ async def test_aggregate_attestations(
 
     aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
     await attestation_service.aggregate_attestations(
+        slot=duty_slot,
         att_data=att_data,
-        slot_attester_duties=slot_attester_duties,
+        aggregator_duties={d for d in slot_attester_duties if d.is_aggregator},
     )
 
     assert any("Published aggregate and proofs" in m for m in caplog.messages)
