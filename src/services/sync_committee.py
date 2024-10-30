@@ -158,6 +158,18 @@ class SyncCommitteeService(ValidatorDutyService):
                 ),
             )
 
+        # Add the aggregation duty to the schedule *before*
+        # publishing sync messages so that any delays in publishing
+        # do not affect the aggregation duty start time
+        self.scheduler.add_job(
+            self.prepare_and_aggregate_sync_messages,
+            kwargs=dict(
+                duty_slot=duty_slot,
+                beacon_block_root=beacon_block_root,
+                sync_duties=self.sync_duties[sync_period],
+            ),
+        )
+
         self._duty_submission_time_metric.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
@@ -180,10 +192,16 @@ class SyncCommitteeService(ValidatorDutyService):
                 amount=len(sync_committee_members),
             )
 
+    async def prepare_and_aggregate_sync_messages(
+        self,
+        duty_slot: int,
+        beacon_block_root: str,
+        sync_duties: list[SchemaBeaconAPI.SyncDuty],
+    ) -> None:
         # Prepare data for contribution and proof
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         selection_proofs_coroutines = []
-        for duty in self.sync_duties[sync_period]:
+        for duty in sync_duties:
             subcommittee_indexes = self._compute_subnets_for_sync_committee(
                 duty.validator_sync_committee_indices,
             )
@@ -213,7 +231,7 @@ class SyncCommitteeService(ValidatorDutyService):
             return
 
         duties_with_proofs = []
-        for duty in self.sync_duties[sync_period]:
+        for duty in sync_duties:
             duty_sync_committee_selection_proofs = []
             for sel_proof_msg, sig, identifier in selection_proofs:
                 if identifier != duty.pubkey:
@@ -248,9 +266,9 @@ class SyncCommitteeService(ValidatorDutyService):
         self.scheduler.add_job(
             self.aggregate_sync_messages,
             kwargs=dict(
-                duties_with_proofs=duties_with_proofs,
                 duty_slot=duty_slot,
                 beacon_block_root=beacon_block_root,
+                duties_with_proofs=duties_with_proofs,
             ),
             next_run_time=aggregation_run_time,
         )
@@ -291,9 +309,9 @@ class SyncCommitteeService(ValidatorDutyService):
 
     async def aggregate_sync_messages(
         self,
-        duties_with_proofs: list[SchemaBeaconAPI.SyncDutyWithSelectionProofs],
         duty_slot: int,
         beacon_block_root: str,
+        duties_with_proofs: list[SchemaBeaconAPI.SyncDutyWithSelectionProofs],
     ) -> None:
         slot_sync_aggregate_duties = [
             d
