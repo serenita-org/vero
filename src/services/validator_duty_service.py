@@ -107,9 +107,12 @@ class ValidatorDutyService:
         next_run_time = None
         try:
             await self._update_duties()
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
-            self.logger.exception("Failed to update duties")
+            self.logger.error(
+                f"Failed to update duties: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
             next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
                 seconds=1,
             )

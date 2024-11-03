@@ -130,7 +130,7 @@ async def test_handle_slashing_event(
 
     if our_validator_affected:
         assert any("Slashing detected" in m for m in caplog.messages)
-        assert any(record.levelname == "ERROR" for record in caplog.records)
+        assert any(record.levelname == "CRITICAL" for record in caplog.records)
 
         # ValidatorStatusTracker property value should be set
         assert validator_status_tracker.slashing_detected is True

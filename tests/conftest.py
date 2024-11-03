@@ -64,7 +64,7 @@ def _init_observability() -> None:
         metrics_address="localhost",
         metrics_port=8080,
         metrics_multiprocess_mode=False,
-        log_level="INFO",
+        log_level="DEBUG",
     )
 
 

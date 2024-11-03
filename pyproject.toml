@@ -22,7 +22,7 @@ target-version = "py312"
 [tool.ruff.lint]
 # Enable all rules and explicitly disable some that we don't comply with (yet?)
 select = ["ALL"]
-ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM812", "ERA001", "E501", "FBT", "G004", "ISC001", "N805", "N812", "N818","TRY003"]
+ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM812", "ERA001", "E501", "FBT", "G004", "ISC001", "N805", "N812", "N818", "TRY003", "TRY400", "BLE001"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/mock_api/beacon_node.py" = ["C901"]

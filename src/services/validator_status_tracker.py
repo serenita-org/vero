@@ -84,7 +84,7 @@ class ValidatorStatusTrackerService:
 
             if len(our_slashed_indices) > 0:
                 self.slashing_detected = True
-                self.logger.error(
+                self.logger.critical(
                     f"Slashing detected for validator indices {our_slashed_indices}",
                 )
             self.logger.info(
@@ -94,7 +94,7 @@ class ValidatorStatusTrackerService:
             slashed_validator_index = event.signed_header_1.message.proposer_index
             if slashed_validator_index in our_validator_indices:
                 self.slashing_detected = True
-                self.logger.error(
+                self.logger.critical(
                     f"Slashing detected for validator index {slashed_validator_index}",
                 )
             self.logger.info(
@@ -115,7 +115,7 @@ class ValidatorStatusTrackerService:
 
         if len(slashed_validators) > 0:
             self.slashing_detected = True
-            self.logger.error(
+            self.logger.critical(
                 f"Slashed validators detected while updating validator statuses. Slashed validators: {slashed_validators}",
             )
 
@@ -154,8 +154,11 @@ class ValidatorStatusTrackerService:
     async def update_validator_statuses(self) -> None:
         try:
             await self._update_validator_statuses()
-        except Exception:
-            self.logger.exception("Failed to update validator statuses")
+        except Exception as e:
+            self.logger.error(
+                f"Failed to update validator statuses: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
 
         # Schedule the update of validator statuses
         # one slot before the next epoch starts

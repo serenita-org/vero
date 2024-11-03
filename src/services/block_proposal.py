@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import logging
 from collections import defaultdict
 from typing import Unpack
 
@@ -154,8 +155,11 @@ class BlockProposalService(ValidatorDutyService):
         next_run_time = None
         try:
             await self._prepare_beacon_proposer()
-        except Exception:
-            self.logger.exception("Failed to prepare beacon proposer")
+        except Exception as e:
+            self.logger.error(
+                f"Failed to prepare beacon proposer: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
             next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
                 seconds=1,
             )
@@ -218,10 +222,11 @@ class BlockProposalService(ValidatorDutyService):
                         for v in validator_batch
                     ],
                 )
-            except Exception:
+            except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.exception(
-                    "Failed to get signature for validator registrations",
+                self.logger.error(
+                    f"Failed to get signature for validator registrations: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 continue
 
@@ -237,8 +242,11 @@ class BlockProposalService(ValidatorDutyService):
         next_run_time = None
         try:
             await self._register_validators()
-        except Exception:
-            self.logger.exception("Failed to register validators")
+        except Exception as e:
+            self.logger.error(
+                f"Failed to register validators: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
             # On registration errors we retry every 60 seconds
             next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
                 seconds=60,
@@ -323,8 +331,9 @@ class BlockProposalService(ValidatorDutyService):
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.SIGNATURE.value,
                         ).inc()
-                        self.logger.exception(
-                            "Failed to get signature for RANDAO reveal",
+                        self.logger.error(
+                            f"Failed to get signature for RANDAO reveal: {e!r}",
+                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
                         )
                         sign_randao_span.set_status(Status(StatusCode.ERROR))
                         sign_randao_span.record_exception(e)
@@ -343,11 +352,15 @@ class BlockProposalService(ValidatorDutyService):
                             builder_boost_factor=self.cli_args.builder_boost_factor,
                             randao_reveal=randao_reveal,
                         )
-                    except Exception:
+                    except Exception as e:
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.BLOCK_PRODUCE.value,
                         ).inc()
-                        raise
+                        self.logger.error(
+                            f"Failed to produce block: {e!r}",
+                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                        )
+                        return
 
                 beacon_block_header = BeaconBlockHeader(
                     slot=beacon_block.slot,
@@ -375,7 +388,10 @@ class BlockProposalService(ValidatorDutyService):
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.SIGNATURE.value,
                         ).inc()
-                        self.logger.exception("Failed to get signature for block")
+                        self.logger.error(
+                            f"Failed to get signature for block: {e!r}",
+                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                        )
                         sign_block_span.set_status(Status(StatusCode.ERROR))
                         sign_block_span.record_exception(e)
                         continue
@@ -406,12 +422,13 @@ class BlockProposalService(ValidatorDutyService):
                                 block=beacon_block,
                                 signature=signature,
                             )
-                    except Exception:
+                    except Exception as e:
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.BLOCK_PUBLISH.value,
                         ).inc()
-                        self.logger.exception(
-                            f"Failed to publish block for slot {slot}"
+                        self.logger.error(
+                            f"Failed to publish block for slot {slot}: {e!r}",
+                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
                         )
                         raise
                     else:
