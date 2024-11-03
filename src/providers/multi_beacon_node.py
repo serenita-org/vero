@@ -48,10 +48,7 @@ from pydantic import HttpUrl
 from remerkleable.complex import Container
 
 from observability import ErrorType, get_shared_metrics
-from providers.beacon_node import (
-    BeaconNode,
-    BeaconNodeNotReady,
-)
+from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
@@ -174,11 +171,8 @@ class MultiBeaconNode:
         for coro in asyncio.as_completed(tasks):
             try:
                 resp = await coro
-            except Exception as e:
-                self.logger.error(
-                    f"Failed to get beacon node response for {func_name}: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
-                )
+            except Exception:  # noqa: S112
+                continue
             else:
                 # Successful response -> cancel other pending tasks
                 for task in tasks:
@@ -206,12 +200,9 @@ class MultiBeaconNode:
             return_exceptions=True,
         ):
             if isinstance(res, Exception):
-                self.logger.error(
-                    f"Failed to get beacon node response for {func_name}: {res!r}",
-                    exc_info=res if self.logger.isEnabledFor(logging.DEBUG) else False,
-                )
-            else:
-                responses.append(res)
+                continue
+
+            responses.append(res)
 
         if len(responses) == 0:
             raise RuntimeError(
@@ -328,13 +319,7 @@ class MultiBeaconNode:
             for coro in done:
                 try:
                     response = await coro
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to get beacon node response for produce_block_v3: {e!r}",
-                        exc_info=e
-                        if self.logger.isEnabledFor(logging.DEBUG)
-                        else False,
-                    )
+                except Exception:  # noqa: S112
                     continue
 
                 block_value = (
@@ -369,13 +354,7 @@ class MultiBeaconNode:
                     )
                     # Exit loop
                     break
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to get beacon node response for produce_block_v3: {e!r}",
-                        exc_info=e
-                        if self.logger.isEnabledFor(logging.DEBUG)
-                        else False,
-                    )
+                except Exception:  # noqa: S112
                     continue
 
         # Cancel pending requests
@@ -516,11 +495,6 @@ class MultiBeaconNode:
             for coro in asyncio.as_completed(tasks):
                 try:
                     att_data = await coro
-                except BeaconNodeNotReady:
-                    self.logger.debug(
-                        "Beacon node returned 503 not ready while requesting attestation data",
-                    )
-                    continue
                 except Exception as e:
                     self.logger.error(
                         f"Failed to produce attestation data: {e!r}",

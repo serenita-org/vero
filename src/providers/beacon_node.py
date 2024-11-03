@@ -140,13 +140,15 @@ class BeaconNode:
         if response.ok:
             return
 
+        resp_text = await response.text()
+
         if response.status == 503:
-            raise BeaconNodeNotReady(await response.text())
+            raise BeaconNodeNotReady(resp_text)
         if response.status == 405:
-            raise BeaconNodeUnsupportedEndpoint(await response.text())
+            raise BeaconNodeUnsupportedEndpoint(resp_text)
         raise ValueError(
-            f"Unexpected status code received: {response.status} for request to {response.request_info.url}"
-            f"\nResponse text: {await response.text()}",
+            f"Received status code {response.status} for request to {response.request_info.url}"
+            f" Full response text: {resp_text}",
         )
 
     async def _make_request(
@@ -181,7 +183,11 @@ class BeaconNode:
                 return await resp.text()
         except BeaconNodeUnsupportedEndpoint:
             raise
-        except Exception:
+        except Exception as e:
+            self.logger.error(
+                f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
             self.score -= _SCORE_DELTA_FAILURE
             raise
 
