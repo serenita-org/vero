@@ -67,10 +67,13 @@ class SyncCommitteeService(ValidatorDutyService):
                 "Slashing detected, not producing sync committee message",
             )
 
-        if duty_slot <= self._last_slot_duty_performed_for:
-            self.logger.warning(
-                f"Not producing sync committee message during slot {duty_slot} (already started producing message during slot {self._last_slot_duty_performed_for})",
-            )
+        if duty_slot < self._last_slot_duty_performed_for:
+            return
+        if duty_slot == self._last_slot_duty_performed_for:
+            if head_event:
+                self.logger.warning(
+                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_performed_for}",
+                )
             return
         self._last_slot_duty_performed_for = duty_slot
 
