@@ -119,9 +119,10 @@ class BeaconNode:
             self.logger.info(
                 f"Initialized beacon node at {self.base_url}{f' [{function}]' if function else ''}",
             )
-        except Exception:
-            self.logger.exception(
-                f"Failed to initialize beacon node at {self.base_url}",
+        except Exception as e:
+            self.logger.error(
+                f"Failed to initialize beacon node at {self.base_url}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             # Retry initializing every 30 seconds
             next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
@@ -214,7 +215,7 @@ class BeaconNode:
 
         try:
             version = json.loads(resp)["data"]["version"]
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             self.logger.warning(f"Failed to parse beacon node version: {e}")
             version = "unknown"
 
@@ -282,8 +283,11 @@ class BeaconNode:
                     )
                     if att_data.beacon_block_root.to_obj() == expected_head_block_root:
                         return att_data
-                except Exception:
-                    self.logger.exception("Failed to produce attestation data")
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to produce attestation data: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
 
                 # Rate-limiting - wait at least 50ms in between requests
                 elapsed_time = asyncio.get_event_loop().time() - _request_start_time
@@ -603,6 +607,11 @@ class BeaconNode:
                     consensus_block_value=response.consensus_block_value,
                 ),
             )
+            block_value = (
+                response.consensus_block_value + response.execution_payload_value
+            )
+            self.logger.info(f"{self.host} returned block with value {block_value}")
+
             return response
 
     async def publish_block_v2(
@@ -682,7 +691,9 @@ class BeaconNode:
             url=self.base_url.join(URL("/eth/v1/events")),
             params={"topics": ",".join(topics)},
             headers={"accept": "text/event-stream"},
-            timeout=ClientTimeout(total=None),  # Defaults to 5 minutes
+            timeout=ClientTimeout(
+                sock_connect=1, sock_read=None
+            ),  # Defaults to 5 minutes
         ) as resp:
             # Minimal SSE client implementation
             events_iter = aiter(resp.content)
@@ -703,9 +714,10 @@ class BeaconNode:
 
                 try:
                     event_name = decoded.split(":")[1].strip()
-                except Exception:
-                    self.logger.exception(
-                        f"Failed to parse event name from {decoded} -> ignoring event...",
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to parse event name from {decoded} ({e!r}) -> ignoring event...",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     continue
                 event_data = []

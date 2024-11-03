@@ -17,7 +17,7 @@ def setup_logging(log_level: str) -> None:
     stream_handler.setFormatter(formatter)
     stream_handler.setLevel(log_level)
     root_logger.addHandler(stream_handler)
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(log_level)
     if log_level != logging.getLevelName(logging.DEBUG):
         # apscheduler is quite verbose with default INFO logging
         logging.getLogger("apscheduler").setLevel(logging.ERROR)

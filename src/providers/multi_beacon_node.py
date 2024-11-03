@@ -174,9 +174,10 @@ class MultiBeaconNode:
         for coro in asyncio.as_completed(tasks):
             try:
                 resp = await coro
-            except Exception:
-                self.logger.exception(
-                    f"Failed to get beacon node response for {func_name}",
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to get beacon node response for {func_name}: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
             else:
                 # Successful response -> cancel other pending tasks
@@ -205,9 +206,9 @@ class MultiBeaconNode:
             return_exceptions=True,
         ):
             if isinstance(res, Exception):
-                self.logger.exception(
-                    f"Failed to get beacon node response for {func_name}",
-                    exc_info=res,
+                self.logger.error(
+                    f"Failed to get beacon node response for {func_name}: {res!r}",
+                    exc_info=res if self.logger.isEnabledFor(logging.DEBUG) else False,
                 )
             else:
                 responses.append(res)
@@ -328,16 +329,17 @@ class MultiBeaconNode:
                 try:
                     response = await coro
                 except Exception as e:
-                    self.logger.exception(
-                        "Failed to get beacon node response for produce_block_v3",
-                        exc_info=e,
+                    self.logger.error(
+                        f"Failed to get beacon node response for produce_block_v3: {e!r}",
+                        exc_info=e
+                        if self.logger.isEnabledFor(logging.DEBUG)
+                        else False,
                     )
                     continue
 
                 block_value = (
                     response.consensus_block_value + response.execution_payload_value
                 )
-                self.logger.info(f"Evaluating block with value {block_value}")
 
                 if block_value > best_block_value:
                     best_block_value = block_value
@@ -368,9 +370,11 @@ class MultiBeaconNode:
                     # Exit loop
                     break
                 except Exception as e:
-                    self.logger.exception(
-                        "Failed to get beacon node response for produce_block_v3",
-                        exc_info=e,
+                    self.logger.error(
+                        f"Failed to get beacon node response for produce_block_v3: {e!r}",
+                        exc_info=e
+                        if self.logger.isEnabledFor(logging.DEBUG)
+                        else False,
                     )
                     continue
 
@@ -474,8 +478,11 @@ class MultiBeaconNode:
             except TimeoutError:
                 # Deadline reached
                 continue
-            except Exception:
-                self.logger.exception("Failed waiting for attestation data")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed waiting for attestation data: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                )
                 continue
 
         # Cancel pending tasks
@@ -514,8 +521,11 @@ class MultiBeaconNode:
                         "Beacon node returned 503 not ready while requesting attestation data",
                     )
                     continue
-                except Exception:
-                    self.logger.exception("Failed to produce attestation data")
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to produce attestation data: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
                     continue
 
                 block_root = att_data.beacon_block_root.to_obj()
@@ -650,7 +660,7 @@ class MultiBeaconNode:
         for task in asyncio.as_completed(tasks):
             try:
                 yield await task
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
@@ -735,7 +745,7 @@ class MultiBeaconNode:
         for task in asyncio.as_completed(tasks):
             try:
                 yield await task
-            except Exception:  # noqa: BLE001
+            except Exception:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PRODUCE.value,
                 ).inc()

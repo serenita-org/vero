@@ -1,10 +1,9 @@
-import datetime
+import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from typing import Any
 
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter
 
@@ -88,13 +87,11 @@ class EventConsumerService:
                     event_type=type(event).__name__,
                 ).inc()
 
-        except Exception:
-            self.logger.exception(
-                "Error occurred while processing beacon node events. Reconnecting in 1 second..."
+        except Exception as e:
+            self.logger.error(
+                f"Error occurred while processing beacon node events ({e!r}). Reconnecting in 1 second...",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
-            self.scheduler.add_job(
-                self.handle_events,
-                "date",
-                next_run_time=datetime.datetime.now(tz=pytz.UTC)
-                + datetime.timedelta(seconds=1),
-            )
+            await asyncio.sleep(1)
+
+        self.scheduler.add_job(self.handle_events)

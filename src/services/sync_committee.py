@@ -112,12 +112,15 @@ class SyncCommitteeService(ValidatorDutyService):
                 beacon_block_root = await self.multi_beacon_node.get_block_root(
                     block_id="head",
                 )
-            except Exception:
-                self.logger.exception("Failed to get beacon block root")
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to get beacon block root: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                )
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
                 ).inc()
-                raise
+                return
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         coroutines = [
@@ -138,10 +141,11 @@ class SyncCommitteeService(ValidatorDutyService):
         for coro in asyncio.as_completed(coroutines):
             try:
                 msg, sig, pubkey = await coro
-            except Exception:
+            except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.exception(
-                    f"Failed to get signature for sync committee message for slot {duty_slot}",
+                self.logger.error(
+                    f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 continue
 
@@ -170,6 +174,10 @@ class SyncCommitteeService(ValidatorDutyService):
             ),
         )
 
+        self.logger.info(
+            f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
+        )
+
         self._duty_submission_time_metric.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
@@ -177,15 +185,16 @@ class SyncCommitteeService(ValidatorDutyService):
             await self.multi_beacon_node.publish_sync_committee_messages(
                 messages=sync_messages_to_publish,
             )
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
             ).inc()
-            self.logger.exception(
-                f"Failed to publish sync committee messages for slot {duty_slot}",
+            self.logger.error(
+                f"Failed to publish sync committee messages for slot {duty_slot}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
         else:
-            self.logger.info(
+            self.logger.debug(
                 f"Published sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
             )
             _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.inc(
@@ -223,10 +232,11 @@ class SyncCommitteeService(ValidatorDutyService):
 
         try:
             selection_proofs = await asyncio.gather(*selection_proofs_coroutines)
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.exception(
-                f"Failed to get signatures for sync selection proofs for slot {duty_slot}",
+            self.logger.error(
+                f"Failed to get signatures for sync selection proofs for slot {duty_slot}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             return
 
@@ -299,12 +309,13 @@ class SyncCommitteeService(ValidatorDutyService):
             _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS.inc(
                 amount=len(signed_contribution_and_proofs),
             )
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
             ).inc()
-            self.logger.exception(
-                f"Failed to publish sync committee contribution and proofs for slot {duty_slot}",
+            self.logger.error(
+                f"Failed to publish sync committee contribution and proofs for slot {duty_slot}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
 
     async def aggregate_sync_messages(
@@ -338,6 +349,9 @@ class SyncCommitteeService(ValidatorDutyService):
         }
 
         contribution_count = 0
+        self.logger.info(
+            f"Publishing sync committee contribution and proofs for slot {duty_slot}"
+        )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         _sign_and_publish_tasks = []
@@ -380,7 +394,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         await asyncio.gather(*_sign_and_publish_tasks)
-        self.logger.info(
+        self.logger.debug(
             f"Published sync committee contribution and proofs for slot {duty_slot}, count: {contribution_count}"
         )
 

@@ -170,12 +170,16 @@ class AttestationService(ValidatorDutyService):
                         slot=slot,
                         committee_index=0,
                     )
-                except AttestationConsensusFailure:
+                except AttestationConsensusFailure as e:
+                    self.logger.error(
+                        f"Failed to produce attestation data: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
                     _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.ATTESTATION_CONSENSUS.value,
                     ).inc()
-                    raise
+                    return
 
             consensus_time = asyncio.get_event_loop().time() - consensus_start
             self.logger.debug(
@@ -229,8 +233,9 @@ class AttestationService(ValidatorDutyService):
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.SIGNATURE.value,
                         ).inc()
-                        self.logger.exception(
-                            f"Failed to get signature for attestation for slot {slot}",
+                        self.logger.error(
+                            f"Failed to get signature for attestation for slot {slot}: {e!r}",
+                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
                         )
                         sign_span.set_status(Status(StatusCode.ERROR))
                         sign_span.record_exception(e)
@@ -268,7 +273,10 @@ class AttestationService(ValidatorDutyService):
                 ),
             )
 
-            self.logger.debug("Publishing attestations")
+            self.logger.info(
+                f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
+            )
+
             self._duty_submission_time_metric.labels(
                 duty=ValidatorDuty.ATTESTATION.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
@@ -283,13 +291,14 @@ class AttestationService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.ATTESTATION_PUBLISH.value,
                     ).inc()
-                    self.logger.exception(
-                        f"Failed to publish attestations for slot {att_data.slot}",
+                    self.logger.error(
+                        f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     publish_span.set_status(Status(StatusCode.ERROR))
                     publish_span.record_exception(e)
                 else:
-                    self.logger.info(
+                    self.logger.debug(
                         f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
                     )
 
@@ -356,12 +365,13 @@ class AttestationService(ValidatorDutyService):
             _VC_PUBLISHED_AGGREGATE_ATTESTATIONS.inc(
                 amount=len(signed_aggregate_and_proofs),
             )
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
             ).inc()
-            self.logger.exception(
-                f"Failed to publish aggregate and proofs for slot {slot}",
+            self.logger.error(
+                f"Failed to publish aggregate and proofs for slot {slot}: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
 
     async def aggregate_attestations(
@@ -383,6 +393,9 @@ class AttestationService(ValidatorDutyService):
         committee_indices = {d.committee_index for d in aggregator_duties}
 
         aggregate_count = 0
+        self.logger.info(
+            f"Publishing aggregate and proofs for slot {att_data.slot}",
+        )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
         _sign_and_publish_tasks = []
@@ -418,7 +431,7 @@ class AttestationService(ValidatorDutyService):
             )
 
         await asyncio.gather(*_sign_and_publish_tasks)
-        self.logger.info(
+        self.logger.debug(
             f"Published aggregate and proofs for slot {att_data.slot}, count: {aggregate_count}",
         )
 
@@ -468,10 +481,11 @@ class AttestationService(ValidatorDutyService):
                 messages=signable_messages,
                 identifiers=identifiers,
             )
-        except Exception:
+        except Exception as e:
             _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.exception(
-                "Failed to get signatures for aggregation selection proofs",
+            self.logger.error(
+                f"Failed to get signatures for aggregation selection proofs: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             raise
 
