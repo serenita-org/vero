@@ -174,7 +174,7 @@ class SyncCommitteeService(ValidatorDutyService):
             ),
         )
 
-        self.logger.info(
+        self.logger.debug(
             f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
         )
 
@@ -194,7 +194,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
         else:
-            self.logger.debug(
+            self.logger.info(
                 f"Published sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
             )
             _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.inc(
@@ -349,8 +349,8 @@ class SyncCommitteeService(ValidatorDutyService):
         }
 
         contribution_count = 0
-        self.logger.info(
-            f"Publishing sync committee contribution and proofs for slot {duty_slot}"
+        self.logger.debug(
+            f"Starting sync committee contribution and proof sign-and-publish tasks for slot {duty_slot}",
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
@@ -394,7 +394,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         await asyncio.gather(*_sign_and_publish_tasks)
-        self.logger.debug(
+        self.logger.info(
             f"Published sync committee contribution and proofs for slot {duty_slot}, count: {contribution_count}"
         )
 

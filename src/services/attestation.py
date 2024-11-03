@@ -273,7 +273,7 @@ class AttestationService(ValidatorDutyService):
                 ),
             )
 
-            self.logger.info(
+            self.logger.debug(
                 f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
             )
 
@@ -298,7 +298,7 @@ class AttestationService(ValidatorDutyService):
                     publish_span.set_status(Status(StatusCode.ERROR))
                     publish_span.record_exception(e)
                 else:
-                    self.logger.debug(
+                    self.logger.info(
                         f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
                     )
 
@@ -393,8 +393,8 @@ class AttestationService(ValidatorDutyService):
         committee_indices = {d.committee_index for d in aggregator_duties}
 
         aggregate_count = 0
-        self.logger.info(
-            f"Publishing aggregate and proofs for slot {att_data.slot}",
+        self.logger.debug(
+            f"Starting aggregate and proof sign-and-publish tasks for slot {att_data.slot}",
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
@@ -431,7 +431,7 @@ class AttestationService(ValidatorDutyService):
             )
 
         await asyncio.gather(*_sign_and_publish_tasks)
-        self.logger.debug(
+        self.logger.info(
             f"Published aggregate and proofs for slot {att_data.slot}, count: {aggregate_count}",
         )
 
