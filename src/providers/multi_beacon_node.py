@@ -44,7 +44,6 @@ from typing import Any
 import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
-from pydantic import HttpUrl
 from remerkleable.complex import Container
 
 from observability import ErrorType, get_shared_metrics
@@ -64,8 +63,8 @@ class AttestationConsensusFailure(Exception):
 class MultiBeaconNode:
     def __init__(
         self,
-        beacon_node_urls: list[HttpUrl],
-        beacon_node_urls_proposal: list[HttpUrl],
+        beacon_node_urls: list[str],
+        beacon_node_urls_proposal: list[str],
         scheduler: AsyncIOScheduler,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -74,11 +73,11 @@ class MultiBeaconNode:
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
         self.beacon_nodes = [
-            BeaconNode(base_url=str(base_url), scheduler=scheduler)
+            BeaconNode(base_url=base_url, scheduler=scheduler)
             for base_url in beacon_node_urls
         ]
         self.beacon_nodes_proposal = [
-            BeaconNode(base_url=str(base_url), scheduler=scheduler)
+            BeaconNode(base_url=base_url, scheduler=scheduler)
             for base_url in beacon_node_urls_proposal
         ]
         # TODO Consider renaming to consensus_threshold
@@ -171,7 +170,8 @@ class MultiBeaconNode:
         for coro in asyncio.as_completed(tasks):
             try:
                 resp = await coro
-            except Exception:  # noqa: S112
+            except Exception as e:
+                self.logger.warning(f"Failed to get a response from beacon node: {e!r}")
                 continue
             else:
                 # Successful response -> cancel other pending tasks
@@ -319,11 +319,14 @@ class MultiBeaconNode:
             for coro in done:
                 try:
                     response = await coro
-                except Exception:  # noqa: S112
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to get a response from beacon node: {e!r}"
+                    )
                     continue
 
-                block_value = (
-                    response.consensus_block_value + response.execution_payload_value
+                block_value = int(response.consensus_block_value) + int(
+                    response.execution_payload_value
                 )
 
                 if block_value > best_block_value:
@@ -348,13 +351,15 @@ class MultiBeaconNode:
             for coro_first in asyncio.as_completed(pending):
                 try:
                     best_block_response = await coro_first
-                    best_block_value = (
+                    best_block_value = int(
                         best_block_response.consensus_block_value
-                        + best_block_response.execution_payload_value
-                    )
+                    ) + int(best_block_response.execution_payload_value)
                     # Exit loop
                     break
-                except Exception:  # noqa: S112
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to get a response from beacon node: {e!r}"
+                    )
                     continue
 
         # Cancel pending requests

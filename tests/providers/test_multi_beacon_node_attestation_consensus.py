@@ -71,10 +71,8 @@ from spec.attestation import AttestationData
                 "0x000000000000000000000000000000000000000000000000000000000000abcd",
             ],
             SchemaBeaconAPI.HeadEvent(
-                slot=1,
+                slot=str(1),
                 block="0x000000000000000000000000000000000000000000000000000000000000abcd",
-                state="0x0",
-                epoch_transition=False,
                 previous_duty_dependent_root="0x",
                 current_duty_dependent_root="0x",
                 execution_optimistic=False,
@@ -88,10 +86,8 @@ from spec.attestation import AttestationData
                 "0x0000000000000000000000000000000000000000000000000000000000005555",
             ],
             SchemaBeaconAPI.HeadEvent(
-                slot=1,
+                slot=str(1),
                 block="0x000000000000000000000000000000000000000000000000000000000000abcd",
-                state="0x0",
-                epoch_transition=False,
                 previous_duty_dependent_root="0x",
                 current_duty_dependent_root="0x",
                 execution_optimistic=False,

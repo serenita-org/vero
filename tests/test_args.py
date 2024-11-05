@@ -1,8 +1,6 @@
-from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic_core import Url
 
 from args import parse_cli_args
 
@@ -28,8 +26,9 @@ from args import parse_cli_args
             ],
             None,
             {
-                "remote_signer_url": Url("http://signer:9000"),
-                "beacon_node_urls": [Url("http://beacon-node:5052")],
+                "remote_signer_url": "http://signer:9000",
+                "beacon_node_urls": ["http://beacon-node:5052"],
+                "beacon_node_urls_proposal": [],
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             },
             id="Minimal valid list of arguments",
@@ -52,11 +51,11 @@ from args import parse_cli_args
             ],
             None,
             {
-                "remote_signer_url": Url("http://signer:9000"),
-                "beacon_node_urls": [Url("http://beacon-node:5052")],
-                "beacon_node_urls_proposal": [Url("http://beacon-node-prop:5052")],
+                "remote_signer_url": "http://signer:9000",
+                "beacon_node_urls": ["http://beacon-node:5052"],
+                "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "data_dir": Path("/tmp/vero"),
+                "data_dir": "/tmp/vero",
                 "graffiti": b"test-graffiti".ljust(32, b"\x00"),
                 "gas_limit": 31_000_000,
                 "use_external_builder": True,
@@ -76,10 +75,10 @@ from args import parse_cli_args
             ],
             None,
             {
-                "remote_signer_url": Url("http://signer:9000"),
+                "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": [
-                    Url("http://beacon-node-1:5052"),
-                    Url("http://beacon-node-2:5052"),
+                    "http://beacon-node-1:5052",
+                    "http://beacon-node-2:5052",
                 ],
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             },
@@ -91,7 +90,7 @@ from args import parse_cli_args
                 "--beacon-node-urls=   ",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
-            "no beacon node urls provided",
+            "Not enough beacon node urls provided",
             {},
             id="--beacon-node-urls invalid input - empty string",
         ),
@@ -114,8 +113,8 @@ from args import parse_cli_args
             ],
             None,
             {
-                "beacon_node_urls": [Url("http://beacon-node:5052")],
-                "beacon_node_urls_proposal": [Url("http://beacon-node-prop:5052")],
+                "beacon_node_urls": ["http://beacon-node:5052"],
+                "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
             },
             id="--beacon-node-urls-proposal",
         ),
@@ -125,7 +124,7 @@ from args import parse_cli_args
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c",
             ],
-            "invalid hex inputs: ['0x1c6c']",
+            "Invalid fee recipient: 0x1c6c",
             {},
             id="--fee-recipient invalid input - wrong length",
         ),
@@ -135,7 +134,7 @@ from args import parse_cli_args
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
-            "invalid hex inputs: ['1c6c9654",
+            "Invalid fee recipient: 1c6c9654",
             {},
             id="--fee-recipient invalid input - no 0x prefix",
         ),
@@ -145,7 +144,7 @@ from args import parse_cli_args
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0xGGGG96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
-            "invalid hex inputs: ['0xGGGG96",
+            "Invalid fee recipient 0xGGGG96549debfc6aaec7631051b84ce9a6e11ad2: ValueError('non-hexadecimal number found",
             {},
             id="--fee-recipient invalid input - non-hex character",
         ),
@@ -157,7 +156,7 @@ from args import parse_cli_args
                 "--data-dir=data",
             ],
             None,
-            {"data_dir": Path("data")},
+            {"data_dir": "data"},
             id="--data-dir - relative path",
         ),
         pytest.param(
@@ -168,7 +167,7 @@ from args import parse_cli_args
                 "--data-dir=/tmp/data",
             ],
             None,
-            {"data_dir": Path("/tmp/data")},
+            {"data_dir": "/tmp/data"},
             id="--data-dir - absolute path",
         ),
         pytest.param(
@@ -200,7 +199,7 @@ from args import parse_cli_args
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "--graffiti=waaaaaaaay_toooooo_loooooooooooooooooong",
             ],
-            "encoded graffiti exceeds the maximum length of 32 bytes",
+            "Encoded graffiti exceeds the maximum length of 32 bytes",
             {},
             id="--graffiti invalid input - too long",
         ),

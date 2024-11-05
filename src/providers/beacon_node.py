@@ -9,6 +9,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import aiohttp
+import msgspec
 import pytz
 from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -91,6 +92,8 @@ class BeaconNode:
                 RequestLatency(host=self.host, service_type=ServiceType.BEACON_NODE),
             ],
         )
+
+        self.json_encoder = msgspec.json.Encoder()
 
     @property
     def score(self) -> int:
@@ -300,7 +303,7 @@ class BeaconNode:
                 await asyncio.sleep(max(0.05 - elapsed_time, 0))
 
     async def get_block_root(self, block_id: str) -> str:
-        resp = await self._make_request(
+        resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v1/beacon/blocks/{block_id}/root",
             formatted_endpoint_string_params=dict(block_id=block_id),
@@ -310,7 +313,9 @@ class BeaconNode:
             ),
         )
 
-        response = SchemaBeaconAPI.GetBlockRootResponse.model_validate_json(resp)
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetBlockRootResponse
+        )
         self._raise_if_optimistic(response)
 
         return response.data.root
@@ -318,7 +323,7 @@ class BeaconNode:
     async def _get_validators_fallback(
         self,
         ids: list[str],
-        statuses: list[SchemaValidator.ValidatorStatus],
+        statuses: list[SchemaBeaconAPI.ValidatorStatus],
         state_id: str = "head",
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
         if len(ids) == 0:
@@ -332,7 +337,7 @@ class BeaconNode:
         for i in range(0, len(ids), _batch_size):
             ids_batch = ids[i : i + _batch_size]
 
-            resp = await self._make_request(
+            resp_text = await self._make_request(
                 method="GET",
                 endpoint=_endpoint,
                 formatted_endpoint_string_params=dict(state_id=state_id),
@@ -342,34 +347,40 @@ class BeaconNode:
                 },
             )
 
+            resp_decoded = msgspec.json.decode(
+                resp_text, type=SchemaBeaconAPI.GetStateValidatorsResponse
+            )
+
             results += [
                 SchemaValidator.ValidatorIndexPubkey(
-                    index=v["index"],
-                    pubkey=v["validator"]["pubkey"],
-                    status=v["status"],
+                    index=int(v.index),
+                    pubkey=v.validator.pubkey,
+                    status=v.status,
                 )
-                for v in json.loads(resp)["data"]
+                for v in resp_decoded.data
             ]
         return results
 
     async def get_validators(
         self,
         ids: list[str],
-        statuses: list[SchemaValidator.ValidatorStatus],
+        statuses: list[SchemaBeaconAPI.ValidatorStatus],
         state_id: str = "head",
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
         if len(ids) == 0:
             return []
 
         try:
-            resp = await self._make_request(
+            resp_text = await self._make_request(
                 method="POST",
                 endpoint="/eth/v1/beacon/states/{state_id}/validators",
                 formatted_endpoint_string_params=dict(state_id=state_id),
-                json={
-                    "ids": ids,
-                    "statuses": [s.value for s in statuses],
-                },
+                data=self.json_encoder.encode(
+                    {
+                        "ids": ids,
+                        "statuses": [s.value for s in statuses],
+                    }
+                ),
             )
         except BeaconNodeUnsupportedEndpoint:
             # Grandine doesn't support the POST endpoint yet
@@ -380,13 +391,17 @@ class BeaconNode:
                 state_id=state_id,
             )
 
+        resp_decoded = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetStateValidatorsResponse
+        )
+
         return [
             SchemaValidator.ValidatorIndexPubkey(
-                index=v["index"],
-                pubkey=v["validator"]["pubkey"],
-                status=v["status"],
+                index=int(v.index),
+                pubkey=v.validator.pubkey,
+                status=v.status,
             )
-            for v in json.loads(resp)["data"]
+            for v in resp_decoded.data
         ]
 
     async def get_attester_duties(
@@ -394,14 +409,16 @@ class BeaconNode:
         epoch: int,
         indices: list[int],
     ) -> SchemaBeaconAPI.GetAttesterDutiesResponse:
-        resp = await self._make_request(
+        resp_text = await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/duties/attester/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
-            json=[str(i) for i in indices],
+            data=self.json_encoder.encode([str(i) for i in indices]),
         )
 
-        response = SchemaBeaconAPI.GetAttesterDutiesResponse.model_validate_json(resp)
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetAttesterDutiesResponse
+        )
         self._raise_if_optimistic(response)
 
         return response
@@ -410,13 +427,15 @@ class BeaconNode:
         self,
         epoch: int,
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
-        resp = await self._make_request(
+        resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/duties/proposer/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
         )
 
-        response = SchemaBeaconAPI.GetProposerDutiesResponse.model_validate_json(resp)
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetProposerDutiesResponse
+        )
         self._raise_if_optimistic(response)
 
         return response
@@ -426,13 +445,15 @@ class BeaconNode:
         epoch: int,
         indices: list[int],
     ) -> SchemaBeaconAPI.GetSyncDutiesResponse:
-        resp = await self._make_request(
+        resp_text = await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/duties/sync/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
-            json=[str(i) for i in indices],
+            data=self.json_encoder.encode([str(i) for i in indices]),
         )
-        response = SchemaBeaconAPI.GetSyncDutiesResponse.model_validate_json(resp)
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetSyncDutiesResponse
+        )
         self._raise_if_optimistic(response)
 
         return response
@@ -444,28 +465,28 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/pool/sync_committees",
-            json=messages,
+            data=self.json_encoder.encode(messages),
         )
 
     async def publish_attestations(self, attestations: list[dict]) -> None:  # type: ignore[type-arg]
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/pool/attestations",
-            json=attestations,
+            data=self.json_encoder.encode(attestations),
         )
 
     async def prepare_beacon_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/beacon_committee_subscriptions",
-            json=data,
+            data=self.json_encoder.encode(data),
         )
 
     async def prepare_sync_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/sync_committee_subscriptions",
-            json=data,
+            data=self.json_encoder.encode(data),
         )
 
     async def get_aggregate_attestation(
@@ -495,10 +516,12 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/aggregate_and_proofs",
-            json=[
-                dict(message=msg, signature=sig)
-                for msg, sig in signed_aggregate_and_proofs
-            ],
+            data=self.json_encoder.encode(
+                [
+                    dict(message=msg, signature=sig)
+                    for msg, sig in signed_aggregate_and_proofs
+                ]
+            ),
         )
 
     async def get_sync_committee_contribution(
@@ -533,17 +556,19 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/contribution_and_proofs",
-            json=[
-                dict(message=contribution, signature=sig)
-                for contribution, sig in signed_contribution_and_proofs
-            ],
+            data=self.json_encoder.encode(
+                [
+                    dict(message=contribution, signature=sig)
+                    for contribution, sig in signed_contribution_and_proofs
+                ]
+            ),
         )
 
     async def prepare_beacon_proposer(self, data: list[dict[str, str]]) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/prepare_beacon_proposer",
-            json=data,
+            data=self.json_encoder.encode(data),
         )
 
     async def register_validator(
@@ -555,10 +580,12 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/register_validator",
-            json=[
-                dict(message=registration.model_dump(), signature=sig)
-                for registration, sig in signed_registrations
-            ],
+            data=self.json_encoder.encode(
+                [
+                    dict(message=registration, signature=sig)
+                    for registration, sig in signed_registrations
+                ]
+            ),
         )
 
     async def produce_block_v3(
@@ -603,7 +630,9 @@ class BeaconNode:
                 ),
             )
 
-            response = SchemaBeaconAPI.ProduceBlockV3Response.model_validate_json(resp)
+            response = msgspec.json.decode(
+                resp, type=SchemaBeaconAPI.ProduceBlockV3Response
+            )
 
             tracer_span.add_event(
                 "ProduceBlockV3Response",
@@ -649,7 +678,7 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/blocks",
-            json=data,
+            data=self.json_encoder.encode(data),
             headers={"Eth-Consensus-Version": block_version.value},
         )
 
@@ -676,7 +705,7 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/blinded_blocks",
-            json=data,
+            data=self.json_encoder.encode(data),
             headers={"Eth-Consensus-Version": block_version.value},
         )
 
@@ -684,7 +713,7 @@ class BeaconNode:
         self,
         topics: list[str],
     ) -> AsyncIterable[SchemaBeaconAPI.BeaconNodeEvent]:
-        _event_name_to_model_mapping: dict[
+        _event_name_to_struct_mapping: dict[
             str, type[SchemaBeaconAPI.BeaconNodeEvent]
         ] = dict(
             head=SchemaBeaconAPI.HeadEvent,
@@ -733,9 +762,11 @@ class BeaconNode:
                     next_line = (await anext(events_iter)).decode()
 
                 try:
-                    event_model = _event_name_to_model_mapping[event_name]
+                    event_struct = _event_name_to_struct_mapping[event_name]
                 except KeyError:
                     raise NotImplementedError(
-                        f"Unable to process event with name {event_name}, event_data {event_data}!",
+                        f"Unable to process event with name {event_name}, event_data: {event_data}!",
                     ) from None
-                yield event_model.model_validate_json(event_data[0].split("data:")[1])
+                yield msgspec.json.decode(
+                    event_data[0].split("data:")[1], type=event_struct
+                )

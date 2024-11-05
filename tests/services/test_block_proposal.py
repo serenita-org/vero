@@ -3,7 +3,6 @@ import datetime
 
 import pytest
 import pytz
-from pydantic import HttpUrl
 
 from providers import BeaconChain
 from schemas import SchemaBeaconAPI
@@ -57,8 +56,8 @@ async def test_publish_block(
     ].add(
         SchemaBeaconAPI.ProposerDuty(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            slot=duty_slot,
+            validator_index=str(random_active_validator.index),
+            slot=str(duty_slot),
         ),
     )
 
@@ -82,8 +81,8 @@ async def test_publish_block(
         pytest.param([], id="No proposal beacon nodes specified"),
         pytest.param(
             [
-                HttpUrl("http://beacon-node-proposal-1:1234"),
-                HttpUrl("http://beacon-node-proposal-2:1234"),
+                "http://beacon-node-proposal-1:1234",
+                "http://beacon-node-proposal-2:1234",
             ],
             id="Beacon nodes explicitly specified for block proposals",
         ),
@@ -94,7 +93,7 @@ async def test_block_proposal_beacon_node_urls_proposal(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
-    beacon_node_urls_proposal: list[HttpUrl],
+    beacon_node_urls_proposal: list[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The provided proposal beacon node URLs should be exclusively used for block proposals,
@@ -108,8 +107,8 @@ async def test_block_proposal_beacon_node_urls_proposal(
     ].add(
         SchemaBeaconAPI.ProposerDuty(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            slot=duty_slot,
+            validator_index=str(random_active_validator.index),
+            slot=str(duty_slot),
         ),
     )
 

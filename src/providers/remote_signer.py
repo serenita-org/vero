@@ -5,10 +5,11 @@ import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from types import TracebackType
+from urllib.parse import urlparse
 
 import aiohttp
+import msgspec.json
 from prometheus_client import Counter
-from pydantic import HttpUrl
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
@@ -22,7 +23,7 @@ _SIGNED_MESSAGES = Counter(
 
 
 def _sign_messages_in_separate_process(
-    remote_signer_url: HttpUrl,
+    remote_signer_url: str,
     messages: list[SchemaRemoteSigner.SignableMessageT],
     identifiers: list[str],
     batch_size: int,
@@ -50,21 +51,22 @@ def _sign_messages_in_separate_process(
 
 
 class RemoteSigner:
-    def __init__(self, url: HttpUrl):
+    def __init__(self, url: str):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
         self.url = url
+        self.host = urlparse(url).hostname or ""
 
         self.process_pool_executor = ProcessPoolExecutor()
 
     async def __aenter__(self) -> "RemoteSigner":
-        if not self.url.host:
+        if not self.host:
             raise ValueError(f"Failed to parse hostname from {self.url}")
 
         _user_agent = f"{get_service_name()}/{get_service_version()}"
 
         self._trace_default_request_ctx = dict(
-            host=self.url.host or "",
+            host=self.host or "",
             service_type=ServiceType.REMOTE_SIGNER.value,
         )
 
@@ -76,27 +78,29 @@ class RemoteSigner:
         # signing blocks and attestations, where
         # every ms counts.
         self.low_priority_client_session = aiohttp.ClientSession(
-            base_url=str(self.url),
+            base_url=self.url,
             connector=aiohttp.TCPConnector(limit=10),
             headers={"User-Agent": _user_agent},
             trace_configs=[
                 RequestLatency(
-                    host=self.url.host,
+                    host=self.host,
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
         )
 
         self.high_priority_client_session = aiohttp.ClientSession(
-            base_url=str(self.url),
+            base_url=self.url,
             headers={"User-Agent": _user_agent},
             trace_configs=[
                 RequestLatency(
-                    host=self.url.host,
+                    host=self.host,
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
         )
+
+        self.json_encoder = msgspec.json.Encoder()
 
         return self
 
@@ -157,7 +161,7 @@ class RemoteSigner:
 
         async with self._get_session_for_message(message).post(
             _endpoint.format(identifier=identifier),
-            data=message.model_dump_json(),
+            data=self.json_encoder.encode(message),
             trace_request_ctx=dict(
                 path=_endpoint,
                 request_type=message.__class__.__name__,

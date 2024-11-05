@@ -1,20 +1,17 @@
 import argparse
 from collections.abc import Sequence
 from logging import getLevelNamesMapping
-from pathlib import Path
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, HttpUrl, ValidationError, field_validator
-
-_fee_recipient_bytes = 20
-_graffiti_max_bytes = 32
+import msgspec
 
 
-class CLIArgs(BaseModel):
-    remote_signer_url: HttpUrl
-    beacon_node_urls: list[HttpUrl]
-    beacon_node_urls_proposal: list[HttpUrl] = []
+class CLIArgs(msgspec.Struct, kw_only=True):
+    remote_signer_url: str
+    beacon_node_urls: list[str]
+    beacon_node_urls_proposal: list[str] = []
     fee_recipient: str
-    data_dir: Path
+    data_dir: str
     graffiti: bytes
     gas_limit: int
     use_external_builder: bool = False
@@ -24,67 +21,51 @@ class CLIArgs(BaseModel):
     metrics_multiprocess_mode: bool = False
     log_level: str
 
-    @staticmethod
-    def _validate_comma_separated_strings(
-        input_string: str, entity_name: str
-    ) -> list[str]:
-        items = [
-            item.strip() for item in input_string.split(",") if len(item.strip()) > 0
-        ]
 
-        if len(items) == 0:
-            raise ValueError(f"no {entity_name}s provided")
+def _validate_url(url: str) -> str:
+    parsed = urlparse(url)
+    if not (parsed.scheme and parsed.netloc):
+        raise ValueError(f"Invalid URL: {url}")
+    return url
 
-        if len(items) != len(set(items)):
-            raise ValueError(f"{entity_name}s must be unique: {items}")
 
-        return items
+def _validate_comma_separated_strings(
+    input_string: str, entity_name: str, min_values_required: int = 0
+) -> list[str]:
+    items = [item.strip() for item in input_string.split(",") if item.strip()]
+    if len(items) < min_values_required:
+        raise ValueError(f"Not enough {entity_name}s provided")
+    if len(items) != len(set(items)):
+        raise ValueError(f"{entity_name}s must be unique: {items}")
+    return items
 
-    @staticmethod
-    def _validate_hex_strings(items: list[str], byte_length: int) -> None:
-        invalid_items = []
-        for item in items:
-            if not item.startswith("0x") or len(item) != 2 + 2 * byte_length:
-                invalid_items.append(item)
-                continue
 
-            try:
-                bytes.fromhex(item[2:])
-            except ValueError:
-                invalid_items.append(item)
+def _process_fee_recipient(input_string: str) -> str:
+    _fee_recipient_byte_length = 20
 
-        if invalid_items:
-            raise ValueError(f"invalid hex inputs: {invalid_items}")
+    if (
+        not input_string.startswith("0x")
+        or len(input_string) != 2 + 2 * _fee_recipient_byte_length
+    ):
+        raise ValueError(f"Invalid fee recipient: {input_string}")
 
-    @field_validator("beacon_node_urls", mode="before")
-    def validate_beacon_node_urls(cls, v: str) -> list[str]:
-        return cls._validate_comma_separated_strings(
-            input_string=v, entity_name="beacon node url"
+    try:
+        _ = bytes.fromhex(input_string[2:])
+    except ValueError as e:
+        raise ValueError(f"Invalid fee recipient {input_string}: {e!r}") from e
+    else:
+        return input_string
+
+
+def _process_graffiti(graffiti: str) -> bytes:
+    _graffiti_max_bytes = 32
+
+    encoded = graffiti.encode("utf-8").ljust(_graffiti_max_bytes, b"\x00")
+    if len(encoded) > _graffiti_max_bytes:
+        raise ValueError(
+            f"Encoded graffiti exceeds the maximum length of {_graffiti_max_bytes} bytes"
         )
-
-    @field_validator("beacon_node_urls_proposal", mode="before")
-    def validate_beacon_node_urls_proposal(cls, v: str | None) -> list[str]:
-        return (
-            []
-            if v is None
-            else cls._validate_comma_separated_strings(
-                input_string=v, entity_name="beacon node url"
-            )
-        )
-
-    @field_validator("fee_recipient")
-    def validate_fee_recipient(cls, v: str) -> str:
-        cls._validate_hex_strings(items=[v], byte_length=_fee_recipient_bytes)
-        return v
-
-    @field_validator("graffiti", mode="before")
-    def validate_graffiti(cls, v: str) -> bytes:
-        encoded = v.encode("utf-8").ljust(_graffiti_max_bytes, b"\x00")
-        if len(v) > _graffiti_max_bytes:
-            raise ValueError(
-                f"encoded graffiti exceeds the maximum length of {_graffiti_max_bytes} bytes"
-            )
-        return encoded
+    return encoded
 
 
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
@@ -103,6 +84,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         "--beacon-node-urls-proposal",
         type=str,
         required=False,
+        default="",
         help="A comma-separated list of beacon node URLs to exclusively use for block proposals.",
     )
     parser.add_argument(
@@ -174,7 +156,35 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     parsed_args = parser.parse_args(args=args)
 
     try:
-        # Convert parsed args to dictionary and validate using Pydantic model
-        return CLIArgs(**vars(parsed_args))
-    except ValidationError as e:
-        parser.error(str(e))
+        # Process and validate parsed args
+        return CLIArgs(
+            remote_signer_url=_validate_url(parsed_args.remote_signer_url),
+            beacon_node_urls=[
+                _validate_url(url)
+                for url in _validate_comma_separated_strings(
+                    input_string=parsed_args.beacon_node_urls,
+                    entity_name="beacon node url",
+                    min_values_required=1,
+                )
+            ],
+            beacon_node_urls_proposal=[
+                _validate_url(url)
+                for url in _validate_comma_separated_strings(
+                    input_string=parsed_args.beacon_node_urls_proposal,
+                    entity_name="proposal beacon node url",
+                    min_values_required=0,
+                )
+            ],
+            fee_recipient=_process_fee_recipient(parsed_args.fee_recipient),
+            data_dir=parsed_args.data_dir,
+            graffiti=_process_graffiti(parsed_args.graffiti),
+            gas_limit=parsed_args.gas_limit,
+            use_external_builder=parsed_args.use_external_builder,
+            builder_boost_factor=parsed_args.builder_boost_factor,
+            metrics_address=parsed_args.metrics_address,
+            metrics_port=parsed_args.metrics_port,
+            metrics_multiprocess_mode=parsed_args.metrics_multiprocess_mode,
+            log_level=parsed_args.log_level,
+        )
+    except ValueError as e:
+        parser.error(repr(e))

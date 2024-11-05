@@ -3,6 +3,7 @@ import random
 import re
 from typing import Any
 
+import msgspec
 import pytest
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist
@@ -107,18 +108,22 @@ def _mocked_beacon_node_endpoints(
             epoch_no = int(url.raw_path.split("/")[-1])
 
             return CallbackResult(
-                payload=SchemaBeaconAPI.GetProposerDutiesResponse(
-                    dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
-                    execution_optimistic=False,
-                    data=[
-                        SchemaBeaconAPI.ProposerDuty(
-                            pubkey="0x" + os.urandom(48).hex(),
-                            validator_index=random.randint(0, 1_000_000),
-                            slot=epoch_no * spec_deneb.SLOTS_PER_EPOCH + slot_no,
-                        )
-                        for slot_no in range(spec_deneb.SLOTS_PER_EPOCH)
-                    ],
-                ).model_dump(),
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetProposerDutiesResponse(
+                        dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
+                        execution_optimistic=False,
+                        data=[
+                            SchemaBeaconAPI.ProposerDuty(
+                                pubkey="0x" + os.urandom(48).hex(),
+                                validator_index=str(random.randint(0, 1_000_000)),
+                                slot=str(
+                                    epoch_no * spec_deneb.SLOTS_PER_EPOCH + slot_no
+                                ),
+                            )
+                            for slot_no in range(spec_deneb.SLOTS_PER_EPOCH)
+                        ],
+                    )
+                ),
             )
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
@@ -144,11 +149,11 @@ def _mocked_beacon_node_endpoints(
             response = SchemaBeaconAPI.ProduceBlockV3Response(
                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                 execution_payload_blinded=execution_payload_blinded,
-                execution_payload_value=random.randint(0, 10_000_000),
-                consensus_block_value=random.randint(0, 10_000_000),
+                execution_payload_value=str(random.randint(0, 10_000_000)),
+                consensus_block_value=str(random.randint(0, 10_000_000)),
                 data=_data,
             )
-            return CallbackResult(payload=response.model_dump())
+            return CallbackResult(body=msgspec.json.encode(response))
 
         if re.match("/eth/v1/validator/attestation_data", url.raw_path):
             att_data = AttestationData(
@@ -183,11 +188,14 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v1/beacon/blocks/head/root", url.raw_path):
             return CallbackResult(
-                payload=SchemaBeaconAPI.GetBlockRootResponse(
-                    execution_optimistic=False,
-                    finalized=False,
-                    data=SchemaBeaconAPI.BlockRoot(root="0x" + os.urandom(32).hex()),
-                ).model_dump(),
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetBlockRootResponse(
+                        execution_optimistic=False,
+                        data=SchemaBeaconAPI.BlockRoot(
+                            root="0x" + os.urandom(32).hex()
+                        ),
+                    )
+                )
             )
 
         if re.match("/eth/v1/validator/sync_committee_contribution", url.raw_path):
@@ -212,22 +220,29 @@ def _mocked_beacon_node_endpoints(
 
     def _mocked_beacon_api_endpoints_post(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match(r"/eth/v1/beacon/states/\w*/validators", url.raw_path):
-            ids = kwargs["json"]["ids"]
-            statuses = kwargs["json"]["statuses"]
+            data = msgspec.json.decode(kwargs["data"])
+            ids = data["ids"]
+            statuses = data["statuses"]
 
-            return_data = [
-                dict(
-                    index=str(validator.index),
-                    status=validator.status.value,
-                    validator=dict(
-                        pubkey=validator.pubkey,
-                    ),
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetStateValidatorsResponse(
+                        execution_optimistic=False,
+                        data=[
+                            SchemaBeaconAPI.ValidatorInfo(
+                                index=str(validator.index),
+                                status=validator.status,
+                                validator=SchemaBeaconAPI.Validator(
+                                    pubkey=validator.pubkey
+                                ),
+                            )
+                            for validator in validators
+                            if validator.status.value in statuses
+                            and validator.pubkey in ids
+                        ],
+                    )
                 )
-                for validator in validators
-                if validator.status.value in statuses and validator.pubkey in ids
-            ]
-
-            return CallbackResult(payload=dict(data=return_data))
+            )
 
         if re.match("/eth/v1/validator/prepare_beacon_proposer", url.raw_path):
             return CallbackResult(status=200)
@@ -255,27 +270,35 @@ def _mocked_beacon_node_endpoints(
                 attester_duties.append(
                     SchemaBeaconAPI.AttesterDuty(
                         pubkey=v.pubkey,
-                        validator_index=v.index,
-                        committee_index=random.randint(
-                            0,
-                            spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                        validator_index=str(v.index),
+                        committee_index=str(
+                            random.randint(
+                                0,
+                                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                            )
                         ),
-                        committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-                        committees_at_slot=random.randint(0, 10),
-                        validator_committee_index=random.randint(
-                            0,
-                            spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                        committee_length=str(
+                            spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE
                         ),
-                        slot=duty_slot,
+                        committees_at_slot=str(random.randint(0, 10)),
+                        validator_committee_index=str(
+                            random.randint(
+                                0,
+                                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                            )
+                        ),
+                        slot=str(duty_slot),
                     ),
                 )
 
             return CallbackResult(
-                payload=SchemaBeaconAPI.GetAttesterDutiesResponse(
-                    dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
-                    execution_optimistic=False,
-                    data=attester_duties,
-                ).model_dump(),
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetAttesterDutiesResponse(
+                        dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
+                        execution_optimistic=False,
+                        data=attester_duties,
+                    )
+                )
             )
 
         if re.match("/eth/v1/validator/beacon_committee_subscriptions", url.raw_path):
@@ -295,17 +318,19 @@ def _mocked_beacon_node_endpoints(
             sync_duties = [
                 SchemaBeaconAPI.SyncDuty(
                     pubkey=v.pubkey,
-                    validator_index=v.index,
+                    validator_index=str(v.index),
                     validator_sync_committee_indices=[],
                 )
                 for v in validators
             ]
 
             return CallbackResult(
-                payload=SchemaBeaconAPI.GetSyncDutiesResponse(
-                    execution_optimistic=False,
-                    data=sync_duties,
-                ).model_dump(),
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetSyncDutiesResponse(
+                        execution_optimistic=False,
+                        data=sync_duties,
+                    )
+                )
             )
 
         if re.match("/eth/v1/validator/sync_committee_subscriptions", url.raw_path):

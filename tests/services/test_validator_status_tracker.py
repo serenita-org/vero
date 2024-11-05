@@ -22,14 +22,10 @@ def _reset_slashing_detected_metric() -> None:
         pytest.param(
             SchemaBeaconAPI.AttesterSlashingEvent(
                 attestation_1=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[1, 2, 3, 4, 5],
-                    data=dict(),
-                    signature=b"",
+                    attesting_indices=["1", "2", "3", "4", "5"],
                 ),
                 attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[4, 8, 9, 10],
-                    data=dict(),
-                    signature=b"",
+                    attesting_indices=["4", "8", "9", "10"],
                 ),
             ),
             True,
@@ -38,14 +34,10 @@ def _reset_slashing_detected_metric() -> None:
         pytest.param(
             SchemaBeaconAPI.AttesterSlashingEvent(
                 attestation_1=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[1, 2, 3, 4, 5, 10, 11],
-                    data=dict(),
-                    signature=b"",
+                    attesting_indices=["1", "2", "3", "4", "5", "10", "11"],
                 ),
                 attestation_2=SchemaBeaconAPI.AttesterSlashingEventAttestation(
-                    attesting_indices=[10, 11],
-                    data=dict(),
-                    signature=b"",
+                    attesting_indices=["10", "11"],
                 ),
             ),
             False,
@@ -55,23 +47,13 @@ def _reset_slashing_detected_metric() -> None:
             SchemaBeaconAPI.ProposerSlashingEvent(
                 signed_header_1=SchemaBeaconAPI.ProposerSlashingEventData(
                     message=SchemaBeaconAPI.ProposerSlashingEventMessage(
-                        slot=123,
-                        proposer_index=4,
-                        parent_root="0xabc",
-                        state_root="0xabc",
-                        body_root="0xabc",
+                        proposer_index="4",
                     ),
-                    signature=b"",
                 ),
                 signed_header_2=SchemaBeaconAPI.ProposerSlashingEventData(
                     message=SchemaBeaconAPI.ProposerSlashingEventMessage(
-                        slot=123,
-                        proposer_index=4,
-                        parent_root="0xabc",
-                        state_root="0xabc",
-                        body_root="0xdef",
+                        proposer_index="4",
                     ),
-                    signature=b"",
                 ),
             ),
             True,
@@ -81,23 +63,13 @@ def _reset_slashing_detected_metric() -> None:
             SchemaBeaconAPI.ProposerSlashingEvent(
                 signed_header_1=SchemaBeaconAPI.ProposerSlashingEventData(
                     message=SchemaBeaconAPI.ProposerSlashingEventMessage(
-                        slot=123,
-                        proposer_index=10,
-                        parent_root="0xabc",
-                        state_root="0xabc",
-                        body_root="0xabc",
+                        proposer_index="10",
                     ),
-                    signature=b"",
                 ),
                 signed_header_2=SchemaBeaconAPI.ProposerSlashingEventData(
                     message=SchemaBeaconAPI.ProposerSlashingEventMessage(
-                        slot=123,
-                        proposer_index=10,
-                        parent_root="0xabc",
-                        state_root="0xabc",
-                        body_root="0xdef",
+                        proposer_index="10",
                     ),
-                    signature=b"",
                 ),
             ),
             False,

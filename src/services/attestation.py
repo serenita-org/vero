@@ -89,7 +89,7 @@ class AttestationService(ValidatorDutyService):
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.scheduler.add_job(self.update_duties)
-        await self.attest_if_not_yet_attested(slot=event.slot, head_event=event)
+        await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
 
     async def attest_if_not_yet_attested(
         self,
@@ -125,7 +125,7 @@ class AttestationService(ValidatorDutyService):
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
             slot_attester_duties = {
-                duty for duty in self.attester_duties[epoch] if duty.slot == slot
+                duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
             }
 
             for duty in slot_attester_duties:
@@ -202,11 +202,11 @@ class AttestationService(ValidatorDutyService):
 
             def _att_data_for_committee_idx(
                 _orig_att_data_obj: dict,  # type: ignore[type-arg]
-                committee_index: int,
+                committee_index: str,
             ) -> dict:  # type: ignore[type-arg]
                 # This updates the attestation data's index field
                 # to the correct, committee-specific value.
-                return {**_orig_att_data_obj, "index": str(committee_index)}
+                return {**_orig_att_data_obj, "index": committee_index}
 
             _fork_info = self.beacon_chain.get_fork_info(slot=slot)
             pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
@@ -247,9 +247,9 @@ class AttestationService(ValidatorDutyService):
                     duty = pubkey_to_duty[pubkey]
 
                     aggregation_bits = Bitlist[MAX_VALIDATORS_PER_COMMITTEE](
-                        False for _ in range(duty.committee_length)
+                        False for _ in range(int(duty.committee_length))
                     )
-                    aggregation_bits[duty.validator_committee_index] = True
+                    aggregation_bits[int(duty.validator_committee_index)] = True
 
                     attestations_objects_to_publish.append(
                         dict(
@@ -404,18 +404,18 @@ class AttestationService(ValidatorDutyService):
         _sign_and_publish_tasks = []
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations(
             attestation_data=att_data,
-            committee_indices=committee_indices,
+            committee_indices={int(i) for i in committee_indices},
         ):
             messages = []
             identifiers = []
             for duty in aggregator_duties:
-                if duty.committee_index == aggregate.data.index:
+                if int(duty.committee_index) == aggregate.data.index:
                     aggregate_count += 1
                     messages.append(
                         SchemaRemoteSigner.AggregateAndProofSignableMessage(
                             fork_info=_fork_info,
                             aggregate_and_proof=AggregateAndProof(
-                                aggregator_index=duty.validator_index,
+                                aggregator_index=int(duty.validator_index),
                                 aggregate=aggregate,
                                 selection_proof=duty.selection_proof,
                             ).to_obj(),
@@ -446,12 +446,12 @@ class AttestationService(ValidatorDutyService):
             return []
 
         # Fork info for all slots in the same epoch will be the same
-        _fork_slot = next(d.slot for d in duties)
+        _fork_slot = int(next(d.slot for d in duties))
         _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
 
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent
-        for duty_slot in {duty.slot for duty in duties}:
+        for duty_slot in {int(duty.slot) for duty in duties}:
             self.logger.debug(f"Adding attest_if_not_yet job for slot {duty_slot}")
             self.scheduler.add_job(
                 self.attest_if_not_yet_attested,
@@ -475,7 +475,7 @@ class AttestationService(ValidatorDutyService):
                 signable_messages.append(
                     SchemaRemoteSigner.AggregationSlotSignableMessage(
                         fork_info=_fork_info,
-                        aggregation_slot=SchemaRemoteSigner.Slot(slot=duty.slot),
+                        aggregation_slot=SchemaRemoteSigner.Slot(slot=int(duty.slot)),
                     ),
                 )
                 identifiers.append(duty.pubkey)
@@ -500,13 +500,13 @@ class AttestationService(ValidatorDutyService):
         for duty in duties:
             selection_proof = pubkey_to_selection_proof[duty.pubkey]
             is_aggregator = self._is_aggregator_by_committee_length(
-                committee_length=duty.committee_length,
+                committee_length=int(duty.committee_length),
                 slot_signature=selection_proof,
             )
 
             duties_with_proofs.append(
                 SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-                    **duty.model_dump(),
+                    **duty.to_dict(),
                     is_aggregator=is_aggregator,
                     selection_proof=selection_proof,
                 ),
@@ -515,10 +515,10 @@ class AttestationService(ValidatorDutyService):
         # Prepare beacon node subnet subscriptions for aggregation duties
         beacon_committee_subscriptions_data = [
             dict(
-                validator_index=str(duty.validator_index),
-                committee_index=str(duty.committee_index),
-                committees_at_slot=str(duty.committees_at_slot),
-                slot=str(duty.slot),
+                validator_index=duty.validator_index,
+                committee_index=duty.committee_index,
+                committees_at_slot=duty.committees_at_slot,
+                slot=duty.slot,
                 is_aggregator=duty.is_aggregator,
             )
             for duty in duties_with_proofs
@@ -592,9 +592,10 @@ class AttestationService(ValidatorDutyService):
             duties_due_later = []
             fetched_duties = response.data
             for duty in fetched_duties:
-                if duty.slot < current_slot:
+                duty_slot = int(duty.slot)
+                if duty_slot < current_slot:
                     continue
-                if duty.slot <= current_slot + 1:
+                if duty_slot <= current_slot + 1:
                     duties_due_soon.append(duty)
                 else:
                     duties_due_later.append(duty)

@@ -10,41 +10,48 @@ https://docs.nodereal.io/reference/eventstream
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+import msgspec
 
 
-class ExecutionOptimisticResponse(BaseModel):
+class ExecutionOptimisticResponse(msgspec.Struct):
     execution_optimistic: bool
 
 
-class AttesterDuty(BaseModel):
+class ValidatorStatus(Enum):
+    ACTIVE_ONGOING = "active_ongoing"
+    ACTIVE_EXITING = "active_exiting"
+    ACTIVE_SLASHED = "active_slashed"
+    PENDING_INITIALIZED = "pending_initialized"
+    PENDING_QUEUED = "pending_queued"
+
+
+class Validator(msgspec.Struct):
     pubkey: str
-    validator_index: int
-    committee_index: int
-    committee_length: int
-    committees_at_slot: int
-    validator_committee_index: int
-    slot: int
 
 
-class AttesterDutyWithSelectionProof(AttesterDuty):
-    is_aggregator: bool
-    selection_proof: bytes
-
-    model_config = ConfigDict(frozen=True)
-
-
-class GetAttesterDutiesResponse(ExecutionOptimisticResponse):
-    dependent_root: str
-    data: list[AttesterDuty]
+class ValidatorInfo(msgspec.Struct):
+    index: str
+    status: ValidatorStatus
+    validator: Validator
 
 
-class ProposerDuty(BaseModel):
+class GetStateValidatorsResponse(ExecutionOptimisticResponse):
+    data: list[ValidatorInfo]
+
+
+class BlockRoot(msgspec.Struct):
+    root: str
+
+
+class GetBlockRootResponse(ExecutionOptimisticResponse):
+    data: BlockRoot
+
+
+# Duty endpoints responses
+class ProposerDuty(msgspec.Struct, frozen=True):
     pubkey: str
-    validator_index: int
-    slot: int
-
-    model_config = ConfigDict(frozen=True)
+    validator_index: str
+    slot: str
 
 
 class GetProposerDutiesResponse(ExecutionOptimisticResponse):
@@ -52,13 +59,36 @@ class GetProposerDutiesResponse(ExecutionOptimisticResponse):
     data: list[ProposerDuty]
 
 
-class SyncDuty(BaseModel):
+class AttesterDuty(msgspec.Struct, frozen=True):
     pubkey: str
-    validator_index: int
-    validator_sync_committee_indices: list[int]
+    validator_index: str
+    committee_index: str
+    committee_length: str
+    committees_at_slot: str
+    validator_committee_index: str
+    slot: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {f: getattr(self, f) for f in self.__struct_fields__}
 
 
-class SyncDutySubCommitteeSelectionProof(BaseModel):
+class AttesterDutyWithSelectionProof(AttesterDuty, frozen=True):
+    is_aggregator: bool
+    selection_proof: bytes
+
+
+class GetAttesterDutiesResponse(ExecutionOptimisticResponse):
+    dependent_root: str
+    data: list[AttesterDuty]
+
+
+class SyncDuty(msgspec.Struct):
+    pubkey: str
+    validator_index: str
+    validator_sync_committee_indices: list[str]
+
+
+class SyncDutySubCommitteeSelectionProof(msgspec.Struct):
     slot: int
     subcommittee_index: int
     is_aggregator: bool
@@ -73,45 +103,44 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
     data: list[SyncDuty]
 
 
-class BlockRoot(BaseModel):
-    root: str
+# Block production
+class BeaconBlockVersion(Enum):
+    DENEB = "deneb"
 
 
-class GetBlockRootResponse(ExecutionOptimisticResponse):
-    finalized: bool
-    data: BlockRoot
+class ProduceBlockV3Response(msgspec.Struct):
+    version: BeaconBlockVersion
+    execution_payload_blinded: bool
+    execution_payload_value: str
+    consensus_block_value: str
+    data: dict  # type: ignore[type-arg]
 
 
-class BeaconNodeEvent(BaseModel):
+# Events
+class BeaconNodeEvent(msgspec.Struct):
     pass
 
 
 class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
-    slot: int
+    slot: str
     block: str
-    state: str
-    epoch_transition: bool
     previous_duty_dependent_root: str
     current_duty_dependent_root: str
 
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
-    slot: int
-    depth: int
+    slot: str
+    depth: str
     old_head_block: str
     new_head_block: str
-    old_head_state: str
-    new_head_state: str
-    epoch: int
 
 
-class AttesterSlashingEventAttestation(BaseModel):
-    attesting_indices: list[int]
-    data: dict  # type: ignore[type-arg]
-    signature: bytes
+# Slashing events
+class AttesterSlashingEventAttestation(msgspec.Struct):
+    attesting_indices: list[str]
 
 
-class AttesterSlashing(BaseModel):
+class AttesterSlashing(msgspec.Struct):
     attestation_1: AttesterSlashingEventAttestation
     attestation_2: AttesterSlashingEventAttestation
 
@@ -120,42 +149,18 @@ class AttesterSlashingEvent(BeaconNodeEvent, AttesterSlashing):
     pass
 
 
-class ProposerSlashingEventMessage(BaseModel):
-    slot: int
-    proposer_index: int
-    parent_root: str
-    state_root: str
-    body_root: str
+class ProposerSlashingEventMessage(msgspec.Struct):
+    proposer_index: str
 
 
-class ProposerSlashingEventData(BaseModel):
+class ProposerSlashingEventData(msgspec.Struct):
     message: ProposerSlashingEventMessage
-    signature: bytes
 
 
-class ProposerSlashing(BaseModel):
+class ProposerSlashing(msgspec.Struct):
     signed_header_1: ProposerSlashingEventData
     signed_header_2: ProposerSlashingEventData
 
 
 class ProposerSlashingEvent(BeaconNodeEvent, ProposerSlashing):
     pass
-
-
-class BeaconBlockVersion(Enum):
-    DENEB = "deneb"
-
-
-class ProduceBlockV3Response(BaseModel):
-    version: BeaconBlockVersion
-    execution_payload_blinded: bool
-    execution_payload_value: int
-    consensus_block_value: int
-    data: dict  # type: ignore[type-arg]
-
-    # Intentionally not using ConfigDict(use_enum_values=True)
-    # here for version so that we can more easily work with
-    # the Enum in the rest of the codebase
-    @field_serializer("version")
-    def serialize_version(self, version: BeaconBlockVersion) -> str:
-        return version.value

@@ -53,7 +53,7 @@ class SyncCommitteeService(ValidatorDutyService):
         if not isinstance(event, SchemaBeaconAPI.HeadEvent):
             raise NotImplementedError(f"Expected HeadEvent but got {type(event)}")
         await self.produce_sync_message_if_not_yet_produced(
-            duty_slot=event.slot,
+            duty_slot=int(event.slot),
             head_event=event,
         )
 
@@ -82,9 +82,9 @@ class SyncCommitteeService(ValidatorDutyService):
 
         sync_committee_members = {
             SchemaValidator.ValidatorIndexPubkey(
-                index=d.validator_index,
+                index=int(d.validator_index),
                 pubkey=d.pubkey,
-                status=SchemaValidator.ValidatorStatus.ACTIVE_ONGOING,
+                status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
             )
             for d in self.sync_duties[sync_period]
         }
@@ -215,7 +215,7 @@ class SyncCommitteeService(ValidatorDutyService):
         selection_proofs_coroutines = []
         for duty in sync_duties:
             subcommittee_indexes = self._compute_subnets_for_sync_committee(
-                duty.validator_sync_committee_indices,
+                [int(i) for i in duty.validator_sync_committee_indices],
             )
             selection_proofs_coroutines.extend(
                 [
@@ -263,7 +263,9 @@ class SyncCommitteeService(ValidatorDutyService):
 
             duties_with_proofs.append(
                 SchemaBeaconAPI.SyncDutyWithSelectionProofs(
-                    **duty.model_dump(),
+                    pubkey=duty.pubkey,
+                    validator_index=duty.validator_index,
+                    validator_sync_committee_indices=duty.validator_sync_committee_indices,
                     selection_proofs=duty_sync_committee_selection_proofs,
                 ),
             )
@@ -378,7 +380,7 @@ class SyncCommitteeService(ValidatorDutyService):
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
                                 contribution_and_proof=SyncCommitteeContributionClass.ContributionAndProof(
-                                    aggregator_index=duty.validator_index,
+                                    aggregator_index=int(duty.validator_index),
                                     contribution=contribution,
                                     selection_proof=duty_sp.selection_proof,
                                 ).to_obj(),
@@ -410,7 +412,7 @@ class SyncCommitteeService(ValidatorDutyService):
         for idx in indexes_in_committee:
             subnets.add(
                 idx
-                // (
+                // int(
                     self.beacon_chain.spec.SYNC_COMMITTEE_SIZE
                     // self.beacon_chain.spec.SYNC_COMMITTEE_SUBNET_COUNT
                 ),
@@ -510,10 +512,8 @@ class SyncCommitteeService(ValidatorDutyService):
             ) * self.beacon_chain.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
             sync_committee_subscriptions_data = [
                 dict(
-                    validator_index=str(duty.validator_index),
-                    sync_committee_indices=[
-                        str(i) for i in duty.validator_sync_committee_indices
-                    ],
+                    validator_index=duty.validator_index,
+                    sync_committee_indices=duty.validator_sync_committee_indices,
                     until_epoch=str(until_epoch),
                 )
                 for duty in self.sync_duties[sync_period]
