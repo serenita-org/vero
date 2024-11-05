@@ -5251,7 +5251,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "histogram_quantile(0.99, event_loop_lag_seconds_bucket{instance=\"$instance\"}) and on(instance, job) vero_info",
+              "expr": "histogram_quantile(0.99, rate(event_loop_lag_seconds_bucket{instance=\"$instance\"}[$__rate_interval])) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "{{ time_since_slot_start }}s into slot",
               "range": true,
@@ -5544,6 +5544,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 4,
+  "version": 5,
   "weekStart": ""
 }
