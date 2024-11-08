@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 import pytest
 from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from pydantic import HttpUrl
 
 from providers import MultiBeaconNode
 from spec.base import SpecDeneb
@@ -19,12 +18,9 @@ async def multi_beacon_node_three_inited_nodes(
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(
         beacon_node_urls=[
-            HttpUrl(u)
-            for u in (
-                "http://beacon-node-a:1234",
-                "http://beacon-node-b:1234",
-                "http://beacon-node-c:1234",
-            )
+            "http://beacon-node-a:1234",
+            "http://beacon-node-b:1234",
+            "http://beacon-node-c:1234",
         ],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,

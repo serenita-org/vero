@@ -2,18 +2,15 @@ import os
 
 import pyroscope
 from opentelemetry import trace
-from pydantic import HttpUrl
 from pyroscope.otel import PyroscopeSpanProcessor
 
 from observability._vero_info import get_service_name
 
 
 def setup_profiling() -> None:
-    pyroscope_address = os.getenv("PYROSCOPE_SERVER_ADDRESS")
-    if not pyroscope_address:
+    pyroscope_server_address = os.getenv("PYROSCOPE_SERVER_ADDRESS")
+    if not pyroscope_server_address:
         return
-
-    pyroscope_server_address = HttpUrl(pyroscope_address)
 
     tags = {
         key_value_pair.split("=")[0]: key_value_pair.split("=")[1]
@@ -23,7 +20,7 @@ def setup_profiling() -> None:
 
     pyroscope.configure(
         application_name=get_service_name(),
-        server_address=str(pyroscope_server_address),
+        server_address=pyroscope_server_address,
         tags=tags,
     )
 

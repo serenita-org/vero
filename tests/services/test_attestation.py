@@ -37,18 +37,22 @@ async def test_attest_if_not_yet_attested(
     attestation_service.attester_duties[duty_epoch].add(
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            committee_index=random.randint(
-                0,
-                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+            validator_index=str(random_active_validator.index),
+            committee_index=str(
+                random.randint(
+                    0,
+                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                )
             ),
-            committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-            committees_at_slot=random.randint(0, 10),
-            validator_committee_index=random.randint(
-                0,
-                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1,
+            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
+            committees_at_slot=str(random.randint(0, 10)),
+            validator_committee_index=str(
+                random.randint(
+                    0,
+                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1,
+                )
             ),
-            slot=duty_slot,
+            slot=str(duty_slot),
             is_aggregator=False,
             selection_proof=os.urandom(96),
         ),
@@ -77,15 +81,17 @@ async def test_aggregate_attestations(
     slot_attester_duties = {
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            committee_index=123,
-            committee_length=spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-            committees_at_slot=random.randint(0, 10),
-            validator_committee_index=random.randint(
-                0,
-                spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+            validator_index=str(random_active_validator.index),
+            committee_index=str(123),
+            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
+            committees_at_slot=str(random.randint(0, 10)),
+            validator_committee_index=str(
+                random.randint(
+                    0,
+                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
+                )
             ),
-            slot=duty_slot,
+            slot=str(duty_slot),
             is_aggregator=True,
             selection_proof=os.urandom(96),
         ),

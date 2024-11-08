@@ -77,9 +77,9 @@ class ValidatorStatusTrackerService:
         }
 
         if isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent):
-            slashed_validator_indices = set(
-                event.attestation_1.attesting_indices,
-            ) & set(event.attestation_2.attesting_indices)
+            slashed_validator_indices = {
+                int(i) for i in event.attestation_1.attesting_indices
+            } & {int(i) for i in event.attestation_2.attesting_indices}
             our_slashed_indices = slashed_validator_indices & our_validator_indices
 
             if len(our_slashed_indices) > 0:
@@ -91,7 +91,7 @@ class ValidatorStatusTrackerService:
                 f"Processed attester slashing event affecting validator indices {slashed_validator_indices}",
             )
         elif isinstance(event, SchemaBeaconAPI.ProposerSlashingEvent):
-            slashed_validator_index = event.signed_header_1.message.proposer_index
+            slashed_validator_index = int(event.signed_header_1.message.proposer_index)
             if slashed_validator_index in our_validator_indices:
                 self.slashing_detected = True
                 self.logger.critical(

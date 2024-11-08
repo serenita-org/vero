@@ -1,15 +1,7 @@
 from enum import Enum
 from typing import TypeVar
 
-from pydantic import BaseModel, ConfigDict, field_serializer
-
-from schemas import SchemaBeaconAPI
-
-
-class ForkInfo(BaseModel):
-    model_config = ConfigDict(coerce_numbers_to_str=True)
-    fork: dict[str, str]
-    genesis_validators_root: str
+import msgspec
 
 
 class SigningRequestType(Enum):
@@ -24,47 +16,51 @@ class SigningRequestType(Enum):
     VALIDATOR_REGISTRATION = "VALIDATOR_REGISTRATION"
 
 
-class SignableMessage(BaseModel):
-    model_config = ConfigDict(use_enum_values=True)
-    type: SigningRequestType
-
-
 SignableMessageT = TypeVar("SignableMessageT", bound="SignableMessage")
 
 
-class SignableMessageWithForkInfo(SignableMessage):
+class SignableMessage(msgspec.Struct):
+    type: SigningRequestType
+
+
+class ForkInfo(msgspec.Struct):
+    fork: dict[str, str]
+    genesis_validators_root: str
+
+
+class SignableMessageWithForkInfo(SignableMessage, kw_only=True):
     fork_info: ForkInfo
 
 
-class AttestationSignableMessage(SignableMessageWithForkInfo):
+class AttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.ATTESTATION
     attestation: dict  # type: ignore[type-arg]
 
 
-class Slot(BaseModel):
+class Slot(msgspec.Struct):
     slot: int
 
 
-class AggregationSlotSignableMessage(SignableMessageWithForkInfo):
+class AggregationSlotSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.AGGREGATION_SLOT
     aggregation_slot: Slot
 
 
-class AggregateAndProofSignableMessage(SignableMessageWithForkInfo):
+class AggregateAndProofSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.AGGREGATE_AND_PROOF
     aggregate_and_proof: dict  # type: ignore[type-arg]
 
 
-class RandaoReveal(BaseModel):
+class RandaoReveal(msgspec.Struct):
     epoch: int
 
 
-class RandaoRevealSignableMessage(SignableMessageWithForkInfo):
+class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.RANDAO_REVEAL
     randao_reveal: RandaoReveal
 
 
-class BeaconBlockHeader(BaseModel):
+class BeaconBlockHeader(msgspec.Struct):
     slot: int
     proposer_index: int
     parent_root: str
@@ -72,52 +68,56 @@ class BeaconBlockHeader(BaseModel):
     body_root: str
 
 
-class BeaconBlock(BaseModel):
-    version: SchemaBeaconAPI.BeaconBlockVersion
+class BeaconBlockVersion(Enum):
+    DENEB = "DENEB"
+
+
+class BeaconBlock(msgspec.Struct):
+    version: BeaconBlockVersion
     block_header: BeaconBlockHeader
 
-    @field_serializer("version")
-    def serialize_version(self, version: Enum) -> str:
-        return version.value.upper()  # type: ignore[no-any-return]
 
-
-class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo):
+class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.BLOCK_V2
     beacon_block: BeaconBlock
 
 
-class SyncCommitteeMessage(BaseModel):
+class SyncCommitteeMessage(msgspec.Struct):
     beacon_block_root: str
     slot: int
 
 
-class SyncCommitteeMessageSignableMessage(SignableMessageWithForkInfo):
+class SyncCommitteeMessageSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.SYNC_COMMITTEE_MESSAGE
     sync_committee_message: SyncCommitteeMessage
 
 
-class SyncAggregatorSelectionData(BaseModel):
+class SyncAggregatorSelectionData(msgspec.Struct):
     slot: int
     subcommittee_index: int
 
 
-class SyncCommitteeSelectionProofSignableMessage(SignableMessageWithForkInfo):
+class SyncCommitteeSelectionProofSignableMessage(
+    SignableMessageWithForkInfo, kw_only=True
+):
     type: SigningRequestType = SigningRequestType.SYNC_COMMITTEE_SELECTION_PROOF
     sync_aggregator_selection_data: SyncAggregatorSelectionData
 
 
-class SyncCommitteeContributionAndProofSignableMessage(SignableMessageWithForkInfo):
+class SyncCommitteeContributionAndProofSignableMessage(
+    SignableMessageWithForkInfo, kw_only=True
+):
     type: SigningRequestType = SigningRequestType.SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF
     contribution_and_proof: dict  # type: ignore[type-arg]
 
 
-class ValidatorRegistration(BaseModel):
+class ValidatorRegistration(msgspec.Struct):
     fee_recipient: str
     gas_limit: str
     timestamp: str
     pubkey: str
 
 
-class ValidatorRegistrationSignableMessage(SignableMessage):
+class ValidatorRegistrationSignableMessage(SignableMessage, kw_only=True):
     type: SigningRequestType = SigningRequestType.VALIDATOR_REGISTRATION
     validator_registration: ValidatorRegistration

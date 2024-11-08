@@ -25,8 +25,8 @@ async def main(cli_args: CLIArgs) -> None:
     logging.getLogger("vero-init").info(
         f"Starting vero {get_service_version()} (commit {get_service_commit()})",
     )
-    check_data_dir_permissions(cli_args=cli_args)
-    prep_datadir(data_dir=cli_args.data_dir)
+    check_data_dir_permissions(data_dir=Path(cli_args.data_dir))
+    prep_datadir(data_dir=Path(cli_args.data_dir))
     await run_services(cli_args=cli_args)
 
 

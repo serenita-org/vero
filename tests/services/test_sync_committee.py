@@ -43,8 +43,8 @@ async def test_produce_sync_message_if_not_yet_produced(
     sync_committee_service.sync_duties[sync_period] = [
         SchemaBeaconAPI.SyncDuty(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            validator_sync_committee_indices=[1, 3],
+            validator_index=str(random_active_validator.index),
+            validator_sync_committee_indices=["1", "3"],
         ),
     ]
 
@@ -73,8 +73,8 @@ async def test_aggregate_sync_messages(
     duties_with_proofs = [
         SchemaBeaconAPI.SyncDutyWithSelectionProofs(
             pubkey=random_active_validator.pubkey,
-            validator_index=random_active_validator.index,
-            validator_sync_committee_indices=[1, 3],
+            validator_index=str(random_active_validator.index),
+            validator_sync_committee_indices=["1", "3"],
             selection_proofs=[
                 SchemaBeaconAPI.SyncDutySubCommitteeSelectionProof(
                     slot=duty_slot + 1,

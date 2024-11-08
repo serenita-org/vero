@@ -69,19 +69,19 @@ def _register_event_handlers(
         )
 
 
-def check_data_dir_permissions(cli_args: CLIArgs) -> None:
-    if not Path.is_dir(cli_args.data_dir):
+def check_data_dir_permissions(data_dir: Path) -> None:
+    if not Path.is_dir(data_dir):
         _logger.info("Data directory does not exist, attempting to create it")
         try:
-            Path.mkdir(cli_args.data_dir, parents=True)
+            Path.mkdir(data_dir, parents=True)
         except Exception as e:
             raise RuntimeError(
-                f"Failed to create data directory at {cli_args.data_dir}",
+                f"Failed to create data directory at {data_dir}",
             ) from e
 
     # Attempt to write a file and reading from it
     test_filename = ".vero_test_permissions"
-    test_file_path = Path(cli_args.data_dir) / test_filename
+    test_file_path = data_dir / test_filename
     test_file_content = "test_permissions"
     with Path.open(test_file_path, "w") as f:
         f.write(test_file_content)

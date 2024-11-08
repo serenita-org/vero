@@ -99,23 +99,24 @@ class BlockProposalService(ValidatorDutyService):
             current_slot = self.beacon_chain.current_slot
             self.proposer_duties[epoch] = set()
             for duty in fetched_duties:
-                if duty.slot < current_slot:
+                duty_slot = int(duty.slot)
+                if duty_slot < current_slot:
                     continue
-                if duty.validator_index in _validator_indices:
+                if int(duty.validator_index) in _validator_indices:
                     self.proposer_duties[epoch].add(duty)
 
                     self.logger.info(
-                        f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}",
+                        f"Upcoming block proposal duty at slot {duty_slot} for validator {duty.validator_index}",
                     )
 
                     self.scheduler.add_job(
                         self.propose_block,
                         "date",
                         next_run_time=self.beacon_chain.get_datetime_for_slot(
-                            slot=duty.slot,
+                            slot=duty_slot,
                         ),
-                        kwargs=dict(slot=duty.slot),
-                        id=f"propose_block_job_for_slot_{duty.slot}",
+                        kwargs=dict(slot=duty_slot),
+                        id=f"propose_block_job_for_slot_{duty_slot}",
                         replace_existing=True,
                     )
 
@@ -298,7 +299,7 @@ class BlockProposalService(ValidatorDutyService):
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
             slot_proposer_duties = {
-                duty for duty in self.proposer_duties[epoch] if duty.slot == slot
+                duty for duty in self.proposer_duties[epoch] if int(duty.slot) == slot
             }
 
             for duty in slot_proposer_duties:
@@ -322,7 +323,7 @@ class BlockProposalService(ValidatorDutyService):
                             message=SchemaRemoteSigner.RandaoRevealSignableMessage(
                                 fork_info=self.beacon_chain.get_fork_info(slot=slot),
                                 randao_reveal=SchemaRemoteSigner.RandaoReveal(
-                                    epoch=epoch,
+                                    epoch=int(epoch),
                                 ),
                             ),
                             identifier=duty.pubkey,
@@ -378,7 +379,9 @@ class BlockProposalService(ValidatorDutyService):
                             message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
                                 fork_info=self.beacon_chain.get_fork_info(slot=slot),
                                 beacon_block=SchemaRemoteSigner.BeaconBlock(
-                                    version=full_response.version,
+                                    version=SchemaRemoteSigner.BeaconBlockVersion[
+                                        full_response.version.value.upper()
+                                    ],
                                     block_header=beacon_block_header.to_obj(),
                                 ),
                             ),

@@ -95,7 +95,7 @@ class ValidatorDutyService:
 
     async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:
         self.logger.debug(
-            f"Handling reorg event, new head block {event.new_head_block}"
+            f"Handling reorg event at slot {event.slot}, new head block {event.new_head_block}"
         )
         self.scheduler.add_job(self.update_duties)
 

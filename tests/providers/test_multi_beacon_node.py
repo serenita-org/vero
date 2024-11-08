@@ -13,7 +13,6 @@ import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from pydantic import HttpUrl
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from providers import MultiBeaconNode
@@ -76,7 +75,7 @@ async def test_initialize(
     assert len(beacon_node_base_urls) == len(beacon_node_availabilities)
 
     mbn = MultiBeaconNode(
-        beacon_node_urls=[HttpUrl(u) for u in beacon_node_base_urls],
+        beacon_node_urls=beacon_node_base_urls,
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
     )

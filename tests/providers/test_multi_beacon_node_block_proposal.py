@@ -8,6 +8,7 @@ import re
 from functools import partial
 from typing import Any, TypedDict
 
+import msgspec.json
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
@@ -40,8 +41,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=100,
-                                consensus_block_value=50,
+                                execution_payload_value=str(100),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -56,8 +57,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=150,
-                                consensus_block_value=50,
+                                execution_payload_value=str(150),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -72,8 +73,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=120,
-                                consensus_block_value=50,
+                                execution_payload_value=str(120),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -94,8 +95,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=100,
-                                consensus_block_value=50,
+                                execution_payload_value=str(100),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -110,8 +111,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=150,
-                                consensus_block_value=50,
+                                execution_payload_value=str(150),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -142,8 +143,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=100,
-                                consensus_block_value=50,
+                                execution_payload_value=str(100),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -220,8 +221,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=150,
-                                consensus_block_value=50,
+                                execution_payload_value=str(150),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -236,8 +237,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=200,
-                                consensus_block_value=50,
+                                execution_payload_value=str(200),
+                                consensus_block_value=str(50),
                                 data=dict(),
                             ),
                             exception=None,
@@ -252,8 +253,8 @@ class BeaconNodeResponseSequence(TypedDict):
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
                                 version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
                                 execution_payload_blinded=False,
-                                execution_payload_value=1000,
-                                consensus_block_value=500,
+                                execution_payload_value=str(1000),
+                                consensus_block_value=str(500),
                                 data=dict(),
                             ),
                             exception=None,
@@ -302,7 +303,7 @@ async def test_produce_block_v3(
                     if _exception:
                         raise _exception
                     if _response:
-                        return CallbackResult(payload=_response.model_dump())
+                        return CallbackResult(body=msgspec.json.encode(_response))
                     raise ValueError("No exception or response to return")
 
                 _callback = partial(
@@ -334,8 +335,8 @@ async def test_produce_block_v3(
                 full_response,
             ) = result
             assert (
-                full_response.consensus_block_value
-                + full_response.execution_payload_value
+                int(full_response.consensus_block_value)
+                + int(full_response.execution_payload_value)
                 == returned_block_value
             )
         else:

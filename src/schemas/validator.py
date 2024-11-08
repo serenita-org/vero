@@ -1,34 +1,23 @@
-from enum import Enum
+import msgspec
 
-from pydantic import BaseModel, ConfigDict
-
-
-class ValidatorStatus(Enum):
-    ACTIVE_ONGOING = "active_ongoing"
-    ACTIVE_EXITING = "active_exiting"
-    ACTIVE_SLASHED = "active_slashed"
-    PENDING_INITIALIZED = "pending_initialized"
-    PENDING_QUEUED = "pending_queued"
-
+from schemas import SchemaBeaconAPI
 
 ACTIVE_STATUSES = [
-    ValidatorStatus.ACTIVE_ONGOING,
-    ValidatorStatus.ACTIVE_EXITING,
+    SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
+    SchemaBeaconAPI.ValidatorStatus.ACTIVE_EXITING,
 ]
 
 PENDING_STATUSES = [
-    ValidatorStatus.PENDING_INITIALIZED,
-    ValidatorStatus.PENDING_QUEUED,
+    SchemaBeaconAPI.ValidatorStatus.PENDING_INITIALIZED,
+    SchemaBeaconAPI.ValidatorStatus.PENDING_QUEUED,
 ]
 
 SLASHED_STATUSES = [
-    ValidatorStatus.ACTIVE_SLASHED,
+    SchemaBeaconAPI.ValidatorStatus.ACTIVE_SLASHED,
 ]
 
 
-class ValidatorIndexPubkey(BaseModel):
+class ValidatorIndexPubkey(msgspec.Struct, frozen=True):
     index: int
     pubkey: str
-    status: ValidatorStatus
-
-    model_config = ConfigDict(frozen=True)
+    status: SchemaBeaconAPI.ValidatorStatus
