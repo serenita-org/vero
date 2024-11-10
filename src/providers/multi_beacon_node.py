@@ -615,7 +615,8 @@ class MultiBeaconNode:
         committee_index: int,
     ) -> Attestation | AttestationElectra:
         _att_data = attestation_data.copy()
-        _att_data.index = committee_index
+        if isinstance(attestation_data, Attestation):
+            _att_data.index = committee_index
 
         aggregates: list[
             Attestation | AttestationElectra
