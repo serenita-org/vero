@@ -39,7 +39,10 @@ class BeaconChain:
 
     @property
     def current_fork_version(self) -> SchemaBeaconAPI.ForkVersion:
-        if self.fork.current_version == self.spec.ELECTRA_FORK_VERSION:
+        if (
+            hasattr(self.spec, "ELECTRA_FORK_VERSION")
+            and self.fork.current_version == self.spec.ELECTRA_FORK_VERSION
+        ):
             return SchemaBeaconAPI.ForkVersion.ELECTRA
         if self.fork.current_version == self.spec.DENEB_FORK_VERSION:
             return SchemaBeaconAPI.ForkVersion.DENEB
