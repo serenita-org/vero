@@ -32,6 +32,7 @@ from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
+from spec.constants import INTERVALS_PER_SLOT, TARGET_AGGREGATORS_PER_COMMITTEE
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -80,8 +81,7 @@ class AttestationService(ValidatorDutyService):
         _produce_deadline = self.beacon_chain.get_datetime_for_slot(
             slot=slot
         ) + datetime.timedelta(
-            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
         )
 
         self.scheduler.add_job(
@@ -188,7 +188,7 @@ class AttestationService(ValidatorDutyService):
             ) + datetime.timedelta(
                 seconds=2
                 * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-                / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+                / INTERVALS_PER_SLOT,
             )
 
             consensus_start = asyncio.get_running_loop().time()
@@ -239,6 +239,7 @@ class AttestationService(ValidatorDutyService):
                 return {**_orig_att_data_obj, "index": committee_index}
 
             _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+            _fork_version = self.beacon_chain.current_fork_version
 
             pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
             with self.tracer.start_as_current_span(
@@ -251,7 +252,9 @@ class AttestationService(ValidatorDutyService):
                         self.remote_signer.sign(
                             message=SchemaRemoteSigner.AttestationSignableMessage(
                                 fork_info=_fork_info,
-                                attestation=_att_data_for_committee_idx(
+                                attestation=att_data_obj
+                                if _fork_version != SchemaBeaconAPI.ForkVersion.DENEB
+                                else _att_data_for_committee_idx(
                                     att_data_obj,
                                     duty.committee_index,
                                 ),
@@ -277,21 +280,35 @@ class AttestationService(ValidatorDutyService):
 
                     duty = pubkey_to_duty[pubkey]
 
-                    aggregation_bits = Bitlist[self.spec.MAX_VALIDATORS_PER_COMMITTEE](
-                        False for _ in range(int(duty.committee_length))
-                    )
-                    aggregation_bits[int(duty.validator_committee_index)] = True
+                    if _fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
+                        # Attestation object from the CL spec
+                        aggregation_bits = Bitlist[
+                            self.spec.MAX_VALIDATORS_PER_COMMITTEE
+                        ](False for _ in range(int(duty.committee_length)))
+                        aggregation_bits[int(duty.validator_committee_index)] = True
 
-                    attestations_objects_to_publish.append(
-                        dict(
-                            aggregation_bits=aggregation_bits.to_obj(),
-                            data=_att_data_for_committee_idx(
-                                att_data_obj,
-                                duty.committee_index,
+                        attestations_objects_to_publish.append(
+                            dict(
+                                aggregation_bits=aggregation_bits.to_obj(),
+                                data=_att_data_for_committee_idx(
+                                    att_data_obj,
+                                    duty.committee_index,
+                                ),
+                                signature=signature,
                             ),
-                            signature=signature,
-                        ),
-                    )
+                        )
+                    elif _fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+                        # SingleAttestation object from the CL spec
+                        attestations_objects_to_publish.append(
+                            dict(
+                                committee_index=duty.committee_index,
+                                attester_index=duty.validator_index,
+                                data=att_data_obj,
+                                signature=signature,
+                            ),
+                        )
+                    else:
+                        raise NotImplementedError
 
             # Add the aggregation duty to the schedule *before*
             # publishing attestations so that any delays in publishing
@@ -319,6 +336,7 @@ class AttestationService(ValidatorDutyService):
                 try:
                     await self.multi_beacon_node.publish_attestations(
                         attestations=attestations_objects_to_publish,
+                        fork_version=_fork_version,
                     )
                 except Exception as e:
                     _ERRORS_METRIC.labels(
@@ -353,7 +371,7 @@ class AttestationService(ValidatorDutyService):
         ) + datetime.timedelta(
             seconds=2
             * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+            / INTERVALS_PER_SLOT,
         )
         self.scheduler.add_job(
             self.aggregate_attestations,
@@ -373,18 +391,20 @@ class AttestationService(ValidatorDutyService):
     ) -> bool:
         modulo = max(
             1,
-            committee_length // self.beacon_chain.spec.TARGET_AGGREGATORS_PER_COMMITTEE,
+            committee_length // TARGET_AGGREGATORS_PER_COMMITTEE,
         )
         return bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0  # type: ignore[no-any-return]
 
     async def _sign_and_publish_aggregates(
         self,
         slot: int,
-        messages: list[SchemaRemoteSigner.AggregateAndProofSignableMessage],
+        messages: list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
+        | list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage],
         identifiers: list[str],
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         signed_aggregate_and_proofs = []
-        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(
+        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(  # type: ignore[misc]
             messages=messages,
             identifiers=identifiers,
         ):
@@ -397,6 +417,7 @@ class AttestationService(ValidatorDutyService):
         try:
             await self.multi_beacon_node.publish_aggregate_and_proofs(
                 signed_aggregate_and_proofs=signed_aggregate_and_proofs,
+                fork_version=fork_version,
             )
             _VC_PUBLISHED_AGGREGATE_ATTESTATIONS.inc(
                 amount=len(signed_aggregate_and_proofs),
@@ -430,31 +451,53 @@ class AttestationService(ValidatorDutyService):
 
         aggregate_count = 0
         self.logger.debug(
-            f"Starting aggregate and proof sign-and-publish tasks for slot {att_data.slot}",
+            f"Starting aggregate and proof sign-and-publish tasks for slot {att_data.slot}, committee indices: {committee_indices}",
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+        _fork_version = self.beacon_chain.current_fork_version
         _sign_and_publish_tasks = []
-        async for aggregate in self.multi_beacon_node.get_aggregate_attestations(
+
+        async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data=att_data,
             committee_indices={int(i) for i in committee_indices},
         ):
-            messages = []
+            messages: (
+                list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
+                | list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage]
+            ) = []
             identifiers = []
             for duty in aggregator_duties:
-                if int(duty.committee_index) == aggregate.data.index:
-                    aggregate_count += 1
-                    messages.append(
-                        SchemaRemoteSigner.AggregateAndProofSignableMessage(
-                            fork_info=_fork_info,
-                            aggregate_and_proof=SpecAttestation.AggregateAndProofDeneb(
-                                aggregator_index=int(duty.validator_index),
-                                aggregate=aggregate,
-                                selection_proof=duty.selection_proof,
-                            ).to_obj(),
+                if isinstance(aggregate, SpecAttestation.AttestationPhase0):
+                    if int(duty.committee_index) == aggregate.data.index:
+                        aggregate_count += 1
+                        messages.append(
+                            SchemaRemoteSigner.AggregateAndProofSignableMessage(  # type: ignore[arg-type]
+                                fork_info=_fork_info,
+                                aggregate_and_proof=SpecAttestation.AggregateAndProofPhase0(
+                                    aggregator_index=int(duty.validator_index),
+                                    aggregate=aggregate,
+                                    selection_proof=duty.selection_proof,
+                                ).to_obj(),
+                            )
                         )
-                    )
-                    identifiers.append(duty.pubkey)
+                        identifiers.append(duty.pubkey)
+                elif isinstance(aggregate, SpecAttestation.AttestationElectra):
+                    if aggregate.committee_bits[int(duty.committee_index)]:
+                        aggregate_count += 1
+                        messages.append(
+                            SchemaRemoteSigner.AggregateAndProofV2SignableMessage(  # type: ignore[arg-type]
+                                fork_info=_fork_info,
+                                aggregate_and_proof=SpecAttestation.AggregateAndProofElectra(
+                                    aggregator_index=int(duty.validator_index),
+                                    aggregate=aggregate,
+                                    selection_proof=duty.selection_proof,
+                                ).to_obj(),
+                            )
+                        )
+                        identifiers.append(duty.pubkey)
+                else:
+                    raise NotImplementedError
 
             _sign_and_publish_tasks.append(
                 asyncio.create_task(
@@ -462,6 +505,7 @@ class AttestationService(ValidatorDutyService):
                         slot=slot,
                         messages=messages,
                         identifiers=identifiers,
+                        fork_version=_fork_version,
                     )
                 )
             )

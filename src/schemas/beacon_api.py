@@ -51,6 +51,16 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
+class ForkVersion(Enum):
+    DENEB = "deneb"
+    ELECTRA = "electra"
+
+
+class GetAggregatedAttestationV2Response(msgspec.Struct):
+    version: ForkVersion
+    data: dict  # type: ignore[type-arg]
+
+
 # Duty endpoints responses
 class ProposerDuty(msgspec.Struct, frozen=True):
     pubkey: str
@@ -108,12 +118,8 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
 
 
 # Block production
-class BeaconBlockVersion(Enum):
-    DENEB = "deneb"
-
-
 class ProduceBlockV3Response(msgspec.Struct):
-    version: BeaconBlockVersion
+    version: ForkVersion
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
