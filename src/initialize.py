@@ -21,6 +21,25 @@ from services import (
 
 _logger = logging.getLogger("vero-init")
 
+_electra_ascii = r"""
+ .--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--.
+/ .. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \
+\ \/\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ \/ /
+ \/ /`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'``--'\/ /
+ / /\                                                                                                     / /\
+/ /\ \      /       _______  __       _______   ______ .___________..______           ___          /     / /\ \
+\ \/ /     /       |   ____||  |     |   ____| /      ||           ||   _  \         /   \        /      \ \/ /
+ \/ /     /___     |  |__   |  |     |  |__   |  ,----'`---|  |----`|  |_)  |       /  ^  \      /___     \/ /
+ / /\        /     |   __|  |  |     |   __|  |  |         |  |     |      /       /  /_\  \        /     / /\
+/ /\ \      /      |  |____ |  `----.|  |____ |  `----.    |  |     |  |\  \----. /  _____  \      /     / /\ \
+\ \/ /     /       |_______||_______||_______| \______|    |__|     | _| `._____|/__/     \__\    /      \ \/ /
+ \/ /                                                                                                     \/ /
+ / /\.--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..--..---./ /\
+/ /\ \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \.. \... \/\ \
+\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `'\ `' \ `'\ `' /
+ `--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`--'`---'`--'
+"""
+
 
 async def _wait_for_genesis(genesis_datetime: datetime.datetime) -> None:
     # Waits for genesis to occur
@@ -161,6 +180,15 @@ async def run_services(cli_args: CLIArgs) -> None:
 
         scheduler.add_job(event_consumer_service.handle_events)
         _logger.info("Started event consumer")
+
+        if hasattr(beacon_chain.spec, "ELECTRA_FORK_EPOCH"):
+            scheduler.add_job(
+                lambda: logging.getLogger("Network").info(_electra_ascii),
+                next_run_time=beacon_chain.get_datetime_for_slot(
+                    slot=beacon_chain.spec.ELECTRA_FORK_EPOCH
+                    * beacon_chain.spec.SLOTS_PER_EPOCH
+                ),
+            )
 
         # Run forever while monitoring the event loop
         await monitor_event_loop(beacon_chain=beacon_chain)

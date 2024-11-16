@@ -16,8 +16,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from providers import MultiBeaconNode
+from schemas import SchemaBeaconAPI
 from spec.attestation import Attestation, AttestationData
-from spec.base import SpecDeneb
+from spec.base import SpecDeneb, SpecElectra
 from spec.sync_committee import SyncCommitteeContributionClass
 
 
@@ -166,26 +167,33 @@ async def test_initialize(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    "spec",
+    [pytest.param(SpecDeneb, id="Deneb"), pytest.param(SpecElectra, id="Electra")],
+    indirect=True,
+)
 async def test_get_aggregate_attestation(
     numbers_of_attesting_indices: list[Exception | int],
     best_aggregate_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
     """
+    # Adjust for specDeneb/SpecElectra
     with aioresponses() as m:
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
-                agg_bits_to_return = Bitlist[spec_deneb.MAX_VALIDATORS_PER_COMMITTEE](
-                    False for _ in range(spec_deneb.MAX_VALIDATORS_PER_COMMITTEE)
+                agg_bits_to_return = Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE](
+                    False for _ in range(spec.MAX_VALIDATORS_PER_COMMITTEE)
                 )
                 for idx in range(number_of_attesting_indices):
                     agg_bits_to_return[idx] = True
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
+                            version=SchemaBeaconAPI.ForkVersion.DENEB.value,
                             data=Attestation(
                                 aggregation_bits=_bits,
                             ).to_obj(),
@@ -195,14 +203,14 @@ async def test_get_aggregate_attestation(
                 )
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
+                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
                     ),
                     callback=_callback,
                 )
             elif isinstance(number_of_attesting_indices, Exception):
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
+                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
                     ),
                     exception=number_of_attesting_indices,
                 )
@@ -214,13 +222,13 @@ async def test_get_aggregate_attestation(
                 RuntimeError,
                 match="Failed to get a response from all beacon nodes",
             ):
-                _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
+                _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
                     attestation_data=AttestationData(),
                     committee_index=3,
                 )
         else:
             returned_aggregate = (
-                await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
+                await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
                     attestation_data=AttestationData(),
                     committee_index=3,
                 )
