@@ -223,24 +223,15 @@ class AttestationService(ValidatorDutyService):
             ) as sign_span:
                 att_data_obj = att_data.to_obj()
 
-                # Post-Electra the committee index is set outside
-                # of the AttestationData object
-                if _fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
-                    att_data_obj = _att_data_for_committee_idx(
-                        att_data_obj,
-                        duty.committee_index,
-                    )
-
-                self.logger.debug(f"Att data object: {att_data_obj}")
-                self.logger.debug(f"Fork info: {_fork_info}")
-                self.logger.debug(f"Fork version: {_fork_version}")
-
                 for coro in asyncio.as_completed(
                     [
                         self.remote_signer.sign(
                             message=SchemaRemoteSigner.AttestationSignableMessage(
                                 fork_info=_fork_info,
-                                attestation=att_data_obj,
+                                attestation=_att_data_for_committee_idx(
+                                    att_data_obj,
+                                    duty.committee_index,
+                                ),
                             ),
                             identifier=duty.pubkey,
                         )
@@ -272,7 +263,10 @@ class AttestationService(ValidatorDutyService):
                         attestations_objects_to_publish.append(
                             dict(
                                 aggregation_bits=aggregation_bits.to_obj(),
-                                data=att_data_obj,
+                                data=_att_data_for_committee_idx(
+                                    att_data_obj,
+                                    duty.committee_index,
+                                ),
                                 signature=signature,
                             ),
                         )
