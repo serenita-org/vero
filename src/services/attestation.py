@@ -247,6 +247,10 @@ class AttestationService(ValidatorDutyService):
                         duty.committee_index,
                     )
 
+                self.logger.debug(f"Att data object: {att_data_obj}")
+                self.logger.debug(f"Fork info: {_fork_info}")
+                self.logger.debug(f"Fork version: {_fork_version}")
+
                 for coro in asyncio.as_completed(
                     [
                         self.remote_signer.sign(
@@ -284,10 +288,7 @@ class AttestationService(ValidatorDutyService):
                         attestations_objects_to_publish.append(
                             dict(
                                 aggregation_bits=aggregation_bits.to_obj(),
-                                data=_att_data_for_committee_idx(
-                                    att_data_obj,
-                                    duty.committee_index,
-                                ),
+                                data=att_data_obj,
                                 signature=signature,
                             ),
                         )
@@ -300,10 +301,7 @@ class AttestationService(ValidatorDutyService):
                         attestations_objects_to_publish.append(
                             dict(
                                 aggregation_bits=aggregation_bits.to_obj(),
-                                data=_att_data_for_committee_idx(
-                                    att_data_obj,
-                                    str(0),
-                                ),
+                                data=att_data_obj,
                                 signature=signature,
                                 committee_bits=committee_bits.to_obj(),
                             ),
