@@ -228,7 +228,9 @@ class AttestationService(ValidatorDutyService):
                         self.remote_signer.sign(
                             message=SchemaRemoteSigner.AttestationSignableMessage(
                                 fork_info=_fork_info,
-                                attestation=_att_data_for_committee_idx(
+                                attestation=att_data_obj
+                                if _fork_version != SchemaBeaconAPI.ForkVersion.DENEB
+                                else _att_data_for_committee_idx(
                                     att_data_obj,
                                     duty.committee_index,
                                 ),
