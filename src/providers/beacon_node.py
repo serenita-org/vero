@@ -534,27 +534,6 @@ class BeaconNode:
             data=self.json_encoder.encode(data),
         )
 
-    # TODO delete this method, mock, tests, ...
-    async def get_aggregate_attestation(
-        self,
-        attestation_data: AttestationData,
-    ) -> Attestation:
-        resp = await self._make_request(
-            method="GET",
-            endpoint="/eth/v1/validator/aggregate_attestation",
-            params=dict(
-                attestation_data_root=f"0x{attestation_data.hash_tree_root().hex()}",
-                slot=attestation_data.slot,
-            ),
-            timeout=ClientTimeout(
-                connect=self.client_session.timeout.connect,
-                total=int(self.spec.SECONDS_PER_SLOT)
-                / int(self.spec.INTERVALS_PER_SLOT),
-            ),
-        )
-
-        return Attestation.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
-
     async def get_aggregated_attestation_v2(
         self,
         attestation_data: AttestationData,

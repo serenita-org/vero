@@ -1,6 +1,5 @@
 import asyncio
 import os
-import random
 
 import pytest
 
@@ -98,25 +97,24 @@ async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     spec: SpecDeneb | SpecElectra,
-    random_active_validator: ValidatorIndexPubkey,
+    validators: list[ValidatorIndexPubkey],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Create an attester aggregation duty
     duty_slot = beacon_chain.current_slot
 
+    second_active_validator = [
+        v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING
+    ][1]
+
     slot_attester_duties = {
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-            pubkey=random_active_validator.pubkey,
-            validator_index=str(random_active_validator.index),
-            committee_index=str(12),
-            committee_length=str(spec.TARGET_AGGREGATORS_PER_COMMITTEE),
-            committees_at_slot=str(random.randint(0, 10)),
-            validator_committee_index=str(
-                random.randint(
-                    0,
-                    spec.TARGET_AGGREGATORS_PER_COMMITTEE,
-                )
-            ),
+            pubkey=second_active_validator.pubkey,
+            validator_index=str(second_active_validator.index),
+            committee_index=str(14),
+            committee_length=str(16),
+            committees_at_slot=str(20),
+            validator_committee_index=str(9),
             slot=str(duty_slot),
             is_aggregator=True,
             selection_proof=os.urandom(96),
@@ -126,7 +124,7 @@ async def test_aggregate_attestations(
     att_data = AttestationData(
         slot=duty_slot,
         index=0,
-        beacon_block_root="0x" + os.urandom(32).hex(),
+        beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
     )
 
     aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
