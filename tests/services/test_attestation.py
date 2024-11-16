@@ -6,6 +6,7 @@ import pytest
 
 from providers import BeaconChain
 from schemas import SchemaBeaconAPI
+from schemas.beacon_api import ValidatorStatus
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 from services.attestation import (
@@ -27,31 +28,25 @@ async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     spec_deneb: SpecDeneb,
-    random_active_validator: ValidatorIndexPubkey,
+    validators: list[ValidatorIndexPubkey],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with an attester duty
     duty_slot = beacon_chain.current_slot + 1
     duty_epoch = duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
 
+    first_active_validator = next(
+        v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING
+    )
+
     attestation_service.attester_duties[duty_epoch].add(
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-            pubkey=random_active_validator.pubkey,
-            validator_index=str(random_active_validator.index),
-            committee_index=str(
-                random.randint(
-                    0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-                )
-            ),
-            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
-            committees_at_slot=str(random.randint(0, 10)),
-            validator_committee_index=str(
-                random.randint(
-                    0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1,
-                )
-            ),
+            pubkey=first_active_validator.pubkey,
+            validator_index=str(first_active_validator.index),
+            committee_index=str(14),
+            committee_length=str(16),
+            committees_at_slot=str(20),
+            validator_committee_index=str(9),
             slot=str(duty_slot),
             is_aggregator=False,
             selection_proof=os.urandom(96),

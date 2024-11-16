@@ -3,6 +3,7 @@ import random
 from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator, Generator
 
+import milagro_bls_binding as bls
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -63,31 +64,52 @@ def _init_observability() -> None:
 
 
 @pytest.fixture(scope="session")
-def validators() -> list[ValidatorIndexPubkey]:
+def validator_privkeys() -> list[bytes]:
+    return [
+        bytes.fromhex(
+            "3790d84ccaa187d6446929de4334244f1533290f3ec59c35bbabe29b65cf75f5"
+        ),
+        bytes.fromhex(
+            "6159530651e3024960127c55e55b76c5c4a993ed20d86e823e4071facd77ef46"
+        ),
+        bytes.fromhex(
+            "06d2402dea01ef37a38d5e88c1373233a63714111d1444e60b3d7a77995f6c69"
+        ),
+        bytes.fromhex(
+            "1a642fe520729113c35da46751cdf68485412a7d9dfe64deb91ccee9e84c0ec3"
+        ),
+        bytes.fromhex(
+            "1da22e7f7b0970f9d6deffe15b861dfd8673e130977b680f4aa9c668a38855af"
+        ),
+    ]
+
+
+@pytest.fixture(scope="session")
+def validators(validator_privkeys: list[bytes]) -> list[ValidatorIndexPubkey]:
     return [
         ValidatorIndexPubkey(
             index=0,
-            pubkey="0x8c87f7a01e54215ac177fb706d78e9edf762f15f34ba81103094da450f1683ced257d4270fc030a9a803aaa060edf16a",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[0]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=1,
-            pubkey="0xa728ab62714bada6b46f11dc0262c70fe4c45bb4d167fb4d709a49ec14ead5d0da7d5a57175f1c6b3a89a40f42be7439",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[1]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=2,
-            pubkey="0x832b8286f5d6535fd941c6c4ed8b9b20d214fc6aa726ce4fba1c9dbb4f278132646304f550e557231b6932aa02cf08d3",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[2]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=3,
-            pubkey="0xb99d27eeea8c7f9201926801acae031a9aa558428a47d403cfeda91260087dc77cb7e97f213b552c179d60be5d8dd671",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[3]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.PENDING_QUEUED,
         ),
         ValidatorIndexPubkey(
             index=4,
-            pubkey="0xa3ad41f12e889eb1f4e9d23247a7d8fc665f7e7bcd76e1ca61a1c54fc31fb30dd6cf12992969ab0899f0514d2f2aa852",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[4]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_EXITING,
         ),
     ]
