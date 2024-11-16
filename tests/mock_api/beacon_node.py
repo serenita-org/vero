@@ -393,6 +393,9 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(status=200)
 
+        if re.match("/eth/v2/beacon/pool/attestations", url.raw_path):
+            return CallbackResult(status=200)
+
         if re.match("/eth/v1/validator/aggregate_and_proofs", url.raw_path):
             return CallbackResult(status=200)
 

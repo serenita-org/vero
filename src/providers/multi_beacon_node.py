@@ -637,6 +637,13 @@ class MultiBeaconNode:
         attestation_data: AttestationData,
         committee_indices: set[int],
     ) -> AsyncIterator[Attestation | AttestationElectra]:
+        # TODO post-Electra there's a "single" shared aggregate attestation so it's
+        #  sufficient to get it once! (w/ committee_index=0)
+        #  Is it though?
+        #  I think we may still need to get it for each committee index.
+        #  We can test on kurtosis but we need to increase the validator count
+        #  so that there is more than 1 committee...
+
         tasks = [
             self.get_aggregate_attestation_v2(
                 attestation_data=attestation_data,
