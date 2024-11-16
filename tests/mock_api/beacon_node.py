@@ -1,3 +1,4 @@
+import datetime
 import os
 import random
 import re
@@ -5,6 +6,7 @@ from typing import Any
 
 import msgspec
 import pytest
+import pytz
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist
 from yarl import URL
@@ -72,7 +74,11 @@ def mocked_genesis_response() -> dict:  # type: ignore[type-arg]
     return dict(
         data=Genesis.from_obj(
             dict(
-                genesis_time=1695902100,
+                genesis_time=int(
+                    (
+                        datetime.datetime.now(tz=pytz.UTC) - datetime.timedelta(days=30)
+                    ).timestamp()
+                ),
                 genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
                 genesis_fork_version="0x10000038",
             ),
@@ -159,7 +165,7 @@ def _mocked_beacon_node_endpoints(
             att_data = AttestationData(
                 slot=int(url.query["slot"]),
                 index=int(url.query["committee_index"]),
-                beacon_block_root="0x" + os.urandom(32).hex(),
+                beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
             )
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
@@ -172,7 +178,7 @@ def _mocked_beacon_node_endpoints(
                 data=AttestationData(
                     slot=int(url.query["slot"]),
                     index=123,
-                    beacon_block_root="0x" + os.urandom(32).hex(),
+                    beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
                     source=Checkpoint(
                         epoch=2,
                         root="0x" + os.urandom(32).hex(),
@@ -305,6 +311,14 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(status=200)
 
         if re.match("/eth/v1/beacon/pool/attestations", url.raw_path):
+            data_list = msgspec.json.decode(kwargs["data"])
+            assert len(data_list) == 1
+            data = data_list[0]
+            assert data["aggregation_bits"] == "0x000201"
+            assert (
+                data["signature"]
+                == "0xa92c7837242b8f17512300f3bdb3613d7475a281d54d6f31e1d4666de82348dad34ce1c8680712b69ba86f5eb7882823028bddf0fa963d61fc95050fbd98060435d39cadb07fa444928d55b36ac8a350a6b2c5e10aa7d7da32b51c7ac6e0cb62"
+            )
             return CallbackResult(status=200)
 
         if re.match("/eth/v1/validator/aggregate_and_proofs", url.raw_path):
