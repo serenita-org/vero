@@ -17,6 +17,11 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec.common import bytes_to_uint64, hash_function
+from spec.constants import (
+    INTERVALS_PER_SLOT,
+    SYNC_COMMITTEE_SUBNET_COUNT,
+    TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
+)
 from spec.sync_committee import SpecSyncCommittee
 
 _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES = Counter(
@@ -61,8 +66,7 @@ class SyncCommitteeService(ValidatorDutyService):
         _produce_deadline = self.beacon_chain.get_datetime_for_slot(
             slot=slot
         ) + datetime.timedelta(
-            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
         )
 
         self.scheduler.add_job(
@@ -314,7 +318,7 @@ class SyncCommitteeService(ValidatorDutyService):
         ) + datetime.timedelta(
             seconds=2
             * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+            / INTERVALS_PER_SLOT,
         )
         self.scheduler.add_job(
             self.aggregate_sync_messages,
@@ -453,7 +457,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 idx
                 // int(
                     self.beacon_chain.spec.SYNC_COMMITTEE_SIZE
-                    // self.beacon_chain.spec.SYNC_COMMITTEE_SUBNET_COUNT
+                    // SYNC_COMMITTEE_SUBNET_COUNT
                 ),
             )
 
@@ -463,8 +467,8 @@ class SyncCommitteeService(ValidatorDutyService):
         modulo = max(
             1,
             self.beacon_chain.spec.SYNC_COMMITTEE_SIZE
-            // self.beacon_chain.spec.SYNC_COMMITTEE_SUBNET_COUNT
-            // self.beacon_chain.spec.TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
+            // SYNC_COMMITTEE_SUBNET_COUNT
+            // TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
         return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0  # type: ignore[no-any-return]
 

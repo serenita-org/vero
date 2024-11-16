@@ -394,7 +394,7 @@ class BlockProposalService(ValidatorDutyService):
                 try:
                     if not full_response.execution_payload_blinded:
                         await self.multi_beacon_node.publish_block_v2(
-                            block_version=full_response.version,
+                            fork_version=full_response.version,
                             block=beacon_block,
                             blobs=full_response.data.get("blobs", []),
                             kzg_proofs=full_response.data.get("kzg_proofs", []),
@@ -403,7 +403,7 @@ class BlockProposalService(ValidatorDutyService):
                     else:
                         # Blinded block
                         await self.multi_beacon_node.publish_blinded_block_v2(
-                            block_version=full_response.version,
+                            fork_version=full_response.version,
                             block=beacon_block,
                             signature=signature,
                         )

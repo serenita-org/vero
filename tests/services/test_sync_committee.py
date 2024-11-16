@@ -11,7 +11,6 @@ from services.sync_committee import (
     _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
-from spec.base import SpecDeneb
 
 
 @pytest.fixture
@@ -67,7 +66,6 @@ async def test_produce_sync_message_if_not_yet_produced(
 async def test_aggregate_sync_messages(
     sync_committee_service: SyncCommitteeService,
     beacon_chain: BeaconChain,
-    spec_deneb: SpecDeneb,
     random_active_validator: ValidatorIndexPubkey,
     caplog: pytest.LogCaptureFixture,
 ) -> None:

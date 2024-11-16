@@ -16,9 +16,11 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from args import CLIArgs, _process_attestation_consensus_threshold
-from providers import MultiBeaconNode
+from providers import BeaconChain, MultiBeaconNode
+from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
-from spec.base import SpecDeneb
+from spec.base import SpecElectra
+from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
 from tasks import TaskManager
 
@@ -68,7 +70,8 @@ async def test_initialize(
     expected_initialization_success: bool,
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec_deneb: SpecDeneb,
+    beacon_chain: BeaconChain,
+    spec: SpecElectra,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     cli_args: CLIArgs,
@@ -84,7 +87,7 @@ async def test_initialize(
     mbn = MultiBeaconNode(
         beacon_node_urls=beacon_node_urls,
         beacon_node_urls_proposal=[],
-        spec=spec_deneb,
+        spec=spec,
         scheduler=scheduler,
         task_manager=task_manager,
         cli_args=cli_args,
@@ -114,7 +117,7 @@ async def test_initialize(
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=spec_deneb.to_obj()),
+                        payload=dict(data=spec.to_obj()),
                     ),
                 )
                 m.get(
@@ -180,8 +183,8 @@ async def test_initialize(
 async def test_get_aggregate_attestation(
     numbers_of_attesting_indices: list[Exception | int],
     best_aggregate_score: int,
+    beacon_chain: BeaconChain,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    spec_deneb: SpecDeneb,
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
@@ -189,15 +192,20 @@ async def test_get_aggregate_attestation(
     with aioresponses() as m:
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
-                agg_bits_to_return = Bitlist[spec_deneb.MAX_VALIDATORS_PER_COMMITTEE](
-                    False for _ in range(spec_deneb.MAX_VALIDATORS_PER_COMMITTEE)
+                bitlist_length = (
+                    beacon_chain.spec.MAX_VALIDATORS_PER_COMMITTEE
+                    * beacon_chain.spec.MAX_COMMITTEES_PER_SLOT
+                )
+                agg_bits_to_return = Bitlist[bitlist_length](
+                    False for _ in range(bitlist_length)
                 )
                 for idx in range(number_of_attesting_indices):
                     agg_bits_to_return[idx] = True
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
-                            data=SpecAttestation.AttestationDeneb(
+                            version=SchemaBeaconAPI.ForkVersion.ELECTRA.value,
+                            data=SpecAttestation.AttestationElectra(
                                 aggregation_bits=_bits,
                             ).to_obj(),
                         ),
@@ -206,14 +214,14 @@ async def test_get_aggregate_attestation(
                 )
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
+                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
                     ),
                     callback=_callback,
                 )
             elif isinstance(number_of_attesting_indices, Exception):
                 m.get(
                     url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/aggregate_attestation",
+                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
                     ),
                     exception=number_of_attesting_indices,
                 )
@@ -225,13 +233,13 @@ async def test_get_aggregate_attestation(
                 RuntimeError,
                 match="Failed to get a response from all beacon nodes",
             ):
-                _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
+                _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
                     attestation_data=AttestationData(),
                     committee_index=3,
                 )
         else:
             returned_aggregate = (
-                await multi_beacon_node_three_inited_nodes.get_aggregate_attestation(
+                await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
                     attestation_data=AttestationData(),
                     committee_index=3,
                 )
@@ -272,12 +280,11 @@ async def test_get_aggregate_attestation(
         ),
     ],
 )
-@pytest.mark.usefixtures("_sync_committee_contribution_class_init")
 async def test_get_sync_committee_contribution(
     numbers_of_root_matching_indices: list[Exception | int],
     best_contribution_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    spec_deneb: SpecDeneb,
+    spec: SpecElectra,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
@@ -285,10 +292,7 @@ async def test_get_sync_committee_contribution(
     with aioresponses() as m:
         for number_of_root_matching_indices in numbers_of_root_matching_indices:
             if isinstance(number_of_root_matching_indices, int):
-                bitlist_size = (
-                    spec_deneb.SYNC_COMMITTEE_SIZE
-                    // spec_deneb.SYNC_COMMITTEE_SUBNET_COUNT
-                )
+                bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
                 agg_bits_to_return = Bitvector[bitlist_size](
                     False for _ in range(bitlist_size)
                 )

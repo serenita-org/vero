@@ -1,8 +1,10 @@
 import asyncio
 import random
 from asyncio import AbstractEventLoop
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
+from unittest import mock
 
+import milagro_bls_binding as bls
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -10,10 +12,12 @@ from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
+from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecDeneb
+from spec.base import SpecElectra, Fork, Version
+from spec.common import Epoch
 from spec.configs import Network, get_network_spec
 from tasks import TaskManager
 
@@ -21,9 +25,7 @@ from tasks import TaskManager
 from tests.mock_api.base import *
 from tests.mock_api.beacon_node import *
 from tests.mock_api.beacon_node import (
-    _beacon_block_class_init,
     _mocked_beacon_node_endpoints,
-    _sync_committee_contribution_class_init,
 )
 from tests.mock_api.remote_signer import *
 from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
@@ -73,43 +75,76 @@ def _init_observability() -> None:
 
 
 @pytest.fixture(scope="session")
-def spec_deneb() -> Spec:
-    return get_network_spec(Network._TESTS)
+def spec(request: pytest.FixtureRequest) -> Spec:
+    return get_network_spec(network=Network._TESTS)
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _init_spec(spec_deneb: SpecDeneb) -> None:
-    SpecAttestation.initialize(spec=spec_deneb)
-    SpecBeaconBlock.initialize(spec=spec_deneb)
-    SpecSyncCommittee.initialize(spec=spec_deneb)
+def _init_spec(spec: SpecElectra) -> None:
+    SpecAttestation.initialize(spec=spec)
+    SpecBeaconBlock.initialize(spec=spec)
+    SpecSyncCommittee.initialize(spec=spec)
+
+
+@pytest.fixture
+def fork_version(
+    request: pytest.FixtureRequest, beacon_chain: BeaconChain
+) -> Generator[None, None, None]:
+    requested_fork_version = getattr(request, "param", ForkVersion.ELECTRA)
+
+    with mock.patch.object(
+        beacon_chain, "current_fork_version", requested_fork_version
+    ):
+        yield
 
 
 @pytest.fixture(scope="session")
-def validators() -> list[ValidatorIndexPubkey]:
+def validator_privkeys() -> list[bytes]:
+    return [
+        bytes.fromhex(
+            "3790d84ccaa187d6446929de4334244f1533290f3ec59c35bbabe29b65cf75f5"
+        ),
+        bytes.fromhex(
+            "6159530651e3024960127c55e55b76c5c4a993ed20d86e823e4071facd77ef46"
+        ),
+        bytes.fromhex(
+            "06d2402dea01ef37a38d5e88c1373233a63714111d1444e60b3d7a77995f6c69"
+        ),
+        bytes.fromhex(
+            "1a642fe520729113c35da46751cdf68485412a7d9dfe64deb91ccee9e84c0ec3"
+        ),
+        bytes.fromhex(
+            "1da22e7f7b0970f9d6deffe15b861dfd8673e130977b680f4aa9c668a38855af"
+        ),
+    ]
+
+
+@pytest.fixture(scope="session")
+def validators(validator_privkeys: list[bytes]) -> list[ValidatorIndexPubkey]:
     return [
         ValidatorIndexPubkey(
             index=0,
-            pubkey="0x8c87f7a01e54215ac177fb706d78e9edf762f15f34ba81103094da450f1683ced257d4270fc030a9a803aaa060edf16a",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[0]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=1,
-            pubkey="0xa728ab62714bada6b46f11dc0262c70fe4c45bb4d167fb4d709a49ec14ead5d0da7d5a57175f1c6b3a89a40f42be7439",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[1]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=2,
-            pubkey="0x832b8286f5d6535fd941c6c4ed8b9b20d214fc6aa726ce4fba1c9dbb4f278132646304f550e557231b6932aa02cf08d3",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[2]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_ONGOING,
         ),
         ValidatorIndexPubkey(
             index=3,
-            pubkey="0xb99d27eeea8c7f9201926801acae031a9aa558428a47d403cfeda91260087dc77cb7e97f213b552c179d60be5d8dd671",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[3]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.PENDING_QUEUED,
         ),
         ValidatorIndexPubkey(
             index=4,
-            pubkey="0xa3ad41f12e889eb1f4e9d23247a7d8fc665f7e7bcd76e1ca61a1c54fc31fb30dd6cf12992969ab0899f0514d2f2aa852",
+            pubkey="0x" + bls.SkToPk(validator_privkeys[4]).hex(),
             status=SchemaBeaconAPI.ValidatorStatus.ACTIVE_EXITING,
         ),
     ]
@@ -169,25 +204,23 @@ async def validator_status_tracker(
 async def multi_beacon_node(
     cli_args: CLIArgs,
     _mocked_beacon_node_endpoints: None,
-    spec_deneb: SpecDeneb,
+    spec: SpecElectra,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
+    beacon_chain: BeaconChain,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     async with MultiBeaconNode(
         beacon_node_urls=cli_args.beacon_node_urls,
         beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-        spec=spec_deneb,
+        spec=spec,
         scheduler=scheduler,
         task_manager=task_manager,
         cli_args=cli_args,
     ) as mbn:
+        beacon_chain.initialize(genesis=mbn.best_beacon_node.genesis)
         yield mbn
 
 
 @pytest.fixture
-async def beacon_chain(
-    multi_beacon_node: MultiBeaconNode, spec_deneb: SpecDeneb, task_manager: TaskManager
-) -> BeaconChain:
-    return BeaconChain(
-        multi_beacon_node=multi_beacon_node, spec=spec_deneb, task_manager=task_manager
-    )
+async def beacon_chain(spec: SpecElectra, task_manager: TaskManager) -> BeaconChain:
+    return BeaconChain(spec=spec, task_manager=task_manager)

@@ -1,10 +1,13 @@
-from remerkleable.basic import uint256
+from remerkleable.basic import uint64, uint256
 from remerkleable.bitfields import Bitvector
 from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
 from remerkleable.core import ObjType
 
-from spec.attestation import AttestationData, SpecAttestation
+from spec.attestation import (
+    AttestationData,
+    SpecAttestation,
+)
 from spec.base import Spec
 from spec.common import (
     DEPOSIT_CONTRACT_TREE_DEPTH,
@@ -107,31 +110,56 @@ class UInt256SerializedAsString(uint256):
         return str(self)
 
 
+class DepositRequest(Container):
+    pubkey: BLSPubkey
+    withdrawal_credentials: Bytes32
+    amount: Gwei
+    signature: BLSSignature
+    index: uint64
+
+
+class WithdrawalRequest(Container):
+    source_address: ExecutionAddress
+    validator_pubkey: BLSPubkey
+    amount: Gwei
+
+
+class ConsolidationRequest(Container):
+    source_address: ExecutionAddress
+    source_pubkey: BLSPubkey
+    target_pubkey: BLSPubkey
+
+
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecBeaconBlock:
     Deneb: Container
     DenebBlinded: Container
+    Electra: Container
+    ElectraBlinded: Container
 
     @classmethod
     def initialize(
         cls,
         spec: Spec,
     ) -> None:
-        class IndexedAttestation(Container):
+        class IndexedAttestationPhase0(Container):
             attesting_indices: List[ValidatorIndex, spec.MAX_VALIDATORS_PER_COMMITTEE]
             data: AttestationData
             signature: BLSSignature
 
-        class AttesterSlashing(Container):
-            attestation_1: IndexedAttestation
-            attestation_2: IndexedAttestation
+        class AttesterSlashingPhase0(Container):
+            attestation_1: IndexedAttestationPhase0
+            attestation_2: IndexedAttestationPhase0
 
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
             sync_committee_signature: BLSSignature
 
-        class ExecutionPayloadHeaderDeneb(Container):
+        class Transaction(ByteList[spec.MAX_BYTES_PER_TRANSACTION]):  # type: ignore[name-defined]
+            pass
+
+        class ExecutionPayloadV3Header(Container):
             # Execution block header fields
             parent_hash: Hash32
             fee_recipient: ExecutionAddress
@@ -152,10 +180,7 @@ class SpecBeaconBlock:
             blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
             excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
 
-        class Transaction(ByteList[spec.MAX_BYTES_PER_TRANSACTION]):  # type: ignore[name-defined]
-            pass
-
-        class ExecutionPayloadDeneb(Container):
+        class ExecutionPayloadV3(Container):
             # Execution block header fields
             parent_hash: Hash32
             fee_recipient: ExecutionAddress  # 'beneficiary' in the yellow paper
@@ -182,21 +207,23 @@ class SpecBeaconBlock:
             graffiti: Bytes32  # Arbitrary data
             # Operations
             proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashing, spec.MAX_ATTESTER_SLASHINGS]
-            attestations: List[SpecAttestation.AttestationDeneb, spec.MAX_ATTESTATIONS]
+            attester_slashings: List[
+                AttesterSlashingPhase0, spec.MAX_ATTESTER_SLASHINGS
+            ]
+            attestations: List[SpecAttestation.AttestationPhase0, spec.MAX_ATTESTATIONS]
             deposits: List[Deposit, spec.MAX_DEPOSITS]
             voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
             # Execution
             execution_payload: (
-                ExecutionPayloadDeneb  # [New in Bellatrix, Modified in Deneb:EIP4844]
+                ExecutionPayloadV3  # [New in Bellatrix, Modified in Deneb:EIP4844]
             )
             # Capella operations
             bls_to_execution_changes: List[
                 SignedBLSToExecutionChange,
                 spec.MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
-            # Execution
+            # Deneb
             blob_kzg_commitments: List[
                 KZGCommitment,
                 spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
@@ -208,14 +235,16 @@ class SpecBeaconBlock:
             graffiti: Bytes32  # Arbitrary data
             # Operations
             proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashing, spec.MAX_ATTESTER_SLASHINGS]
-            attestations: List[SpecAttestation.AttestationDeneb, spec.MAX_ATTESTATIONS]
+            attester_slashings: List[
+                AttesterSlashingPhase0, spec.MAX_ATTESTER_SLASHINGS
+            ]
+            attestations: List[SpecAttestation.AttestationPhase0, spec.MAX_ATTESTATIONS]
             deposits: List[Deposit, spec.MAX_DEPOSITS]
             voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
             # Execution
             execution_payload_header: (
-                ExecutionPayloadHeaderDeneb
+                ExecutionPayloadV3Header
                 # [New in Bellatrix, Modified in Deneb:EIP4844]
             )
             # Capella operations
@@ -223,11 +252,97 @@ class SpecBeaconBlock:
                 SignedBLSToExecutionChange,
                 spec.MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
-            # Execution
+            # Deneb
             blob_kzg_commitments: List[
                 KZGCommitment,
                 spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
             ]  # [New in Deneb:EIP4844]
+
+        class IndexedAttestationElectra(Container):
+            attesting_indices: List[
+                ValidatorIndex,
+                spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT,
+            ]
+            data: AttestationData
+            signature: BLSSignature
+
+        class AttesterSlashingElectra(Container):
+            attestation_1: IndexedAttestationElectra
+            attestation_2: IndexedAttestationElectra
+
+        class ExecutionRequests(Container):
+            deposits: List[
+                DepositRequest, spec.MAX_DEPOSIT_REQUESTS_PER_PAYLOAD
+            ]  # [New in Electra:EIP6110]
+            withdrawals: List[
+                WithdrawalRequest, spec.MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD
+            ]  # [New in Electra:EIP7002:EIP7251]
+            consolidations: List[
+                ConsolidationRequest, spec.MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD
+            ]  # [New in Electra:EIP7251]
+
+        class BeaconBlockBodyElectra(Container):
+            randao_reveal: BLSSignature
+            eth1_data: Eth1Data  # Eth1 data vote
+            graffiti: Bytes32  # Arbitrary data
+            # Operations
+            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
+            attester_slashings: List[
+                AttesterSlashingElectra, spec.MAX_ATTESTER_SLASHINGS_ELECTRA
+            ]  # [Modified in Electra:EIP7549]
+            attestations: List[
+                SpecAttestation.AttestationElectra, spec.MAX_ATTESTATIONS_ELECTRA
+            ]  # [Modified in Electra:EIP7549]
+            deposits: List[Deposit, spec.MAX_DEPOSITS]
+            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
+            sync_aggregate: SyncAggregate
+            # Execution
+            execution_payload: ExecutionPayloadV3
+            # Capella operations
+            bls_to_execution_changes: List[
+                SignedBLSToExecutionChange,
+                spec.MAX_BLS_TO_EXECUTION_CHANGES,
+            ]  # [New in Capella]
+            # Deneb
+            blob_kzg_commitments: List[
+                KZGCommitment,
+                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
+            ]  # [New in Deneb:EIP4844]
+            # Electra
+            execution_requests: ExecutionRequests  # [New in Electra]
+
+        class BlindedBeaconBlockBodyElectra(Container):
+            randao_reveal: BLSSignature
+            eth1_data: Eth1Data  # Eth1 data vote
+            graffiti: Bytes32  # Arbitrary data
+            # Operations
+            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
+            attester_slashings: List[
+                AttesterSlashingElectra, spec.MAX_ATTESTER_SLASHINGS_ELECTRA
+            ]  # [Modified in Electra:EIP7549]
+            attestations: List[
+                SpecAttestation.AttestationElectra, spec.MAX_ATTESTATIONS_ELECTRA
+            ]  # [Modified in Electra:EIP7549]
+            deposits: List[Deposit, spec.MAX_DEPOSITS]
+            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
+            sync_aggregate: SyncAggregate  # [New in Altair]
+            # Execution
+            execution_payload_header: (
+                ExecutionPayloadV3Header
+                # [New in Bellatrix, Modified in Deneb:EIP4844]
+            )
+            # Capella operations
+            bls_to_execution_changes: List[
+                SignedBLSToExecutionChange,
+                spec.MAX_BLS_TO_EXECUTION_CHANGES,
+            ]  # [New in Capella]
+            # Deneb
+            blob_kzg_commitments: List[
+                KZGCommitment,
+                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
+            ]  # [New in Deneb:EIP4844]
+            # Electra
+            execution_requests: ExecutionRequests  # [New in Electra]
 
         class BeaconBlockDeneb(Container):
             slot: Slot
@@ -243,5 +358,21 @@ class SpecBeaconBlock:
             state_root: Root
             body: BlindedBeaconBlockBodyDeneb
 
+        class BeaconBlockElectra(Container):
+            slot: Slot
+            proposer_index: ValidatorIndex
+            parent_root: Root
+            state_root: Root
+            body: BeaconBlockBodyElectra
+
+        class BlindedBeaconBlockElectra(Container):
+            slot: Slot
+            proposer_index: ValidatorIndex
+            parent_root: Root
+            state_root: Root
+            body: BlindedBeaconBlockBodyElectra
+
         cls.Deneb = BeaconBlockDeneb
         cls.DenebBlinded = BlindedBeaconBlockDeneb
+        cls.Electra = BeaconBlockElectra
+        cls.ElectraBlinded = BlindedBeaconBlockElectra

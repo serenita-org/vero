@@ -1,11 +1,11 @@
 import asyncio
 import os
-import random
 
 import pytest
 
 from providers import BeaconChain
 from schemas import SchemaBeaconAPI
+from schemas.beacon_api import ForkVersion, ValidatorStatus
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 from services.attestation import (
@@ -13,7 +13,6 @@ from services.attestation import (
     _VC_PUBLISHED_ATTESTATIONS,
 )
 from spec.attestation import AttestationData
-from spec.base import SpecDeneb
 
 
 async def test_update_duties(attestation_service: AttestationService) -> None:
@@ -23,35 +22,37 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     assert len(attestation_service.attester_duties) > 0
 
 
+@pytest.mark.parametrize(
+    "fork_version",
+    [
+        pytest.param(ForkVersion.DENEB, id="Deneb"),
+        pytest.param(ForkVersion.ELECTRA, id="Electra"),
+    ],
+    indirect=True,
+)
 async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    spec_deneb: SpecDeneb,
-    random_active_validator: ValidatorIndexPubkey,
+    validators: list[ValidatorIndexPubkey],
+    fork_version: ForkVersion,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with an attester duty
     duty_slot = beacon_chain.current_slot + 1
     duty_epoch = duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
 
+    first_active_validator = next(
+        v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING
+    )
+
     attestation_service.attester_duties[duty_epoch].add(
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-            pubkey=random_active_validator.pubkey,
-            validator_index=str(random_active_validator.index),
-            committee_index=str(
-                random.randint(
-                    0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-                )
-            ),
-            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
-            committees_at_slot=str(random.randint(0, 10)),
-            validator_committee_index=str(
-                random.randint(
-                    0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE - 1,
-                )
-            ),
+            pubkey=first_active_validator.pubkey,
+            validator_index=str(first_active_validator.index),
+            committee_index=str(14),
+            committee_length=str(16),
+            committees_at_slot=str(20),
+            validator_committee_index=str(9),
             slot=str(duty_slot),
             is_aggregator=False,
             selection_proof=os.urandom(96),
@@ -91,29 +92,36 @@ async def test_attest_to_invalid_slot(
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before
 
 
+@pytest.mark.parametrize(
+    "fork_version",
+    [
+        pytest.param(ForkVersion.DENEB, id="Deneb"),
+        pytest.param(ForkVersion.ELECTRA, id="Electra"),
+    ],
+    indirect=True,
+)
 async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    spec_deneb: SpecDeneb,
-    random_active_validator: ValidatorIndexPubkey,
+    fork_version: ForkVersion,
+    validators: list[ValidatorIndexPubkey],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Create an attester aggregation duty
     duty_slot = beacon_chain.current_slot
 
+    second_active_validator = [
+        v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING
+    ][1]
+
     slot_attester_duties = {
         SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-            pubkey=random_active_validator.pubkey,
-            validator_index=str(random_active_validator.index),
-            committee_index=str(123),
-            committee_length=str(spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE),
-            committees_at_slot=str(random.randint(0, 10)),
-            validator_committee_index=str(
-                random.randint(
-                    0,
-                    spec_deneb.TARGET_AGGREGATORS_PER_COMMITTEE,
-                )
-            ),
+            pubkey=second_active_validator.pubkey,
+            validator_index=str(second_active_validator.index),
+            committee_index=str(14),
+            committee_length=str(16),
+            committees_at_slot=str(20),
+            validator_committee_index=str(9),
             slot=str(duty_slot),
             is_aggregator=True,
             selection_proof=os.urandom(96),
@@ -123,7 +131,7 @@ async def test_aggregate_attestations(
     att_data = AttestationData(
         slot=duty_slot,
         index=0,
-        beacon_block_root="0x" + os.urandom(32).hex(),
+        beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
     )
 
     aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
