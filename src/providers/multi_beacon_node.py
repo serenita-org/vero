@@ -50,7 +50,7 @@ from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
-from spec.attestation import Attestation, AttestationData, AttestationElectra
+from spec.attestation import AttestationData, AttestationElectra, AttestationPhase0
 from spec.block import BeaconBlockClass
 from spec.configs import Network
 from spec.sync_committee import SyncCommitteeContributionClass
@@ -255,14 +255,14 @@ class MultiBeaconNode:
         #  (probably not all CLs support this but still...)
         #  That would help a bit since we wouldn't be deserializing
         #  the execution payload - transactions.
-        if response.version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
             if response.execution_payload_blinded:
                 return BeaconBlockClass.DenebBlinded.from_obj(response.data)
             return BeaconBlockClass.Deneb.from_obj(response.data["block"])
-        if response.version == SchemaBeaconAPI.BeaconBlockVersion.ELECTRA:
+        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
             if response.execution_payload_blinded:
                 # TODO Electra blinded
-                pass
+                raise NotImplementedError
             return BeaconBlockClass.Electra.from_obj(response.data["block"])
         raise ValueError(
             f"Unsupported block version {response.version} in response {response}",
@@ -613,15 +613,15 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> Attestation | AttestationElectra:
+    ) -> AttestationPhase0 | AttestationElectra:
         _att_data = attestation_data.copy()
-        if isinstance(attestation_data, Attestation):
+        if isinstance(attestation_data, AttestationPhase0):
             _att_data.index = committee_index
 
-        aggregates: list[
-            Attestation | AttestationElectra
-        ] = await self._get_all_beacon_node_responses(
-            func_name="get_aggregated_attestation_v2",
+        aggregates: (
+            list[AttestationPhase0] | list[AttestationElectra]
+        ) = await self._get_all_beacon_node_responses(
+            func_name="get_aggregate_attestation_v2",
             attestation_data=_att_data,
             committee_index=committee_index,
         )
@@ -647,7 +647,7 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_indices: set[int],
-    ) -> AsyncIterator[Attestation | AttestationElectra]:
+    ) -> AsyncIterator[AttestationPhase0 | AttestationElectra]:
         # TODO post-Electra there's a "single" shared aggregate attestation so it's
         #  sufficient to get it once! (w/ committee_index=0)
         #  Is it though?

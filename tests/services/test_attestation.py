@@ -139,16 +139,3 @@ async def test_aggregate_attestations(
         _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
         == aggregates_produced_before + 1
     )
-
-
-# TODO
-#  the attestations are still not handled quite right - they work in Deneb or Electra but not both...
-#  what could help debug this (and improve tests) is if we mocked the submit attestations
-#  endpoint here specifically, and checked them against the expected value
-#  ... so basically the steps:
-#      - check out the pre-Electra version of Vero
-#      - check using Kurtosis that attestations and aggregate attestations work correctly even for committee indicies >0
-#      - mock the submit attestations endpoint and check the data being submitted
-#      - then rebase Pectra branch on top of that
-#      - make Deneb tests pass if they don't
-#      - add similar Electra-spec tests and make them pass

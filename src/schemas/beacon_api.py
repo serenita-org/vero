@@ -47,7 +47,6 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
-# TODO deduplicate these (BeaconBlockVersion -> ForkVersion)
 class ForkVersion(Enum):
     DENEB = "deneb"
     ELECTRA = "electra"
@@ -115,13 +114,8 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
 
 
 # Block production
-class BeaconBlockVersion(Enum):
-    DENEB = "deneb"
-    ELECTRA = "electra"
-
-
 class ProduceBlockV3Response(msgspec.Struct):
-    version: BeaconBlockVersion
+    version: ForkVersion
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str

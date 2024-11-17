@@ -14,9 +14,9 @@ from yarl import URL
 from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from spec.attestation import (
-    Attestation,
     AttestationData,
     AttestationElectra,
+    AttestationPhase0,
     Checkpoint,
 )
 from spec.base import Fork, Genesis, SpecDeneb, SpecElectra
@@ -187,7 +187,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.ProduceBlockV3Response(
-                        version=SchemaBeaconAPI.BeaconBlockVersion.DENEB,
+                        version=SchemaBeaconAPI.ForkVersion.DENEB,
                         execution_payload_blinded=execution_payload_blinded,
                         execution_payload_value=str(random.randint(0, 10_000_000)),
                         consensus_block_value=str(random.randint(0, 10_000_000)),
@@ -245,7 +245,7 @@ def _mocked_beacon_node_endpoints(
                 _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1] + [
                     1 for _ in range(_agg_bitlist_size - 10)
                 ]
-                aggregate_attestation = Attestation(
+                aggregate_attestation = AttestationPhase0(
                     aggregation_bits=Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE](
                         _agg_bits
                     ),

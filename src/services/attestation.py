@@ -30,9 +30,9 @@ from services.validator_duty_service import (
 from spec.attestation import (
     AggregateAndProof,
     AggregateAndProofV2,
-    Attestation,
     AttestationData,
     AttestationElectra,
+    AttestationPhase0,
 )
 from spec.common import (
     MAX_COMMITTEES_PER_SLOT,
@@ -468,7 +468,7 @@ class AttestationService(ValidatorDutyService):
             ) = []
             identifiers = []
             for duty in aggregator_duties:
-                if isinstance(aggregate, Attestation):
+                if isinstance(aggregate, AttestationPhase0):
                     if int(duty.committee_index) == aggregate.data.index:
                         aggregate_count += 1
                         messages.append(
