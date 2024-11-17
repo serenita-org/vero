@@ -32,7 +32,7 @@ class AttestationData(Container):
     target: Checkpoint
 
 
-class Attestation(Container):
+class AttestationPhase0(Container):
     aggregation_bits: Bitlist[MAX_VALIDATORS_PER_COMMITTEE]
     data: AttestationData
     signature: BLSSignature
@@ -48,7 +48,7 @@ class AttestationElectra(Container):
 # TODO Post-Electra cleanup
 class AggregateAndProof(Container):
     aggregator_index: ValidatorIndex
-    aggregate: Attestation
+    aggregate: AttestationPhase0
     selection_proof: BLSSignature
 
 
@@ -58,7 +58,7 @@ class AggregateAndProofV2(Container):
     selection_proof: BLSSignature
 
 
-class IndexedAttestationDeneb(Container):
+class IndexedAttestationPhase0(Container):
     attesting_indices: List[ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE]
     data: AttestationData
     signature: BLSSignature

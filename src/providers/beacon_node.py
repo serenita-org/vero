@@ -22,7 +22,7 @@ from yarl import URL
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec.attestation import Attestation, AttestationData, AttestationElectra
+from spec.attestation import AttestationData, AttestationElectra, AttestationPhase0
 from spec.base import Genesis, Spec, parse_spec
 from spec.sync_committee import SyncCommitteeContributionClass
 
@@ -494,11 +494,11 @@ class BeaconNode:
             data=self.json_encoder.encode(data),
         )
 
-    async def get_aggregated_attestation_v2(
+    async def get_aggregate_attestation_v2(
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> Attestation | AttestationElectra:
+    ) -> AttestationPhase0 | AttestationElectra:
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
@@ -519,7 +519,7 @@ class BeaconNode:
         )
 
         if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
-            return Attestation.from_obj(response.data)  # type: ignore[no-any-return]
+            return AttestationPhase0.from_obj(response.data)  # type: ignore[no-any-return]
         if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
             return AttestationElectra.from_obj(response.data)  # type: ignore[no-any-return]
         raise NotImplementedError(f"Unsupported fork version {response.version}")
@@ -668,15 +668,15 @@ class BeaconNode:
 
     async def publish_block_v2(
         self,
-        block_version: SchemaBeaconAPI.BeaconBlockVersion,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         block: Container,
         blobs: list,  # type: ignore[type-arg]
         kzg_proofs: list,  # type: ignore[type-arg]
         signature: str,
     ) -> None:
-        if block_version in (
-            SchemaBeaconAPI.BeaconBlockVersion.DENEB,
-            SchemaBeaconAPI.BeaconBlockVersion.ELECTRA,
+        if fork_version in (
+            SchemaBeaconAPI.ForkVersion.DENEB,
+            SchemaBeaconAPI.ForkVersion.ELECTRA,
         ):
             data = dict(
                 signed_block=dict(
@@ -687,7 +687,7 @@ class BeaconNode:
                 blobs=blobs,
             )
         else:
-            raise NotImplementedError(f"Unsupported block version {block_version}")
+            raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
         self.logger.debug(
             f"Publishing block for slot {block.slot},"
@@ -699,23 +699,23 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/beacon/blocks",
             data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": block_version.value},
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def publish_blinded_block_v2(
         self,
-        block_version: SchemaBeaconAPI.BeaconBlockVersion,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         block: Container,
         signature: str,
     ) -> None:
-        if block_version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
             data = dict(
                 message=block.to_obj(),
                 signature=signature,
             )
         # TODO Electra
         else:
-            raise NotImplementedError(f"Unsupported block version {block_version}")
+            raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
         self.logger.debug(
             f"Publishing blinded block for slot {block.slot},"
@@ -727,7 +727,7 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/beacon/blinded_blocks",
             data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": block_version.value},
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def subscribe_to_events(

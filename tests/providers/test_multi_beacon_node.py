@@ -17,7 +17,7 @@ from remerkleable.bitfields import Bitlist, Bitvector
 
 from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
-from spec.attestation import Attestation, AttestationData
+from spec.attestation import AttestationData, AttestationPhase0
 from spec.base import SpecDeneb, SpecElectra
 from spec.sync_committee import SyncCommitteeContributionClass
 
@@ -194,7 +194,7 @@ async def test_get_aggregate_attestation(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
                             version=SchemaBeaconAPI.ForkVersion.DENEB.value,
-                            data=Attestation(
+                            data=AttestationPhase0(
                                 aggregation_bits=_bits,
                             ).to_obj(),
                         ),

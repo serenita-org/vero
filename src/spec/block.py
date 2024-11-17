@@ -5,10 +5,10 @@ from remerkleable.complex import Container, List, Vector
 from remerkleable.core import ObjType
 
 from spec.attestation import (
-    Attestation,
     AttestationElectra,
-    IndexedAttestationDeneb,
+    AttestationPhase0,
     IndexedAttestationElectra,
+    IndexedAttestationPhase0,
 )
 from spec.base import Spec
 from spec.common import (
@@ -79,9 +79,9 @@ class ProposerSlashing(Container):
     signed_header_2: SignedBeaconBlockHeader
 
 
-class AttesterSlashingDeneb(Container):
-    attestation_1: IndexedAttestationDeneb
-    attestation_2: IndexedAttestationDeneb
+class AttesterSlashingPhase0(Container):
+    attestation_1: IndexedAttestationPhase0
+    attestation_2: IndexedAttestationPhase0
 
 
 class AttesterSlashingElectra(Container):
@@ -249,8 +249,8 @@ class BeaconBlockClass:
             graffiti: Bytes32  # Arbitrary data
             # Operations
             proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashingDeneb, MAX_ATTESTER_SLASHINGS]
-            attestations: List[Attestation, MAX_ATTESTATIONS]
+            attester_slashings: List[AttesterSlashingPhase0, MAX_ATTESTER_SLASHINGS]
+            attestations: List[AttestationPhase0, MAX_ATTESTATIONS]
             deposits: List[Deposit, MAX_DEPOSITS]
             voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
@@ -275,8 +275,8 @@ class BeaconBlockClass:
             graffiti: Bytes32  # Arbitrary data
             # Operations
             proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashingDeneb, MAX_ATTESTER_SLASHINGS]
-            attestations: List[Attestation, MAX_ATTESTATIONS]
+            attester_slashings: List[AttesterSlashingPhase0, MAX_ATTESTER_SLASHINGS]
+            attestations: List[AttestationPhase0, MAX_ATTESTATIONS]
             deposits: List[Deposit, MAX_DEPOSITS]
             voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
