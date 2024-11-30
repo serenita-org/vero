@@ -1099,7 +1099,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 27
+            "y": 35
           },
           "id": 28,
           "options": {
@@ -1232,7 +1232,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 42
           },
           "id": 33,
           "maxDataPoints": 50,
@@ -1300,7 +1300,7 @@
             "h": 14,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 50
           },
           "id": 19,
           "maxDataPoints": 50,
@@ -1482,7 +1482,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 3
+            "y": 11
           },
           "id": 230,
           "maxDataPoints": 100,
@@ -1653,7 +1653,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 3
+            "y": 11
           },
           "id": 214,
           "maxDataPoints": 100,
@@ -1824,7 +1824,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 3
+            "y": 11
           },
           "id": 215,
           "maxDataPoints": 100,
@@ -1995,7 +1995,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 3
+            "y": 11
           },
           "id": 216,
           "maxDataPoints": 100,
@@ -2166,7 +2166,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 3
+            "y": 11
           },
           "id": 217,
           "maxDataPoints": 100,
@@ -2252,7 +2252,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 9
+            "y": 17
           },
           "id": 24,
           "maxDataPoints": 10,
@@ -2335,7 +2335,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 9
+            "y": 17
           },
           "id": 18,
           "maxDataPoints": 10,
@@ -2418,7 +2418,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 9
+            "y": 17
           },
           "id": 22,
           "maxDataPoints": 10,
@@ -2501,7 +2501,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 9
+            "y": 17
           },
           "id": 26,
           "maxDataPoints": 10,
@@ -2584,7 +2584,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 9
+            "y": 17
           },
           "id": 23,
           "maxDataPoints": 10,
@@ -2766,7 +2766,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 29
+            "y": 37
           },
           "id": 181,
           "maxDataPoints": 100,
@@ -2937,7 +2937,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 29
+            "y": 37
           },
           "id": 198,
           "maxDataPoints": 100,
@@ -3108,7 +3108,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 29
+            "y": 37
           },
           "id": 199,
           "maxDataPoints": 100,
@@ -3279,7 +3279,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 29
+            "y": 37
           },
           "id": 200,
           "maxDataPoints": 100,
@@ -3450,7 +3450,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 29
+            "y": 37
           },
           "id": 201,
           "maxDataPoints": 100,
@@ -3536,7 +3536,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 35
+            "y": 43
           },
           "id": 82,
           "maxDataPoints": 10,
@@ -3619,7 +3619,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 35
+            "y": 43
           },
           "id": 83,
           "maxDataPoints": 10,
@@ -3702,7 +3702,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 35
+            "y": 43
           },
           "id": 84,
           "maxDataPoints": 10,
@@ -3785,7 +3785,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 35
+            "y": 43
           },
           "id": 85,
           "maxDataPoints": 10,
@@ -3868,7 +3868,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 35
+            "y": 43
           },
           "id": 86,
           "maxDataPoints": 10,
@@ -3966,7 +3966,7 @@
             "h": 4,
             "w": 4,
             "x": 0,
-            "y": 38
+            "y": 22
           },
           "id": 131,
           "options": {
@@ -4064,7 +4064,7 @@
             "h": 20,
             "w": 10,
             "x": 4,
-            "y": 38
+            "y": 22
           },
           "id": 7,
           "maxDataPoints": 100,
@@ -4159,7 +4159,7 @@
             "h": 20,
             "w": 10,
             "x": 14,
-            "y": 38
+            "y": 22
           },
           "id": 39,
           "maxDataPoints": 100,
@@ -4263,7 +4263,7 @@
             "h": 16,
             "w": 4,
             "x": 0,
-            "y": 42
+            "y": 26
           },
           "id": 60,
           "options": {
@@ -4293,6 +4293,194 @@
             }
           ],
           "title": "Score",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "ETH"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 42
+          },
+          "id": 243,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(rate(beacon_node_consensus_block_value_sum{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__rate_interval])\n/\nrate(beacon_node_consensus_block_value_count[$__rate_interval])) / 1e18",
+              "instant": false,
+              "legendFormat": "{{host}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Consensus Block Value",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "axisSoftMin": 0,
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "ETH"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 42
+          },
+          "id": 256,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "(rate(beacon_node_execution_payload_value_sum{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__rate_interval])\n/\nrate(beacon_node_execution_payload_value_count[$__rate_interval])) / 1e18",
+              "instant": false,
+              "legendFormat": "{{host}}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Execution Payload Value",
           "type": "timeseries"
         },
         {
@@ -4347,7 +4535,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 58
+            "y": 50
           },
           "id": 49,
           "maxDataPoints": 100,
@@ -4461,7 +4649,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 94
+            "y": 102
           },
           "id": 69,
           "maxDataPoints": 100,
@@ -4565,7 +4753,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 94
+            "y": 102
           },
           "id": 42,
           "maxDataPoints": 100,
@@ -4660,7 +4848,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 101
+            "y": 109
           },
           "id": 41,
           "maxDataPoints": 100,
@@ -4756,7 +4944,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 50
           },
           "id": 36,
           "maxDataPoints": 20,
@@ -4870,7 +5058,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 10
+            "y": 18
           },
           "id": 97,
           "options": {
@@ -4966,7 +5154,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 10
+            "y": 18
           },
           "id": 98,
           "options": {
@@ -5058,7 +5246,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 10
+            "y": 18
           },
           "id": 120,
           "options": {
@@ -5126,7 +5314,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 10
+            "y": 18
           },
           "id": 79,
           "options": {
@@ -5229,7 +5417,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 18
+            "y": 26
           },
           "id": 30,
           "options": {
@@ -5321,7 +5509,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 18
+            "y": 26
           },
           "id": 32,
           "options": {
@@ -5417,7 +5605,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 34
           },
           "id": 78,
           "options": {
@@ -5544,6 +5732,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 5,
+  "version": 6,
   "weekStart": ""
 }

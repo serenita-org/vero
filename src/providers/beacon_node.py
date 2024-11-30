@@ -15,7 +15,7 @@ from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from prometheus_client import Gauge
+from prometheus_client import Gauge, Histogram
 from remerkleable.complex import Container
 from yarl import URL
 
@@ -43,6 +43,25 @@ _BEACON_NODE_VERSION = Gauge(
     "Beacon node score",
     labelnames=["host", "version"],
     multiprocess_mode="max",
+)
+_block_value_buckets = [
+    int(0.001 * 1e18),
+    int(0.01 * 1e18),
+    int(0.1 * 1e18),
+    int(1 * 1e18),
+    int(10 * 1e18),
+]
+_BEACON_NODE_CONSENSUS_BLOCK_VALUE = Histogram(
+    "beacon_node_consensus_block_value",
+    "Tracks the value of consensus layer rewards paid to the proposer in the block produced by this beacon node",
+    labelnames=["host"],
+    buckets=_block_value_buckets,
+)
+_BEACON_NODE_EXECUTION_PAYLOAD_VALUE = Histogram(
+    "beacon_node_execution_payload_value",
+    "Tracks the value of execution payloads in blocks produced by this beacon node",
+    labelnames=["host"],
+    buckets=_block_value_buckets,
 )
 
 
@@ -634,18 +653,26 @@ class BeaconNode:
                 resp, type=SchemaBeaconAPI.ProduceBlockV3Response
             )
 
+            consensus_block_value = int(response.consensus_block_value)
+            execution_payload_value = int(response.execution_payload_value)
+
             tracer_span.add_event(
                 "ProduceBlockV3Response",
                 attributes=dict(
                     blinded=response.execution_payload_blinded,
-                    execution_payload_value=int(response.execution_payload_value),
-                    consensus_block_value=int(response.consensus_block_value),
+                    execution_payload_value=execution_payload_value,
+                    consensus_block_value=consensus_block_value,
                 ),
             )
-            block_value: int = int(response.consensus_block_value) + int(
-                response.execution_payload_value
-            )
+
+            block_value: int = consensus_block_value + execution_payload_value
             self.logger.info(f"{self.host} returned block with value {block_value}")
+            _BEACON_NODE_CONSENSUS_BLOCK_VALUE.labels(host=self.host).observe(
+                consensus_block_value
+            )
+            _BEACON_NODE_EXECUTION_PAYLOAD_VALUE.labels(host=self.host).observe(
+                execution_payload_value
+            )
 
             return response
 
