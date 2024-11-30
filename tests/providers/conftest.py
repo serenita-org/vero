@@ -7,14 +7,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from providers import MultiBeaconNode
-from spec.base import SpecDeneb
+from spec.base import SpecDeneb, SpecElectra
 
 
 @pytest.fixture
 async def multi_beacon_node_three_inited_nodes(
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
     scheduler: AsyncIOScheduler,
     cli_args: CLIArgs,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
@@ -46,7 +46,7 @@ async def multi_beacon_node_three_inited_nodes(
         m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
             callback=lambda *args, **kwargs: CallbackResult(
-                payload=dict(data=spec_deneb.to_obj()),
+                payload=dict(data=spec.to_obj()),
             ),
             repeat=True,
         )

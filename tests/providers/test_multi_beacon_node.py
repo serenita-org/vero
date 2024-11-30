@@ -68,7 +68,7 @@ async def test_initialize(
     expected_initialization_success: bool,
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
     scheduler: AsyncIOScheduler,
     cli_args: CLIArgs,
 ) -> None:
@@ -111,7 +111,7 @@ async def test_initialize(
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=spec_deneb.to_obj()),
+                        payload=dict(data=spec.to_obj()),
                     ),
                 )
                 m.get(
@@ -282,7 +282,7 @@ async def test_get_sync_committee_contribution(
     numbers_of_root_matching_indices: list[Exception | int],
     best_contribution_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    spec_deneb: SpecDeneb,
+    spec: SpecDeneb | SpecElectra,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
@@ -291,8 +291,7 @@ async def test_get_sync_committee_contribution(
         for number_of_root_matching_indices in numbers_of_root_matching_indices:
             if isinstance(number_of_root_matching_indices, int):
                 bitlist_size = (
-                    spec_deneb.SYNC_COMMITTEE_SIZE
-                    // spec_deneb.SYNC_COMMITTEE_SUBNET_COUNT
+                    spec.SYNC_COMMITTEE_SIZE // spec.SYNC_COMMITTEE_SUBNET_COUNT
                 )
                 agg_bits_to_return = Bitvector[bitlist_size](
                     False for _ in range(bitlist_size)

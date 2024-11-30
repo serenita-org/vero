@@ -138,7 +138,7 @@ class UInt256SerializedAsString(uint256):
         return str(self)
 
 
-class ExecutionPayloadHeaderDeneb(Container):
+class ExecutionPayloadV3Header(Container):
     # Execution block header fields
     parent_hash: Hash32
     fee_recipient: ExecutionAddress
@@ -220,29 +220,6 @@ class BeaconBlockClass:
             blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
             excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
 
-        if _is_electra_spec:
-
-            class ExecutionPayloadV4(Container):
-                # Execution block header fields
-                parent_hash: Hash32
-                fee_recipient: ExecutionAddress  # 'beneficiary' in the yellow paper
-                state_root: Bytes32
-                receipts_root: Bytes32
-                logs_bloom: ByteVector[BYTES_PER_LOGS_BLOOM]
-                prev_randao: Bytes32  # 'difficulty' in the yellow paper
-                block_number: UInt64SerializedAsString  # 'number' in the yellow paper
-                gas_limit: UInt64SerializedAsString
-                gas_used: UInt64SerializedAsString
-                timestamp: UInt64SerializedAsString
-                extra_data: ByteList[MAX_EXTRA_DATA_BYTES]
-                base_fee_per_gas: UInt256SerializedAsString
-                # Extra payload fields
-                block_hash: Hash32  # Hash of execution block
-                transactions: List[Transaction, MAX_TRANSACTIONS_PER_PAYLOAD]
-                withdrawals: List[Withdrawal, spec.MAX_WITHDRAWALS_PER_PAYLOAD]
-                blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
-                excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
-
         class BeaconBlockBodyDeneb(Container):
             randao_reveal: BLSSignature
             eth1_data: Eth1Data  # Eth1 data vote
@@ -282,7 +259,7 @@ class BeaconBlockClass:
             sync_aggregate: SyncAggregate  # [New in Altair]
             # Execution
             execution_payload_header: (
-                ExecutionPayloadHeaderDeneb
+                ExecutionPayloadV3Header
                 # [New in Bellatrix, Modified in Deneb:EIP4844]
             )
             # Capella operations
@@ -325,7 +302,7 @@ class BeaconBlockClass:
                 voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
                 sync_aggregate: SyncAggregate
                 # Execution
-                execution_payload: ExecutionPayloadV4
+                execution_payload: ExecutionPayloadV3
                 bls_to_execution_changes: List[
                     SignedBLSToExecutionChange, MAX_BLS_TO_EXECUTION_CHANGES
                 ]
@@ -334,7 +311,37 @@ class BeaconBlockClass:
                 ]
                 execution_requests: ExecutionRequests  # [New in Electra]
 
-            # TODO BlindedBeaconBlockBodyElectra (+ExecutionPayloadHeaderElectra)
+            class BlindedBeaconBlockBodyElectra(Container):
+                randao_reveal: BLSSignature
+                eth1_data: Eth1Data  # Eth1 data vote
+                graffiti: Bytes32  # Arbitrary data
+                # Operations
+                proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
+                attester_slashings: List[
+                    AttesterSlashingElectra, MAX_ATTESTER_SLASHINGS_ELECTRA
+                ]  # [Modified in Electra:EIP7549]
+                attestations: List[
+                    AttestationElectra, MAX_ATTESTATIONS_ELECTRA
+                ]  # [Modified in Electra:EIP7549]
+                deposits: List[Deposit, MAX_DEPOSITS]
+                voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
+                sync_aggregate: SyncAggregate  # [New in Altair]
+                # Execution
+                execution_payload_header: (
+                    ExecutionPayloadV3Header
+                    # [New in Bellatrix, Modified in Deneb:EIP4844]
+                )
+                # Capella operations
+                bls_to_execution_changes: List[
+                    SignedBLSToExecutionChange,
+                    MAX_BLS_TO_EXECUTION_CHANGES,
+                ]  # [New in Capella]
+                # Execution
+                blob_kzg_commitments: List[
+                    KZGCommitment,
+                    spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
+                ]  # [New in Deneb:EIP4844]
+                execution_requests: ExecutionRequests  # [New in Electra]
 
         class BeaconBlockDeneb(Container):
             slot: Slot
@@ -359,9 +366,17 @@ class BeaconBlockClass:
                 state_root: Root
                 body: BeaconBlockBodyElectra
 
-            # TODO BlindedBeaconBlockElectra
+            class BlindedBeaconBlockElectra(Container):
+                slot: Slot
+                proposer_index: ValidatorIndex
+                parent_root: Root
+                state_root: Root
+                body: BlindedBeaconBlockBodyElectra
+
+            # TODO test blinded blocks post-Electra
 
         cls.Deneb = BeaconBlockDeneb
         cls.DenebBlinded = BlindedBeaconBlockDeneb
         if _is_electra_spec:
             cls.Electra = BeaconBlockElectra
+            cls.ElectraBlinded = BlindedBeaconBlockElectra

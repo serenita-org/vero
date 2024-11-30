@@ -756,12 +756,14 @@ class BeaconNode:
         block: Container,
         signature: str,
     ) -> None:
-        if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
+        if fork_version in (
+            SchemaBeaconAPI.ForkVersion.DENEB,
+            SchemaBeaconAPI.ForkVersion.ELECTRA,
+        ):
             data = dict(
                 message=block.to_obj(),
                 signature=signature,
             )
-        # TODO Electra
         else:
             raise NotImplementedError(f"Unsupported fork version {fork_version}")
 

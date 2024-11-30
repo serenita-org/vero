@@ -7,6 +7,7 @@ from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
 from services.block_proposal import _VC_PUBLISHED_BLOCKS
+from spec.base import SpecDeneb, SpecElectra
 
 
 async def test_update_duties(
@@ -39,11 +40,17 @@ async def test_register_validators(
     [pytest.param(False, id="Unblinded"), pytest.param(True, id="Blinded")],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "spec",
+    [pytest.param(SpecDeneb, id="Deneb"), pytest.param(SpecElectra, id="Electra")],
+    indirect=True,
+)
 async def test_publish_block(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
     execution_payload_blinded: bool,
+    spec: SpecDeneb | SpecElectra,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with a proposal duty

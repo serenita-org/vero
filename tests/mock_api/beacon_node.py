@@ -69,23 +69,18 @@ def spec(request: pytest.FixtureRequest) -> SpecDeneb | SpecElectra:
 
 
 @pytest.fixture
-def spec_deneb(spec: SpecDeneb) -> SpecDeneb:
-    return spec
-
-
-@pytest.fixture
 def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
 
 
 @pytest.fixture
-def _beacon_block_class_init(spec_deneb: SpecDeneb) -> None:
-    BeaconBlockClass.initialize(spec=spec_deneb)
+def _beacon_block_class_init(spec: SpecDeneb | SpecElectra) -> None:
+    BeaconBlockClass.initialize(spec=spec)
 
 
 @pytest.fixture
-def _sync_committee_contribution_class_init(spec_deneb: SpecDeneb) -> None:
-    SyncCommitteeContributionClass.initialize(spec=spec_deneb)
+def _sync_committee_contribution_class_init(spec: SpecDeneb | SpecElectra) -> None:
+    SyncCommitteeContributionClass.initialize(spec=spec)
 
 
 @pytest.fixture(scope="session")
@@ -163,31 +158,53 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
-            # TODO - add Electra case!!!
-
-            if execution_payload_blinded:
-                _data = BeaconBlockClass.DenebBlinded(
-                    slot=int(url.raw_path.split("/")[-1]),
-                    proposer_index=123,
-                    parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                    state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                    # body=...
-                ).to_obj()
-            else:
-                _data = dict(
-                    block=BeaconBlockClass.Deneb(
+            if isinstance(spec, SpecElectra):
+                fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
+                if execution_payload_blinded:
+                    _data = BeaconBlockClass.ElectraBlinded(
                         slot=int(url.raw_path.split("/")[-1]),
                         proposer_index=123,
                         parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
                         state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
                         # body=...
-                    ).to_obj(),
-                )
+                    ).to_obj()
+                else:
+                    _data = dict(
+                        block=BeaconBlockClass.Electra(
+                            slot=int(url.raw_path.split("/")[-1]),
+                            proposer_index=123,
+                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                            # body=...
+                        ).to_obj(),
+                    )
+            elif isinstance(spec, SpecDeneb):
+                fork_version = SchemaBeaconAPI.ForkVersion.DENEB
+                if execution_payload_blinded:
+                    _data = BeaconBlockClass.DenebBlinded(
+                        slot=int(url.raw_path.split("/")[-1]),
+                        proposer_index=123,
+                        parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                        state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                        # body=...
+                    ).to_obj()
+                else:
+                    _data = dict(
+                        block=BeaconBlockClass.Deneb(
+                            slot=int(url.raw_path.split("/")[-1]),
+                            proposer_index=123,
+                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                            # body=...
+                        ).to_obj(),
+                    )
+            else:
+                raise NotImplementedError(f"Endpoint not implemented for spec {spec}")
 
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.ProduceBlockV3Response(
-                        version=SchemaBeaconAPI.ForkVersion.DENEB,
+                        version=fork_version,
                         execution_payload_blinded=execution_payload_blinded,
                         execution_payload_value=str(random.randint(0, 10_000_000)),
                         consensus_block_value=str(random.randint(0, 10_000_000)),

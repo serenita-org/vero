@@ -261,8 +261,7 @@ class MultiBeaconNode:
             return BeaconBlockClass.Deneb.from_obj(response.data["block"])
         if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
             if response.execution_payload_blinded:
-                # TODO Electra blinded
-                raise NotImplementedError
+                return BeaconBlockClass.ElectraBlinded.from_obj(response.data)
             return BeaconBlockClass.Electra.from_obj(response.data["block"])
         raise ValueError(
             f"Unsupported block version {response.version} in response {response}",
