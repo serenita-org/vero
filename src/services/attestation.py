@@ -162,7 +162,7 @@ class AttestationService(ValidatorDutyService):
                 / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
             )
 
-            consensus_start = asyncio.get_event_loop().time()
+            consensus_start = asyncio.get_running_loop().time()
             with self.tracer.start_as_current_span(
                 name=f"{self.__class__.__name__}.produce_attestation_data",
             ):
@@ -184,7 +184,7 @@ class AttestationService(ValidatorDutyService):
                     ).inc()
                     return
 
-            consensus_time = asyncio.get_event_loop().time() - consensus_start
+            consensus_time = asyncio.get_running_loop().time() - consensus_start
             self.logger.debug(
                 f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
             )

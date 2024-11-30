@@ -6,4 +6,5 @@ opentelemetry-sdk
 prometheus-client
 pyroscope-io
 pyroscope-otel
+pytz
 remerkleable
