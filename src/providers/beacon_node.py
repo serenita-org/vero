@@ -638,12 +638,12 @@ class BeaconNode:
                 "ProduceBlockV3Response",
                 attributes=dict(
                     blinded=response.execution_payload_blinded,
-                    execution_payload_value=response.execution_payload_value,
-                    consensus_block_value=response.consensus_block_value,
+                    execution_payload_value=int(response.execution_payload_value),
+                    consensus_block_value=int(response.consensus_block_value),
                 ),
             )
-            block_value = (
-                response.consensus_block_value + response.execution_payload_value
+            block_value: int = int(response.consensus_block_value) + int(
+                response.execution_payload_value
             )
             self.logger.info(f"{self.host} returned block with value {block_value}")
 
