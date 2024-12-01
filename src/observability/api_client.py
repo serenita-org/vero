@@ -28,7 +28,7 @@ async def _on_request_start(
     trace_config_ctx: SimpleNamespace,
     _params: aiohttp.TraceRequestStartParams,
 ) -> None:
-    trace_config_ctx.start = asyncio.get_event_loop().time()
+    trace_config_ctx.start = asyncio.get_running_loop().time()
 
 
 async def _on_request_end(
@@ -60,7 +60,7 @@ async def _on_request_end(
         request_type=request_type,
     )
 
-    elapsed = asyncio.get_event_loop().time() - trace_config_ctx.start
+    elapsed = asyncio.get_running_loop().time() - trace_config_ctx.start
     _REQUEST_DURATION.labels(**_labels).observe(elapsed)
     _REQUESTS_COUNTER.labels(**_labels).inc()
 

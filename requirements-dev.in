@@ -1,5 +1,6 @@
 -c requirements.txt
 aioresponses
+pre-commit
 pytest
 pytest-asyncio
 pytest-cov

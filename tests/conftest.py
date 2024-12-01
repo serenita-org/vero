@@ -1,7 +1,6 @@
-import asyncio
 import random
 from asyncio import AbstractEventLoop
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -109,11 +108,14 @@ async def remote_signer(
         yield remote_signer
 
 
-@pytest.fixture(scope="session")
-def scheduler() -> AsyncIOScheduler:
-    scheduler = AsyncIOScheduler()
-    scheduler.start()
-    return scheduler
+@pytest.fixture
+async def scheduler(
+    event_loop: AbstractEventLoop,
+) -> AsyncGenerator[AsyncIOScheduler, None]:
+    _scheduler = AsyncIOScheduler(event_loop=event_loop)
+    _scheduler.start()
+    yield _scheduler
+    _scheduler.shutdown(wait=False)
 
 
 @pytest.fixture
@@ -150,10 +152,3 @@ async def multi_beacon_node(
 @pytest.fixture
 async def beacon_chain(multi_beacon_node: MultiBeaconNode) -> BeaconChain:
     return BeaconChain(multi_beacon_node=multi_beacon_node)
-
-
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[AbstractEventLoop, None, None]:
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()

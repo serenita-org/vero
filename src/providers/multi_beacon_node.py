@@ -306,7 +306,7 @@ class MultiBeaconNode:
 
         best_block_value = 0
         best_block_response = None
-        start_time = asyncio.get_event_loop().time()
+        start_time = asyncio.get_running_loop().time()
         remaining_timeout = timeout
 
         while pending and remaining_timeout > 0:
@@ -334,7 +334,7 @@ class MultiBeaconNode:
                     best_block_response = response
 
             # Calculate remaining timeout
-            elapsed_time = asyncio.get_event_loop().time() - start_time
+            elapsed_time = asyncio.get_running_loop().time() - start_time
             remaining_timeout = max(timeout - elapsed_time, 0)
 
         if remaining_timeout <= 0:
@@ -483,7 +483,7 @@ class MultiBeaconNode:
         deadline: datetime.datetime,
     ) -> AttestationData:
         while datetime.datetime.now(pytz.UTC) < deadline:
-            _round_start = asyncio.get_event_loop().time()
+            _round_start = asyncio.get_running_loop().time()
             head_block_root_counter: Counter[str] = Counter()
 
             tasks = [
@@ -517,7 +517,7 @@ class MultiBeaconNode:
 
             # Rate-limiting - wait at least 30ms in between requests
             await asyncio.sleep(
-                max(0.03 - (asyncio.get_event_loop().time() - _round_start), 0),
+                max(0.03 - (asyncio.get_running_loop().time() - _round_start), 0),
             )
         raise AttestationConsensusFailure(
             f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes.",

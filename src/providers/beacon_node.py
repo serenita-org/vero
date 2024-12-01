@@ -283,7 +283,7 @@ class BeaconNode:
             },
         ):
             while True:
-                _request_start_time = asyncio.get_event_loop().time()
+                _request_start_time = asyncio.get_running_loop().time()
 
                 try:
                     att_data = await self.produce_attestation_data(
@@ -299,7 +299,7 @@ class BeaconNode:
                     )
 
                 # Rate-limiting - wait at least 50ms in between requests
-                elapsed_time = asyncio.get_event_loop().time() - _request_start_time
+                elapsed_time = asyncio.get_running_loop().time() - _request_start_time
                 await asyncio.sleep(max(0.05 - elapsed_time, 0))
 
     async def get_block_root(self, block_id: str) -> str:
