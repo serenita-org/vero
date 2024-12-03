@@ -132,6 +132,8 @@ async def test_initialize(
             ):
                 await mbn.initialize()
 
+    await mbn.__aexit__(None, None, None)
+
 
 @pytest.mark.parametrize(
     argnames=["numbers_of_attesting_indices", "best_aggregate_score"],

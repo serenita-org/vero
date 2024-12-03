@@ -65,12 +65,11 @@ class BeaconChain:
         return datetime.datetime.fromtimestamp(slot_timestamp, tz=pytz.UTC)
 
     def _get_slots_since_genesis(self) -> int:
-        seconds_elapsed = (
-            floor(datetime.datetime.now(tz=pytz.UTC).timestamp())
-            - self.genesis.genesis_time
+        seconds_elapsed = floor(datetime.datetime.now(tz=pytz.UTC).timestamp()) - int(
+            self.genesis.genesis_time
         )
         seconds_elapsed = max(0, seconds_elapsed)
-        return seconds_elapsed // self.spec.SECONDS_PER_SLOT  # type: ignore[no-any-return]
+        return seconds_elapsed // int(self.spec.SECONDS_PER_SLOT)
 
     @property
     def current_slot(self) -> int:
