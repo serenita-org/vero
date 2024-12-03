@@ -1,3 +1,4 @@
+import logging
 import os
 
 from opentelemetry import trace
@@ -12,8 +13,13 @@ from observability._vero_info import get_service_name, get_service_version
 
 
 def setup_tracing() -> None:
-    if not os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if not endpoint:
         return
+
+    logging.getLogger("vero-init").info(
+        f"Enabling tracing, exporting data to {endpoint}"
+    )
 
     provider = TracerProvider(
         resource=Resource.create(
@@ -24,7 +30,7 @@ def setup_tracing() -> None:
         ),
     )
     processor = BatchSpanProcessor(
-        OTLPSpanExporter(endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")),
+        OTLPSpanExporter(endpoint=endpoint),
     )
     provider.add_span_processor(processor)
 

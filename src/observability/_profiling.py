@@ -1,3 +1,4 @@
+import logging
 import os
 
 import pyroscope
@@ -11,6 +12,10 @@ def setup_profiling() -> None:
     pyroscope_server_address = os.getenv("PYROSCOPE_SERVER_ADDRESS")
     if not pyroscope_server_address:
         return
+
+    logging.getLogger("vero-init").info(
+        f"Enabling profiling, exporting data to {pyroscope_server_address}"
+    )
 
     tags = {
         key_value_pair.split("=")[0]: key_value_pair.split("=")[1]
