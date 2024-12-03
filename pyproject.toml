@@ -14,6 +14,7 @@ disallow_subclassing_any = false
 [tool.pytest.ini_options]
 pythonpath = ["./src", "."]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 # Assume Python 3.12+
