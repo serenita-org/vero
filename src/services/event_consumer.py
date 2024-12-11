@@ -48,8 +48,11 @@ class EventConsumerService:
             self.logger.info(f"Subscribing to events from {beacon_node.host}")
 
             topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
-            if "grandine" in beacon_node.node_version.lower():
-                # Grandine doesn't support the slashing SSE events
+            if any(
+                client_id in beacon_node.node_version.lower()
+                for client_id in ("grandine", "caplin")
+            ):
+                # Caplin and Grandine don't support the slashing SSE events
                 for t in ("attester_slashing", "proposer_slashing"):
                     topics.remove(t)
 
