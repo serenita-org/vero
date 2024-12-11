@@ -724,7 +724,7 @@ class BeaconNode:
 
         async with self.client_session.get(
             url=self.base_url.join(URL("/eth/v1/events")),
-            params={"topics": ",".join(topics)},
+            params={"topics": topics},
             headers={"accept": "text/event-stream"},
             timeout=ClientTimeout(
                 sock_connect=1, sock_read=None
