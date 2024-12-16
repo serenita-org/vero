@@ -16,6 +16,11 @@ beacon nodes to be temporarily offline, whether that's
 because of an unexpected technical issue or for planned
 maintenance.
 
+Note: it is possible to override the default mode of
+reaching consensus on attestation data among a majority
+of the beacon nodes using the
+`--attestation-consensus-threshold` CLI parameter.
+
 ## Attestations
 
 When the time comes to attest to the head of the chain,

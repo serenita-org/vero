@@ -1,8 +1,8 @@
 """Uses multiple beacon nodes to provide the validator client with data.
 
 The biggest advantage of using multiple beacon nodes is that we can
-request attestation data from all of them, and only attest if a majority
-of them agrees on the state of the chain, providing resilience against
+request attestation data from all of them, and only attest if enough
+of them agree on the state of the chain, providing resilience against
 single-client bugs.
 
 This provider has 2 important internal methods:
@@ -46,6 +46,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from remerkleable.complex import Container
 
+from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
@@ -66,6 +67,7 @@ class MultiBeaconNode:
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
         scheduler: AsyncIOScheduler,
+        cli_args: CLIArgs,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
@@ -80,21 +82,15 @@ class MultiBeaconNode:
             BeaconNode(base_url=base_url, scheduler=scheduler)
             for base_url in beacon_node_urls_proposal
         ]
-        # TODO Consider renaming to consensus_threshold
-        #  allowing for overrides of this value through a CLI argument.
-        #  Usecase would be larger node operators, running say 5 nodes with
-        #  diverse client combinations.
-        #  They could use this override to attest as soon as 2 of them agree
-        #  and don't need to wait for the 3rd confirmation. This would allow
-        #  them to attest quickly yet still avoid single-client bugs.
-        self._majority_threshold = len(self.beacon_nodes) // 2 + 1
+
+        self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
 
     async def initialize(self) -> None:
         # Attempt to fully initialize the connected beacon nodes
         await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
 
         successfully_initialized = len([b for b in self.beacon_nodes if b.initialized])
-        if successfully_initialized < self._majority_threshold:
+        if successfully_initialized < self._attestation_consensus_threshold:
             raise RuntimeError(
                 f"Failed to fully initialize a sufficient amount of beacon nodes -"
                 f" {successfully_initialized}/{len(self.beacon_nodes)} initialized",
@@ -454,7 +450,7 @@ class MultiBeaconNode:
             try:
                 att_data = await coro
                 head_match_count += 1
-                if head_match_count >= self._majority_threshold:
+                if head_match_count >= self._attestation_consensus_threshold:
                     # Cancel pending tasks
                     for task in tasks:
                         task.cancel()
@@ -509,7 +505,10 @@ class MultiBeaconNode:
 
                 block_root = att_data.beacon_block_root.to_obj()
                 head_block_root_counter[block_root] += 1
-                if head_block_root_counter[block_root] >= self._majority_threshold:
+                if (
+                    head_block_root_counter[block_root]
+                    >= self._attestation_consensus_threshold
+                ):
                     # Cancel pending tasks
                     for task in tasks:
                         task.cancel()
@@ -533,10 +532,10 @@ class MultiBeaconNode:
         # Slightly different algorithms depending on whether
         # a head event has been emitted.
         # A) A head event was emitted
-        #    We wait for a majority of beacon nodes to report the same
+        #    We wait for enough beacon nodes to report the same
         #    head block root as is present in the head event.
         # B) No head event was emitted
-        #    We wait for a majority of beacon nodes to report the same
+        #    We wait for enough beacon nodes to report the same
         #    head block root.
         if head_event:
             return await self._produce_attestation_data_from_head_event(
@@ -560,17 +559,17 @@ class MultiBeaconNode:
     ) -> AttestationData:
         """Returns attestation data from the connected beacon nodes.
 
-        If a head event is provided, the function will wait until a majority of beacon nodes
+        If a head event is provided, the function will wait until enough beacon nodes
         has processed the same head block.
 
         Some example situations that can occur and how they are handled:
         - 2s into the slot, we receive a head event from one beacon node,
           but the rest of connected beacon nodes hasn't processed that block yet
-          --> we wait for a majority of beacon nodes to report the same head block
+          --> we wait for enough beacon nodes to report the same head block
               (even if that means submitting the attestation later than 4s into the slot)
         - 4s into the slot, we haven't received a head event.
-          --> We request all beacon nodes to produce attestation data and wait until a majority
-              of beacon nodes agrees on a head block. Then we attest to that.
+          --> We request all beacon nodes to produce attestation data and wait until enough
+              beacon nodes agrees on a head block. Then we attest to that.
         """
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.produce_attestation_data",

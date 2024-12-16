@@ -9,16 +9,17 @@ import msgspec
 class CLIArgs(msgspec.Struct, kw_only=True):
     remote_signer_url: str
     beacon_node_urls: list[str]
-    beacon_node_urls_proposal: list[str] = []
+    beacon_node_urls_proposal: list[str]
+    attestation_consensus_threshold: int
     fee_recipient: str
     data_dir: str
     graffiti: bytes
     gas_limit: int
-    use_external_builder: bool = False
+    use_external_builder: bool
     builder_boost_factor: int
     metrics_address: str
     metrics_port: int
-    metrics_multiprocess_mode: bool = False
+    metrics_multiprocess_mode: bool
     log_level: str
 
 
@@ -38,6 +39,25 @@ def _validate_comma_separated_strings(
     if len(items) != len(set(items)):
         raise ValueError(f"{entity_name}s must be unique: {items}")
     return items
+
+
+def _process_attestation_consensus_threshold(
+    value: int | None, beacon_node_urls: list[str]
+) -> int:
+    if value is None:
+        # If no value provided, default to a majority of beacon nodes
+        return len(beacon_node_urls) // 2 + 1
+
+    if value <= 0:
+        raise ValueError(f"Invalid value for attestation_consensus_threshold: {value}")
+
+    if len(beacon_node_urls) < value:
+        raise ValueError(
+            f"Invalid value for attestation_consensus_threshold ({value})"
+            f" with {len(beacon_node_urls)} beacon node(s)"
+        )
+
+    return value
 
 
 def _process_fee_recipient(input_string: str) -> str:
@@ -86,6 +106,13 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         required=False,
         default="",
         help="A comma-separated list of beacon node URLs to exclusively use for block proposals.",
+    )
+    parser.add_argument(
+        "--attestation-consensus-threshold",
+        type=int,
+        required=False,
+        default=None,
+        help="Specify the required number of beacon nodes that need to agree on the attestation data before the validators proceed to attest. Defaults to a majority of beacon nodes (>50%) agreeing.",
     )
     parser.add_argument(
         "--fee-recipient",
@@ -157,16 +184,17 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
 
     try:
         # Process and validate parsed args
+        beacon_node_urls = [
+            _validate_url(url)
+            for url in _validate_comma_separated_strings(
+                input_string=parsed_args.beacon_node_urls,
+                entity_name="beacon node url",
+                min_values_required=1,
+            )
+        ]
         return CLIArgs(
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
-            beacon_node_urls=[
-                _validate_url(url)
-                for url in _validate_comma_separated_strings(
-                    input_string=parsed_args.beacon_node_urls,
-                    entity_name="beacon node url",
-                    min_values_required=1,
-                )
-            ],
+            beacon_node_urls=beacon_node_urls,
             beacon_node_urls_proposal=[
                 _validate_url(url)
                 for url in _validate_comma_separated_strings(
@@ -175,6 +203,10 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                     min_values_required=0,
                 )
             ],
+            attestation_consensus_threshold=_process_attestation_consensus_threshold(
+                value=parsed_args.attestation_consensus_threshold,
+                beacon_node_urls=beacon_node_urls,
+            ),
             fee_recipient=_process_fee_recipient(parsed_args.fee_recipient),
             data_dir=parsed_args.data_dir,
             graffiti=_process_graffiti(parsed_args.graffiti),

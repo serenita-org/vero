@@ -29,6 +29,7 @@ from args import parse_cli_args
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": [],
+                "attestation_consensus_threshold": 1,
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             },
             id="Minimal valid list of arguments",
@@ -38,6 +39,7 @@ from args import parse_cli_args
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
+                "--attestation-consensus-threshold=1",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "--data-dir=/tmp/vero",
                 "--graffiti=test-graffiti",
@@ -54,6 +56,7 @@ from args import parse_cli_args
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
+                "attestation_consensus_threshold": 1,
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "data_dir": "/tmp/vero",
                 "graffiti": b"test-graffiti".ljust(32, b"\x00"),
@@ -117,6 +120,39 @@ from args import parse_cli_args
                 "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
             },
             id="--beacon-node-urls-proposal",
+        ),
+        pytest.param(
+            [
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--attestation-consensus-threshold=asd",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "argument --attestation-consensus-threshold: invalid int value",
+            {},
+            id="--attestation-consensus-threshold invalid input - string instead of int",
+        ),
+        pytest.param(
+            [
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--attestation-consensus-threshold=2",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "Invalid value for attestation_consensus_threshold (2) with 1 beacon node(s)",
+            {},
+            id="--attestation-consensus-threshold invalid input - threshold impossible to reach",
+        ),
+        pytest.param(
+            [
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--attestation-consensus-threshold=0",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "Invalid value for attestation_consensus_threshold: 0",
+            {},
+            id="--attestation-consensus-threshold invalid input - 0",
         ),
         pytest.param(
             [

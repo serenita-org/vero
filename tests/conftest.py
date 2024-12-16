@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from args import CLIArgs
+from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
@@ -39,6 +39,9 @@ def cli_args(
         remote_signer_url=remote_signer_url,
         beacon_node_urls=[beacon_node_url],
         beacon_node_urls_proposal=beacon_node_urls_proposal,
+        attestation_consensus_threshold=_process_attestation_consensus_threshold(
+            None, [beacon_node_url]
+        ),
         fee_recipient="0x0000000000000000000000000000000000000000",
         data_dir="/tmp/vero_tests",
         use_external_builder=False,
@@ -47,6 +50,7 @@ def cli_args(
         gas_limit=30_000_000,
         metrics_address="localhost",
         metrics_port=8000,
+        metrics_multiprocess_mode=False,
         log_level="INFO",
     )
 
@@ -145,6 +149,7 @@ async def multi_beacon_node(
         beacon_node_urls=cli_args.beacon_node_urls,
         beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
         scheduler=scheduler,
+        cli_args=cli_args,
     ) as mbn:
         yield mbn
 
