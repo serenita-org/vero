@@ -97,7 +97,11 @@ class ValidatorDutyService:
         self.logger.debug(
             f"Handling reorg event at slot {event.slot}, new head block {event.new_head_block}"
         )
-        self.scheduler.add_job(self.update_duties)
+        self.scheduler.add_job(
+            self.update_duties,
+            id=f"{self.__class__.__name__}.update_duties",
+            replace_existing=True,
+        )
 
     async def _update_duties(self) -> None:
         raise NotImplementedError
@@ -128,6 +132,6 @@ class ValidatorDutyService:
                 self.update_duties,
                 "date",
                 next_run_time=next_run_time,
-                id=f"update_duties_{self.__class__.__name__}",
+                id=f"{self.__class__.__name__}.update_duties",
                 replace_existing=True,
             )

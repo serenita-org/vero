@@ -19,6 +19,7 @@ class ErrorType(Enum):
     SYNC_COMMITTEE_MESSAGE_PUBLISH = "sync-committee-message-publish"
     DUTIES_UPDATE = "duties-update"
     SIGNATURE = "signature"
+    OTHER = "other"
 
 
 def get_shared_metrics() -> tuple[Counter]:

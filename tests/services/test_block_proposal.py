@@ -1,8 +1,6 @@
 import asyncio
-import datetime
 
 import pytest
-import pytz
 
 from providers import BeaconChain
 from schemas import SchemaBeaconAPI
@@ -61,13 +59,10 @@ async def test_publish_block(
         ),
     )
 
-    # Wait for duty slot
-    time_to_slot = datetime.datetime.now(
-        tz=pytz.UTC,
-    ) - beacon_chain.get_datetime_for_slot(duty_slot)
-    await asyncio.sleep(time_to_slot.total_seconds())
-
     blocks_published_before = _VC_PUBLISHED_BLOCKS._value.get()
+
+    # Wait for duty slot
+    await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
 
     await block_proposal_service.propose_block(slot=duty_slot)
 
@@ -113,11 +108,7 @@ async def test_block_proposal_beacon_node_urls_proposal(
     )
 
     # Wait for duty slot
-    time_to_slot = datetime.datetime.now(
-        tz=pytz.UTC,
-    ) - beacon_chain.get_datetime_for_slot(duty_slot)
-    await asyncio.sleep(time_to_slot.total_seconds())
-
+    await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
     await block_proposal_service.propose_block(slot=duty_slot)
 
     _override_log_string = "Overriding beacon nodes for block proposal"

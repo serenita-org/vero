@@ -57,7 +57,7 @@ _VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
 _VC_ATTESTATION_CONSENSUS_FAILURES.reset()
 (_ERRORS_METRIC,) = get_shared_metrics()
 
-_PRODUCE_JOB_ID = "attest_if_not_yet_job_for_slot_{duty_slot}"
+_PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 
 
 class AttestationService(ValidatorDutyService):
@@ -72,7 +72,9 @@ class AttestationService(ValidatorDutyService):
         self.attester_duties_dependent_roots: dict[int, str] = dict()
 
     def start(self) -> None:
-        self.scheduler.add_job(self.update_duties)
+        self.scheduler.add_job(
+            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
+        )
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
@@ -88,7 +90,11 @@ class AttestationService(ValidatorDutyService):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.scheduler.add_job(self.update_duties)
+            self.scheduler.add_job(
+                self.update_duties,
+                id=f"{self.__class__.__name__}.update_duties",
+                replace_existing=True,
+            )
         await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
 
     async def attest_if_not_yet_attested(
@@ -112,6 +118,15 @@ class AttestationService(ValidatorDutyService):
         ):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not attesting")
+
+            if slot != self.beacon_chain.current_slot:
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.OTHER.value,
+                ).inc()
+                self.logger.error(
+                    f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
+                )
+                return
 
             if slot < self._last_slot_duty_performed_for:
                 return
@@ -274,6 +289,7 @@ class AttestationService(ValidatorDutyService):
                         d for d in slot_attester_duties if d.is_aggregator
                     ],
                 ),
+                id=f"{self.__class__.__name__}.prepare_and_aggregate_attestations-slot-{slot}",
             )
 
             self.logger.debug(
@@ -331,6 +347,7 @@ class AttestationService(ValidatorDutyService):
                 aggregator_duties=aggregator_duties,
             ),
             next_run_time=aggregation_run_time,
+            id=f"{self.__class__.__name__}.aggregate_attestations-slot-{slot}",
         )
 
     def _is_aggregator_by_committee_length(
@@ -439,8 +456,7 @@ class AttestationService(ValidatorDutyService):
         )
 
     async def _prep_and_schedule_duties(
-        self,
-        duties: list[SchemaBeaconAPI.AttesterDuty],
+        self, duties: list[SchemaBeaconAPI.AttesterDuty], epoch: int
     ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
         if len(duties) == 0:
             return []
@@ -452,7 +468,9 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent
         for duty_slot in {int(duty.slot) for duty in duties}:
-            self.logger.debug(f"Adding attest_if_not_yet job for slot {duty_slot}")
+            self.logger.debug(
+                f"Adding attest_if_not_yet_attested job for slot {duty_slot}"
+            )
             self.scheduler.add_job(
                 self.attest_if_not_yet_attested,
                 "date",
@@ -528,6 +546,8 @@ class AttestationService(ValidatorDutyService):
         self.scheduler.add_job(
             self.multi_beacon_node.prepare_beacon_committee_subscriptions,
             kwargs=dict(data=beacon_committee_subscriptions_data),
+            id=f"{self.__class__.__name__}.multi_beacon_node.prepare_beacon_committee_subscriptions-epoch-{epoch}",
+            replace_existing=True,
         )
 
         return duties_with_proofs
@@ -603,6 +623,7 @@ class AttestationService(ValidatorDutyService):
             for list_of_duties in (duties_due_soon, duties_due_later):
                 for duty_with_proof in await self._prep_and_schedule_duties(
                     duties=list_of_duties,
+                    epoch=epoch,
                 ):
                     self.attester_duties[epoch].add(duty_with_proof)
 

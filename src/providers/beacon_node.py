@@ -129,8 +129,18 @@ class BeaconNode:
         self.node_version = await self.get_node_version()
 
         # Regularly refresh these values
-        self.scheduler.add_job(self.get_spec, "interval", minutes=10)
-        self.scheduler.add_job(self.get_node_version, "interval", minutes=10)
+        self.scheduler.add_job(
+            self.get_spec,
+            "interval",
+            minutes=10,
+            id=f"{self.__class__.__name__}.get_spec-{self.host}",
+        )
+        self.scheduler.add_job(
+            self.get_node_version,
+            "interval",
+            minutes=10,
+            id=f"{self.__class__.__name__}.get_node_version-{self.host}",
+        )
 
         self.score = 100
         self.initialized = True
@@ -155,6 +165,7 @@ class BeaconNode:
                 "date",
                 next_run_time=next_run_time,
                 kwargs=dict(function=function),
+                id=f"{self.__class__.__name__}.initialize_full-{self.host}",
             )
 
     @staticmethod
