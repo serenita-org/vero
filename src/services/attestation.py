@@ -4,6 +4,7 @@ import datetime
 import logging
 from collections import defaultdict
 from typing import Unpack
+from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
@@ -456,7 +457,7 @@ class AttestationService(ValidatorDutyService):
         )
 
     async def _prep_and_schedule_duties(
-        self, duties: list[SchemaBeaconAPI.AttesterDuty], epoch: int
+        self, duties: list[SchemaBeaconAPI.AttesterDuty]
     ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
         if len(duties) == 0:
             return []
@@ -546,8 +547,7 @@ class AttestationService(ValidatorDutyService):
         self.scheduler.add_job(
             self.multi_beacon_node.prepare_beacon_committee_subscriptions,
             kwargs=dict(data=beacon_committee_subscriptions_data),
-            id=f"{self.__class__.__name__}.multi_beacon_node.prepare_beacon_committee_subscriptions-epoch-{epoch}",
-            replace_existing=True,
+            id=f"{self.__class__.__name__}.multi_beacon_node.prepare_beacon_committee_subscriptions-{uuid4().hex}",
         )
 
         return duties_with_proofs
@@ -623,7 +623,6 @@ class AttestationService(ValidatorDutyService):
             for list_of_duties in (duties_due_soon, duties_due_later):
                 for duty_with_proof in await self._prep_and_schedule_duties(
                     duties=list_of_duties,
-                    epoch=epoch,
                 ):
                     self.attester_duties[epoch].add(duty_with_proof)
 
