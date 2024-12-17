@@ -119,6 +119,14 @@ class AttestationService(ValidatorDutyService):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not attesting")
 
+            if slot < self._last_slot_duty_performed_for:
+                return
+            if slot == self._last_slot_duty_performed_for:
+                if head_event:
+                    self.logger.warning(
+                        f"Ignoring head event, already started attesting to slot {self._last_slot_duty_performed_for}",
+                    )
+                return
             if slot != self.beacon_chain.current_slot:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.OTHER.value,
@@ -128,14 +136,6 @@ class AttestationService(ValidatorDutyService):
                 )
                 return
 
-            if slot < self._last_slot_duty_performed_for:
-                return
-            if slot == self._last_slot_duty_performed_for:
-                if head_event:
-                    self.logger.warning(
-                        f"Ignoring head event, already started attesting to slot {self._last_slot_duty_performed_for}",
-                    )
-                return
             self._last_slot_duty_performed_for = slot
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH

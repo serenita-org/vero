@@ -71,6 +71,14 @@ class SyncCommitteeService(ValidatorDutyService):
                 "Slashing detected, not producing sync committee message",
             )
 
+        if duty_slot < self._last_slot_duty_performed_for:
+            return
+        if duty_slot == self._last_slot_duty_performed_for:
+            if head_event:
+                self.logger.warning(
+                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_performed_for}",
+                )
+            return
         if duty_slot != self.beacon_chain.current_slot:
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.OTHER.value,
@@ -80,14 +88,6 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             return
 
-        if duty_slot < self._last_slot_duty_performed_for:
-            return
-        if duty_slot == self._last_slot_duty_performed_for:
-            if head_event:
-                self.logger.warning(
-                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_performed_for}",
-                )
-            return
         self._last_slot_duty_performed_for = duty_slot
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee

@@ -302,6 +302,11 @@ class BlockProposalService(ValidatorDutyService):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not producing block")
 
+            if slot <= self._last_slot_duty_performed_for:
+                self.logger.debug(
+                    f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})",
+                )
+                return
             if slot != self.beacon_chain.current_slot:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.OTHER.value,
@@ -311,11 +316,6 @@ class BlockProposalService(ValidatorDutyService):
                 )
                 return
 
-            if slot <= self._last_slot_duty_performed_for:
-                self.logger.debug(
-                    f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})",
-                )
-                return
             self._last_slot_duty_performed_for = slot
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
