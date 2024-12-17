@@ -36,6 +36,12 @@ class EventConsumerService:
             list[Callable[[Any], Coroutine[Any, Any, None]]],
         ] = defaultdict(list)
 
+    def start(self) -> None:
+        self.scheduler.add_job(
+            self.handle_events,
+            id=f"{self.__class__.__name__}.handle_events",
+        )
+
     def add_event_handler(
         self,
         event_handler: Callable[[Any], Coroutine[Any, Any, None]],

@@ -158,12 +158,8 @@ async def run_services(cli_args: CLIArgs) -> None:
             event_consumer_service=event_consumer_service,
             validator_status_tracker_service=validator_status_tracker_service,
         )
-
-        scheduler.add_job(
-            event_consumer_service.handle_events,
-            id=f"{event_consumer_service.__class__.__name__}.handle_events",
-        )
-        _logger.info("Started event consumer")
+        _logger.info("Starting event consumer")
+        event_consumer_service.start()
 
         # Run forever while monitoring the event loop
         await monitor_event_loop(beacon_chain=beacon_chain)
