@@ -68,6 +68,27 @@ async def test_attest_if_not_yet_attested(
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1
 
 
+@pytest.mark.parametrize(
+    argnames=[
+        "slot_offset",
+    ],
+    argvalues=[pytest.param(10, id="future slot"), pytest.param(-10, id="past slot")],
+)
+async def test_attest_to_invalid_slot(
+    slot_offset: int,
+    attestation_service: AttestationService,
+    beacon_chain: BeaconChain,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
+    await attestation_service.attest_if_not_yet_attested(
+        slot=beacon_chain.current_slot + slot_offset
+    )
+
+    assert any("Invalid slot for attestation" in m for m in caplog.messages)
+    assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before
+
+
 async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
