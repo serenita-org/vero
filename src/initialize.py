@@ -97,7 +97,7 @@ def check_data_dir_permissions(data_dir: Path) -> None:
 async def run_services(cli_args: CLIArgs) -> None:
     scheduler = AsyncIOScheduler(
         timezone=pytz.UTC,
-        job_defaults=dict(misfire_grace_time=1),
+        job_defaults=dict(misfire_grace_time=None),
     )
     scheduler.start()
 
@@ -158,9 +158,8 @@ async def run_services(cli_args: CLIArgs) -> None:
             event_consumer_service=event_consumer_service,
             validator_status_tracker_service=validator_status_tracker_service,
         )
-
-        scheduler.add_job(event_consumer_service.handle_events)
-        _logger.info("Started event consumer")
+        _logger.info("Starting event consumer")
+        event_consumer_service.start()
 
         # Run forever while monitoring the event loop
         await monitor_event_loop(beacon_chain=beacon_chain)

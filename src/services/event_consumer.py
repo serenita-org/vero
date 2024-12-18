@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from typing import Any
+from uuid import uuid4
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter
@@ -34,6 +35,12 @@ class EventConsumerService:
             type[SchemaBeaconAPI.BeaconNodeEvent],
             list[Callable[[Any], Coroutine[Any, Any, None]]],
         ] = defaultdict(list)
+
+    def start(self) -> None:
+        self.scheduler.add_job(
+            self.handle_events,
+            id=f"{self.__class__.__name__}.handle_events",
+        )
 
     def add_event_handler(
         self,
@@ -80,7 +87,11 @@ class EventConsumerService:
                 for event_type, handlers in self.event_handlers.items():
                     if isinstance(event, event_type):
                         for handler in handlers:
-                            self.scheduler.add_job(handler, kwargs=dict(event=event))
+                            self.scheduler.add_job(
+                                handler,
+                                kwargs=dict(event=event),
+                                id=f"{self.__class__.__name__}.handler-{event_type}-{handler.__name__}-{uuid4().hex}",
+                            )
 
                 _VC_PROCESSED_BEACON_NODE_EVENTS.labels(
                     host=beacon_node.host,
@@ -94,4 +105,8 @@ class EventConsumerService:
             )
             await asyncio.sleep(1)
 
-        self.scheduler.add_job(self.handle_events)
+        self.scheduler.add_job(
+            self.handle_events,
+            id=f"{self.__class__.__name__}.handle_events",
+            replace_existing=True,
+        )

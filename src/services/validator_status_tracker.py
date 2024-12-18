@@ -52,7 +52,10 @@ class ValidatorStatusTrackerService:
         # to continue initializing the validator client since we don't know
         # which validators to retrieve duties for.
         await self._update_validator_statuses()
-        self.scheduler.add_job(self.update_validator_statuses)
+        self.scheduler.add_job(
+            self.update_validator_statuses,
+            id=f"{self.__class__.__name__}.update_validator_statuses",
+        )
 
     @property
     def any_active_or_pending_validators(self) -> bool:
@@ -175,6 +178,6 @@ class ValidatorStatusTrackerService:
             self.update_validator_statuses,
             "date",
             next_run_time=next_run_time,
-            id="update_validator_statuses_job",
+            id=f"{self.__class__.__name__}.update_validator_statuses",
             replace_existing=True,
         )

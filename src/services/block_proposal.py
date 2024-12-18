@@ -43,10 +43,18 @@ class BlockProposalService(ValidatorDutyService):
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
     def start(self) -> None:
-        self.scheduler.add_job(self.update_duties)
-        self.scheduler.add_job(self.prepare_beacon_proposer)
+        self.scheduler.add_job(
+            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
+        )
+        self.scheduler.add_job(
+            self.prepare_beacon_proposer,
+            id=f"{self.__class__.__name__}.prepare_beacon_proposer",
+        )
         if self.cli_args.use_external_builder:
-            self.scheduler.add_job(self.register_validators)
+            self.scheduler.add_job(
+                self.register_validators,
+                id=f"{self.__class__.__name__}.register_validators",
+            )
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
@@ -56,7 +64,11 @@ class BlockProposalService(ValidatorDutyService):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.scheduler.add_job(self.update_duties)
+            self.scheduler.add_job(
+                self.update_duties,
+                id=f"{self.__class__.__name__}.update_duties",
+                replace_existing=True,
+            )
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
@@ -116,7 +128,7 @@ class BlockProposalService(ValidatorDutyService):
                             slot=duty_slot,
                         ),
                         kwargs=dict(slot=duty_slot),
-                        id=f"propose_block_job_for_slot_{duty_slot}",
+                        id=f"{self.__class__.__name__}.propose_block-slot-{duty_slot}",
                         replace_existing=True,
                     )
 
@@ -178,7 +190,7 @@ class BlockProposalService(ValidatorDutyService):
                 self.prepare_beacon_proposer,
                 "date",
                 next_run_time=next_run_time,
-                id="prepare_beacon_proposer_job",
+                id=f"{self.__class__.__name__}.prepare_beacon_proposer",
                 replace_existing=True,
             )
 
@@ -268,7 +280,7 @@ class BlockProposalService(ValidatorDutyService):
                 self.register_validators,
                 "date",
                 next_run_time=next_run_time,
-                id="register_validators_job",
+                id=f"{self.__class__.__name__}.register_validators",
                 replace_existing=True,
             )
 
@@ -295,6 +307,15 @@ class BlockProposalService(ValidatorDutyService):
                     f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})",
                 )
                 return
+            if slot != self.beacon_chain.current_slot:
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.OTHER.value,
+                ).inc()
+                self.logger.error(
+                    f"Invalid slot for block proposal: {slot}. Current slot: {self.beacon_chain.current_slot}"
+                )
+                return
+
             self._last_slot_duty_performed_for = slot
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH

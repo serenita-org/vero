@@ -34,7 +34,9 @@ _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.reset()
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
-_PRODUCE_JOB_ID = "produce_sync_message_if_not_yet_job_for_slot_{duty_slot}"
+_PRODUCE_JOB_ID = (
+    "SyncCommitteeService.produce_sync_message_if_not_yet_produced-slot-{duty_slot}"
+)
 
 
 class SyncCommitteeService(ValidatorDutyService):
@@ -47,7 +49,9 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
     def start(self) -> None:
-        self.scheduler.add_job(self.update_duties)
+        self.scheduler.add_job(
+            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
+        )
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if not isinstance(event, SchemaBeaconAPI.HeadEvent):
@@ -75,6 +79,15 @@ class SyncCommitteeService(ValidatorDutyService):
                     f"Ignoring head event, already started producing message during slot {self._last_slot_duty_performed_for}",
                 )
             return
+        if duty_slot != self.beacon_chain.current_slot:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.OTHER.value,
+            ).inc()
+            self.logger.error(
+                f"Invalid duty_slot for sync committee message: {duty_slot}. Current slot: {self.beacon_chain.current_slot}"
+            )
+            return
+
         self._last_slot_duty_performed_for = duty_slot
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
@@ -175,6 +188,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 beacon_block_root=beacon_block_root,
                 sync_duties=self.sync_duties[sync_period],
             ),
+            id=f"{self.__class__.__name__}.prepare_and_aggregate_sync_messages",
         )
 
         self.logger.debug(
@@ -286,6 +300,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 duties_with_proofs=duties_with_proofs,
             ),
             next_run_time=aggregation_run_time,
+            id=f"{self.__class__.__name__}.aggregate_sync_messages",
         )
 
     async def _sign_and_publish_contributions(
@@ -521,6 +536,7 @@ class SyncCommitteeService(ValidatorDutyService):
             self.scheduler.add_job(
                 self.multi_beacon_node.prepare_sync_committee_subscriptions,
                 kwargs=dict(data=sync_committee_subscriptions_data),
+                id=f"{self.__class__.__name__}.multi_beacon_node.prepare_sync_committee_subscriptions",
             )
 
             self.logger.debug(
