@@ -112,7 +112,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         type=int,
         required=False,
         default=None,
-        help="Specify the required number of beacon nodes that need to agree on the attestation data before the validators proceed to attest. Defaults to a majority of beacon nodes (>50%) agreeing.",
+        help="Specify the required number of beacon nodes that need to agree on the attestation data before the validators proceed to attest. Defaults to a majority of beacon nodes (>50%%) agreeing.",
     )
     parser.add_argument(
         "--fee-recipient",
