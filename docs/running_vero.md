@@ -54,6 +54,24 @@ exclusively use for block proposals. When performing a block proposal duty,
 only these beacon nodes will be used to produce and publish a block.
 ___
 
+#### `--attestation-consensus-threshold`
+
+Specify the required number of beacon nodes that need to agree
+on the attestation data before the validators proceed to attest.
+
+There are a few situations where you may want to change the default:
+- when running against 2 beacon nodes, where you only want to use
+  the second node as a fallback
+- when running against a large client-diverse set of beacon nodes
+  where a lower threshold (like 2 or 3 out of 6 beacon nodes agreeing)
+  may be sufficient to avoid single-client bugs.
+
+See https://github.com/serenita-org/vero/issues/38 for more
+information.
+
+Defaults to a majority of beacon nodes (>50%) agreeing.
+___
+
 #### `--fee-recipient`
 
 **[required]** The fee recipient address to use during block proposals.

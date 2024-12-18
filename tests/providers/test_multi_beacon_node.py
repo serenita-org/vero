@@ -15,6 +15,7 @@ from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from remerkleable.bitfields import Bitlist, Bitvector
 
+from args import CLIArgs, _process_attestation_consensus_threshold
 from providers import MultiBeaconNode
 from spec.attestation import Attestation, AttestationData
 from spec.base import SpecDeneb
@@ -23,7 +24,7 @@ from spec.sync_committee import SyncCommitteeContributionClass
 
 @pytest.mark.parametrize(
     argnames=[
-        "beacon_node_base_urls",
+        "beacon_node_urls",
         "beacon_node_availabilities",
         "expected_initialization_success",
     ],
@@ -61,28 +62,33 @@ from spec.sync_committee import SyncCommitteeContributionClass
     ],
 )
 async def test_initialize(
-    beacon_node_base_urls: list[str],
+    beacon_node_urls: list[str],
     beacon_node_availabilities: list[bool],
     expected_initialization_success: bool,
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     spec_deneb: SpecDeneb,
     scheduler: AsyncIOScheduler,
+    cli_args: CLIArgs,
 ) -> None:
-    """Tests that the multi-beacon node is able to initialize if a majority
-    of its supplied beacon nodes is available.
+    """Tests that the multi-beacon node is able to initialize if enough
+    of its supplied beacon nodes are available.
     """
-    assert len(beacon_node_base_urls) == len(beacon_node_availabilities)
+    assert len(beacon_node_urls) == len(beacon_node_availabilities)
+    cli_args.attestation_consensus_threshold = _process_attestation_consensus_threshold(
+        None, beacon_node_urls
+    )
 
     mbn = MultiBeaconNode(
-        beacon_node_urls=beacon_node_base_urls,
+        beacon_node_urls=beacon_node_urls,
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
+        cli_args=cli_args,
     )
 
     with aioresponses() as m:
         for _url, beacon_node_available in zip(
-            beacon_node_base_urls,
+            beacon_node_urls,
             beacon_node_availabilities,
             strict=True,
         ):

@@ -5,6 +5,7 @@ import pytest
 from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from args import CLIArgs
 from providers import MultiBeaconNode
 from spec.base import SpecDeneb
 
@@ -15,6 +16,7 @@ async def multi_beacon_node_three_inited_nodes(
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     spec_deneb: SpecDeneb,
     scheduler: AsyncIOScheduler,
+    cli_args: CLIArgs,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(
         beacon_node_urls=[
@@ -24,6 +26,7 @@ async def multi_beacon_node_three_inited_nodes(
         ],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
+        cli_args=cli_args,
     )
     with aioresponses() as m:
         m.get(

@@ -107,6 +107,7 @@ async def run_services(cli_args: CLIArgs) -> None:
             beacon_node_urls=cli_args.beacon_node_urls,
             beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
             scheduler=scheduler,
+            cli_args=cli_args,
         ) as multi_beacon_node,
     ):
         beacon_chain = BeaconChain(multi_beacon_node=multi_beacon_node)
