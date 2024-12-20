@@ -1,3 +1,4 @@
+import copy
 import logging
 from typing import TypeVar
 
@@ -38,35 +39,39 @@ class Spec(Container):
     def from_obj(cls: type[SpecV], obj: ObjType) -> SpecV:
         if not isinstance(obj, dict):
             raise ObjParseException(f"obj '{obj}' is not a dict")
+
+        # Create a copy since we manipulate the dict
+        _obj = copy.deepcopy(obj)
+
         fields = cls.fields()
-        for k in list(obj.keys()):
+        for k in list(_obj.keys()):
             if k not in fields:
-                del obj[k]  # Remove extra keys/fields
+                del _obj[k]  # Remove extra keys/fields
 
         # Handle missing value for INTERVALS_PER_SLOT from some CL clients
         # TODO report and get rid of this workaround?
         logger = logging.getLogger("spec-parser")
-        if "INTERVALS_PER_SLOT" not in obj:
+        if "INTERVALS_PER_SLOT" not in _obj:
             logger.debug(
                 "Missing spec value for INTERVALS_PER_SLOT, using default of 3",
             )
-            obj["INTERVALS_PER_SLOT"] = 3
+            _obj["INTERVALS_PER_SLOT"] = 3
 
         # Handle missing value for MAX_BLOB_COMMITMENTS_PER_BLOCK from Prysm
         # TODO report and get rid of this workaround?
-        if "MAX_BLOB_COMMITMENTS_PER_BLOCK" not in obj:
+        if "MAX_BLOB_COMMITMENTS_PER_BLOCK" not in _obj:
             logger.warning(
                 "Missing spec value for MAX_BLOB_COMMITMENTS_PER_BLOCK, using default of 4096",
             )
-            obj["MAX_BLOB_COMMITMENTS_PER_BLOCK"] = 4096
+            _obj["MAX_BLOB_COMMITMENTS_PER_BLOCK"] = 4096
 
-        if any(field not in obj for field in fields):
-            missing = set(fields.keys()) - set(obj.keys())
+        if any(field not in _obj for field in fields):
+            missing = set(fields.keys()) - set(_obj.keys())
             raise ObjParseException(
-                f"obj '{obj}' is missing required field(s): {missing}",
+                f"_obj '{_obj}' is missing required field(s): {missing}",
             )
 
-        return cls(**{k: fields[k].from_obj(v) for k, v in obj.items()})
+        return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
 
 
 class SpecPhase0(Spec):

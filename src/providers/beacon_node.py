@@ -19,11 +19,13 @@ from prometheus_client import Gauge, Histogram
 from remerkleable.complex import Container
 from yarl import URL
 
+from args import CLIArgs
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.base import Genesis, Spec, parse_spec
+from spec.configs import Network, get_network_spec
 from spec.sync_committee import SyncCommitteeContributionClass
 
 _TIMEOUT_DEFAULT_CONNECT = 1
@@ -123,18 +125,25 @@ class BeaconNode:
         self._score = max(0, min(value, 100))
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
 
-    async def _initialize_full(self) -> None:
+    async def _initialize_full(self, cli_args: CLIArgs) -> None:
         self.genesis = await self.get_genesis()
-        self.spec = await self.get_spec()
-        self.node_version = await self.get_node_version()
 
-        # Regularly refresh these values
-        self.scheduler.add_job(
-            self.get_spec,
-            "interval",
-            minutes=10,
-            id=f"{self.__class__.__name__}.get_spec-{self.host}",
-        )
+        if cli_args.network == Network.FETCH:
+            # Fetch the spec values from the beacon node
+            self.spec = await self.get_spec()
+        else:
+            # Use included hardcoded spec values for known networks
+            self.spec = get_network_spec(network=cli_args.network)
+            bn_spec = await self.get_spec()
+            if self.spec != bn_spec:
+                self.logger.warning(
+                    f"Spec values returned by beacon node not equal to hardcoded spec values."
+                    f"\nBeacon node:\n{bn_spec}"
+                    f"\nHardcoded:\n{self.spec}"
+                )
+
+        # Regularly refresh the version of the beacon node
+        self.node_version = await self.get_node_version()
         self.scheduler.add_job(
             self.get_node_version,
             "interval",
@@ -145,11 +154,11 @@ class BeaconNode:
         self.score = 100
         self.initialized = True
 
-    async def initialize_full(self, function: str | None = None) -> None:
+    async def initialize_full(self, cli_args: CLIArgs) -> None:
         try:
-            await self._initialize_full()
+            await self._initialize_full(cli_args=cli_args)
             self.logger.info(
-                f"Initialized beacon node at {self.base_url}{f' [{function}]' if function else ''}",
+                f"Initialized beacon node at {self.base_url}",
             )
         except Exception as e:
             self.logger.error(
@@ -164,8 +173,9 @@ class BeaconNode:
                 self.initialize_full,
                 "date",
                 next_run_time=next_run_time,
-                kwargs=dict(function=function),
+                kwargs=dict(cli_args=cli_args),
                 id=f"{self.__class__.__name__}.initialize_full-{self.host}",
+                replace_existing=True,
             )
 
     @staticmethod

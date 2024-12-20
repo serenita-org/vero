@@ -11,6 +11,7 @@ from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
+from spec.configs import Network
 
 # A few more global fixtures defined separately
 from tests.mock_api.base import *
@@ -36,6 +37,7 @@ def cli_args(
     beacon_node_urls_proposal: list[str],
 ) -> CLIArgs:
     return CLIArgs(
+        network=Network.FETCH,
         remote_signer_url=remote_signer_url,
         beacon_node_urls=[beacon_node_url],
         beacon_node_urls_proposal=beacon_node_urls_proposal,
