@@ -5,8 +5,11 @@ from urllib.parse import urlparse
 
 import msgspec
 
+from spec.configs import Network
+
 
 class CLIArgs(msgspec.Struct, kw_only=True):
+    network: Network
     remote_signer_url: str
     beacon_node_urls: list[str]
     beacon_node_urls_proposal: list[str]
@@ -91,6 +94,14 @@ def _process_graffiti(graffiti: str) -> bytes:
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
+    _network_choices = [e.value for e in list(Network)]
+    parser.add_argument(
+        "--network",
+        type=str,
+        required=True,
+        choices=_network_choices,
+        help="The network to use. 'fetch' is a special case where Vero uses the network specs returned by the beacon node(s).",
+    )
     parser.add_argument(
         "--remote-signer-url", type=str, required=True, help="URL of the remote signer."
     )
@@ -193,6 +204,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             )
         ]
         return CLIArgs(
+            network=Network(parsed_args.network),
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
             beacon_node_urls=beacon_node_urls,
             beacon_node_urls_proposal=[

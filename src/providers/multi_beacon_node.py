@@ -52,6 +52,7 @@ from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
+from spec.configs import Network
 from spec.sync_committee import SyncCommitteeContributionClass
 
 (_ERRORS_METRIC,) = get_shared_metrics()
@@ -84,10 +85,13 @@ class MultiBeaconNode:
         ]
 
         self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
+        self.cli_args = cli_args
 
     async def initialize(self) -> None:
         # Attempt to fully initialize the connected beacon nodes
-        await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
+        await asyncio.gather(
+            *(bn.initialize_full(cli_args=self.cli_args) for bn in self.beacon_nodes)
+        )
 
         successfully_initialized = len([b for b in self.beacon_nodes if b.initialized])
         if successfully_initialized < self._attestation_consensus_threshold:
@@ -305,6 +309,11 @@ class MultiBeaconNode:
         start_time = asyncio.get_running_loop().time()
         remaining_timeout = timeout
 
+        # Only compare consensus block value on Gnosis Chain
+        # since the execution payload value is in a different
+        # currency (xDAI) and not easily comparable
+        _compare_consensus_block_value_only = self.cli_args.network in [Network.GNOSIS]
+
         while pending and remaining_timeout > 0:
             done, pending = await asyncio.wait(
                 pending,
@@ -321,9 +330,12 @@ class MultiBeaconNode:
                     )
                     continue
 
-                block_value = int(response.consensus_block_value) + int(
-                    response.execution_payload_value
-                )
+                if _compare_consensus_block_value_only:
+                    block_value = int(response.consensus_block_value)
+                else:
+                    block_value = int(response.consensus_block_value) + int(
+                        response.execution_payload_value
+                    )
 
                 if block_value > best_block_value:
                     best_block_value = block_value

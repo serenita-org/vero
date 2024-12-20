@@ -1,0 +1,48 @@
+# Mainnet config
+
+# Extends the mainnet preset
+PRESET_BASE: 'mainnet'
+
+# Free-form short name of the network that this configuration applies to - known
+# canonical network names include:
+# * 'mainnet' - there can be only one
+# * 'prater' - testnet
+# Must match the regex: [a-z0-9\-]
+CONFIG_NAME: 'mainnet'
+
+# Genesis
+# ---------------------------------------------------------------
+# Dec 1, 2020, 12pm UTC
+MIN_GENESIS_TIME: 1606824000
+GENESIS_FORK_VERSION: 0x00000000
+
+# Forking
+# ---------------------------------------------------------------
+# Some forks are disabled for now:
+#  - These may be re-assigned to another fork-version later
+#  - Temporarily set to max uint64 value: 2**64 - 1
+
+# Altair
+ALTAIR_FORK_VERSION: 0x01000000
+ALTAIR_FORK_EPOCH: 74240  # Oct 27, 2021, 10:56:23am UTC
+# Bellatrix
+BELLATRIX_FORK_VERSION: 0x02000000
+BELLATRIX_FORK_EPOCH: 144896  # Sept 6, 2022, 11:34:47am UTC
+# Capella
+CAPELLA_FORK_VERSION: 0x03000000
+CAPELLA_FORK_EPOCH: 194048  # April 12, 2023, 10:27:35pm UTC
+# Deneb
+DENEB_FORK_VERSION: 0x04000000
+DENEB_FORK_EPOCH: 269568  # March 13, 2024, 01:55:35pm UTC
+
+# Time parameters
+# ---------------------------------------------------------------
+# 12 seconds
+SECONDS_PER_SLOT: 12
+
+# phase0
+INTERVALS_PER_SLOT: 3
+TARGET_AGGREGATORS_PER_COMMITTEE: 16
+# altair
+TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE: 16
+SYNC_COMMITTEE_SUBNET_COUNT: 4

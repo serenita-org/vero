@@ -1,0 +1,46 @@
+PRESET_BASE: 'gnosis'
+
+# Free-form short name of the network that this configuration applies to - known
+# canonical network names include:
+# * 'mainnet' - there can be only one
+# * 'prater' - testnet
+# Must match the regex: [a-z0-9\-]
+CONFIG_NAME: 'gnosis'
+
+# Genesis
+# ---------------------------------------------------------------
+# Dec 08, 2021, 13:00 UTC
+MIN_GENESIS_TIME: 1638968400
+GENESIS_FORK_VERSION: 0x00000064
+
+
+# Forking
+# ---------------------------------------------------------------
+# Some forks are disabled for now:
+#  - These may be re-assigned to another fork-version later
+#  - Temporarily set to max uint64 value: 2**64 - 1
+
+# Altair
+ALTAIR_FORK_VERSION: 0x01000064
+ALTAIR_FORK_EPOCH: 512
+# Bellatrix
+BELLATRIX_FORK_VERSION: 0x02000064
+BELLATRIX_FORK_EPOCH: 385536  # 2022-11-30T19:23:40.000Z
+# Capella
+CAPELLA_FORK_VERSION: 0x03000064
+CAPELLA_FORK_EPOCH: 648704  # 2023-08-01T11:34:20.000Z
+# Deneb
+DENEB_FORK_VERSION: 0x04000064
+DENEB_FORK_EPOCH: 889856  # 2024-03-11T18:30:20.000Z
+
+# Time parameters
+# ---------------------------------------------------------------
+# 5 seconds
+SECONDS_PER_SLOT: 5
+
+# phase0
+INTERVALS_PER_SLOT: 3
+TARGET_AGGREGATORS_PER_COMMITTEE: 16
+# altair
+TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE: 16
+SYNC_COMMITTEE_SUBNET_COUNT: 4

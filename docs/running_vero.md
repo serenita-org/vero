@@ -37,6 +37,13 @@ Check out the [example docker compose file](../compose-example.yaml).
 
 # CLI Reference
 
+#### `--network`
+
+**[required]** The network to use, one of `mainnet,gnosis,holesky,fetch`.
+
+`fetch` is a special case where Vero uses the network specs as returned by the beacon nodes.
+___
+
 #### `--remote-signer-url`
 
 **[required]** URL of the remote signer, e.g. `http://remote-signer:9000`

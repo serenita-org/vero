@@ -3,6 +3,7 @@ from typing import Any
 import pytest
 
 from args import parse_cli_args
+from spec.configs import Network
 
 
 @pytest.mark.parametrize(
@@ -14,18 +15,20 @@ from args import parse_cli_args
     argvalues=[
         pytest.param(
             [],
-            "the following arguments are required: --remote-signer-url, --beacon-node-urls, --fee-recipient",
+            "the following arguments are required: --network, --remote-signer-url, --beacon-node-urls, --fee-recipient\n",
             {},
             id="No arguments provided",
         ),
         pytest.param(
             [
+                "--network=mainnet",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
             None,
             {
+                "network": Network.MAINNET,
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": [],
@@ -36,6 +39,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
@@ -53,6 +57,7 @@ from args import parse_cli_args
             ],
             None,
             {
+                "network": Network.FETCH,
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
@@ -72,23 +77,23 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
             None,
             {
-                "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": [
                     "http://beacon-node-1:5052",
                     "http://beacon-node-2:5052",
                 ],
-                "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             },
             id="--beacon-node-urls valid input - multiple values",
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=   ",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -99,6 +104,18 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=sepolia",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=   ",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "argument --network: invalid choice: 'sepolia'",
+            {},
+            id="--network invalid input - unsupported network",
+        ),
+        pytest.param(
+            [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052,http://beacon-node-1:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -109,6 +126,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
@@ -123,6 +141,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=asd",
@@ -134,6 +153,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=2",
@@ -145,6 +165,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=0",
@@ -156,6 +177,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c",
@@ -166,6 +188,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -176,6 +199,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0xGGGG96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -186,6 +210,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -197,6 +222,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -208,6 +234,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -219,6 +246,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -230,6 +258,7 @@ from args import parse_cli_args
         ),
         pytest.param(
             [
+                "--network=fetch",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
