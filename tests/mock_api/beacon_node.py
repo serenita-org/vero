@@ -413,11 +413,16 @@ def _mocked_beacon_node_endpoints(
             data_list = msgspec.json.decode(kwargs["data"])
             assert len(data_list) == 1
             data = data_list[0]
-            assert data["aggregation_bits"] == "0x000201"
+            assert (
+                data["data"]["beacon_block_root"]
+                == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
+            )
 
             if isinstance(spec, SpecElectra):
-                assert data["committee_bits"] == "0x0040000000000000"
+                assert "committee_index" in data
+                assert "attester_index" in data
             elif isinstance(spec, SpecDeneb):
+                assert data["aggregation_bits"] == "0x000201"
                 assert "committee_bits" not in data
             else:
                 raise ValueError(f"Unsupported spec: {spec}")

@@ -17,7 +17,7 @@ from opentelemetry.trace import (
 )
 from prometheus_client import Counter as CounterMetric
 from prometheus_client import Histogram
-from remerkleable.bitfields import Bitlist, Bitvector
+from remerkleable.bitfields import Bitlist
 
 from observability import ErrorType, get_shared_metrics
 from providers.multi_beacon_node import AttestationConsensusFailure
@@ -35,7 +35,6 @@ from spec.attestation import (
     AttestationPhase0,
 )
 from spec.common import (
-    MAX_COMMITTEES_PER_SLOT,
     MAX_VALIDATORS_PER_COMMITTEE,
     bytes_to_uint64,
     hash_function,
@@ -278,6 +277,7 @@ class AttestationService(ValidatorDutyService):
                     aggregation_bits[int(duty.validator_committee_index)] = True
 
                     if _fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
+                        # Attestation object from the CL spec
                         attestations_objects_to_publish.append(
                             dict(
                                 aggregation_bits=aggregation_bits.to_obj(),
@@ -289,17 +289,13 @@ class AttestationService(ValidatorDutyService):
                             ),
                         )
                     elif _fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-                        committee_bits = Bitvector[MAX_COMMITTEES_PER_SLOT](
-                            False for _ in range(MAX_COMMITTEES_PER_SLOT)
-                        )
-                        committee_bits[int(duty.committee_index)] = True
-
+                        # SingleAttestation object from the CL spec
                         attestations_objects_to_publish.append(
                             dict(
-                                aggregation_bits=aggregation_bits.to_obj(),
+                                committee_index=duty.committee_index,
+                                attester_index=duty.validator_index,
                                 data=att_data_obj,
                                 signature=signature,
-                                committee_bits=committee_bits.to_obj(),
                             ),
                         )
                     else:
@@ -483,9 +479,6 @@ class AttestationService(ValidatorDutyService):
                         )
                         identifiers.append(duty.pubkey)
                 elif isinstance(aggregate, AttestationElectra):
-                    # TODO we need to check the committee index differently now...
-                    # it's
-                    # probably like this but not sure yet
                     if aggregate.committee_bits[int(duty.committee_index)]:
                         aggregate_count += 1
                         messages.append(
