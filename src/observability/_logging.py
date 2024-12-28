@@ -20,4 +20,4 @@ def setup_logging(log_level: str) -> None:
     root_logger.setLevel(log_level)
     if log_level != logging.getLevelName(logging.DEBUG):
         # apscheduler is quite verbose with default INFO logging
-        logging.getLogger("apscheduler").setLevel(logging.ERROR)
+        logging.getLogger("apscheduler").setLevel(logging.WARNING)
