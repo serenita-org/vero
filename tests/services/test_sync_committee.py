@@ -47,6 +47,8 @@ async def test_produce_sync_message_if_not_yet_produced(
             validator_sync_committee_indices=["1", "3"],
         ),
     ]
+    sync_committee_service._last_slot_duty_started_for = 0
+    sync_committee_service._last_slot_duty_completed_for = 0
 
     sync_messages_published_before = _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES._value.get()
     await sync_committee_service.produce_sync_message_if_not_yet_produced(
@@ -58,6 +60,8 @@ async def test_produce_sync_message_if_not_yet_produced(
         _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES._value.get()
         == sync_messages_published_before + 1
     )
+    assert sync_committee_service._last_slot_duty_started_for == duty_slot
+    assert sync_committee_service._last_slot_duty_completed_for == duty_slot
 
 
 async def test_aggregate_sync_messages(

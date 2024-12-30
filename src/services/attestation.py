@@ -77,6 +77,45 @@ class AttestationService(ValidatorDutyService):
             self.update_duties, id=f"{self.__class__.__name__}.update_duties"
         )
 
+    @property
+    def next_duty_slot(self) -> int | None:
+        # In case a duty for the current slot has not finished yet, it is still
+        # considered the next duty slot
+        if self.has_ongoing_duty:
+            return self._last_slot_duty_started_for
+
+        current_slot = self.beacon_chain.current_slot
+        min_duty_slots_per_epoch = (
+            min(
+                (
+                    int(d.slot)
+                    for d in duties
+                    if int(d.slot) > self._last_slot_duty_started_for
+                    and int(d.slot) >= current_slot
+                ),
+                default=None,
+            )
+            for duties in self.attester_duties.values()
+            if duties
+        )
+        return min(
+            (slot for slot in min_duty_slots_per_epoch if slot is not None),
+            default=None,
+        )
+
+    @property
+    def next_duty_run_time(self) -> datetime.datetime | None:
+        next_duty_slot = self.next_duty_slot
+        if next_duty_slot is None:
+            return None
+
+        return self.beacon_chain.get_datetime_for_slot(
+            next_duty_slot
+        ) + datetime.timedelta(
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+        )
+
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             any(
@@ -120,12 +159,12 @@ class AttestationService(ValidatorDutyService):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not attesting")
 
-            if slot < self._last_slot_duty_performed_for:
+            if slot < self._last_slot_duty_started_for:
                 return
-            if slot == self._last_slot_duty_performed_for:
+            if slot == self._last_slot_duty_started_for:
                 if head_event:
                     self.logger.warning(
-                        f"Ignoring head event, already started attesting to slot {self._last_slot_duty_performed_for}",
+                        f"Ignoring head event, already started attesting to slot {self._last_slot_duty_started_for}",
                     )
                 return
             if slot != self.beacon_chain.current_slot:
@@ -136,8 +175,6 @@ class AttestationService(ValidatorDutyService):
                     f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
                 )
                 return
-
-            self._last_slot_duty_performed_for = slot
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
             slot_attester_duties = {
@@ -162,6 +199,7 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(
                 f"Attesting to slot {slot}, {len(slot_attester_duties)} duties",
             )
+            self._last_slot_duty_started_for = slot
             self._duty_start_time_metric.labels(
                 duty=ValidatorDuty.ATTESTATION.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
@@ -198,6 +236,7 @@ class AttestationService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.ATTESTATION_CONSENSUS.value,
                     ).inc()
+                    self._last_slot_duty_completed_for = slot
                     return
 
             consensus_time = asyncio.get_running_loop().time() - consensus_start
@@ -325,6 +364,8 @@ class AttestationService(ValidatorDutyService):
                     _VC_PUBLISHED_ATTESTATIONS.inc(
                         amount=len(attestations_objects_to_publish),
                     )
+                finally:
+                    self._last_slot_duty_completed_for = slot
 
     def prepare_and_aggregate_attestations(
         self,

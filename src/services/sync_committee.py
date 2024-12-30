@@ -53,6 +53,53 @@ class SyncCommitteeService(ValidatorDutyService):
             self.update_duties, id=f"{self.__class__.__name__}.update_duties"
         )
 
+    @property
+    def next_duty_slot(self) -> int | None:
+        # In case a duty for the current slot has not finished yet, it is still
+        # considered the next duty slot
+        if self.has_ongoing_duty:
+            return self._last_slot_duty_started_for
+
+        if len(self.sync_duties) == 0:
+            return None
+
+        # Cache property values
+        slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
+        current_epoch = self.beacon_chain.current_epoch
+        current_slot = self.beacon_chain.current_slot
+        next_epochs = {current_epoch, current_epoch + 1}
+
+        future_sync_duty_slots = set()
+
+        for period in self.sync_duties:
+            for epoch in range(
+                *self.beacon_chain.compute_epochs_for_sync_period(period)
+            ):
+                if epoch in next_epochs:
+                    epoch_start_slot = epoch * slots_per_epoch
+                    for i in range(slots_per_epoch):
+                        slot = epoch_start_slot + i
+                        if (
+                            slot > self._last_slot_duty_started_for
+                            and slot >= current_slot
+                        ):
+                            future_sync_duty_slots.add(slot)
+
+        return min(future_sync_duty_slots, default=None)
+
+    @property
+    def next_duty_run_time(self) -> datetime.datetime | None:
+        next_duty_slot = self.next_duty_slot
+        if next_duty_slot is None:
+            return None
+
+        return self.beacon_chain.get_datetime_for_slot(
+            next_duty_slot
+        ) + datetime.timedelta(
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+        )
+
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if not isinstance(event, SchemaBeaconAPI.HeadEvent):
             raise NotImplementedError(f"Expected HeadEvent but got {type(event)}")
@@ -71,12 +118,12 @@ class SyncCommitteeService(ValidatorDutyService):
                 "Slashing detected, not producing sync committee message",
             )
 
-        if duty_slot < self._last_slot_duty_performed_for:
+        if duty_slot < self._last_slot_duty_started_for:
             return
-        if duty_slot == self._last_slot_duty_performed_for:
+        if duty_slot == self._last_slot_duty_started_for:
             if head_event:
                 self.logger.warning(
-                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_performed_for}",
+                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_started_for}",
                 )
             return
         if duty_slot != self.beacon_chain.current_slot:
@@ -87,8 +134,6 @@ class SyncCommitteeService(ValidatorDutyService):
                 f"Invalid duty_slot for sync committee message: {duty_slot}. Current slot: {self.beacon_chain.current_slot}"
             )
             return
-
-        self._last_slot_duty_performed_for = duty_slot
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
         sync_period = self.beacon_chain.compute_sync_period_for_slot(duty_slot + 1)
@@ -117,6 +162,7 @@ class SyncCommitteeService(ValidatorDutyService):
         self.logger.debug(
             f"Producing sync message for slot {duty_slot} for {len(sync_committee_members)} validators, from head: {head_event is not None}",
         )
+        self._last_slot_duty_started_for = duty_slot
         self._duty_start_time_metric.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
@@ -217,6 +263,8 @@ class SyncCommitteeService(ValidatorDutyService):
             _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.inc(
                 amount=len(sync_committee_members),
             )
+        finally:
+            self._last_slot_duty_completed_for = duty_slot
 
     async def prepare_and_aggregate_sync_messages(
         self,

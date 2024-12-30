@@ -87,6 +87,12 @@ class BeaconChain:
     def compute_start_slot_at_epoch(self, epoch: int) -> int:
         return epoch * self.spec.SLOTS_PER_EPOCH  # type: ignore[no-any-return]
 
+    def compute_epochs_for_sync_period(self, sync_period: int) -> tuple[int, int]:
+        spec = self.spec  # Cache property value
+        start_epoch = sync_period * spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        end_epoch = start_epoch + spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        return start_epoch, end_epoch
+
     def compute_sync_period_for_epoch(self, epoch: int) -> int:
         return epoch // self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD  # type: ignore[no-any-return]
 

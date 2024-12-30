@@ -58,6 +58,8 @@ async def test_publish_block(
             slot=str(duty_slot),
         ),
     )
+    block_proposal_service._last_slot_duty_started_for = 0
+    block_proposal_service._last_slot_duty_completed_for = 0
 
     blocks_published_before = _VC_PUBLISHED_BLOCKS._value.get()
 
@@ -68,6 +70,8 @@ async def test_publish_block(
 
     assert any("Published block" in m for m in caplog.messages)
     assert _VC_PUBLISHED_BLOCKS._value.get() == blocks_published_before + 1
+    assert block_proposal_service._last_slot_duty_started_for == duty_slot
+    assert block_proposal_service._last_slot_duty_completed_for == duty_slot
 
 
 @pytest.mark.parametrize(
