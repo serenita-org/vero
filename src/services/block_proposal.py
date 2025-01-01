@@ -249,7 +249,9 @@ class BlockProposalService(ValidatorDutyService):
                 ],
             )
 
-            self.logger.info(f"Published validator registrations, count: {len(validator_batch)}")
+            self.logger.info(
+                f"Published validator registrations, count: {len(validator_batch)}"
+            )
 
     async def register_validators(self) -> None:
         next_run_time = None
