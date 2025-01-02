@@ -71,9 +71,12 @@ class SyncCommitteeService(ValidatorDutyService):
 
         future_sync_duty_slots = set()
 
-        for period in self.sync_duties:
+        for sync_period, sync_duties in self.sync_duties.items():
+            if len(sync_duties) == 0:
+                continue
+
             for epoch in range(
-                *self.beacon_chain.compute_epochs_for_sync_period(period)
+                *self.beacon_chain.compute_epochs_for_sync_period(sync_period)
             ):
                 if epoch in next_epochs:
                     epoch_start_slot = epoch * slots_per_epoch
