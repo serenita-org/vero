@@ -57,6 +57,8 @@ async def test_attest_if_not_yet_attested(
             selection_proof=os.urandom(96),
         ),
     )
+    attestation_service._last_slot_duty_started_for = 0
+    attestation_service._last_slot_duty_completed_for = 0
 
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
 
@@ -66,6 +68,8 @@ async def test_attest_if_not_yet_attested(
 
     assert any("Published attestations" in m for m in caplog.messages)
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1
+    assert attestation_service._last_slot_duty_started_for == duty_slot
+    assert attestation_service._last_slot_duty_completed_for == duty_slot
 
 
 @pytest.mark.parametrize(

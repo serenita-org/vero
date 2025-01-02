@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import logging
 from enum import Enum
@@ -75,15 +76,25 @@ class ValidatorDutyService:
         self.logger.setLevel(logging.getLogger().level)
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
+        # Keeps track of the last slot for which this service started performing its
+        # duty.
+        # Prevents us from trying to perform the duty for the same slot twice.
+        # Performing a slashable duty twice would fail because of the remote
+        # signer's slashing protection but we can try to prevent the attempt
+        # at signing too.
+        self._last_slot_duty_started_for = -1
+
         # Keeps track of the last slot for which this
-        # service performed its duty.
-        # Prevents us from trying to perform the duty
-        # for the same slot twice.
-        # Performing a slashable duty twice would fail
-        # because of the remote signer's slashing
-        # protection but we can try to prevent the
-        # attempted signing too.
-        self._last_slot_duty_performed_for = -1
+        # service completed performing its duty.
+        # Allows us to wait for a duty to be completed
+        # before taking further actions (e.g. shutting down).
+        self._last_slot_duty_completed_for = -1
+
+        # This variable defines the interval (in seconds) before a validator duty is
+        # scheduled (/or ongoing) during which an immediate shutdown is deferred.
+        # Instead of shutting down immediately, Vero will wait for the
+        # duty to complete, minimizing the risk of missing a scheduled duty.
+        self._shutdown_defer_interval = 3
 
     def start(self) -> None:
         # Every service should start its
@@ -102,6 +113,50 @@ class ValidatorDutyService:
             id=f"{self.__class__.__name__}.update_duties",
             replace_existing=True,
         )
+
+    @property
+    def has_ongoing_duty(self) -> bool:
+        return (
+            self._last_slot_duty_completed_for < self._last_slot_duty_started_for
+            and self._last_slot_duty_started_for == self.beacon_chain.current_slot
+        )
+
+    @property
+    def next_duty_slot(self) -> int | None:
+        raise NotImplementedError
+
+    @property
+    def next_duty_run_time(self) -> datetime.datetime | None:
+        raise NotImplementedError
+
+    @property
+    def has_upcoming_duty(self) -> bool:
+        next_duty_run_time = self.next_duty_run_time  # Cache the property value
+        if next_duty_run_time is None:
+            return False
+
+        time_to_next_duty_run_time = (
+            next_duty_run_time - datetime.datetime.now(pytz.utc)
+        ).total_seconds()
+        return time_to_next_duty_run_time < self._shutdown_defer_interval
+
+    async def wait_for_duty_completion(self) -> None:
+        """
+        This functions waits until any upcoming validator duty
+        is performed.
+        """
+        if not (self.has_ongoing_duty or self.has_upcoming_duty):
+            return
+
+        slot_to_complete_duty_for = self.next_duty_slot
+        if slot_to_complete_duty_for is None:
+            return
+        self.logger.info(
+            f"Waiting for validator duty to be completed (slot {slot_to_complete_duty_for})"
+        )
+        while self._last_slot_duty_completed_for < slot_to_complete_duty_for:  # noqa: ASYNC110
+            await asyncio.sleep(0.01)
+        self.logger.info("Validator duty completed")
 
     async def _update_duties(self) -> None:
         raise NotImplementedError

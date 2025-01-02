@@ -104,6 +104,10 @@ class EventConsumerService:
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            # Expected to happen when Vero shuts down
+            self.logger.info("Stopped event consumer")
+            return
 
         self.scheduler.add_job(
             self.handle_events,

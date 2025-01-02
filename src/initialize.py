@@ -15,6 +15,7 @@ from services import (
     BlockProposalService,
     EventConsumerService,
     SyncCommitteeService,
+    ValidatorDutyService,
     ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
 )
@@ -94,13 +95,12 @@ def check_data_dir_permissions(data_dir: Path) -> None:
         )
 
 
-async def run_services(cli_args: CLIArgs) -> None:
-    scheduler = AsyncIOScheduler(
-        timezone=pytz.UTC,
-        job_defaults=dict(misfire_grace_time=None),
-    )
-    scheduler.start()
-
+async def run_services(
+    cli_args: CLIArgs,
+    scheduler: AsyncIOScheduler,
+    validator_duty_services: list[ValidatorDutyService],
+    shutdown_event: asyncio.Event,
+) -> None:
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(
@@ -145,6 +145,7 @@ async def run_services(cli_args: CLIArgs) -> None:
             sync_committee_service,
         ):
             service.start()
+            validator_duty_services.append(service)
         _logger.info("Started validator duty services")
 
         event_consumer_service = EventConsumerService(
@@ -163,4 +164,6 @@ async def run_services(cli_args: CLIArgs) -> None:
         event_consumer_service.start()
 
         # Run forever while monitoring the event loop
-        await monitor_event_loop(beacon_chain=beacon_chain)
+        await monitor_event_loop(
+            beacon_chain=beacon_chain, shutdown_event=shutdown_event
+        )

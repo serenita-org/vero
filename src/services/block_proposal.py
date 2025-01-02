@@ -9,8 +9,6 @@ from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
     SpanContext,
-    Status,
-    StatusCode,
     TraceFlags,
 )
 from prometheus_client import Counter
@@ -36,6 +34,11 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
+        # Give a bit more headroom for block proposals since they are rare and valuable.
+        # If there's less than this many seconds remaining until the next
+        # block proposal duty, shutdown is deferred until the duty is completed.
+        self._shutdown_defer_interval = 6
+
         # Proposer duty by epoch
         self.proposer_duties: defaultdict[int, set[SchemaBeaconAPI.ProposerDuty]] = (
             defaultdict(set)
@@ -55,6 +58,40 @@ class BlockProposalService(ValidatorDutyService):
                 self.register_validators,
                 id=f"{self.__class__.__name__}.register_validators",
             )
+
+    @property
+    def next_duty_slot(self) -> int | None:
+        # In case a duty for the current slot has not finished yet, it is still
+        # considered the next duty slot
+        if self.has_ongoing_duty:
+            return self._last_slot_duty_started_for
+
+        current_slot = self.beacon_chain.current_slot
+        min_duty_slots_per_epoch = (
+            min(
+                (
+                    int(d.slot)
+                    for d in duties
+                    if int(d.slot) > self._last_slot_duty_started_for
+                    and int(d.slot) > current_slot
+                ),
+                default=None,
+            )
+            for duties in self.proposer_duties.values()
+            if duties
+        )
+        return min(
+            (slot for slot in min_duty_slots_per_epoch if slot is not None),
+            default=None,
+        )
+
+    @property
+    def next_duty_run_time(self) -> datetime.datetime | None:
+        next_duty_slot = self.next_duty_slot
+        if next_duty_slot is None:
+            return None
+
+        return self.beacon_chain.get_datetime_for_slot(next_duty_slot)
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
@@ -304,9 +341,9 @@ class BlockProposalService(ValidatorDutyService):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not producing block")
 
-            if slot <= self._last_slot_duty_performed_for:
+            if slot <= self._last_slot_duty_started_for:
                 self.logger.debug(
-                    f"Not producing block for slot {slot} (already produced a block for slot {self._last_slot_duty_performed_for})",
+                    f"Not producing block for slot {slot} (already started producing a block for slot {self._last_slot_duty_started_for})",
                 )
                 return
             if slot != self.beacon_chain.current_slot:
@@ -317,8 +354,6 @@ class BlockProposalService(ValidatorDutyService):
                     f"Invalid slot for block proposal: {slot}. Current slot: {self.beacon_chain.current_slot}"
                 )
                 return
-
-            self._last_slot_duty_performed_for = slot
 
             epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
             slot_proposer_duties = {
@@ -332,134 +367,142 @@ class BlockProposalService(ValidatorDutyService):
                 self.logger.debug(f"No remaining proposer duties for slot {slot}")
                 return
 
+            if len(slot_proposer_duties) != 1:
+                raise ValueError(
+                    f"Unexpected number of proposer duties ({len(slot_proposer_duties)}): {slot_proposer_duties}"
+                )
+
+            duty = slot_proposer_duties.pop()
+
             self.logger.info(f"Producing block for slot {slot}")
+            self._last_slot_duty_started_for = slot
             self._duty_start_time_metric.labels(
                 duty=ValidatorDuty.BLOCK_PROPOSAL.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-            for duty in slot_proposer_duties:
-                with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.sign_randao",
-                ) as sign_randao_span:
-                    try:
-                        _, randao_reveal, _ = await self.remote_signer.sign(
-                            message=SchemaRemoteSigner.RandaoRevealSignableMessage(
-                                fork_info=self.beacon_chain.get_fork_info(slot=slot),
-                                randao_reveal=SchemaRemoteSigner.RandaoReveal(
-                                    epoch=int(epoch),
-                                ),
+            with self.tracer.start_as_current_span(
+                name=f"{self.__class__.__name__}.sign_randao",
+            ):
+                try:
+                    _, randao_reveal, _ = await self.remote_signer.sign(
+                        message=SchemaRemoteSigner.RandaoRevealSignableMessage(
+                            fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                            randao_reveal=SchemaRemoteSigner.RandaoReveal(
+                                epoch=int(epoch),
                             ),
-                            identifier=duty.pubkey,
-                        )
-                    except Exception as e:
-                        _ERRORS_METRIC.labels(
-                            error_type=ErrorType.SIGNATURE.value,
-                        ).inc()
-                        self.logger.error(
-                            f"Failed to get signature for RANDAO reveal: {e!r}",
-                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
-                        )
-                        sign_randao_span.set_status(Status(StatusCode.ERROR))
-                        sign_randao_span.record_exception(e)
-                        continue
+                        ),
+                        identifier=duty.pubkey,
+                    )
+                except Exception as e:
+                    _ERRORS_METRIC.labels(
+                        error_type=ErrorType.SIGNATURE.value,
+                    ).inc()
+                    self.logger.error(
+                        f"Failed to get signature for RANDAO reveal: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
+                    self._last_slot_duty_completed_for = slot
+                    raise
 
-                with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.produce_block",
-                ):
-                    try:
-                        (
-                            beacon_block,
-                            full_response,
-                        ) = await self.multi_beacon_node.produce_block_v3(
-                            slot=slot,
-                            graffiti=self.cli_args.graffiti,
-                            builder_boost_factor=self.cli_args.builder_boost_factor,
-                            randao_reveal=randao_reveal,
-                        )
-                    except Exception as e:
-                        _ERRORS_METRIC.labels(
-                            error_type=ErrorType.BLOCK_PRODUCE.value,
-                        ).inc()
-                        self.logger.error(
-                            f"Failed to produce block: {e!r}",
-                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
-                        )
-                        return
+            with self.tracer.start_as_current_span(
+                name=f"{self.__class__.__name__}.produce_block",
+            ):
+                try:
+                    (
+                        beacon_block,
+                        full_response,
+                    ) = await self.multi_beacon_node.produce_block_v3(
+                        slot=slot,
+                        graffiti=self.cli_args.graffiti,
+                        builder_boost_factor=self.cli_args.builder_boost_factor,
+                        randao_reveal=randao_reveal,
+                    )
+                except Exception as e:
+                    _ERRORS_METRIC.labels(
+                        error_type=ErrorType.BLOCK_PRODUCE.value,
+                    ).inc()
+                    self.logger.error(
+                        f"Failed to produce block: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
+                    self._last_slot_duty_completed_for = slot
+                    raise
 
-                beacon_block_header = BeaconBlockHeader(
-                    slot=beacon_block.slot,
-                    proposer_index=beacon_block.proposer_index,
-                    parent_root=beacon_block.parent_root,
-                    state_root=beacon_block.state_root,
-                    body_root=beacon_block.body.hash_tree_root(),
-                )
+            beacon_block_header = BeaconBlockHeader(
+                slot=beacon_block.slot,
+                proposer_index=beacon_block.proposer_index,
+                parent_root=beacon_block.parent_root,
+                state_root=beacon_block.state_root,
+                body_root=beacon_block.body.hash_tree_root(),
+            )
 
-                with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.sign_block",
-                ) as sign_block_span:
-                    try:
-                        _, signature, _ = await self.remote_signer.sign(
-                            message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
-                                fork_info=self.beacon_chain.get_fork_info(slot=slot),
-                                beacon_block=SchemaRemoteSigner.BeaconBlock(
-                                    version=SchemaRemoteSigner.BeaconBlockVersion[
-                                        full_response.version.value.upper()
-                                    ],
-                                    block_header=beacon_block_header.to_obj(),
-                                ),
+            with self.tracer.start_as_current_span(
+                name=f"{self.__class__.__name__}.sign_block",
+            ):
+                try:
+                    _, signature, _ = await self.remote_signer.sign(
+                        message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
+                            fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                            beacon_block=SchemaRemoteSigner.BeaconBlock(
+                                version=SchemaRemoteSigner.BeaconBlockVersion[
+                                    full_response.version.value.upper()
+                                ],
+                                block_header=beacon_block_header.to_obj(),
                             ),
-                            identifier=duty.pubkey,
-                        )
-                    except Exception as e:
-                        _ERRORS_METRIC.labels(
-                            error_type=ErrorType.SIGNATURE.value,
-                        ).inc()
-                        self.logger.error(
-                            f"Failed to get signature for block: {e!r}",
-                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
-                        )
-                        sign_block_span.set_status(Status(StatusCode.ERROR))
-                        sign_block_span.record_exception(e)
-                        continue
+                        ),
+                        identifier=duty.pubkey,
+                    )
+                except Exception as e:
+                    _ERRORS_METRIC.labels(
+                        error_type=ErrorType.SIGNATURE.value,
+                    ).inc()
+                    self.logger.error(
+                        f"Failed to get signature for block: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
+                    self._last_slot_duty_completed_for = slot
+                    raise
 
-                self.logger.info(
-                    f"Publishing block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
-                )
-                self._duty_submission_time_metric.labels(
-                    duty=ValidatorDuty.BLOCK_PROPOSAL.value,
-                ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
+            self.logger.info(
+                f"Publishing block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
+            )
+            self._duty_submission_time_metric.labels(
+                duty=ValidatorDuty.BLOCK_PROPOSAL.value,
+            ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-                with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.publish_block",
-                ):
-                    try:
-                        if not full_response.execution_payload_blinded:
-                            await self.multi_beacon_node.publish_block_v2(
-                                block_version=full_response.version,
-                                block=beacon_block,
-                                blobs=full_response.data.get("blobs", []),
-                                kzg_proofs=full_response.data.get("kzg_proofs", []),
-                                signature=signature,
-                            )
-                        else:
-                            # Blinded block
-                            await self.multi_beacon_node.publish_blinded_block_v2(
-                                block_version=full_response.version,
-                                block=beacon_block,
-                                signature=signature,
-                            )
-                    except Exception as e:
-                        _ERRORS_METRIC.labels(
-                            error_type=ErrorType.BLOCK_PUBLISH.value,
-                        ).inc()
-                        self.logger.error(
-                            f"Failed to publish block for slot {slot}: {e!r}",
-                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            with self.tracer.start_as_current_span(
+                name=f"{self.__class__.__name__}.publish_block",
+            ):
+                try:
+                    if not full_response.execution_payload_blinded:
+                        await self.multi_beacon_node.publish_block_v2(
+                            block_version=full_response.version,
+                            block=beacon_block,
+                            blobs=full_response.data.get("blobs", []),
+                            kzg_proofs=full_response.data.get("kzg_proofs", []),
+                            signature=signature,
                         )
-                        raise
                     else:
-                        self.logger.info(
-                            f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
+                        # Blinded block
+                        await self.multi_beacon_node.publish_blinded_block_v2(
+                            block_version=full_response.version,
+                            block=beacon_block,
+                            signature=signature,
                         )
+                except Exception as e:
+                    _ERRORS_METRIC.labels(
+                        error_type=ErrorType.BLOCK_PUBLISH.value,
+                    ).inc()
+                    self.logger.error(
+                        f"Failed to publish block for slot {slot}: {e!r}",
+                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                    )
+                    raise
+                else:
+                    self.logger.info(
+                        f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
+                    )
 
-                        _VC_PUBLISHED_BLOCKS.inc()
+                    _VC_PUBLISHED_BLOCKS.inc()
+                finally:
+                    self._last_slot_duty_completed_for = slot

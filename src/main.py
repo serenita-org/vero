@@ -1,13 +1,21 @@
 import asyncio
+import functools
 import logging
 import signal
 import sys
 from pathlib import Path
-from types import FrameType
+from typing import TYPE_CHECKING
+
+import pytz
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs, parse_cli_args
 from initialize import check_data_dir_permissions, run_services
 from observability import get_service_commit, get_service_version, init_observability
+
+if TYPE_CHECKING:
+    from services import ValidatorDutyService
+from shutdown import shutdown_handler
 
 
 def prep_datadir(data_dir: Path) -> None:
@@ -27,12 +35,36 @@ async def main(cli_args: CLIArgs) -> None:
     )
     check_data_dir_permissions(data_dir=Path(cli_args.data_dir))
     prep_datadir(data_dir=Path(cli_args.data_dir))
-    await run_services(cli_args=cli_args)
 
+    scheduler = AsyncIOScheduler(
+        timezone=pytz.UTC,
+        job_defaults=dict(
+            coalesce=True,  # default value
+            max_instances=1,  # default value
+            misfire_grace_time=None,  # default is 1 second
+        ),
+    )
+    scheduler.start()
 
-def sigterm_handler(_signum: int, _frame: FrameType | None) -> None:
-    logging.getLogger().info("Received SIGTERM. Exiting.")
-    sys.exit(0)
+    validator_duty_services: list[ValidatorDutyService] = []
+
+    loop = asyncio.get_running_loop()
+    signals = (signal.SIGINT, signal.SIGTERM)
+    shutdown_event = asyncio.Event()
+    for s in signals:
+        loop.add_signal_handler(
+            s,
+            functools.partial(
+                shutdown_handler, s, validator_duty_services, shutdown_event
+            ),
+        )
+
+    await run_services(
+        cli_args=cli_args,
+        scheduler=scheduler,
+        validator_duty_services=validator_duty_services,
+        shutdown_event=shutdown_event,
+    )
 
 
 if __name__ == "__main__":
@@ -43,12 +75,4 @@ if __name__ == "__main__":
         metrics_multiprocess_mode=cli_args.metrics_multiprocess_mode,
         log_level=cli_args.log_level,
     )
-
-    signal.signal(signal.SIGTERM, sigterm_handler)
-
-    # Execution will block here until Ctrl+C (Ctrl+Break on Windows) is pressed.
-    try:
-        asyncio.run(main(cli_args=cli_args))
-    except (KeyboardInterrupt, SystemExit):
-        logger = logging.getLogger("vero-shutdown")
-        logger.info("Shutting down...")
+    asyncio.run(main(cli_args=cli_args))

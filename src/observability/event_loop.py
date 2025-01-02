@@ -17,14 +17,16 @@ EVENT_LOOP_TASKS = Gauge(
 )
 
 
-async def monitor_event_loop(beacon_chain: BeaconChain) -> None:
+async def monitor_event_loop(
+    beacon_chain: BeaconChain, shutdown_event: asyncio.Event
+) -> None:
     _logger = logging.getLogger("event-loop")
     event_loop = asyncio.get_running_loop()
     _start = event_loop.time()
     _interval = 0.1  # Check every 100 milliseconds
     _loop_lag_high_threshold = 0.5  # 500 milliseconds
 
-    while True:
+    while not shutdown_event.is_set():
         await asyncio.sleep(_interval)
         lag = event_loop.time() - _start - _interval
         if lag > _loop_lag_high_threshold:

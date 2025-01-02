@@ -2,6 +2,14 @@ services:
   validator-client:
     container_name: validator-client
     image: ghcr.io/serenita-org/vero:v0.9.0
+    # It's recommended to set the `stop_grace_period` value
+    # (or equivalent, e.g. `terminationGracePeriodSeconds` in k8s)
+    # to at least 30 seconds.
+    # This is because Vero defers the shutdown process if it detects
+    # an upcoming validator duty, opting to complete the duty before
+    # shutting down.
+    # This feature can make the shutdown process take several seconds.
+    stop_grace_period: 1m
     command:
       - "--network=holesky"
       - "--remote-signer-url=http://remote-signer:9000"
