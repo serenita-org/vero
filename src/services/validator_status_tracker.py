@@ -178,7 +178,7 @@ class ValidatorStatusTrackerService:
             f" {len(withdrawal_pubkeys)} withdrawal,"
             f" {len(unknown_pubkeys)} unknown.",
         )
-        _VALIDATORS_COUNT.labels(status="unknown").set(len(withdrawal_pubkeys))
+        _VALIDATORS_COUNT.labels(status="unknown").set(len(unknown_pubkeys))
         _VALIDATORS_COUNT.labels(status="pending").set(len(pending_pubkeys))
         _VALIDATORS_COUNT.labels(status="active").set(len(active_pubkeys))
         _VALIDATORS_COUNT.labels(status="exited").set(len(exited_pubkeys))
