@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 2,
+  "id": 38,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -433,6 +433,7 @@
         "y": 5
       },
       "id": 34,
+      "interval": "1m",
       "maxDataPoints": 50,
       "options": {
         "legend": {
@@ -504,6 +505,51 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "exited"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "withdrawal"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unknown"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -540,28 +586,39 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "validator_status{instance=\"$instance\", status!=\"other\"}",
+          "expr": "validator_status{instance=\"$instance\"}",
           "instant": false,
           "legendFormat": "{{status}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "validator_status{instance=\"$instance\", status=\"other\"}",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "{{status}}",
-          "range": true,
-          "refId": "B"
         }
       ],
       "title": "Validators",
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "includeByName": {},
+            "indexByName": {
+              "Time": 0,
+              "active": 3,
+              "exited": 4,
+              "pending": 2,
+              "unknown": 1,
+              "withdrawal": 5
+            },
+            "renameByName": {}
+          }
+        }
+      ],
       "type": "stat"
     },
     {
@@ -1039,6 +1096,6 @@
   "timezone": "",
   "title": "Vero - Simple",
   "uid": "f3868b92-83fd-43a3-8e18-a74f35169590",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

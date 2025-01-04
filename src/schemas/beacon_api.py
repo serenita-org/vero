@@ -18,11 +18,15 @@ class ExecutionOptimisticResponse(msgspec.Struct):
 
 
 class ValidatorStatus(Enum):
+    PENDING_INITIALIZED = "pending_initialized"
+    PENDING_QUEUED = "pending_queued"
     ACTIVE_ONGOING = "active_ongoing"
     ACTIVE_EXITING = "active_exiting"
     ACTIVE_SLASHED = "active_slashed"
-    PENDING_INITIALIZED = "pending_initialized"
-    PENDING_QUEUED = "pending_queued"
+    EXITED_UNSLASHED = "exited_unslashed"
+    EXITED_SLASHED = "exited_slashed"
+    WITHDRAWAL_POSSIBLE = "withdrawal_possible"
+    WITHDRAWAL_DONE = "withdrawal_done"
 
 
 class Validator(msgspec.Struct):

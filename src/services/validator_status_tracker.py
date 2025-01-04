@@ -7,8 +7,10 @@ from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
+    EXITED_STATUSES,
     PENDING_STATUSES,
     SLASHED_STATUSES,
+    WITHDRAWAL_STATUSES,
 )
 
 _VALIDATORS_COUNT = Gauge(
@@ -51,7 +53,7 @@ class ValidatorStatusTrackerService:
         # If we fail to retrieve our validator statuses, it doesn't make sense
         # to continue initializing the validator client since we don't know
         # which validators to retrieve duties for.
-        await self._update_validator_statuses()
+        await self._update_validator_statuses(minimal_update=True)
         self.scheduler.add_job(
             self.update_validator_statuses,
             id=f"{self.__class__.__name__}.update_validator_statuses",
@@ -106,7 +108,12 @@ class ValidatorStatusTrackerService:
         else:
             raise NotImplementedError(f"Unexpected event type {type(event)}")
 
-    async def _update_validator_statuses(self) -> None:
+    async def _update_validator_statuses(self, minimal_update: bool = False) -> None:
+        """
+        With minimal_update enabled, this function only fetches the slashed,
+        active and pending validators in order to return as quickly as possible.
+        """
+
         self.logger.debug("Updating validator statuses")
 
         remote_signer_pubkeys = set(await self.remote_signer.get_public_keys())
@@ -134,25 +141,48 @@ class ValidatorStatusTrackerService:
         )
         pending_pubkeys = {v.pubkey for v in self.pending_validators}
 
-        # Pubkeys with no active/pending validator
-        other_status_pubkeys = {
-            pk
-            for pk in remote_signer_pubkeys
-            if pk not in active_pubkeys | pending_pubkeys
-        }
+        if len(active_pubkeys | pending_pubkeys) == 0:
+            self.logger.warning("No active or pending validators detected")
+
+        if minimal_update:
+            return
+
+        self.exited_validators = await self.multi_beacon_node.get_validators(
+            ids=list(remote_signer_pubkeys - active_pubkeys - pending_pubkeys),
+            statuses=EXITED_STATUSES,
+        )
+        exited_pubkeys = {v.pubkey for v in self.exited_validators}
+
+        self.withdrawal_validators = await self.multi_beacon_node.get_validators(
+            ids=list(
+                remote_signer_pubkeys
+                - active_pubkeys
+                - pending_pubkeys
+                - exited_pubkeys
+            ),
+            statuses=WITHDRAWAL_STATUSES,
+        )
+        withdrawal_pubkeys = {v.pubkey for v in self.withdrawal_validators}
+
+        # Pubkeys not known on the beacon chain (not deposited to yet)
+        known_pubkeys = (
+            active_pubkeys | pending_pubkeys | exited_pubkeys | withdrawal_pubkeys
+        )
+        unknown_pubkeys = remote_signer_pubkeys - known_pubkeys
 
         self.logger.debug(
             f"Updated validator statuses."
             f" {len(active_pubkeys)} active,"
             f" {len(pending_pubkeys)} pending,"
-            f" {len(other_status_pubkeys)} others.",
+            f" {len(exited_pubkeys)} exited,"
+            f" {len(withdrawal_pubkeys)} withdrawal,"
+            f" {len(unknown_pubkeys)} unknown.",
         )
-        _VALIDATORS_COUNT.labels(status="active").set(len(active_pubkeys))
+        _VALIDATORS_COUNT.labels(status="unknown").set(len(withdrawal_pubkeys))
         _VALIDATORS_COUNT.labels(status="pending").set(len(pending_pubkeys))
-        _VALIDATORS_COUNT.labels(status="other").set(len(other_status_pubkeys))
-
-        if len(self.active_validators + self.pending_validators) == 0:
-            self.logger.warning("No active or pending validators detected")
+        _VALIDATORS_COUNT.labels(status="active").set(len(active_pubkeys))
+        _VALIDATORS_COUNT.labels(status="exited").set(len(exited_pubkeys))
+        _VALIDATORS_COUNT.labels(status="withdrawal").set(len(withdrawal_pubkeys))
 
     async def update_validator_statuses(self) -> None:
         try:
