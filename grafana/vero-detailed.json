@@ -1156,7 +1156,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 19
+            "y": 27
           },
           "id": 28,
           "options": {
@@ -1289,7 +1289,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 26
+            "y": 34
           },
           "id": 33,
           "maxDataPoints": 50,
@@ -1357,7 +1357,7 @@
             "h": 14,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 42
           },
           "id": 19,
           "maxDataPoints": 50,
@@ -1432,6 +1432,7 @@
                 "axisColorMode": "text",
                 "axisLabel": "",
                 "axisPlacement": "auto",
+                "axisSoftMin": 0,
                 "barAlignment": 0,
                 "drawStyle": "line",
                 "fillOpacity": 60,
@@ -1478,7 +1479,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 48
+            "y": 56
           },
           "id": 273,
           "options": {
@@ -1537,7 +1538,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 48
+            "y": 56
           },
           "id": 274,
           "options": {
@@ -1706,7 +1707,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 27
+            "y": 35
           },
           "id": 230,
           "maxDataPoints": 100,
@@ -1877,7 +1878,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 27
+            "y": 35
           },
           "id": 214,
           "maxDataPoints": 100,
@@ -2048,7 +2049,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 27
+            "y": 35
           },
           "id": 215,
           "maxDataPoints": 100,
@@ -2219,7 +2220,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 27
+            "y": 35
           },
           "id": 216,
           "maxDataPoints": 100,
@@ -2390,7 +2391,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 27
+            "y": 35
           },
           "id": 217,
           "maxDataPoints": 100,
@@ -2476,7 +2477,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 33
+            "y": 41
           },
           "id": 24,
           "maxDataPoints": 10,
@@ -2559,7 +2560,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 33
+            "y": 41
           },
           "id": 18,
           "maxDataPoints": 10,
@@ -2642,7 +2643,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 33
+            "y": 41
           },
           "id": 22,
           "maxDataPoints": 10,
@@ -2725,7 +2726,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 33
+            "y": 41
           },
           "id": 26,
           "maxDataPoints": 10,
@@ -2808,7 +2809,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 33
+            "y": 41
           },
           "id": 23,
           "maxDataPoints": 10,
@@ -2990,7 +2991,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 53
+            "y": 61
           },
           "id": 181,
           "maxDataPoints": 100,
@@ -3161,7 +3162,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 53
+            "y": 61
           },
           "id": 198,
           "maxDataPoints": 100,
@@ -3332,7 +3333,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 53
+            "y": 61
           },
           "id": 199,
           "maxDataPoints": 100,
@@ -3503,7 +3504,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 53
+            "y": 61
           },
           "id": 200,
           "maxDataPoints": 100,
@@ -3674,7 +3675,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 53
+            "y": 61
           },
           "id": 201,
           "maxDataPoints": 100,
@@ -3760,7 +3761,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 59
+            "y": 67
           },
           "id": 82,
           "maxDataPoints": 10,
@@ -3843,7 +3844,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 59
+            "y": 67
           },
           "id": 83,
           "maxDataPoints": 10,
@@ -3926,7 +3927,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 59
+            "y": 67
           },
           "id": 84,
           "maxDataPoints": 10,
@@ -4009,7 +4010,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 59
+            "y": 67
           },
           "id": 85,
           "maxDataPoints": 10,
@@ -4092,7 +4093,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 59
+            "y": 67
           },
           "id": 86,
           "maxDataPoints": 10,
@@ -4190,7 +4191,7 @@
             "h": 4,
             "w": 4,
             "x": 0,
-            "y": 38
+            "y": 30
           },
           "id": 131,
           "options": {
@@ -4280,7 +4281,7 @@
                   }
                 ]
               },
-              "unit": "none"
+              "unit": "reqpm"
             },
             "overrides": []
           },
@@ -4288,9 +4289,10 @@
             "h": 20,
             "w": 10,
             "x": 4,
-            "y": 38
+            "y": 30
           },
           "id": 7,
+          "interval": "1m",
           "maxDataPoints": 100,
           "options": {
             "legend": {
@@ -4312,14 +4314,14 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(increase(requests_total{service_type=\"beacon_node\", host=~\"$beacon_node_host\", instance=\"$instance\"}[$__interval])) by (status, method, path)",
+              "expr": "60 * sum(rate(requests_total{service_type=\"beacon_node\", host=~\"$beacon_node_host\", instance=\"$instance\"}[$__rate_interval])) by (status, method, path)",
               "instant": false,
               "legendFormat": "{{status}} {{method}} {{path}}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Requests [$__interval]",
+          "title": "Request Rate",
           "type": "timeseries"
         },
         {
@@ -4383,7 +4385,7 @@
             "h": 20,
             "w": 10,
             "x": 14,
-            "y": 38
+            "y": 30
           },
           "id": 39,
           "maxDataPoints": 100,
@@ -4487,7 +4489,7 @@
             "h": 16,
             "w": 4,
             "x": 0,
-            "y": 42
+            "y": 34
           },
           "id": 60,
           "options": {
@@ -4580,7 +4582,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 58
+            "y": 50
           },
           "id": 243,
           "options": {
@@ -4674,7 +4676,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 58
+            "y": 50
           },
           "id": 256,
           "options": {
@@ -4759,9 +4761,10 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 66
+            "y": 58
           },
           "id": 49,
+          "interval": "1m",
           "maxDataPoints": 100,
           "options": {
             "colWidth": 0.9,
@@ -4873,7 +4876,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 118
+            "y": 67
           },
           "id": 69,
           "maxDataPoints": 100,
@@ -4969,7 +4972,7 @@
                   }
                 ]
               },
-              "unit": "none"
+              "unit": "reqpm"
             },
             "overrides": []
           },
@@ -4977,7 +4980,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 118
+            "y": 67
           },
           "id": 42,
           "maxDataPoints": 100,
@@ -5001,7 +5004,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(increase(requests_total{service_type=\"remote_signer\", instance=\"$instance\"}[$__interval])) by (status, method, path)",
+              "expr": "60 * sum(rate(requests_total{service_type=\"remote_signer\", instance=\"$instance\"}[$__rate_interval])) by (status, method, path)",
               "instant": false,
               "interval": "",
               "legendFormat": "{{status}} {{method}} {{path}}",
@@ -5009,7 +5012,7 @@
               "refId": "A"
             }
           ],
-          "title": "Requests [$__interval]",
+          "title": "Request Rate",
           "type": "timeseries"
         },
         {
@@ -5064,7 +5067,7 @@
                   }
                 ]
               },
-              "unit": "none"
+              "unit": "mpm"
             },
             "overrides": []
           },
@@ -5072,7 +5075,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 125
+            "y": 74
           },
           "id": 41,
           "maxDataPoints": 100,
@@ -5097,7 +5100,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "increase(signed_messages_total{instance=\"$instance\"}[$__interval])",
+              "expr": "60 * rate(signed_messages_total{instance=\"$instance\"}[$__rate_interval])",
               "instant": false,
               "interval": "",
               "legendFormat": "{{ signable_message_type }}",
@@ -5105,7 +5108,7 @@
               "refId": "A"
             }
           ],
-          "title": "Signed Messages [$__interval]",
+          "title": "Signed Message Rate",
           "transformations": [
             {
               "id": "renameByRegex",
@@ -5168,7 +5171,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 66
+            "y": 68
           },
           "id": 36,
           "maxDataPoints": 20,
@@ -5282,7 +5285,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 34
+            "y": 27
           },
           "id": 97,
           "options": {
@@ -5378,7 +5381,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 34
+            "y": 27
           },
           "id": 98,
           "options": {
@@ -5470,7 +5473,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 34
+            "y": 27
           },
           "id": 120,
           "options": {
@@ -5535,10 +5538,10 @@
             "overrides": []
           },
           "gridPos": {
-            "h": 8,
+            "h": 2,
             "w": 6,
             "x": 18,
-            "y": 34
+            "y": 27
           },
           "id": 79,
           "options": {
@@ -5575,6 +5578,201 @@
             }
           ],
           "title": "Uptime (Main Process)",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 2,
+            "w": 6,
+            "x": 18,
+            "y": 29
+          },
+          "id": 291,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "name",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "vero_info{instance=~\"$instance\"}",
+              "instant": true,
+              "legendFormat": "{{ version }}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Vero Version",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 2,
+            "w": 6,
+            "x": 18,
+            "y": 31
+          },
+          "id": 292,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "name",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "vero_info{instance=~\"$instance\"}",
+              "instant": true,
+              "legendFormat": "{{ commit }}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Vero Commit",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 2,
+            "w": 6,
+            "x": 18,
+            "y": 33
+          },
+          "id": 293,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "name",
+            "wideLayout": true
+          },
+          "pluginVersion": "11.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "python_info{instance=~\"$instance\"} and on(instance, job) vero_info",
+              "instant": true,
+              "legendFormat": "{{ implementation }} {{ version }}",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Python Version",
           "type": "stat"
         },
         {
@@ -5641,7 +5839,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 35
           },
           "id": 30,
           "options": {
@@ -5733,7 +5931,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 35
           },
           "id": 32,
           "options": {
@@ -5829,7 +6027,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 43
           },
           "id": 78,
           "options": {
