@@ -1156,7 +1156,7 @@
             "h": 7,
             "w": 24,
             "x": 0,
-            "y": 35
+            "y": 19
           },
           "id": 28,
           "options": {
@@ -1289,7 +1289,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 42
+            "y": 26
           },
           "id": 33,
           "maxDataPoints": 50,
@@ -1357,7 +1357,7 @@
             "h": 14,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 34
           },
           "id": 19,
           "maxDataPoints": 50,
@@ -1414,6 +1414,173 @@
           ],
           "title": "Attestation Consensus Time",
           "type": "heatmap"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Represents the number of times the attestation data's block root ended up matching the block root in the preceding SSE head event, before attestation consensus was reached on that block root.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 60,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineStyle": {
+                  "fill": "solid"
+                },
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 48
+          },
+          "id": 273,
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "none"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "sum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval])) by (host)\n/ ignoring (host) group_left\nsum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval]))",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Attestation Consensus Contributions",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "Represents the number of times the attestation data's block root ended up matching the block root in the preceding SSE head event, before attestation consensus was reached on that block root.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                }
+              },
+              "mappings": [],
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 48
+          },
+          "id": 274,
+          "options": {
+            "displayLabels": [
+              "value"
+            ],
+            "legend": {
+              "displayMode": "list",
+              "placement": "right",
+              "showLegend": true,
+              "values": []
+            },
+            "pieType": "donut",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.1.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__range])) by (host)\n/ ignoring (host) group_left\nsum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__range]))",
+              "instant": true,
+              "legendFormat": "__auto",
+              "range": false,
+              "refId": "A"
+            }
+          ],
+          "title": "Attestation Consensus Contributions",
+          "type": "piechart"
         }
       ],
       "title": "Attestation Consensus",
@@ -1539,7 +1706,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 11
+            "y": 27
           },
           "id": 230,
           "maxDataPoints": 100,
@@ -1710,7 +1877,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 11
+            "y": 27
           },
           "id": 214,
           "maxDataPoints": 100,
@@ -1881,7 +2048,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 11
+            "y": 27
           },
           "id": 215,
           "maxDataPoints": 100,
@@ -2052,7 +2219,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 11
+            "y": 27
           },
           "id": 216,
           "maxDataPoints": 100,
@@ -2223,7 +2390,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 11
+            "y": 27
           },
           "id": 217,
           "maxDataPoints": 100,
@@ -2309,7 +2476,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 17
+            "y": 33
           },
           "id": 24,
           "maxDataPoints": 10,
@@ -2392,7 +2559,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 17
+            "y": 33
           },
           "id": 18,
           "maxDataPoints": 10,
@@ -2475,7 +2642,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 17
+            "y": 33
           },
           "id": 22,
           "maxDataPoints": 10,
@@ -2558,7 +2725,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 17
+            "y": 33
           },
           "id": 26,
           "maxDataPoints": 10,
@@ -2641,7 +2808,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 17
+            "y": 33
           },
           "id": 23,
           "maxDataPoints": 10,
@@ -2823,7 +2990,7 @@
             "h": 6,
             "w": 4,
             "x": 0,
-            "y": 37
+            "y": 53
           },
           "id": 181,
           "maxDataPoints": 100,
@@ -2994,7 +3161,7 @@
             "h": 6,
             "w": 5,
             "x": 4,
-            "y": 37
+            "y": 53
           },
           "id": 198,
           "maxDataPoints": 100,
@@ -3165,7 +3332,7 @@
             "h": 6,
             "w": 5,
             "x": 9,
-            "y": 37
+            "y": 53
           },
           "id": 199,
           "maxDataPoints": 100,
@@ -3336,7 +3503,7 @@
             "h": 6,
             "w": 5,
             "x": 14,
-            "y": 37
+            "y": 53
           },
           "id": 200,
           "maxDataPoints": 100,
@@ -3507,7 +3674,7 @@
             "h": 6,
             "w": 5,
             "x": 19,
-            "y": 37
+            "y": 53
           },
           "id": 201,
           "maxDataPoints": 100,
@@ -3593,7 +3760,7 @@
             "h": 19,
             "w": 4,
             "x": 0,
-            "y": 43
+            "y": 59
           },
           "id": 82,
           "maxDataPoints": 10,
@@ -3676,7 +3843,7 @@
             "h": 19,
             "w": 5,
             "x": 4,
-            "y": 43
+            "y": 59
           },
           "id": 83,
           "maxDataPoints": 10,
@@ -3759,7 +3926,7 @@
             "h": 19,
             "w": 5,
             "x": 9,
-            "y": 43
+            "y": 59
           },
           "id": 84,
           "maxDataPoints": 10,
@@ -3842,7 +4009,7 @@
             "h": 19,
             "w": 5,
             "x": 14,
-            "y": 43
+            "y": 59
           },
           "id": 85,
           "maxDataPoints": 10,
@@ -3925,7 +4092,7 @@
             "h": 19,
             "w": 5,
             "x": 19,
-            "y": 43
+            "y": 59
           },
           "id": 86,
           "maxDataPoints": 10,
@@ -4023,7 +4190,7 @@
             "h": 4,
             "w": 4,
             "x": 0,
-            "y": 22
+            "y": 38
           },
           "id": 131,
           "options": {
@@ -4121,7 +4288,7 @@
             "h": 20,
             "w": 10,
             "x": 4,
-            "y": 22
+            "y": 38
           },
           "id": 7,
           "maxDataPoints": 100,
@@ -4216,7 +4383,7 @@
             "h": 20,
             "w": 10,
             "x": 14,
-            "y": 22
+            "y": 38
           },
           "id": 39,
           "maxDataPoints": 100,
@@ -4320,7 +4487,7 @@
             "h": 16,
             "w": 4,
             "x": 0,
-            "y": 26
+            "y": 42
           },
           "id": 60,
           "options": {
@@ -4413,7 +4580,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 58
           },
           "id": 243,
           "options": {
@@ -4507,7 +4674,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 58
           },
           "id": 256,
           "options": {
@@ -4592,7 +4759,7 @@
             "h": 6,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 66
           },
           "id": 49,
           "maxDataPoints": 100,
@@ -4706,7 +4873,7 @@
             "h": 14,
             "w": 12,
             "x": 0,
-            "y": 102
+            "y": 118
           },
           "id": 69,
           "maxDataPoints": 100,
@@ -4810,7 +4977,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 102
+            "y": 118
           },
           "id": 42,
           "maxDataPoints": 100,
@@ -4905,7 +5072,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 109
+            "y": 125
           },
           "id": 41,
           "maxDataPoints": 100,
@@ -5001,7 +5168,7 @@
             "h": 12,
             "w": 24,
             "x": 0,
-            "y": 50
+            "y": 66
           },
           "id": 36,
           "maxDataPoints": 20,
@@ -5115,7 +5282,7 @@
             "h": 8,
             "w": 6,
             "x": 0,
-            "y": 18
+            "y": 34
           },
           "id": 97,
           "options": {
@@ -5211,7 +5378,7 @@
             "h": 8,
             "w": 6,
             "x": 6,
-            "y": 18
+            "y": 34
           },
           "id": 98,
           "options": {
@@ -5303,7 +5470,7 @@
             "h": 8,
             "w": 6,
             "x": 12,
-            "y": 18
+            "y": 34
           },
           "id": 120,
           "options": {
@@ -5371,7 +5538,7 @@
             "h": 8,
             "w": 6,
             "x": 18,
-            "y": 18
+            "y": 34
           },
           "id": 79,
           "options": {
@@ -5474,7 +5641,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 26
+            "y": 42
           },
           "id": 30,
           "options": {
@@ -5566,7 +5733,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 26
+            "y": 42
           },
           "id": 32,
           "options": {
@@ -5662,7 +5829,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 34
+            "y": 50
           },
           "id": 78,
           "options": {
@@ -5789,6 +5956,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 7,
+  "version": 8,
   "weekStart": ""
 }
