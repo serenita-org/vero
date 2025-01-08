@@ -549,6 +549,7 @@ class MultiBeaconNode:
                     name="HeadBlockRoot",
                     attributes={
                         "host.name": host,
+                        "block_root": block_root,
                     },
                 )
 
