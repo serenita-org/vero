@@ -48,7 +48,7 @@ from remerkleable.complex import Container
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers.beacon_node import BeaconNode
+from providers.beacon_node import _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS, BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
@@ -492,7 +492,9 @@ class MultiBeaconNode:
     ) -> AttestationData:
         while datetime.datetime.now(pytz.UTC) < deadline:
             _round_start = asyncio.get_running_loop().time()
+
             head_block_root_counter: Counter[str] = Counter()
+            host_to_block_root: dict[str, str] = dict()
 
             tasks = [
                 asyncio.create_task(
@@ -507,8 +509,9 @@ class MultiBeaconNode:
 
             for coro in asyncio.as_completed(tasks):
                 try:
-                    att_data = await coro
+                    host, att_data = await coro
                 except Exception as e:
+                    # We can tolerate some attestation data production failures
                     self.logger.error(
                         f"Failed to produce attestation data: {e!r}",
                         exc_info=self.logger.isEnabledFor(logging.DEBUG),
@@ -517,6 +520,9 @@ class MultiBeaconNode:
 
                 block_root = att_data.beacon_block_root.to_obj()
                 head_block_root_counter[block_root] += 1
+                host_to_block_root[host] = block_root
+
+                # Check if we reached the threshold for consensus
                 if (
                     head_block_root_counter[block_root]
                     >= self._attestation_consensus_threshold
@@ -524,12 +530,23 @@ class MultiBeaconNode:
                     # Cancel pending tasks
                     for task in tasks:
                         task.cancel()
+
+                    for contributing_host in (
+                        h for h, r in host_to_block_root.items() if r == block_root
+                    ):
+                        _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(
+                            host=contributing_host
+                        ).inc()
                     return att_data
 
-            # Rate-limiting - wait at least 30ms in between requests
+            # If no consensus has been reached in this round,
+            # rate-limit so we don't spam requests too quickly.
+            # Example: wait at least 30ms from the start of this round
             await asyncio.sleep(
                 max(0.03 - (asyncio.get_running_loop().time() - _round_start), 0),
             )
+
+        # If we exit the while loop, we haven't reached consensus by the deadline
         raise AttestationConsensusFailure(
             f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes.",
         )
