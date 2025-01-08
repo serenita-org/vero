@@ -490,11 +490,12 @@ class MultiBeaconNode:
         committee_index: int,
         deadline: datetime.datetime,
     ) -> AttestationData:
+        # Maps beacon node hosts to their last known head block root
+        host_to_block_root: dict[str, str] = dict()
+        head_block_root_counter: Counter[str] = Counter()
+
         while datetime.datetime.now(pytz.UTC) < deadline:
             _round_start = asyncio.get_running_loop().time()
-
-            head_block_root_counter: Counter[str] = Counter()
-            host_to_block_root: dict[str, str] = dict()
 
             tasks = [
                 asyncio.create_task(
@@ -519,8 +520,18 @@ class MultiBeaconNode:
                     continue
 
                 block_root = att_data.beacon_block_root.to_obj()
-                head_block_root_counter[block_root] += 1
+                prev_root = host_to_block_root.get(host)
+
+                if block_root == prev_root:
+                    # This host has already returned the same block root in the past,
+                    # no need to process it
+                    continue
+
+                # A new block root has arrived for this host
                 host_to_block_root[host] = block_root
+                head_block_root_counter[block_root] += 1
+                if prev_root is not None:
+                    head_block_root_counter[prev_root] -= 1
 
                 # Check if we reached the threshold for consensus
                 if (
