@@ -44,11 +44,13 @@ from typing import Any
 import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
+from opentelemetry.trace import Span
+from prometheus_client import Counter as CounterMetric
 from remerkleable.complex import Container
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers.beacon_node import _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS, BeaconNode
+from providers.beacon_node import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
@@ -56,6 +58,11 @@ from spec.configs import Network
 from spec.sync_committee import SyncCommitteeContributionClass
 
 (_ERRORS_METRIC,) = get_shared_metrics()
+_VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = CounterMetric(
+    "vc_attestation_consensus_contributions",
+    "Tracks how many times the attestation data's block root contributed to the attestation consensus by returning the same root as was emitted in the HeadEvent.",
+    labelnames=["host"],
+)
 
 
 class AttestationConsensusFailure(Exception):
@@ -440,6 +447,7 @@ class MultiBeaconNode:
         committee_index: int,
         deadline: datetime.datetime,
         head_event: SchemaBeaconAPI.HeadEvent,
+        tracer_span: Span,
     ) -> AttestationData:
         tasks = [
             asyncio.create_task(
@@ -457,7 +465,14 @@ class MultiBeaconNode:
             timeout=(deadline - datetime.datetime.now(tz=pytz.UTC)).total_seconds(),
         ):
             try:
-                att_data = await coro
+                host, att_data = await coro
+                _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=host).inc()
+                tracer_span.add_event(
+                    name="HeadEventConfirmation",
+                    attributes={
+                        "host.name": host,
+                    },
+                )
                 head_match_count += 1
                 if head_match_count >= self._attestation_consensus_threshold:
                     # Cancel pending tasks
@@ -486,6 +501,7 @@ class MultiBeaconNode:
         slot: int,
         committee_index: int,
         deadline: datetime.datetime,
+        tracer_span: Span,
     ) -> AttestationData:
         # Maps beacon node hosts to their last known head block root
         host_to_block_root: dict[str, str] = dict()
@@ -529,6 +545,13 @@ class MultiBeaconNode:
                 if prev_root is not None:
                     head_block_root_counter[prev_root] -= 1
 
+                tracer_span.add_event(
+                    name="HeadBlockRoot",
+                    attributes={
+                        "host.name": host,
+                    },
+                )
+
                 # Check if we reached the threshold for consensus
                 if (
                     head_block_root_counter[block_root]
@@ -564,6 +587,7 @@ class MultiBeaconNode:
         committee_index: int,
         deadline: datetime.datetime,
         head_event: SchemaBeaconAPI.HeadEvent | None,
+        tracer_span: Span,
     ) -> AttestationData:
         # Slightly different algorithms depending on whether
         # a head event has been emitted.
@@ -579,11 +603,13 @@ class MultiBeaconNode:
                 committee_index=committee_index,
                 deadline=deadline,
                 head_event=head_event,
+                tracer_span=tracer_span,
             )
         return await self._produce_attestation_data_without_head_event(
             slot=slot,
             committee_index=committee_index,
             deadline=deadline,
+            tracer_span=tracer_span,
         )
 
     async def produce_attestation_data(
@@ -614,12 +640,13 @@ class MultiBeaconNode:
                 if head_event
                 else str(None),
             },
-        ):
+        ) as tracer_span:
             return await self._produce_attestation_data(
                 slot=slot,
                 committee_index=committee_index,
                 deadline=deadline,
                 head_event=head_event,
+                tracer_span=tracer_span,
             )
 
     async def publish_attestations(self, **kwargs: Any) -> None:
