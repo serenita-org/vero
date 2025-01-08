@@ -15,7 +15,7 @@ from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from prometheus_client import Counter, Gauge, Histogram
+from prometheus_client import Gauge, Histogram
 from remerkleable.complex import Container
 from yarl import URL
 
@@ -45,11 +45,6 @@ _BEACON_NODE_VERSION = Gauge(
     "Beacon node score",
     labelnames=["host", "version"],
     multiprocess_mode="max",
-)
-_VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = Counter(
-    "vc_attestation_consensus_contributions",
-    "Tracks how many times the attestation data's block root contributed to the attestation consensus by returning the same root as was emitted in the HeadEvent.",
-    labelnames=["host"],
 )
 _block_value_buckets = [
     int(0.001 * 1e18),
@@ -323,7 +318,10 @@ class BeaconNode:
         expected_head_block_root: str,
         slot: int,
         committee_index: int,
-    ) -> AttestationData:
+    ) -> tuple[str, AttestationData]:
+        """
+        Returns the beacon node host along with the produced attestation data.
+        """
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.wait_for_attestation_data",
             attributes={
@@ -339,10 +337,7 @@ class BeaconNode:
                         committee_index=committee_index,
                     )
                     if att_data.beacon_block_root.to_obj() == expected_head_block_root:
-                        _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(
-                            host=self.host
-                        ).inc()
-                        return att_data
+                        return self.host, att_data
                 except Exception as e:
                     self.logger.error(
                         f"Failed to produce attestation data: {e!r}",
