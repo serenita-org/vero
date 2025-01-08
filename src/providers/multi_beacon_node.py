@@ -93,38 +93,34 @@ class MultiBeaconNode:
             *(bn.initialize_full(cli_args=self.cli_args) for bn in self.beacon_nodes)
         )
 
-        successfully_initialized = len([b for b in self.beacon_nodes if b.initialized])
-        if successfully_initialized < self._attestation_consensus_threshold:
+        successful_init_count = len(self.initialized_beacon_nodes)
+        if successful_init_count < self._attestation_consensus_threshold:
             raise RuntimeError(
                 f"Failed to fully initialize a sufficient amount of beacon nodes -"
-                f" {successfully_initialized}/{len(self.beacon_nodes)} initialized",
+                f" {successful_init_count}/{len(self.beacon_nodes)} initialized",
             )
 
         # Check the connected beacon nodes genesis, spec
-        if (
-            not len({bn.genesis for bn in self.beacon_nodes if bn.initialized})
-            # not len(set([bn.genesis for bn in self.beacon_nodes if bn.initialized]))
-            == 1
-        ):
+        if not len({bn.genesis for bn in self.initialized_beacon_nodes}) == 1:
             raise RuntimeError(
                 f"Beacon nodes provided different genesis:"
-                f" {[bn.genesis for bn in self.beacon_nodes if bn.initialized]}",
+                f" {[bn.genesis for bn in self.initialized_beacon_nodes]}",
             )
-        if not len({bn.spec for bn in self.beacon_nodes if bn.initialized}) == 1:
+        if not len({bn.spec for bn in self.initialized_beacon_nodes}) == 1:
             raise RuntimeError(
                 f"Beacon nodes provided different specs:"
-                f" {[bn.spec for bn in self.beacon_nodes if bn.initialized]}",
+                f" {[bn.spec for bn in self.initialized_beacon_nodes]}",
             )
 
         self.logger.info(
             f"Successfully initialized"
-            f" {successfully_initialized}"
+            f" {successful_init_count}"
             f"/{len(self.beacon_nodes)}"
             f" beacon nodes",
         )
 
         # Dynamically create some of the SSZ classes
-        spec = next(bn.spec for bn in self.beacon_nodes if bn.initialized)
+        spec = next(bn.spec for bn in self.initialized_beacon_nodes)
         BeaconBlockClass.initialize(spec=spec)
         SyncCommitteeContributionClass.initialize(spec=spec)
 
@@ -152,9 +148,14 @@ class MultiBeaconNode:
     def best_beacon_node(self) -> BeaconNode:
         return next(
             bn
-            for bn in sorted(self.beacon_nodes, key=lambda bn: bn.score, reverse=True)
-            if bn.initialized
+            for bn in sorted(
+                self.initialized_beacon_nodes, key=lambda bn: bn.score, reverse=True
+            )
         )
+
+    @property
+    def initialized_beacon_nodes(self) -> list[BeaconNode]:
+        return [bn for bn in self.beacon_nodes if bn.initialized]
 
     async def _get_first_beacon_node_response(
         self,
@@ -163,8 +164,7 @@ class MultiBeaconNode:
     ) -> Any:
         tasks = [
             asyncio.create_task(getattr(bn, func_name)(**kwargs))
-            for bn in self.beacon_nodes
-            if bn.initialized
+            for bn in self.initialized_beacon_nodes
         ]
 
         for coro in asyncio.as_completed(tasks):
@@ -190,9 +190,7 @@ class MultiBeaconNode:
         **kwargs: Any,
     ) -> list[Any]:
         # Returns a list of successful responses
-        beacon_nodes_to_use = beacon_nodes or [
-            bn for bn in self.beacon_nodes if bn.initialized
-        ]
+        beacon_nodes_to_use = beacon_nodes or self.initialized_beacon_nodes
 
         responses: list[Any] = []
         for res in await asyncio.gather(
@@ -276,7 +274,7 @@ class MultiBeaconNode:
         Most of the logic in here makes sure we don't wait too long for a block to be
         produced by an unresponsive beacon node.
         """
-        spec = next(bn.spec for bn in self.beacon_nodes if bn.initialized)
+        spec = next(bn.spec for bn in self.initialized_beacon_nodes)
 
         # Times out at 1/3 of the SECONDS_PER_SLOT spec value into the slot
         # (e.g. 1.33s for Ethereum, 0.55s for Gnosis Chain).
@@ -284,7 +282,7 @@ class MultiBeaconNode:
         # first block to be returned by any beacon node.
         timeout = (1 / 3) * (int(spec.SECONDS_PER_SLOT) / int(spec.INTERVALS_PER_SLOT))
 
-        beacon_nodes_to_use = [bn for bn in self.beacon_nodes if bn.initialized]
+        beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
             self.logger.info(
                 f"Overriding beacon nodes for block proposal, using {[bn.host for bn in self.beacon_nodes_proposal]}",
@@ -451,8 +449,7 @@ class MultiBeaconNode:
                     committee_index=committee_index,
                 ),
             )
-            for bn in self.beacon_nodes
-            if bn.initialized
+            for bn in self.initialized_beacon_nodes
         ]
         head_match_count = 0
         for coro in asyncio.as_completed(
@@ -504,8 +501,7 @@ class MultiBeaconNode:
                         committee_index=committee_index,
                     ),
                 )
-                for bn in self.beacon_nodes
-                if bn.initialized
+                for bn in self.initialized_beacon_nodes
             ]
 
             for coro in asyncio.as_completed(tasks):
