@@ -285,7 +285,10 @@ class BeaconNode:
         self,
         slot: int,
         committee_index: int,
-    ) -> AttestationData:
+    ) -> tuple[str, AttestationData]:
+        """
+        Returns the beacon node host along with the produced attestation data.
+        """
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.produce_attestation_data",
             kind=SpanKind.CLIENT,
@@ -313,7 +316,7 @@ class BeaconNode:
                     "att_data.beacon_block_root": att_data.beacon_block_root.to_obj(),
                 },
             )
-            return att_data  # type: ignore[no-any-return]
+            return self.host, att_data
 
     async def wait_for_attestation_data(
         self,
@@ -331,7 +334,7 @@ class BeaconNode:
                 _request_start_time = asyncio.get_running_loop().time()
 
                 try:
-                    att_data = await self.produce_attestation_data(
+                    _, att_data = await self.produce_attestation_data(
                         slot=slot,
                         committee_index=committee_index,
                     )

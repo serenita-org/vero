@@ -1420,7 +1420,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Represents the number of times the attestation data's block root ended up matching the block root in the preceding SSE head event, before attestation consensus was reached on that block root.",
+          "description": "Represents the number of times the produced attestation data's block root ended up matching the head block root of other beacon nodes, before attestation consensus was reached on that block root.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1516,7 +1516,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Represents the number of times the attestation data's block root ended up matching the block root in the preceding SSE head event, before attestation consensus was reached on that block root.",
+          "description": "Represents the number of times the produced attestation data's block root ended up matching the head block root of other beacon nodes, before attestation consensus was reached on that block root.",
           "fieldConfig": {
             "defaults": {
               "color": {
