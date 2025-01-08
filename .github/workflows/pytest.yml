@@ -16,10 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        enable-cache: true
-        cache-dependency-glob: "**/requirements*.txt"
+      uses: astral-sh/setup-uv@v5
     - name: Run pytest
       run: |
         uv venv --python 3.12
