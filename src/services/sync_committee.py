@@ -539,6 +539,10 @@ class SyncCommitteeService(ValidatorDutyService):
                 indices=_validator_indices,
             )
             fetched_duties = response.data
+
+            if len(fetched_duties) == 0:
+                continue
+
             self.sync_duties[sync_period] = fetched_duties
 
             # Schedule sync committee message produce job
