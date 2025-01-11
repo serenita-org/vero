@@ -12,6 +12,7 @@ from schemas import SchemaBeaconAPI
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec.configs import Network
+from tasks import TaskManager
 
 # A few more global fixtures defined separately
 from tests.mock_api.base import *
@@ -125,17 +126,24 @@ async def scheduler(
 
 
 @pytest.fixture
+def task_manager() -> TaskManager:
+    return TaskManager()
+
+
+@pytest.fixture
 async def validator_status_tracker(
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
     remote_signer: RemoteSigner,
     scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
 ) -> ValidatorStatusTrackerService:
     validator_status_tracker = ValidatorStatusTrackerService(
         multi_beacon_node=multi_beacon_node,
         beacon_chain=beacon_chain,
         remote_signer=remote_signer,
         scheduler=scheduler,
+        task_manager=task_manager,
     )
     await validator_status_tracker.initialize()
     return validator_status_tracker
@@ -146,16 +154,20 @@ async def multi_beacon_node(
     cli_args: CLIArgs,
     _mocked_beacon_node_endpoints: None,
     scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     async with MultiBeaconNode(
         beacon_node_urls=cli_args.beacon_node_urls,
         beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
         scheduler=scheduler,
+        task_manager=task_manager,
         cli_args=cli_args,
     ) as mbn:
         yield mbn
 
 
 @pytest.fixture
-async def beacon_chain(multi_beacon_node: MultiBeaconNode) -> BeaconChain:
-    return BeaconChain(multi_beacon_node=multi_beacon_node)
+async def beacon_chain(
+    multi_beacon_node: MultiBeaconNode, task_manager: TaskManager
+) -> BeaconChain:
+    return BeaconChain(multi_beacon_node=multi_beacon_node, task_manager=task_manager)

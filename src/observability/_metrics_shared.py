@@ -18,6 +18,7 @@ class ErrorType(Enum):
     SYNC_COMMITTEE_MESSAGE_PRODUCE = "sync-committee-message-produce"
     SYNC_COMMITTEE_MESSAGE_PUBLISH = "sync-committee-message-publish"
     DUTIES_UPDATE = "duties-update"
+    VALIDATOR_STATUS_UPDATE = "validator-status-update"
     SIGNATURE = "signature"
     OTHER = "other"
 

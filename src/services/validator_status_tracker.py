@@ -1,8 +1,10 @@
+import asyncio
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Gauge
 
+from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
@@ -12,6 +14,7 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
+from tasks import TaskManager
 
 _VALIDATORS_COUNT = Gauge(
     "validator_status",
@@ -25,6 +28,7 @@ _SLASHING_DETECTED = Gauge(
     multiprocess_mode="max",
 )
 _SLASHING_DETECTED.set(0)
+(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class ValidatorStatusTrackerService:
@@ -34,11 +38,13 @@ class ValidatorStatusTrackerService:
         beacon_chain: BeaconChain,
         remote_signer: RemoteSigner,
         scheduler: AsyncIOScheduler,
+        task_manager: TaskManager,
     ):
         self.multi_beacon_node = multi_beacon_node
         self.beacon_chain = beacon_chain
         self.remote_signer = remote_signer
         self.scheduler = scheduler
+        self.task_manager = task_manager
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
@@ -54,10 +60,7 @@ class ValidatorStatusTrackerService:
         # to continue initializing the validator client since we don't know
         # which validators to retrieve duties for.
         await self._update_validator_statuses(minimal_update=True)
-        self.scheduler.add_job(
-            self.update_validator_statuses,
-            id=f"{self.__class__.__name__}.update_validator_statuses",
-        )
+        self.task_manager.submit_task(self.update_validator_statuses())
 
     @property
     def any_active_or_pending_validators(self) -> bool:
@@ -71,6 +74,13 @@ class ValidatorStatusTrackerService:
     def slashing_detected(self, value: bool) -> None:
         self._slashing_detected = value
         _SLASHING_DETECTED.set(int(value))
+
+    async def on_new_slot(self, slot: int, _: bool) -> None:
+        # Update validator statuses one slot before the next epoch starts
+        # (before duties are updated)
+        slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
+        if slot % slots_per_epoch == slots_per_epoch - 1:
+            self.task_manager.submit_task(self.update_validator_statuses())
 
     async def handle_slashing_event(
         self,
@@ -185,29 +195,28 @@ class ValidatorStatusTrackerService:
         _VALIDATORS_COUNT.labels(status="withdrawal").set(len(withdrawal_pubkeys))
 
     async def update_validator_statuses(self) -> None:
-        try:
-            await self._update_validator_statuses()
-        except Exception as e:
-            self.logger.error(
-                f"Failed to update validator statuses: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
+        # Calls self._update_validator_statuses, retrying until it succeeds, with backoff
 
-        # Schedule the update of validator statuses
-        # one slot before the next epoch starts
-        # (before duties are updated)
-        next_run_time = self.beacon_chain.get_datetime_for_slot(
-            slot=(self.beacon_chain.current_epoch + 2)
-            * self.beacon_chain.spec.SLOTS_PER_EPOCH
-            - 1,
-        )
-        self.logger.debug(
-            f"Next update_validator_statuses job run time: {next_run_time}",
-        )
-        self.scheduler.add_job(
-            self.update_validator_statuses,
-            "date",
-            next_run_time=next_run_time,
-            id=f"{self.__class__.__name__}.update_validator_statuses",
-            replace_existing=True,
-        )
+        # Backoff parameters
+        initial_delay = 1.0  # Starting delay between API calls
+        max_delay = 10.0  # Maximum delay between API calls
+        current_delay = initial_delay
+
+        while True:
+            try:
+                await self._update_validator_statuses()
+                break
+            except Exception as e:
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.VALIDATOR_STATUS_UPDATE.value
+                ).inc()
+                self.logger.error(
+                    f"Failed to update validator statuses: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                )
+
+                # Wait for the current delay before retrying again
+                await asyncio.sleep(current_delay)
+
+                # Increase the delay for the next iteration, up to the max
+                current_delay = min(current_delay * 2, max_delay)

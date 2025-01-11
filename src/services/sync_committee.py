@@ -18,8 +18,6 @@ from services.validator_duty_service import (
 from spec.common import bytes_to_uint64, hash_function
 from spec.sync_committee import SyncCommitteeContributionClass
 
-logging.basicConfig()
-
 _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES = Counter(
     "vc_published_sync_committee_messages",
     "Successfully published sync committee messages",
@@ -46,11 +44,6 @@ class SyncCommitteeService(ValidatorDutyService):
         # Sync duties by sync committee period
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
             defaultdict(list)
-        )
-
-    def start(self) -> None:
-        self.scheduler.add_job(
-            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
         )
 
     @property
@@ -103,9 +96,31 @@ class SyncCommitteeService(ValidatorDutyService):
             / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
         )
 
+    async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        # Schedule sync message job at the deadline in case
+        # it is not triggered earlier by a new HeadEvent,
+        # aiming to produce it 1/3 into the slot at the latest.
+        _produce_deadline = self.beacon_chain.get_datetime_for_slot(
+            slot=slot
+        ) + datetime.timedelta(
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+        )
+
+        self.scheduler.add_job(
+            func=self.produce_sync_message_if_not_yet_produced,
+            trigger="date",
+            next_run_time=_produce_deadline,
+            kwargs=dict(duty_slot=slot),
+            id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+            replace_existing=True,
+        )
+
+        # At the start of an epoch, update duties
+        if is_new_epoch:
+            self.task_manager.submit_task(super().update_duties())
+
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
-        if not isinstance(event, SchemaBeaconAPI.HeadEvent):
-            raise NotImplementedError(f"Expected HeadEvent but got {type(event)}")
         await self.produce_sync_message_if_not_yet_produced(
             duty_slot=int(event.slot),
             head_event=event,
@@ -121,13 +136,10 @@ class SyncCommitteeService(ValidatorDutyService):
                 "Slashing detected, not producing sync committee message",
             )
 
-        if duty_slot < self._last_slot_duty_started_for:
-            return
-        if duty_slot == self._last_slot_duty_started_for:
-            if head_event:
-                self.logger.warning(
-                    f"Ignoring head event, already started producing message during slot {self._last_slot_duty_started_for}",
-                )
+        if duty_slot <= self._last_slot_duty_started_for:
+            self.logger.debug(
+                f"Not producing message during slot {duty_slot} - already started producing message during slot {self._last_slot_duty_started_for}"
+            )
             return
         if duty_slot != self.beacon_chain.current_slot:
             _ERRORS_METRIC.labels(
@@ -230,14 +242,12 @@ class SyncCommitteeService(ValidatorDutyService):
         # Add the aggregation duty to the schedule *before*
         # publishing sync messages so that any delays in publishing
         # do not affect the aggregation duty start time
-        self.scheduler.add_job(
-            self.prepare_and_aggregate_sync_messages,
-            kwargs=dict(
+        self.task_manager.submit_task(
+            self.prepare_and_aggregate_sync_messages(
                 duty_slot=duty_slot,
                 beacon_block_root=beacon_block_root,
                 sync_duties=self.sync_duties[sync_period],
             ),
-            id=f"{self.__class__.__name__}.prepare_and_aggregate_sync_messages",
         )
 
         self.logger.debug(
@@ -545,37 +555,6 @@ class SyncCommitteeService(ValidatorDutyService):
 
             self.sync_duties[sync_period] = fetched_duties
 
-            # Schedule sync committee message produce job
-            # at the deadline in case it is not triggered earlier
-            # by a new HeadEvent
-            _latest_into_slot = int(self.beacon_chain.spec.SECONDS_PER_SLOT) / int(
-                self.beacon_chain.spec.INTERVALS_PER_SLOT,
-            )
-            current_slot = self.beacon_chain.current_slot
-
-            for slot in range(
-                self.beacon_chain.compute_start_slot_at_epoch(epoch),
-                self.beacon_chain.compute_start_slot_at_epoch(epoch + 1),
-            ):
-                if slot < current_slot:
-                    continue
-
-                duty_run_time = self.beacon_chain.get_datetime_for_slot(
-                    slot=slot,
-                ) + datetime.timedelta(seconds=_latest_into_slot)
-
-                self.logger.debug(
-                    f"Adding produce_sync_message_if_not_yet_produced job for slot {slot}",
-                )
-                self.scheduler.add_job(
-                    self.produce_sync_message_if_not_yet_produced,
-                    "date",
-                    next_run_time=duty_run_time,
-                    kwargs=dict(duty_slot=slot),
-                    id=_PRODUCE_JOB_ID.format(duty_slot=slot),
-                    replace_existing=True,
-                )
-
             # Prepare sync committee subnet subscriptions for aggregation duties
             until_epoch = (
                 sync_period + 1
@@ -588,10 +567,10 @@ class SyncCommitteeService(ValidatorDutyService):
                 )
                 for duty in self.sync_duties[sync_period]
             ]
-            self.scheduler.add_job(
-                self.multi_beacon_node.prepare_sync_committee_subscriptions,
-                kwargs=dict(data=sync_committee_subscriptions_data),
-                id=f"{self.__class__.__name__}.multi_beacon_node.prepare_sync_committee_subscriptions",
+            self.task_manager.submit_task(
+                self.multi_beacon_node.prepare_sync_committee_subscriptions(
+                    data=sync_committee_subscriptions_data,
+                )
             )
 
             self.logger.debug(

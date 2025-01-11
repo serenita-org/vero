@@ -19,6 +19,7 @@ from services import (
     ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
 )
+from tasks import TaskManager
 
 _logger = logging.getLogger("vero-init")
 
@@ -101,29 +102,39 @@ async def run_services(
     validator_duty_services: list[ValidatorDutyService],
     shutdown_event: asyncio.Event,
 ) -> None:
+    task_manager = TaskManager()
+
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(
             beacon_node_urls=cli_args.beacon_node_urls,
             beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
             scheduler=scheduler,
+            task_manager=task_manager,
             cli_args=cli_args,
         ) as multi_beacon_node,
     ):
-        beacon_chain = BeaconChain(multi_beacon_node=multi_beacon_node)
+        beacon_chain = BeaconChain(
+            multi_beacon_node=multi_beacon_node,
+            task_manager=task_manager,
+        )
 
         await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
 
-        _logger.info(f"Current slot: {beacon_chain.current_slot}")
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")
+        _logger.info(f"Current slot: {beacon_chain.current_slot}")
 
         validator_status_tracker_service = ValidatorStatusTrackerService(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
             remote_signer=remote_signer,
             scheduler=scheduler,
+            task_manager=task_manager,
         )
         await validator_status_tracker_service.initialize()
+        beacon_chain.new_slot_handlers.append(
+            validator_status_tracker_service.on_new_slot
+        )
         _logger.info("Initialized validator status tracker")
 
         validator_service_args = ValidatorDutyServiceOptions(
@@ -133,6 +144,7 @@ async def run_services(
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,
             cli_args=cli_args,
+            task_manager=task_manager,
         )
 
         attestation_service = AttestationService(**validator_service_args)
@@ -146,11 +158,14 @@ async def run_services(
         ):
             service.start()
             validator_duty_services.append(service)
+            beacon_chain.new_slot_handlers.append(service.on_new_slot)
         _logger.info("Started validator duty services")
 
         event_consumer_service = EventConsumerService(
             multi_beacon_node=multi_beacon_node,
+            beacon_chain=beacon_chain,
             scheduler=scheduler,
+            task_manager=task_manager,
         )
 
         _register_event_handlers(

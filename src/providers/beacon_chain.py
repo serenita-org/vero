@@ -1,25 +1,36 @@
 """Provides information about the beacon chain - current slot, epoch, fork, genesis and spec data."""
 
+import asyncio
 import datetime
 import logging
 from math import floor
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytz
 
 from schemas import SchemaRemoteSigner
 from spec.base import Fork, Genesis, Spec
+from tasks import TaskManager
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
     from providers import MultiBeaconNode
 
 
 class BeaconChain:
-    def __init__(self, multi_beacon_node: "MultiBeaconNode"):
+    def __init__(self, multi_beacon_node: "MultiBeaconNode", task_manager: TaskManager):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
 
         self.multi_beacon_node = multi_beacon_node
+        self.task_manager = task_manager
+
+        self.new_slot_handlers: list[
+            Callable[[int, bool], Coroutine[Any, Any, None]]
+        ] = []
+
+        self.task_manager.submit_task(self.on_new_slot())
 
     @property
     def genesis(self) -> Genesis:
@@ -74,6 +85,31 @@ class BeaconChain:
     @property
     def current_slot(self) -> int:
         return self._get_slots_since_genesis()
+
+    async def _wait_for_next_slot(self) -> None:
+        # A slightly more accurate version of asyncio.sleep()
+        _next_slot = self.current_slot + 1
+        _delay = (
+            self.get_datetime_for_slot(_next_slot) - datetime.datetime.now(tz=pytz.UTC)
+        ).total_seconds()
+
+        # asyncio.sleep can be off by up to 16ms (on Windows)
+        await asyncio.sleep(_delay - 0.016)
+
+        while self.current_slot < _next_slot:  # noqa: ASYNC110
+            await asyncio.sleep(0)
+
+        self.task_manager.submit_task(self.on_new_slot())
+
+    async def on_new_slot(self) -> None:
+        _current_slot = self.current_slot  # Cache property value
+        self.logger.info(f"Slot {_current_slot}")
+        _is_new_epoch = _current_slot % self.spec.SLOTS_PER_EPOCH == 0
+
+        for handler in self.new_slot_handlers:
+            self.task_manager.submit_task(handler(_current_slot, _is_new_epoch))
+
+        self.task_manager.submit_task(self._wait_for_next_slot())
 
     def time_since_slot_start(self, slot: int) -> float:
         return (

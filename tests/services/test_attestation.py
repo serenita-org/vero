@@ -132,7 +132,7 @@ async def test_aggregate_attestations(
     await attestation_service.aggregate_attestations(
         slot=duty_slot,
         att_data=att_data,
-        aggregator_duties={d for d in slot_attester_duties if d.is_aggregator},
+        aggregator_duties=[d for d in slot_attester_duties if d.is_aggregator],
     )
 
     assert any("Published aggregate and proofs" in m for m in caplog.messages)

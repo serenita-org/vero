@@ -9,6 +9,7 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
+from tasks import TaskManager
 
 
 @pytest.fixture
@@ -18,6 +19,7 @@ def validator_duty_service_options(
     remote_signer: RemoteSigner,
     validator_status_tracker: ValidatorStatusTrackerService,
     scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> ValidatorDutyServiceOptions:
     return dict(
@@ -26,6 +28,7 @@ def validator_duty_service_options(
         remote_signer=remote_signer,
         validator_status_tracker_service=validator_status_tracker,
         scheduler=scheduler,
+        task_manager=task_manager,
         cli_args=cli_args,
     )
 

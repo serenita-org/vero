@@ -46,18 +46,8 @@ class BlockProposalService(ValidatorDutyService):
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
     def start(self) -> None:
-        self.scheduler.add_job(
-            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
-        )
-        self.scheduler.add_job(
-            self.prepare_beacon_proposer,
-            id=f"{self.__class__.__name__}.prepare_beacon_proposer",
-        )
-        if self.cli_args.use_external_builder:
-            self.scheduler.add_job(
-                self.register_validators,
-                id=f"{self.__class__.__name__}.register_validators",
-            )
+        super().start()
+        self.task_manager.submit_task(self.prepare_beacon_proposer())
 
     @property
     def next_duty_slot(self) -> int | None:
@@ -93,6 +83,19 @@ class BlockProposalService(ValidatorDutyService):
 
         return self.beacon_chain.get_datetime_for_slot(next_duty_slot)
 
+    async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        # Wait until any block proposals for this slot finish before
+        # doing anything else
+        await self.propose_block(slot=slot)
+
+        if self.cli_args.use_external_builder:
+            self.task_manager.submit_task(self.register_validators(current_slot=slot))
+
+        # At the start of an epoch, update duties
+        if is_new_epoch:
+            self.task_manager.submit_task(super().update_duties())
+            self.task_manager.submit_task(self.prepare_beacon_proposer())
+
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             event.current_duty_dependent_root
@@ -101,11 +104,7 @@ class BlockProposalService(ValidatorDutyService):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.scheduler.add_job(
-                self.update_duties,
-                id=f"{self.__class__.__name__}.update_duties",
-                replace_existing=True,
-            )
+            self.task_manager.submit_task(super().update_duties())
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
@@ -145,29 +144,18 @@ class BlockProposalService(ValidatorDutyService):
                 f"Dependent root for proposer duties for epoch {epoch} - {response.dependent_root}",
             )
 
-            current_slot = self.beacon_chain.current_slot
-            self.proposer_duties[epoch] = set()
-            for duty in fetched_duties:
-                duty_slot = int(duty.slot)
-                if duty_slot < current_slot:
-                    continue
-                if int(duty.validator_index) in _validator_indices:
-                    self.proposer_duties[epoch].add(duty)
+            current_slot = self.beacon_chain.current_slot  # Cache property value
+            self.proposer_duties[epoch] = {
+                d
+                for d in fetched_duties
+                if int(d.slot) >= current_slot
+                and int(d.validator_index) in _validator_indices
+            }
 
-                    self.logger.info(
-                        f"Upcoming block proposal duty at slot {duty_slot} for validator {duty.validator_index}",
-                    )
-
-                    self.scheduler.add_job(
-                        self.propose_block,
-                        "date",
-                        next_run_time=self.beacon_chain.get_datetime_for_slot(
-                            slot=duty_slot,
-                        ),
-                        kwargs=dict(slot=duty_slot),
-                        id=f"{self.__class__.__name__}.propose_block-slot-{duty_slot}",
-                        replace_existing=True,
-                    )
+            for duty in sorted(self.proposer_duties[epoch], key=lambda d: int(d.slot)):
+                self.logger.info(
+                    f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}",
+                )
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
@@ -175,8 +163,8 @@ class BlockProposalService(ValidatorDutyService):
 
         self._prune_duties()
 
-    async def _prepare_beacon_proposer(self) -> None:
-        self.logger.debug("Calling prepare beacon proposer")
+    async def prepare_beacon_proposer(self) -> None:
+        self.logger.debug("Calling prepare_beacon_proposer")
 
         our_indices = [
             v.index
@@ -197,41 +185,7 @@ class BlockProposalService(ValidatorDutyService):
             ],
         )
 
-    async def prepare_beacon_proposer(self) -> None:
-        # TODO we have a lot of functions like this one, where we try something,
-        # and schedule the next run time while catching exceptions and retrying
-        # earlier than planned if an exception occurs. See if we can abstract
-        # this away to reduce duplicate code.
-        next_run_time = None
-        try:
-            await self._prepare_beacon_proposer()
-        except Exception as e:
-            self.logger.error(
-                f"Failed to prepare beacon proposer: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
-            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
-                seconds=1,
-            )
-        finally:
-            # Schedule the next prepare_beacon_proposer call
-            if next_run_time is None:
-                next_run_time = self.beacon_chain.get_datetime_for_slot(
-                    slot=(self.beacon_chain.current_epoch + 1)
-                    * self.beacon_chain.spec.SLOTS_PER_EPOCH,
-                )
-            self.logger.debug(
-                f"Next prepare_beacon_proposer job run time: {next_run_time}",
-            )
-            self.scheduler.add_job(
-                self.prepare_beacon_proposer,
-                "date",
-                next_run_time=next_run_time,
-                id=f"{self.__class__.__name__}.prepare_beacon_proposer",
-                replace_existing=True,
-            )
-
-    async def _register_validators(self) -> None:
+    async def register_validators(self, current_slot: int) -> None:
         _batch_size = 512
 
         active_and_pending_validators = (
@@ -242,7 +196,6 @@ class BlockProposalService(ValidatorDutyService):
         # Registers a subset of validators every slot
         # based on their index to spread the
         # registrations across the epoch
-        current_slot = self.beacon_chain.current_slot
         slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
         validators_to_register = [
             v
@@ -288,39 +241,6 @@ class BlockProposalService(ValidatorDutyService):
 
             self.logger.info(
                 f"Published validator registrations, count: {len(validator_batch)}"
-            )
-
-    async def register_validators(self) -> None:
-        next_run_time = None
-        try:
-            await self._register_validators()
-        except Exception as e:
-            self.logger.error(
-                f"Failed to register validators: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
-            # On registration errors we retry every 60 seconds
-            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
-                seconds=60,
-            )
-        finally:
-            # Schedule the next register_validators call
-            # The job runs every slot, and inside the job,
-            # a subset of validators is selected (validator index // 32)
-            # and registered with external builders.
-            # This way we don't to request too many
-            # signatures at once (when running large numbers of validators).
-            if next_run_time is None:
-                next_run_time = self.beacon_chain.get_datetime_for_slot(
-                    slot=self.beacon_chain.current_slot + 1,
-                )
-            self.logger.debug(f"Next register_validators job run time: {next_run_time}")
-            self.scheduler.add_job(
-                self.register_validators,
-                "date",
-                next_run_time=next_run_time,
-                id=f"{self.__class__.__name__}.register_validators",
-                replace_existing=True,
             )
 
     async def propose_block(self, slot: int) -> None:
