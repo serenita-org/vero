@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from args import CLIArgs
 from providers import MultiBeaconNode
 from spec.base import SpecDeneb
+from tasks import TaskManager
 
 
 @pytest.fixture
@@ -16,6 +17,7 @@ async def multi_beacon_node_three_inited_nodes(
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     spec_deneb: SpecDeneb,
     scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(
@@ -26,6 +28,7 @@ async def multi_beacon_node_three_inited_nodes(
         ],
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
+        task_manager=task_manager,
         cli_args=cli_args,
     )
     with aioresponses() as m:

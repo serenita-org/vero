@@ -13,6 +13,7 @@ from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
+from tasks import TaskManager
 
 if TYPE_CHECKING:
     from services import ValidatorStatusTrackerService
@@ -34,6 +35,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     remote_signer: RemoteSigner
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
+    task_manager: TaskManager
     cli_args: CLIArgs
 
 
@@ -70,6 +72,7 @@ class ValidatorDutyService:
             "validator_status_tracker_service"
         ]
         self.scheduler = kwargs["scheduler"]
+        self.task_manager = kwargs["task_manager"]
         self.cli_args = kwargs["cli_args"]
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -90,6 +93,10 @@ class ValidatorDutyService:
         # before taking further actions (e.g. shutting down).
         self._last_slot_duty_completed_for = -1
 
+        # Avoids us updating validator duties multiple times
+        # at the same time
+        self._update_duties_lock = asyncio.Lock()
+
         # This variable defines the interval (in seconds) before a validator duty is
         # scheduled (/or ongoing) during which an immediate shutdown is deferred.
         # Instead of shutting down immediately, Vero will wait for the
@@ -97,9 +104,7 @@ class ValidatorDutyService:
         self._shutdown_defer_interval = 3
 
     def start(self) -> None:
-        # Every service should start its
-        # reocurring scheduled jobs here.
-        raise NotImplementedError
+        self.task_manager.submit_task(self.update_duties())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         raise NotImplementedError
@@ -108,11 +113,7 @@ class ValidatorDutyService:
         self.logger.debug(
             f"Handling reorg event at slot {event.slot}, new head block {event.new_head_block}"
         )
-        self.scheduler.add_job(
-            self.update_duties,
-            id=f"{self.__class__.__name__}.update_duties",
-            replace_existing=True,
-        )
+        self.task_manager.submit_task(self.update_duties())
 
     @property
     def has_ongoing_duty(self) -> bool:
@@ -158,35 +159,44 @@ class ValidatorDutyService:
             await asyncio.sleep(0.01)
         self.logger.info("Validator duty completed")
 
+    async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        raise NotImplementedError
+
     async def _update_duties(self) -> None:
         raise NotImplementedError
 
     async def update_duties(self) -> None:
-        # Calls self._update_duties once per epoch
-        next_run_time = None
-        try:
-            await self._update_duties()
-        except Exception as e:
-            _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
-            self.logger.error(
-                f"Failed to update duties: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
-            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
-                seconds=1,
-            )
-        finally:
-            # Schedule the next update of duties
-            if next_run_time is None:
-                next_run_time = self.beacon_chain.get_datetime_for_slot(
-                    slot=(self.beacon_chain.current_epoch + 1)
-                    * self.beacon_chain.spec.SLOTS_PER_EPOCH,
+        # Calls self._update_duties, retrying until it succeeds, with backoff
+
+        if self._update_duties_lock.locked():
+            # Duties already being updated
+            self.logger.debug("Duties already being updated, returning...")
+            return
+
+        await self._update_duties_lock.acquire()
+        self.logger.info("Updating duties")
+        epoch_at_start = self.beacon_chain.current_epoch
+
+        # Backoff parameters
+        initial_delay = 1.0  # Starting delay between API calls
+        max_delay = 10.0  # Maximum delay between API calls
+        current_delay = initial_delay
+
+        while self.beacon_chain.current_epoch == epoch_at_start:
+            try:
+                await self._update_duties()
+                break
+            except Exception as e:
+                _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
+                self.logger.error(
+                    f"Failed to update duties: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
-            self.logger.debug(f"Next update_duties job run time: {next_run_time}")
-            self.scheduler.add_job(
-                self.update_duties,
-                "date",
-                next_run_time=next_run_time,
-                id=f"{self.__class__.__name__}.update_duties",
-                replace_existing=True,
-            )
+
+                # Wait for the current delay before retrying again
+                await asyncio.sleep(current_delay)
+
+                # Increase the delay for the next iteration, up to the max
+                current_delay = min(current_delay * 2, max_delay)
+
+        self._update_duties_lock.release()

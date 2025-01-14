@@ -4,7 +4,6 @@ import datetime
 import logging
 from collections import defaultdict
 from typing import Unpack
-from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
@@ -33,8 +32,6 @@ from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
-
-logging.basicConfig()
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -71,11 +68,6 @@ class AttestationService(ValidatorDutyService):
             set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
-
-    def start(self) -> None:
-        self.scheduler.add_job(
-            self.update_duties, id=f"{self.__class__.__name__}.update_duties"
-        )
 
     @property
     def next_duty_slot(self) -> int | None:
@@ -116,6 +108,30 @@ class AttestationService(ValidatorDutyService):
             / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
         )
 
+    async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        # Schedule attestation job at the attestation deadline in case
+        # it is not triggered earlier by a new HeadEvent,
+        # aiming to attest 1/3 into the slot at the latest.
+        _produce_deadline = self.beacon_chain.get_datetime_for_slot(
+            slot=slot
+        ) + datetime.timedelta(
+            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
+            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
+        )
+
+        self.scheduler.add_job(
+            func=self.attest_if_not_yet_attested,
+            trigger="date",
+            next_run_time=_produce_deadline,
+            kwargs=dict(slot=slot),
+            id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+            replace_existing=True,
+        )
+
+        # At the start of an epoch, update duties
+        if is_new_epoch:
+            self.task_manager.submit_task(super().update_duties())
+
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         if (
             any(
@@ -130,11 +146,7 @@ class AttestationService(ValidatorDutyService):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.scheduler.add_job(
-                self.update_duties,
-                id=f"{self.__class__.__name__}.update_duties",
-                replace_existing=True,
-            )
+            self.task_manager.submit_task(super().update_duties())
         await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
 
     async def attest_if_not_yet_attested(
@@ -159,13 +171,10 @@ class AttestationService(ValidatorDutyService):
             if self.validator_status_tracker_service.slashing_detected:
                 raise RuntimeError("Slashing detected, not attesting")
 
-            if slot < self._last_slot_duty_started_for:
-                return
-            if slot == self._last_slot_duty_started_for:
-                if head_event:
-                    self.logger.warning(
-                        f"Ignoring head event, already started attesting to slot {self._last_slot_duty_started_for}",
-                    )
+            if slot <= self._last_slot_duty_started_for:
+                self.logger.warning(
+                    f"Not attesting to slot {slot} - already started attesting to slot {self._last_slot_duty_started_for}"
+                )
                 return
             if slot != self.beacon_chain.current_slot:
                 _ERRORS_METRIC.labels(
@@ -320,16 +329,14 @@ class AttestationService(ValidatorDutyService):
             # Add the aggregation duty to the schedule *before*
             # publishing attestations so that any delays in publishing
             # do not affect the aggregation duty start time
-            self.scheduler.add_job(
-                self.prepare_and_aggregate_attestations,
-                kwargs=dict(
+            self.task_manager.submit_task(
+                self.prepare_and_aggregate_attestations(
                     slot=slot,
                     att_data=att_data,
                     aggregator_duties=[
                         d for d in slot_attester_duties if d.is_aggregator
                     ],
-                ),
-                id=f"{self.__class__.__name__}.prepare_and_aggregate_attestations-slot-{slot}",
+                )
             )
 
             self.logger.debug(
@@ -367,11 +374,11 @@ class AttestationService(ValidatorDutyService):
                 finally:
                     self._last_slot_duty_completed_for = slot
 
-    def prepare_and_aggregate_attestations(
+    async def prepare_and_aggregate_attestations(
         self,
         slot: int,
         att_data: AttestationData,
-        aggregator_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+        aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation at 2/3 of the slot
         aggregation_run_time = self.beacon_chain.get_datetime_for_slot(
@@ -440,7 +447,7 @@ class AttestationService(ValidatorDutyService):
         self,
         slot: int,
         att_data: AttestationData,
-        aggregator_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+        aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         if len(aggregator_duties) == 0:
             return
@@ -507,25 +514,6 @@ class AttestationService(ValidatorDutyService):
         _fork_slot = int(next(d.slot for d in duties))
         _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
 
-        # Schedule attestation job at the attestation deadline in case
-        # it is not triggered earlier by a new HeadEvent
-        for duty_slot in {int(duty.slot) for duty in duties}:
-            self.logger.debug(
-                f"Adding attest_if_not_yet_attested job for slot {duty_slot}"
-            )
-            self.scheduler.add_job(
-                self.attest_if_not_yet_attested,
-                "date",
-                next_run_time=self.beacon_chain.get_datetime_for_slot(slot=duty_slot)
-                + datetime.timedelta(
-                    seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-                    / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
-                ),
-                kwargs={"slot": duty_slot},
-                id=_PRODUCE_JOB_ID.format(duty_slot=duty_slot),
-                replace_existing=True,
-            )
-
         # Gather aggregation duty selection proofs
         try:
             signable_messages = []
@@ -585,10 +573,10 @@ class AttestationService(ValidatorDutyService):
             if duty.is_aggregator
         ]
 
-        self.scheduler.add_job(
-            self.multi_beacon_node.prepare_beacon_committee_subscriptions,
-            kwargs=dict(data=beacon_committee_subscriptions_data),
-            id=f"{self.__class__.__name__}.multi_beacon_node.prepare_beacon_committee_subscriptions-{uuid4().hex}",
+        self.task_manager.submit_task(
+            self.multi_beacon_node.prepare_beacon_committee_subscriptions(
+                data=beacon_committee_subscriptions_data,
+            ),
         )
 
         return duties_with_proofs

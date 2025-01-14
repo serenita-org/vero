@@ -20,6 +20,7 @@ from providers import MultiBeaconNode
 from spec.attestation import Attestation, AttestationData
 from spec.base import SpecDeneb
 from spec.sync_committee import SyncCommitteeContributionClass
+from tasks import TaskManager
 
 
 @pytest.mark.parametrize(
@@ -69,6 +70,7 @@ async def test_initialize(
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     spec_deneb: SpecDeneb,
     scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon node is able to initialize if enough
@@ -83,6 +85,7 @@ async def test_initialize(
         beacon_node_urls=beacon_node_urls,
         beacon_node_urls_proposal=[],
         scheduler=scheduler,
+        task_manager=task_manager,
         cli_args=cli_args,
     )
 

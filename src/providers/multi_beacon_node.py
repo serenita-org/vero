@@ -50,12 +50,13 @@ from remerkleable.complex import Container
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers.beacon_node import BeaconNode
+from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.attestation import Attestation, AttestationData
 from spec.block import BeaconBlockClass
 from spec.configs import Network
 from spec.sync_committee import SyncCommitteeContributionClass
+from tasks import TaskManager
 
 (_ERRORS_METRIC,) = get_shared_metrics()
 _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = CounterMetric(
@@ -75,6 +76,7 @@ class MultiBeaconNode:
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
         scheduler: AsyncIOScheduler,
+        task_manager: TaskManager,
         cli_args: CLIArgs,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -83,11 +85,15 @@ class MultiBeaconNode:
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
         self.beacon_nodes = [
-            BeaconNode(base_url=base_url, scheduler=scheduler)
+            BeaconNode(
+                base_url=base_url, scheduler=scheduler, task_manager=task_manager
+            )
             for base_url in beacon_node_urls
         ]
         self.beacon_nodes_proposal = [
-            BeaconNode(base_url=base_url, scheduler=scheduler)
+            BeaconNode(
+                base_url=base_url, scheduler=scheduler, task_manager=task_manager
+            )
             for base_url in beacon_node_urls_proposal
         ]
 
@@ -150,6 +156,10 @@ class MultiBeaconNode:
                 if not bn.client_session.closed
             ],
         )
+
+    @property
+    def primary_beacon_node(self) -> BeaconNode:
+        return self.beacon_nodes[0]
 
     @property
     def best_beacon_node(self) -> BeaconNode:

@@ -1,7 +1,6 @@
 """Provides methods for interacting with a beacon node through the [Beacon Node API](https://github.com/ethereum/beacon-APIs)."""
 
 import asyncio
-import datetime
 import json
 import logging
 from collections.abc import AsyncIterable
@@ -10,7 +9,6 @@ from urllib.parse import urlparse
 
 import aiohttp
 import msgspec
-import pytz
 from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
@@ -27,11 +25,10 @@ from spec.attestation import Attestation, AttestationData
 from spec.base import Genesis, Spec, parse_spec
 from spec.configs import Network, get_network_spec
 from spec.sync_committee import SyncCommitteeContributionClass
+from tasks import TaskManager
 
 _TIMEOUT_DEFAULT_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10
-_SCORE_DELTA_SUCCESS = 1
-_SCORE_DELTA_FAILURE = 5
 
 
 _BEACON_NODE_SCORE = Gauge(
@@ -76,7 +73,13 @@ class BeaconNodeUnsupportedEndpoint(Exception):
 
 
 class BeaconNode:
-    def __init__(self, base_url: str, scheduler: AsyncIOScheduler) -> None:
+    MAX_SCORE = 100
+    SCORE_DELTA_SUCCESS = 1
+    SCORE_DELTA_FAILURE = 5
+
+    def __init__(
+        self, base_url: str, scheduler: AsyncIOScheduler, task_manager: TaskManager
+    ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
 
@@ -88,6 +91,7 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.scheduler = scheduler
+        self.task_manager = task_manager
 
         self.initialized = False
         self._score = 0
@@ -122,7 +126,7 @@ class BeaconNode:
 
     @score.setter
     def score(self, value: int) -> None:
-        self._score = max(0, min(value, 100))
+        self._score = max(0, min(value, BeaconNode.MAX_SCORE))
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
 
     async def _initialize_full(self, cli_args: CLIArgs) -> None:
@@ -148,10 +152,10 @@ class BeaconNode:
             self.get_node_version,
             "interval",
             minutes=10,
-            id=f"{self.__class__.__name__}.get_node_version-{self.host}",
+            id=f"{self.__class__.__name__}.get_node_version-{self.base_url}",
         )
 
-        self.score = 100
+        self.score = BeaconNode.MAX_SCORE
         self.initialized = True
 
     async def initialize_full(self, cli_args: CLIArgs) -> None:
@@ -165,17 +169,9 @@ class BeaconNode:
                 f"Failed to initialize beacon node at {self.base_url}: {e!r}",
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
-            # Retry initializing every 30 seconds
-            next_run_time = datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(
-                seconds=30,
-            )
-            self.scheduler.add_job(
-                self.initialize_full,
-                "date",
-                next_run_time=next_run_time,
-                kwargs=dict(cli_args=cli_args),
-                id=f"{self.__class__.__name__}.initialize_full-{self.host}",
-                replace_existing=True,
+            # Try to initialize again in 30 seconds
+            self.task_manager.submit_task(
+                self.initialize_full(cli_args=cli_args), delay=30.0
             )
 
     @staticmethod
@@ -222,7 +218,7 @@ class BeaconNode:
                 await self._handle_nok_status_code(response=resp)
 
                 # Request was successfully fulfilled
-                self.score += _SCORE_DELTA_SUCCESS
+                self.score += BeaconNode.SCORE_DELTA_SUCCESS
                 return await resp.text()
         except BeaconNodeUnsupportedEndpoint:
             raise
@@ -231,7 +227,7 @@ class BeaconNode:
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
-            self.score -= _SCORE_DELTA_FAILURE
+            self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
 
     def _raise_if_optimistic(
@@ -692,8 +688,11 @@ class BeaconNode:
                 ),
             )
 
-            block_value: int = consensus_block_value + execution_payload_value
-            self.logger.info(f"{self.host} returned block with value {block_value}")
+            self.logger.info(
+                f"{self.host} returned block with"
+                f" consensus block value {consensus_block_value},"
+                f" execution payload value {execution_payload_value}."
+            )
             _BEACON_NODE_CONSENSUS_BLOCK_VALUE.labels(host=self.host).observe(
                 consensus_block_value
             )
@@ -809,6 +808,7 @@ class BeaconNode:
                         exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     continue
+
                 event_data = []
                 next_line = (await anext(events_iter)).decode()
                 while next_line not in ("\n", "\r\n"):
@@ -821,6 +821,15 @@ class BeaconNode:
                     raise NotImplementedError(
                         f"Unable to process event with name {event_name}, event_data: {event_data}!",
                     ) from None
-                yield msgspec.json.decode(
+
+                event = msgspec.json.decode(
                     event_data[0].split("data:")[1], type=event_struct
                 )
+
+                if (
+                    hasattr(event, "execution_optimistic")
+                    and event.execution_optimistic
+                ):
+                    raise ValueError(f"Execution optimistic for event: {event}")
+
+                yield event

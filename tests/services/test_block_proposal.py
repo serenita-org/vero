@@ -24,14 +24,17 @@ async def test_prepare_beacon_proposer(
     block_proposal_service: BlockProposalService,
 ) -> None:
     # This test just checks that no exception is thrown
-    await block_proposal_service._prepare_beacon_proposer()
+    await block_proposal_service.prepare_beacon_proposer()
 
 
 async def test_register_validators(
     block_proposal_service: BlockProposalService,
+    beacon_chain: BeaconChain,
 ) -> None:
     # This test just checks that no exception is thrown
-    await block_proposal_service._register_validators()
+    await block_proposal_service.register_validators(
+        current_slot=beacon_chain.current_slot
+    )
 
 
 @pytest.mark.parametrize(

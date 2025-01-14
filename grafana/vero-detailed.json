@@ -5174,6 +5174,7 @@
             "y": 68
           },
           "id": 36,
+          "interval": "1m",
           "maxDataPoints": 20,
           "options": {
             "colWidth": 0.9,
