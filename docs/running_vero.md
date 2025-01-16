@@ -91,7 +91,18 @@ ___
 
 #### `--gas-limit`
 
-The gas limit to be used when building blocks. Defaults to `30,000,000`.
+The gas limit value to pass on to external block builders
+during validator registrations. *Note: this does not affect the gas limit value
+of the connected CL or EL clients.*
+
+Current defaults per network:
+```
+mainnet: 30M
+gnosis: 17M
+holesky: 36M
+fetch: 100M
+```
+
 ___
 
 #### `--use-external-builder`
