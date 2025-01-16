@@ -91,6 +91,20 @@ def _process_graffiti(graffiti: str) -> bytes:
     return encoded
 
 
+def _process_gas_limit(input_value: int | None, network: Network) -> int:
+    if input_value is not None:
+        return input_value
+
+    _defaults = {
+        Network.MAINNET: 30_000_000,
+        Network.GNOSIS: 17_000_000,
+        Network.HOLESKY: 36_000_000,
+        Network.FETCH: 100_000_000,
+    }
+
+    return _defaults[network]
+
+
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
@@ -149,8 +163,8 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         "--gas-limit",
         type=int,
         required=False,
-        default=30_000_000,
-        help="The gas limit to be used when building blocks. Defaults to 30,000,000.",
+        default=None,
+        help="The gas limit value to pass on to external block builders during validator registrations. See the docs for more details.",
     )
     parser.add_argument(
         "--use-external-builder",
@@ -203,8 +217,9 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 min_values_required=1,
             )
         ]
+        network = Network(parsed_args.network)
         return CLIArgs(
-            network=Network(parsed_args.network),
+            network=network,
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
             beacon_node_urls=beacon_node_urls,
             beacon_node_urls_proposal=[
@@ -222,7 +237,9 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             fee_recipient=_process_fee_recipient(parsed_args.fee_recipient),
             data_dir=parsed_args.data_dir,
             graffiti=_process_graffiti(parsed_args.graffiti),
-            gas_limit=parsed_args.gas_limit,
+            gas_limit=_process_gas_limit(
+                input_value=parsed_args.gas_limit, network=network
+            ),
             use_external_builder=parsed_args.use_external_builder,
             builder_boost_factor=parsed_args.builder_boost_factor,
             metrics_address=parsed_args.metrics_address,
