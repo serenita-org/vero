@@ -538,11 +538,12 @@ class AttestationService(ValidatorDutyService):
             if duty.is_aggregator
         ]
 
-        self.task_manager.submit_task(
-            self.multi_beacon_node.prepare_beacon_committee_subscriptions(
-                data=beacon_committee_subscriptions_data,
-            ),
-        )
+        if len(beacon_committee_subscriptions_data) > 0:
+            self.task_manager.submit_task(
+                self.multi_beacon_node.prepare_beacon_committee_subscriptions(
+                    data=beacon_committee_subscriptions_data,
+                ),
+            )
 
         return duties_with_proofs
 
