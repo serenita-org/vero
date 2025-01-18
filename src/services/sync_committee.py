@@ -323,7 +323,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 duties_with_proofs=duties_with_proofs,
             ),
             next_run_time=aggregation_run_time,
-            id=f"{self.__class__.__name__}.aggregate_sync_messages",
+            id=f"{self.__class__.__name__}.aggregate_sync_messages-{duty_slot}-{beacon_block_root}",
         )
 
     async def _sign_and_publish_contributions(
