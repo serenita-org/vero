@@ -4,6 +4,7 @@ import datetime
 import logging
 from collections import defaultdict
 from typing import Unpack
+from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
@@ -361,7 +362,7 @@ class AttestationService(ValidatorDutyService):
                 aggregator_duties=aggregator_duties,
             ),
             next_run_time=aggregation_run_time,
-            id=f"{self.__class__.__name__}.aggregate_attestations-slot-{slot}",
+            id=f"{self.__class__.__name__}.aggregate_attestations-slot-{slot}-{uuid4()}",
         )
 
     def _is_aggregator_by_committee_length(

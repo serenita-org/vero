@@ -4,6 +4,7 @@ import datetime
 import logging
 from collections import defaultdict
 from typing import Unpack
+from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
 from prometheus_client import Counter
@@ -323,7 +324,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 duties_with_proofs=duties_with_proofs,
             ),
             next_run_time=aggregation_run_time,
-            id=f"{self.__class__.__name__}.aggregate_sync_messages-{duty_slot}-{beacon_block_root}",
+            id=f"{self.__class__.__name__}.aggregate_sync_messages-{duty_slot}-{uuid4()}",
         )
 
     async def _sign_and_publish_contributions(
