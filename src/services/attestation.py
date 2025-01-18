@@ -69,44 +69,9 @@ class AttestationService(ValidatorDutyService):
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
 
-    @property
-    def next_duty_slot(self) -> int | None:
-        # In case a duty for the current slot has not finished yet, it is still
-        # considered the next duty slot
-        if self.has_ongoing_duty:
-            return self._last_slot_duty_started_for
-
-        current_slot = self.beacon_chain.current_slot
-        min_duty_slots_per_epoch = (
-            min(
-                (
-                    int(d.slot)
-                    for d in duties
-                    if int(d.slot) > self._last_slot_duty_started_for
-                    and int(d.slot) >= current_slot
-                ),
-                default=None,
-            )
-            for duties in self.attester_duties.values()
-            if duties
-        )
-        return min(
-            (slot for slot in min_duty_slots_per_epoch if slot is not None),
-            default=None,
-        )
-
-    @property
-    def next_duty_run_time(self) -> datetime.datetime | None:
-        next_duty_slot = self.next_duty_slot
-        if next_duty_slot is None:
-            return None
-
-        return self.beacon_chain.get_datetime_for_slot(
-            next_duty_slot
-        ) + datetime.timedelta(
-            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
-        )
+    def has_duty_for_slot(self, slot: int) -> bool:
+        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        return any(int(duty.slot) == slot for duty in self.attester_duties[epoch])
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule attestation job at the attestation deadline in case

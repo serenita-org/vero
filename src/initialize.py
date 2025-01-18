@@ -98,12 +98,11 @@ def check_data_dir_permissions(data_dir: Path) -> None:
 
 async def run_services(
     cli_args: CLIArgs,
+    task_manager: TaskManager,
     scheduler: AsyncIOScheduler,
     validator_duty_services: list[ValidatorDutyService],
     shutdown_event: asyncio.Event,
 ) -> None:
-    task_manager = TaskManager()
-
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(

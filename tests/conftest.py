@@ -1,3 +1,4 @@
+import asyncio
 import random
 from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator
@@ -127,7 +128,7 @@ async def scheduler(
 
 @pytest.fixture
 def task_manager() -> TaskManager:
-    return TaskManager()
+    return TaskManager(shutdown_event=asyncio.Event())
 
 
 @pytest.fixture

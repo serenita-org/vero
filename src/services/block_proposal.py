@@ -34,11 +34,6 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
-        # Give a bit more headroom for block proposals since they are rare and valuable.
-        # If there's less than this many seconds remaining until the next
-        # block proposal duty, shutdown is deferred until the duty is completed.
-        self._shutdown_defer_interval = 6
-
         # Proposer duty by epoch
         self.proposer_duties: defaultdict[int, set[SchemaBeaconAPI.ProposerDuty]] = (
             defaultdict(set)
@@ -75,13 +70,16 @@ class BlockProposalService(ValidatorDutyService):
             default=None,
         )
 
-    @property
-    def next_duty_run_time(self) -> datetime.datetime | None:
+    def has_upcoming_duty(self) -> bool:
         next_duty_slot = self.next_duty_slot
         if next_duty_slot is None:
-            return None
+            return False
 
-        return self.beacon_chain.get_datetime_for_slot(next_duty_slot)
+        return next_duty_slot <= self.beacon_chain.current_slot + 3
+
+    def has_duty_for_slot(self, slot: int) -> bool:
+        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        return any(int(duty.slot) == slot for duty in self.proposer_duties[epoch])
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Wait until any block proposals for this slot finish before
