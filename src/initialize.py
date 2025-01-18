@@ -3,7 +3,6 @@ import datetime
 import logging
 from pathlib import Path
 
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
@@ -26,11 +25,11 @@ _logger = logging.getLogger("vero-init")
 
 async def _wait_for_genesis(genesis_datetime: datetime.datetime) -> None:
     # Waits for genesis to occur
-    time_to_genesis = genesis_datetime - datetime.datetime.now(tz=pytz.UTC)
+    time_to_genesis = genesis_datetime - datetime.datetime.now(tz=datetime.UTC)
     while time_to_genesis.total_seconds() > 0:
         _logger.info(f"Waiting for genesis - {time_to_genesis} remaining")
         await asyncio.sleep(min(time_to_genesis.total_seconds(), 10))
-        time_to_genesis = genesis_datetime - datetime.datetime.now(tz=pytz.UTC)
+        time_to_genesis = genesis_datetime - datetime.datetime.now(tz=datetime.UTC)
 
 
 def _register_event_handlers(

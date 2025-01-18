@@ -9,7 +9,6 @@ from collections import Counter
 from functools import partial
 
 import pytest
-import pytz
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 
@@ -219,7 +218,7 @@ async def test_produce_attestation_data(
                 match="Failed to reach consensus on attestation data",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.produce_attestation_data(
-                    deadline=datetime.datetime.now(tz=pytz.UTC)
+                    deadline=datetime.datetime.now(tz=datetime.UTC)
                     + datetime.timedelta(seconds=0.1),
                     slot=123,
                     committee_index=3,
@@ -229,7 +228,8 @@ async def test_produce_attestation_data(
 
         # We expect to reach consensus on attestation data here
         att_data = await multi_beacon_node_three_inited_nodes.produce_attestation_data(
-            deadline=datetime.datetime.now(tz=pytz.UTC) + datetime.timedelta(seconds=1),
+            deadline=datetime.datetime.now(tz=datetime.UTC)
+            + datetime.timedelta(seconds=1),
             slot=123,
             committee_index=3,
             head_event=head_event,

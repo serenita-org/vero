@@ -41,7 +41,6 @@ from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Any
 
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import Span
@@ -472,7 +471,7 @@ class MultiBeaconNode:
         head_match_count = 0
         for coro in asyncio.as_completed(
             tasks,
-            timeout=(deadline - datetime.datetime.now(tz=pytz.UTC)).total_seconds(),
+            timeout=(deadline - datetime.datetime.now(tz=datetime.UTC)).total_seconds(),
         ):
             try:
                 host, att_data = await coro
@@ -517,7 +516,7 @@ class MultiBeaconNode:
         host_to_block_root: dict[str, str] = dict()
         head_block_root_counter: Counter[str] = Counter()
 
-        while datetime.datetime.now(pytz.UTC) < deadline:
+        while datetime.datetime.now(datetime.UTC) < deadline:
             _round_start = asyncio.get_running_loop().time()
 
             tasks = [

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import functools
 import logging
 import signal
@@ -6,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs, parse_cli_args
@@ -38,7 +38,7 @@ async def main(cli_args: CLIArgs) -> None:
     prep_datadir(data_dir=Path(cli_args.data_dir))
 
     scheduler = AsyncIOScheduler(
-        timezone=pytz.UTC,
+        timezone=datetime.UTC,
         job_defaults=dict(
             coalesce=True,  # default value
             max_instances=1,  # default value
