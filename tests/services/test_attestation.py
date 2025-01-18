@@ -73,9 +73,7 @@ async def test_attest_if_not_yet_attested(
 
 
 @pytest.mark.parametrize(
-    argnames=[
-        "slot_offset",
-    ],
+    argnames="slot_offset",
     argvalues=[pytest.param(10, id="future slot"), pytest.param(-10, id="past slot")],
 )
 async def test_attest_to_invalid_slot(

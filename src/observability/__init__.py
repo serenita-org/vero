@@ -23,10 +23,10 @@ def init_observability(
 
 
 __all__ = [
-    "init_observability",
-    "get_shared_metrics",
+    "ErrorType",
     "get_service_commit",
     "get_service_name",
     "get_service_version",
-    "ErrorType",
+    "get_shared_metrics",
+    "init_observability",
 ]

@@ -7,11 +7,11 @@ from spec.configs import Network
 
 
 @pytest.mark.parametrize(
-    argnames=[
+    argnames=(
         "list_of_args",
         "expected_error_message",
         "expected_attr_values",
-    ],
+    ),
     argvalues=[
         pytest.param(
             [],

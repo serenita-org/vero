@@ -24,11 +24,11 @@ from tasks import TaskManager
 
 
 @pytest.mark.parametrize(
-    argnames=[
+    argnames=(
         "beacon_node_urls",
         "beacon_node_availabilities",
         "expected_initialization_success",
-    ],
+    ),
     argvalues=[
         pytest.param(
             [
@@ -136,8 +136,7 @@ async def test_initialize(
         else:
             with pytest.raises(
                 RuntimeError,
-                match="Failed to fully initialize"
-                " a sufficient amount of beacon nodes",
+                match="Failed to fully initialize a sufficient amount of beacon nodes",
             ):
                 await mbn.initialize()
 
@@ -145,7 +144,7 @@ async def test_initialize(
 
 
 @pytest.mark.parametrize(
-    argnames=["numbers_of_attesting_indices", "best_aggregate_score"],
+    argnames=("numbers_of_attesting_indices", "best_aggregate_score"),
     argvalues=[
         pytest.param(
             [4, 5, 3],
@@ -240,7 +239,7 @@ async def test_get_aggregate_attestation(
 
 
 @pytest.mark.parametrize(
-    argnames=["numbers_of_root_matching_indices", "best_contribution_score"],
+    argnames=("numbers_of_root_matching_indices", "best_contribution_score"),
     argvalues=[
         pytest.param(
             [4, 5, 3],

@@ -119,11 +119,9 @@ class ValidatorStatusTrackerService:
             raise NotImplementedError(f"Unexpected event type {type(event)}")
 
     async def _update_validator_statuses(self, minimal_update: bool = False) -> None:
-        """
-        With minimal_update enabled, this function only fetches the slashed,
+        """With minimal_update enabled, this function only fetches the slashed,
         active and pending validators in order to return as quickly as possible.
         """
-
         self.logger.debug("Updating validator statuses")
 
         remote_signer_pubkeys = set(await self.remote_signer.get_public_keys())
