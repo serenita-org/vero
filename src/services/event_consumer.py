@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
@@ -110,7 +109,9 @@ class EventConsumerService:
 
             # We may break out of the for loop to switch nodes, or if the SSE ends
             # naturally. -> In both cases we want to reconnect/resubscribe.
-            self.task_manager.submit_task(self.handle_events())
+            self.task_manager.submit_task(
+                self.handle_events(), name=f"{self.__class__.__name__}.handle_events"
+            )
 
         except Exception as e:
             beacon_node.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -118,9 +119,4 @@ class EventConsumerService:
                 f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 1 second...",
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
-            await asyncio.sleep(1)
-            self.task_manager.submit_task(self.handle_events())
-        except asyncio.CancelledError:
-            # Expected to happen when Vero shuts down
-            self.logger.info("Stopped event consumer")
-            return
+            self.task_manager.submit_task(self.handle_events(), delay=1.0)

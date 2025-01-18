@@ -86,7 +86,7 @@ class BeaconChain:
     def current_slot(self) -> int:
         return self._get_slots_since_genesis()
 
-    async def _wait_for_next_slot(self) -> None:
+    async def wait_for_next_slot(self) -> None:
         # A slightly more accurate version of asyncio.sleep()
         _next_slot = self.current_slot + 1
         _delay = (
@@ -99,8 +99,6 @@ class BeaconChain:
         while self.current_slot < _next_slot:  # noqa: ASYNC110
             await asyncio.sleep(0)
 
-        self.task_manager.submit_task(self.on_new_slot())
-
     async def on_new_slot(self) -> None:
         _current_slot = self.current_slot  # Cache property value
         self.logger.info(f"Slot {_current_slot}")
@@ -109,7 +107,8 @@ class BeaconChain:
         for handler in self.new_slot_handlers:
             self.task_manager.submit_task(handler(_current_slot, _is_new_epoch))
 
-        self.task_manager.submit_task(self._wait_for_next_slot())
+        await self.wait_for_next_slot()
+        self.task_manager.submit_task(self.on_new_slot())
 
     def time_since_slot_start(self, slot: int) -> float:
         return (

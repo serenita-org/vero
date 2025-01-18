@@ -786,7 +786,10 @@ class BeaconNode:
             # Minimal SSE client implementation
             events_iter = aiter(resp.content)
             while True:
-                decoded = (await anext(events_iter)).decode()
+                try:
+                    decoded = (await anext(events_iter)).decode()
+                except StopAsyncIteration:
+                    break
                 if decoded.startswith(":"):
                     self.logger.debug(f"SSE Comment {decoded}")
                     continue

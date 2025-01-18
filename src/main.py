@@ -12,6 +12,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from args import CLIArgs, parse_cli_args
 from initialize import check_data_dir_permissions, run_services
 from observability import get_service_commit, get_service_version, init_observability
+from tasks import TaskManager
 
 if TYPE_CHECKING:
     from services import ValidatorDutyService
@@ -48,19 +49,26 @@ async def main(cli_args: CLIArgs) -> None:
 
     validator_duty_services: list[ValidatorDutyService] = []
 
+    shutdown_event = asyncio.Event()
+    task_manager = TaskManager(shutdown_event=shutdown_event)
+
     loop = asyncio.get_running_loop()
     signals = (signal.SIGINT, signal.SIGTERM)
-    shutdown_event = asyncio.Event()
     for s in signals:
         loop.add_signal_handler(
             s,
             functools.partial(
-                shutdown_handler, s, validator_duty_services, shutdown_event
+                shutdown_handler,
+                s,
+                validator_duty_services,
+                shutdown_event,
+                task_manager,
             ),
         )
 
     await run_services(
         cli_args=cli_args,
+        task_manager=task_manager,
         scheduler=scheduler,
         validator_duty_services=validator_duty_services,
         shutdown_event=shutdown_event,

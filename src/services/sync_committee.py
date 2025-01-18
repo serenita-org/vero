@@ -46,55 +46,12 @@ class SyncCommitteeService(ValidatorDutyService):
             defaultdict(list)
         )
 
-    @property
-    def next_duty_slot(self) -> int | None:
-        # In case a duty for the current slot has not finished yet, it is still
-        # considered the next duty slot
-        if self.has_ongoing_duty:
-            return self._last_slot_duty_started_for
+    def has_duty_for_slot(self, slot: int) -> bool:
+        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
 
-        if len(self.sync_duties) == 0:
-            return None
+        sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
 
-        # Cache property values
-        slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
-        current_epoch = self.beacon_chain.current_epoch
-        current_slot = self.beacon_chain.current_slot
-        next_epochs = {current_epoch, current_epoch + 1}
-
-        future_sync_duty_slots = set()
-
-        for sync_period, sync_duties in self.sync_duties.items():
-            if len(sync_duties) == 0:
-                continue
-
-            for epoch in range(
-                *self.beacon_chain.compute_epochs_for_sync_period(sync_period)
-            ):
-                if epoch in next_epochs:
-                    epoch_start_slot = epoch * slots_per_epoch
-                    for i in range(slots_per_epoch):
-                        slot = epoch_start_slot + i
-                        if (
-                            slot > self._last_slot_duty_started_for
-                            and slot >= current_slot
-                        ):
-                            future_sync_duty_slots.add(slot)
-
-        return min(future_sync_duty_slots, default=None)
-
-    @property
-    def next_duty_run_time(self) -> datetime.datetime | None:
-        next_duty_slot = self.next_duty_slot
-        if next_duty_slot is None:
-            return None
-
-        return self.beacon_chain.get_datetime_for_slot(
-            next_duty_slot
-        ) + datetime.timedelta(
-            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / int(self.beacon_chain.spec.INTERVALS_PER_SLOT),
-        )
+        return len(self.sync_duties[sync_period]) > 0
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule sync message job at the deadline in case
@@ -136,7 +93,12 @@ class SyncCommitteeService(ValidatorDutyService):
                 "Slashing detected, not producing sync committee message",
             )
 
-        if duty_slot <= self._last_slot_duty_started_for:
+        # Using < and not <= on purpose: if a head event comes in late,
+        # we still want to produce a sync message for that block root too
+        # since it is not slashable to publish 2 different sync messages
+        # and it increases the chance of getting the sync message included
+        # in the next block.
+        if duty_slot < self._last_slot_duty_started_for:
             self.logger.debug(
                 f"Not producing message during slot {duty_slot} - already started producing message during slot {self._last_slot_duty_started_for}"
             )
