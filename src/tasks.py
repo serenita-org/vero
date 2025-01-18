@@ -56,7 +56,6 @@ class TaskManager:
         name: str | None = None,
     ) -> None:
         """Create and track a task from the given coroutine."""
-
         if self.shutdown_event.is_set():
             self.logger.debug(f"Cancelling task {name!r}, shutting down...")
             asyncio.create_task(coro).cancel()

@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE_TAG="3.12-slim@sha256:105e9d85a67db1602e70fa2bbb49c1e66bae7e3bdcb6259344fe8ca116434f74"
+ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm@sha256:123be5684f39d8476e64f47a5fddf38f5e9d839baff5c023c815ae5bdfae0df7"
 ARG VENV_LOCATION="/opt/venv"
 
 # Build image
@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y git=1:2.39.5-0+
 
 ARG VENV_LOCATION
 ENV PATH="$VENV_LOCATION/bin:$PATH"
-RUN pip install --no-cache-dir uv==0.4.21 && uv venv ${VENV_LOCATION}
+RUN pip install --no-cache-dir uv==0.5.21 && uv venv ${VENV_LOCATION}
 COPY requirements.txt .
 RUN uv pip sync requirements.txt
 

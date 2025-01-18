@@ -30,7 +30,7 @@ class BeaconNodeResponseSequence(TypedDict):
 
 
 @pytest.mark.parametrize(
-    argnames=["bn_response_sequences", "returned_block_value"],
+    argnames=("bn_response_sequences", "returned_block_value"),
     argvalues=[
         pytest.param(
             [

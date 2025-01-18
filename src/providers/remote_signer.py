@@ -28,9 +28,9 @@ def _sign_messages_in_separate_process(
     identifiers: list[str],
     batch_size: int,
 ) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
-    async def _sign_messages() -> (
-        list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]
-    ):
+    async def _sign_messages() -> list[
+        tuple[SchemaRemoteSigner.SignableMessageT, str, str]
+    ]:
         results = []
         async with RemoteSigner(url=remote_signer_url) as signer:
             for i in range(0, len(messages), batch_size):
@@ -151,9 +151,7 @@ class RemoteSigner:
         message: SchemaRemoteSigner.SignableMessageT,
         identifier: str,
     ) -> tuple[SchemaRemoteSigner.SignableMessageT, str, str]:
-        """
-
-        :param message: SignableMessage to sign
+        """:param message: SignableMessage to sign
         :param identifier: BLS public key in hex format for which data to sign
         :
         """

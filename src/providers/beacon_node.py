@@ -277,9 +277,7 @@ class BeaconNode:
         slot: int,
         committee_index: int,
     ) -> tuple[str, AttestationData]:
-        """
-        Returns the beacon node host along with the produced attestation data.
-        """
+        """Returns the beacon node host along with the produced attestation data."""
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.produce_attestation_data",
             kind=SpanKind.CLIENT,
@@ -315,9 +313,7 @@ class BeaconNode:
         slot: int,
         committee_index: int,
     ) -> tuple[str, AttestationData]:
-        """
-        Returns the beacon node host along with the produced attestation data.
-        """
+        """Returns the beacon node host along with the produced attestation data."""
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.wait_for_attestation_data",
             attributes={

@@ -25,11 +25,11 @@ from spec.attestation import AttestationData
 
 
 @pytest.mark.parametrize(
-    argnames=[
+    argnames=(
         "bn_head_block_roots",
         "head_event",
         "custom_attestation_consensus_threshold",
-    ],
+    ),
     argvalues=[
         pytest.param(
             [
