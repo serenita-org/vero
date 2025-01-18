@@ -4,7 +4,6 @@ import logging
 from collections import defaultdict
 from typing import Unpack
 
-import pytz
 from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
@@ -201,7 +200,7 @@ class BlockProposalService(ValidatorDutyService):
             if v.index % slots_per_epoch == current_slot % slots_per_epoch
         ]
 
-        _timestamp = int(datetime.datetime.now(tz=pytz.UTC).timestamp())
+        _timestamp = int(datetime.datetime.now(tz=datetime.UTC).timestamp())
 
         for i in range(0, len(validators_to_register), _batch_size):
             validator_batch = validators_to_register[i : i + _batch_size]

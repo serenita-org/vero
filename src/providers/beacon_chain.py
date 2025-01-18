@@ -6,8 +6,6 @@ import logging
 from math import floor
 from typing import TYPE_CHECKING, Any
 
-import pytz
-
 from schemas import SchemaRemoteSigner
 from spec.base import Fork, Genesis, Spec
 from tasks import TaskManager
@@ -73,12 +71,12 @@ class BeaconChain:
 
     def get_datetime_for_slot(self, slot: int) -> datetime.datetime:
         slot_timestamp = self.genesis.genesis_time + slot * self.spec.SECONDS_PER_SLOT
-        return datetime.datetime.fromtimestamp(slot_timestamp, tz=pytz.UTC)
+        return datetime.datetime.fromtimestamp(slot_timestamp, tz=datetime.UTC)
 
     def _get_slots_since_genesis(self) -> int:
-        seconds_elapsed = floor(datetime.datetime.now(tz=pytz.UTC).timestamp()) - int(
-            self.genesis.genesis_time
-        )
+        seconds_elapsed = floor(
+            datetime.datetime.now(tz=datetime.UTC).timestamp()
+        ) - int(self.genesis.genesis_time)
         seconds_elapsed = max(0, seconds_elapsed)
         return seconds_elapsed // int(self.spec.SECONDS_PER_SLOT)
 
@@ -90,7 +88,8 @@ class BeaconChain:
         # A slightly more accurate version of asyncio.sleep()
         _next_slot = self.current_slot + 1
         _delay = (
-            self.get_datetime_for_slot(_next_slot) - datetime.datetime.now(tz=pytz.UTC)
+            self.get_datetime_for_slot(_next_slot)
+            - datetime.datetime.now(tz=datetime.UTC)
         ).total_seconds()
 
         # asyncio.sleep can be off by up to 16ms (on Windows)
@@ -112,7 +111,7 @@ class BeaconChain:
 
     def time_since_slot_start(self, slot: int) -> float:
         return (
-            datetime.datetime.now(tz=pytz.UTC) - self.get_datetime_for_slot(slot)
+            datetime.datetime.now(tz=datetime.UTC) - self.get_datetime_for_slot(slot)
         ).total_seconds()
 
     @property

@@ -623,10 +623,6 @@ pyroscope-otel==0.4.0 \
     --hash=sha256:3dec6c9f1fa7935bdf246ac41de7afdad96f5571d8d1fccd5ddca5897abd38fa \
     --hash=sha256:c74f9bcfdbcd3093c25032215e17924755fcb91ae7c5d061099d8bd51cee7505
     # via -r requirements.in
-pytz==2024.2 \
-    --hash=sha256:2aa355083c50a0f93fa581709deac0c9ad65cca8a9e9beac660adcbd493c798a \
-    --hash=sha256:31c7c1817eb7fae7ca4b8c7ee50c72f93aa2dd863de768e1ef4245d426aa0725
-    # via -r requirements.in
 remerkleable==0.1.28 \
     --hash=sha256:133cb1283f1d6fd2a020f47ee3653e93385acf2aa4ddc30f3d00eb9404751bda \
     --hash=sha256:1e19e9a927961b29c4efa210795bfad5d20a28545a6f78f7552b1e4449c24890
