@@ -120,6 +120,44 @@ class AttestationService(ValidatorDutyService):
         slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
     ) -> None:
+        if self.validator_status_tracker_service.slashing_detected:
+            raise RuntimeError("Slashing detected, not attesting")
+
+        if slot <= self._last_slot_duty_started_for:
+            self.logger.warning(
+                f"Not attesting to slot {slot} - already started attesting to slot {self._last_slot_duty_started_for}"
+            )
+            return
+
+        if slot != self.beacon_chain.current_slot:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.OTHER.value,
+            ).inc()
+            self.logger.error(
+                f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
+            )
+            return
+
+        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        slot_attester_duties = {
+            duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
+        }
+
+        for duty in slot_attester_duties:
+            self.attester_duties[epoch].remove(duty)
+
+        if head_event is not None:
+            # Cancel the scheduled job that would call this function
+            # at 1/3 of the slot time if it has not yet been called
+            with contextlib.suppress(JobLookupError):
+                self.scheduler.remove_job(
+                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+                )
+
+        if len(slot_attester_duties) == 0:
+            self.logger.debug(f"No remaining attester duties for slot {slot}")
+            return
+
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context
@@ -134,43 +172,6 @@ class AttestationService(ValidatorDutyService):
             context=trace.set_span_in_context(NonRecordingSpan(span_ctx)),
             attributes={"beacon_chain.slot": slot},
         ):
-            if self.validator_status_tracker_service.slashing_detected:
-                raise RuntimeError("Slashing detected, not attesting")
-
-            if slot <= self._last_slot_duty_started_for:
-                self.logger.warning(
-                    f"Not attesting to slot {slot} - already started attesting to slot {self._last_slot_duty_started_for}"
-                )
-                return
-            if slot != self.beacon_chain.current_slot:
-                _ERRORS_METRIC.labels(
-                    error_type=ErrorType.OTHER.value,
-                ).inc()
-                self.logger.error(
-                    f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
-                )
-                return
-
-            epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
-            slot_attester_duties = {
-                duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
-            }
-
-            for duty in slot_attester_duties:
-                self.attester_duties[epoch].remove(duty)
-
-            if head_event is not None:
-                # Cancel the scheduled job that would call this function
-                # at 1/3 of the slot time if it has not yet been called
-                with contextlib.suppress(JobLookupError):
-                    self.scheduler.remove_job(
-                        job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
-                    )
-
-            if len(slot_attester_duties) == 0:
-                self.logger.debug(f"No remaining attester duties for slot {slot}")
-                return
-
             self.logger.debug(
                 f"Attesting to slot {slot}, {len(slot_attester_duties)} duties",
             )

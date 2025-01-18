@@ -241,6 +241,43 @@ class BlockProposalService(ValidatorDutyService):
             )
 
     async def propose_block(self, slot: int) -> None:
+        if self.validator_status_tracker_service.slashing_detected:
+            raise RuntimeError("Slashing detected, not producing block")
+
+        if slot <= self._last_slot_duty_started_for:
+            self.logger.debug(
+                f"Not producing block for slot {slot} (already started producing a block for slot {self._last_slot_duty_started_for})",
+            )
+            return
+
+        if slot != self.beacon_chain.current_slot:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.OTHER.value,
+            ).inc()
+            self.logger.error(
+                f"Invalid slot for block proposal: {slot}. Current slot: {self.beacon_chain.current_slot}"
+            )
+            return
+
+        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        slot_proposer_duties = {
+            duty for duty in self.proposer_duties[epoch] if int(duty.slot) == slot
+        }
+
+        for duty in slot_proposer_duties:
+            self.proposer_duties[epoch].remove(duty)
+
+        if len(slot_proposer_duties) == 0:
+            self.logger.debug(f"No remaining proposer duties for slot {slot}")
+            return
+
+        if len(slot_proposer_duties) != 1:
+            raise ValueError(
+                f"Unexpected number of proposer duties ({len(slot_proposer_duties)}): {slot_proposer_duties}"
+            )
+
+        duty = slot_proposer_duties.pop()
+
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context
@@ -255,42 +292,6 @@ class BlockProposalService(ValidatorDutyService):
             context=trace.set_span_in_context(span=NonRecordingSpan(span_ctx)),
             attributes={"beacon_chain.slot": slot},
         ):
-            if self.validator_status_tracker_service.slashing_detected:
-                raise RuntimeError("Slashing detected, not producing block")
-
-            if slot <= self._last_slot_duty_started_for:
-                self.logger.debug(
-                    f"Not producing block for slot {slot} (already started producing a block for slot {self._last_slot_duty_started_for})",
-                )
-                return
-            if slot != self.beacon_chain.current_slot:
-                _ERRORS_METRIC.labels(
-                    error_type=ErrorType.OTHER.value,
-                ).inc()
-                self.logger.error(
-                    f"Invalid slot for block proposal: {slot}. Current slot: {self.beacon_chain.current_slot}"
-                )
-                return
-
-            epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
-            slot_proposer_duties = {
-                duty for duty in self.proposer_duties[epoch] if int(duty.slot) == slot
-            }
-
-            for duty in slot_proposer_duties:
-                self.proposer_duties[epoch].remove(duty)
-
-            if len(slot_proposer_duties) == 0:
-                self.logger.debug(f"No remaining proposer duties for slot {slot}")
-                return
-
-            if len(slot_proposer_duties) != 1:
-                raise ValueError(
-                    f"Unexpected number of proposer duties ({len(slot_proposer_duties)}): {slot_proposer_duties}"
-                )
-
-            duty = slot_proposer_duties.pop()
-
             self.logger.info(f"Producing block for slot {slot}")
             self._last_slot_duty_started_for = slot
             self._duty_start_time_metric.labels(
