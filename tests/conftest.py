@@ -12,7 +12,9 @@ from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
-from spec.configs import Network
+from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec.base import SpecDeneb
+from spec.configs import Network, get_network_spec
 from tasks import TaskManager
 
 # A few more global fixtures defined separately
@@ -39,7 +41,8 @@ def cli_args(
     beacon_node_urls_proposal: list[str],
 ) -> CLIArgs:
     return CLIArgs(
-        network=Network.FETCH,
+        network=Network._TESTS,
+        network_custom_config_path=None,
         remote_signer_url=remote_signer_url,
         beacon_node_urls=[beacon_node_url],
         beacon_node_urls_proposal=beacon_node_urls_proposal,
@@ -67,6 +70,18 @@ def _init_observability() -> None:
         metrics_multiprocess_mode=False,
         log_level="DEBUG",
     )
+
+
+@pytest.fixture(scope="session")
+def spec_deneb() -> Spec:
+    return get_network_spec(Network._TESTS)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _init_spec(spec_deneb: SpecDeneb) -> None:
+    SpecAttestation.initialize(spec=spec_deneb)
+    SpecBeaconBlock.initialize(spec=spec_deneb)
+    SpecSyncCommittee.initialize(spec=spec_deneb)
 
 
 @pytest.fixture(scope="session")
@@ -154,12 +169,14 @@ async def validator_status_tracker(
 async def multi_beacon_node(
     cli_args: CLIArgs,
     _mocked_beacon_node_endpoints: None,
+    spec_deneb: SpecDeneb,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     async with MultiBeaconNode(
         beacon_node_urls=cli_args.beacon_node_urls,
         beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
+        spec=spec_deneb,
         scheduler=scheduler,
         task_manager=task_manager,
         cli_args=cli_args,
@@ -169,6 +186,8 @@ async def multi_beacon_node(
 
 @pytest.fixture
 async def beacon_chain(
-    multi_beacon_node: MultiBeaconNode, task_manager: TaskManager
+    multi_beacon_node: MultiBeaconNode, spec_deneb: SpecDeneb, task_manager: TaskManager
 ) -> BeaconChain:
-    return BeaconChain(multi_beacon_node=multi_beacon_node, task_manager=task_manager)
+    return BeaconChain(
+        multi_beacon_node=multi_beacon_node, spec=spec_deneb, task_manager=task_manager
+    )

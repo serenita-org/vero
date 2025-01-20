@@ -9,6 +9,7 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
+from spec.base import SpecDeneb
 from tasks import TaskManager
 
 
@@ -16,6 +17,7 @@ from tasks import TaskManager
 def validator_duty_service_options(
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
+    spec_deneb: SpecDeneb,
     remote_signer: RemoteSigner,
     validator_status_tracker: ValidatorStatusTrackerService,
     scheduler: AsyncIOScheduler,
@@ -25,6 +27,7 @@ def validator_duty_service_options(
     return dict(
         multi_beacon_node=multi_beacon_node,
         beacon_chain=beacon_chain,
+        spec=spec_deneb,
         remote_signer=remote_signer,
         validator_status_tracker_service=validator_status_tracker,
         scheduler=scheduler,

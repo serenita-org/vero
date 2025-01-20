@@ -27,6 +27,7 @@ async def multi_beacon_node_three_inited_nodes(
             "http://beacon-node-c:1234",
         ],
         beacon_node_urls_proposal=[],
+        spec=spec_deneb,
         scheduler=scheduler,
         task_manager=task_manager,
         cli_args=cli_args,

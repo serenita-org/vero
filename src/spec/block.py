@@ -4,21 +4,10 @@ from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
 from remerkleable.core import ObjType
 
-from spec.attestation import Attestation, AttestationData
+from spec.attestation import AttestationData, SpecAttestation
 from spec.base import Spec
 from spec.common import (
-    BYTES_PER_LOGS_BLOOM,
     DEPOSIT_CONTRACT_TREE_DEPTH,
-    MAX_ATTESTATIONS,
-    MAX_ATTESTER_SLASHINGS,
-    MAX_BLS_TO_EXECUTION_CHANGES,
-    MAX_BYTES_PER_TRANSACTION,
-    MAX_DEPOSITS,
-    MAX_EXTRA_DATA_BYTES,
-    MAX_PROPOSER_SLASHINGS,
-    MAX_TRANSACTIONS_PER_PAYLOAD,
-    MAX_VALIDATORS_PER_COMMITTEE,
-    MAX_VOLUNTARY_EXITS,
     BLSPubkey,
     BLSSignature,
     Epoch,
@@ -73,17 +62,6 @@ class ProposerSlashing(Container):
     signed_header_2: SignedBeaconBlockHeader
 
 
-class IndexedAttestation(Container):
-    attesting_indices: List[ValidatorIndex, MAX_VALIDATORS_PER_COMMITTEE]
-    data: AttestationData
-    signature: BLSSignature
-
-
-class AttesterSlashing(Container):
-    attestation_1: IndexedAttestation
-    attestation_2: IndexedAttestation
-
-
 class VoluntaryExit(Container):
     epoch: Epoch  # Earliest epoch when voluntary exit can be processed
     validator_index: ValidatorIndex
@@ -92,10 +70,6 @@ class VoluntaryExit(Container):
 class SignedVoluntaryExit(Container):
     message: VoluntaryExit
     signature: BLSSignature
-
-
-class Transaction(ByteList[MAX_BYTES_PER_TRANSACTION]):
-    pass
 
 
 class ExecutionAddress(ByteVector[20]):
@@ -133,31 +107,9 @@ class UInt256SerializedAsString(uint256):
         return str(self)
 
 
-class ExecutionPayloadHeaderDeneb(Container):
-    # Execution block header fields
-    parent_hash: Hash32
-    fee_recipient: ExecutionAddress
-    state_root: Bytes32
-    receipts_root: Bytes32
-    logs_bloom: ByteVector[BYTES_PER_LOGS_BLOOM]
-    prev_randao: Bytes32
-    block_number: UInt64SerializedAsString
-    gas_limit: UInt64SerializedAsString
-    gas_used: UInt64SerializedAsString
-    timestamp: UInt64SerializedAsString
-    extra_data: ByteList[MAX_EXTRA_DATA_BYTES]
-    base_fee_per_gas: UInt256SerializedAsString
-    # Extra payload fields
-    block_hash: Hash32  # Hash of execution block
-    transactions_root: Root
-    withdrawals_root: Root
-    blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
-    excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
-
-
-# Dynamic block class creation
+# Dynamic spec class creation
 # to account for differing spec values across chains
-class BeaconBlockClass:
+class SpecBeaconBlock:
     Deneb: Container
     DenebBlinded: Container
 
@@ -166,9 +118,42 @@ class BeaconBlockClass:
         cls,
         spec: Spec,
     ) -> None:
+        class IndexedAttestation(Container):
+            attesting_indices: List[ValidatorIndex, spec.MAX_VALIDATORS_PER_COMMITTEE]
+            data: AttestationData
+            signature: BLSSignature
+
+        class AttesterSlashing(Container):
+            attestation_1: IndexedAttestation
+            attestation_2: IndexedAttestation
+
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
             sync_committee_signature: BLSSignature
+
+        class ExecutionPayloadHeaderDeneb(Container):
+            # Execution block header fields
+            parent_hash: Hash32
+            fee_recipient: ExecutionAddress
+            state_root: Bytes32
+            receipts_root: Bytes32
+            logs_bloom: ByteVector[spec.BYTES_PER_LOGS_BLOOM]
+            prev_randao: Bytes32
+            block_number: UInt64SerializedAsString
+            gas_limit: UInt64SerializedAsString
+            gas_used: UInt64SerializedAsString
+            timestamp: UInt64SerializedAsString
+            extra_data: ByteList[spec.MAX_EXTRA_DATA_BYTES]
+            base_fee_per_gas: UInt256SerializedAsString
+            # Extra payload fields
+            block_hash: Hash32  # Hash of execution block
+            transactions_root: Root
+            withdrawals_root: Root
+            blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
+            excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
+
+        class Transaction(ByteList[spec.MAX_BYTES_PER_TRANSACTION]):  # type: ignore[name-defined]
+            pass
 
         class ExecutionPayloadDeneb(Container):
             # Execution block header fields
@@ -176,17 +161,17 @@ class BeaconBlockClass:
             fee_recipient: ExecutionAddress  # 'beneficiary' in the yellow paper
             state_root: Bytes32
             receipts_root: Bytes32
-            logs_bloom: ByteVector[BYTES_PER_LOGS_BLOOM]
+            logs_bloom: ByteVector[spec.BYTES_PER_LOGS_BLOOM]
             prev_randao: Bytes32  # 'difficulty' in the yellow paper
             block_number: UInt64SerializedAsString  # 'number' in the yellow paper
             gas_limit: UInt64SerializedAsString
             gas_used: UInt64SerializedAsString
             timestamp: UInt64SerializedAsString
-            extra_data: ByteList[MAX_EXTRA_DATA_BYTES]
+            extra_data: ByteList[spec.MAX_EXTRA_DATA_BYTES]
             base_fee_per_gas: UInt256SerializedAsString
             # Extra payload fields
             block_hash: Hash32  # Hash of execution block
-            transactions: List[Transaction, MAX_TRANSACTIONS_PER_PAYLOAD]
+            transactions: List[Transaction, spec.MAX_TRANSACTIONS_PER_PAYLOAD]
             withdrawals: List[Withdrawal, spec.MAX_WITHDRAWALS_PER_PAYLOAD]
             blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
             excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
@@ -196,11 +181,11 @@ class BeaconBlockClass:
             eth1_data: Eth1Data  # Eth1 data vote
             graffiti: Bytes32  # Arbitrary data
             # Operations
-            proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashing, MAX_ATTESTER_SLASHINGS]
-            attestations: List[Attestation, MAX_ATTESTATIONS]
-            deposits: List[Deposit, MAX_DEPOSITS]
-            voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
+            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
+            attester_slashings: List[AttesterSlashing, spec.MAX_ATTESTER_SLASHINGS]
+            attestations: List[SpecAttestation.AttestationDeneb, spec.MAX_ATTESTATIONS]
+            deposits: List[Deposit, spec.MAX_DEPOSITS]
+            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
             # Execution
             execution_payload: (
@@ -209,7 +194,7 @@ class BeaconBlockClass:
             # Capella operations
             bls_to_execution_changes: List[
                 SignedBLSToExecutionChange,
-                MAX_BLS_TO_EXECUTION_CHANGES,
+                spec.MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
             # Execution
             blob_kzg_commitments: List[
@@ -222,11 +207,11 @@ class BeaconBlockClass:
             eth1_data: Eth1Data  # Eth1 data vote
             graffiti: Bytes32  # Arbitrary data
             # Operations
-            proposer_slashings: List[ProposerSlashing, MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[AttesterSlashing, MAX_ATTESTER_SLASHINGS]
-            attestations: List[Attestation, MAX_ATTESTATIONS]
-            deposits: List[Deposit, MAX_DEPOSITS]
-            voluntary_exits: List[SignedVoluntaryExit, MAX_VOLUNTARY_EXITS]
+            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
+            attester_slashings: List[AttesterSlashing, spec.MAX_ATTESTER_SLASHINGS]
+            attestations: List[SpecAttestation.AttestationDeneb, spec.MAX_ATTESTATIONS]
+            deposits: List[Deposit, spec.MAX_DEPOSITS]
+            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
             sync_aggregate: SyncAggregate  # [New in Altair]
             # Execution
             execution_payload_header: (
@@ -236,7 +221,7 @@ class BeaconBlockClass:
             # Capella operations
             bls_to_execution_changes: List[
                 SignedBLSToExecutionChange,
-                MAX_BLS_TO_EXECUTION_CHANGES,
+                spec.MAX_BLS_TO_EXECUTION_CHANGES,
             ]  # [New in Capella]
             # Execution
             blob_kzg_commitments: List[

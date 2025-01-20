@@ -51,10 +51,9 @@ from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
-from spec.attestation import Attestation, AttestationData
-from spec.block import BeaconBlockClass
+from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec.attestation import AttestationData
 from spec.configs import Network
-from spec.sync_committee import SyncCommitteeContributionClass
 from tasks import TaskManager
 
 (_ERRORS_METRIC,) = get_shared_metrics()
@@ -74,6 +73,7 @@ class MultiBeaconNode:
         self,
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
+        spec: Spec,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
         cli_args: CLIArgs,
@@ -96,13 +96,15 @@ class MultiBeaconNode:
             for base_url in beacon_node_urls_proposal
         ]
 
+        self.spec = spec
+
         self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
         self.cli_args = cli_args
 
     async def initialize(self) -> None:
         # Attempt to fully initialize the connected beacon nodes
         await asyncio.gather(
-            *(bn.initialize_full(cli_args=self.cli_args) for bn in self.beacon_nodes)
+            *(bn.initialize_full(spec=self.spec) for bn in self.beacon_nodes)
         )
 
         successful_init_count = len(self.initialized_beacon_nodes)
@@ -130,11 +132,6 @@ class MultiBeaconNode:
             f"/{len(self.beacon_nodes)}"
             f" beacon nodes",
         )
-
-        # Dynamically create some of the SSZ classes
-        spec = next(bn.spec for bn in self.initialized_beacon_nodes)
-        BeaconBlockClass.initialize(spec=spec)
-        SyncCommitteeContributionClass.initialize(spec=spec)
 
     async def __aenter__(self) -> "MultiBeaconNode":
         await self.initialize()
@@ -257,7 +254,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> Container:
+    ) -> "SpecBeaconBlock.Deneb | SpecBeaconBlock.DenebBlinded":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -271,8 +268,8 @@ class MultiBeaconNode:
         #  the execution payload - transactions.
         if response.version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
             if response.execution_payload_blinded:
-                return BeaconBlockClass.DenebBlinded.from_obj(response.data)
-            return BeaconBlockClass.Deneb.from_obj(response.data["block"])
+                return SpecBeaconBlock.DenebBlinded.from_obj(response.data)
+            return SpecBeaconBlock.Deneb.from_obj(response.data["block"])
         raise ValueError(
             f"Unsupported block version {response.version} in response {response}",
         )
@@ -669,11 +666,13 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> Attestation:
+    ) -> "SpecAttestation.AttestationDeneb":
         _att_data = attestation_data.copy()
         _att_data.index = committee_index
 
-        aggregates: list[Attestation] = await self._get_all_beacon_node_responses(
+        aggregates: list[
+            SpecAttestation.AttestationDeneb
+        ] = await self._get_all_beacon_node_responses(
             func_name="get_aggregate_attestation",
             attestation_data=_att_data,
         )
@@ -751,8 +750,10 @@ class MultiBeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> Container:
-        contributions: list[Container] = await self._get_all_beacon_node_responses(
+    ) -> "SpecSyncCommittee.Contribution":
+        contributions: list[
+            SpecSyncCommittee.Contribution
+        ] = await self._get_all_beacon_node_responses(
             func_name="get_sync_committee_contribution",
             slot=slot,
             subcommittee_index=subcommittee_index,

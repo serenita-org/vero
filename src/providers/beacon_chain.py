@@ -17,10 +17,16 @@ if TYPE_CHECKING:
 
 
 class BeaconChain:
-    def __init__(self, multi_beacon_node: "MultiBeaconNode", task_manager: TaskManager):
+    def __init__(
+        self,
+        spec: Spec,
+        multi_beacon_node: "MultiBeaconNode",
+        task_manager: TaskManager,
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
 
+        self.spec = spec
         self.multi_beacon_node = multi_beacon_node
         self.task_manager = task_manager
 
@@ -36,30 +42,26 @@ class BeaconChain:
             bn.genesis for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
         )
 
-    @property
-    def spec(self) -> Spec:
-        return next(
-            bn.spec for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
-        )
-
     def get_fork(self, slot: int) -> Fork:
-        spec = self.multi_beacon_node.best_beacon_node.spec
-        slot_epoch = slot // spec.SLOTS_PER_EPOCH
+        slot_epoch = slot // self.spec.SLOTS_PER_EPOCH
 
         if (
-            hasattr(spec, "ELECTRA_FORK_EPOCH")
-            and slot_epoch >= spec.ELECTRA_FORK_EPOCH
+            hasattr(self.spec, "ELECTRA_FORK_EPOCH")
+            and slot_epoch >= self.spec.ELECTRA_FORK_EPOCH
         ):
             return Fork(
-                previous_version=spec.DENEB_FORK_VERSION,
-                current_version=spec.ELECTRA_FORK_VERSION,
-                epoch=spec.ELECTRA_FORK_EPOCH,
+                previous_version=self.spec.DENEB_FORK_VERSION,
+                current_version=self.spec.ELECTRA_FORK_VERSION,
+                epoch=self.spec.ELECTRA_FORK_EPOCH,
             )
-        if hasattr(spec, "DENEB_FORK_EPOCH") and slot_epoch >= spec.DENEB_FORK_EPOCH:
+        if (
+            hasattr(self.spec, "DENEB_FORK_EPOCH")
+            and slot_epoch >= self.spec.DENEB_FORK_EPOCH
+        ):
             return Fork(
-                previous_version=spec.CAPELLA_FORK_VERSION,
-                current_version=spec.DENEB_FORK_VERSION,
-                epoch=spec.DENEB_FORK_EPOCH,
+                previous_version=self.spec.CAPELLA_FORK_VERSION,
+                current_version=self.spec.DENEB_FORK_VERSION,
+                epoch=self.spec.DENEB_FORK_EPOCH,
             )
         raise ValueError(f"Unsupported fork for epoch {self.current_epoch}")
 
@@ -122,9 +124,8 @@ class BeaconChain:
         return epoch * self.spec.SLOTS_PER_EPOCH  # type: ignore[no-any-return]
 
     def compute_epochs_for_sync_period(self, sync_period: int) -> tuple[int, int]:
-        spec = self.spec  # Cache property value
-        start_epoch = sync_period * spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
-        end_epoch = start_epoch + spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        start_epoch = sync_period * self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        end_epoch = start_epoch + self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
         return start_epoch, end_epoch
 
     def compute_sync_period_for_epoch(self, epoch: int) -> int:

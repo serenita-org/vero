@@ -17,7 +17,7 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec.common import bytes_to_uint64, hash_function
-from spec.sync_committee import SyncCommitteeContributionClass
+from spec.sync_committee import SpecSyncCommittee
 
 _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES = Counter(
     "vc_published_sync_committee_messages",
@@ -418,7 +418,7 @@ class SyncCommitteeService(ValidatorDutyService):
                         messages.append(
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
-                                contribution_and_proof=SyncCommitteeContributionClass.ContributionAndProof(
+                                contribution_and_proof=SpecSyncCommittee.ContributionAndProof(
                                     aggregator_index=int(duty.validator_index),
                                     contribution=contribution,
                                     selection_proof=duty_sp.selection_proof,

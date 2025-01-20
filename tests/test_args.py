@@ -29,6 +29,7 @@ from spec.configs import Network
             None,
             {
                 "network": Network.MAINNET,
+                "network_custom_config_path": None,
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": [],
@@ -48,7 +49,8 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=custom",
+                "--network-custom-config-path=/path/to/config.yaml",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
@@ -66,7 +68,8 @@ from spec.configs import Network
             ],
             None,
             {
-                "network": Network.FETCH,
+                "network": Network.CUSTOM,
+                "network_custom_config_path": "/path/to/config.yaml",
                 "remote_signer_url": "http://signer:9000",
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
@@ -86,7 +89,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -102,7 +105,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=   ",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -124,7 +127,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052,http://beacon-node-1:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -135,7 +138,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
@@ -150,7 +153,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=asd",
@@ -162,7 +165,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=2",
@@ -174,7 +177,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=0",
@@ -186,7 +189,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c",
@@ -197,7 +200,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -208,7 +211,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0xGGGG96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -219,7 +222,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -231,7 +234,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -243,7 +246,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -255,7 +258,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -267,7 +270,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -279,7 +282,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -324,7 +327,7 @@ from spec.configs import Network
         ),
         pytest.param(
             [
-                "--network=fetch",
+                "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",

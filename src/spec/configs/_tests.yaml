@@ -1,0 +1,43 @@
+# A preset only used for tests.
+# It is a copy of the Holesky preset, with the following changes:
+# 1) SECONDS_PER_SLOT set to 1 second.
+PRESET_BASE: 'mainnet'
+CONFIG_NAME: _tests
+
+# Genesis
+# ---------------------------------------------------------------
+# Sep-28-2023 11:55:00 +UTC
+MIN_GENESIS_TIME: 1695902100
+GENESIS_FORK_VERSION: 0x01017000
+
+
+# Forking
+# ---------------------------------------------------------------
+# Some forks are disabled for now:
+#  - These may be re-assigned to another fork-version later
+#  - Temporarily set to max uint64 value: 2**64 - 1
+
+# Altair
+ALTAIR_FORK_VERSION: 0x02017000
+ALTAIR_FORK_EPOCH: 0
+# Bellatrix
+BELLATRIX_FORK_VERSION: 0x03017000
+BELLATRIX_FORK_EPOCH: 0
+# Capella
+CAPELLA_FORK_VERSION: 0x04017000
+CAPELLA_FORK_EPOCH: 256
+# Deneb
+DENEB_FORK_VERSION: 0x05017000
+DENEB_FORK_EPOCH: 29696
+
+# Time parameters
+# ---------------------------------------------------------------
+# 12 seconds
+SECONDS_PER_SLOT: 1
+
+# phase0
+INTERVALS_PER_SLOT: 3
+TARGET_AGGREGATORS_PER_COMMITTEE: 16
+# altair
+TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE: 16
+SYNC_COMMITTEE_SUBNET_COUNT: 4

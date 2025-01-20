@@ -67,7 +67,7 @@ class EventConsumerService:
                     and int(event.slot) < self.beacon_chain.current_slot
                 ):
                     self.logger.warning(
-                        f"Ignoring event for old slot {event.slot} from {beacon_node}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
+                        f"Ignoring event for old slot {event.slot} from {beacon_node.host}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
                     )
                     continue
 

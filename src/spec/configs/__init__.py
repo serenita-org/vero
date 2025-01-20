@@ -10,8 +10,12 @@ class Network(Enum):
     GNOSIS = "gnosis"
     HOLESKY = "holesky"
 
-    # Special case where Vero uses the network specs returned by the beacon node(s)
-    FETCH = "fetch"
+    # Special case that should only be used to execute
+    #  Vero's automated test suite
+    _TESTS = "_tests"
+
+    # Special case where Vero loads a custom network config from the filesystem
+    CUSTOM = "custom"
 
 
 def parse_yaml_file(fp: Path) -> dict[str, str]:
@@ -29,10 +33,21 @@ def parse_yaml_file(fp: Path) -> dict[str, str]:
     return return_dict
 
 
-def get_network_spec(network: Network) -> Spec:
+def get_network_spec(
+    network: Network, network_custom_config_path: str | None = None
+) -> Spec:
     spec_dict = {}
 
-    spec_dict.update(parse_yaml_file(Path(__file__).parent / f"{network.value}.yaml"))
+    if network == Network.CUSTOM:
+        if network_custom_config_path is None:
+            raise ValueError(
+                "--network-custom-config-path must be specified for `custom` network"
+            )
+        spec_dict.update(parse_yaml_file(Path(network_custom_config_path)))
+    else:
+        spec_dict.update(
+            parse_yaml_file(Path(__file__).parent / f"{network.value}.yaml")
+        )
 
     preset_files_dir = (
         Path(__file__).parent / "presets" / f"{spec_dict['PRESET_BASE'].strip("'")}"

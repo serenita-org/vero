@@ -18,6 +18,8 @@ from services import (
     ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
 )
+from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec.configs import get_network_spec
 from tasks import TaskManager
 
 _logger = logging.getLogger("vero-init")
@@ -95,6 +97,19 @@ def check_data_dir_permissions(data_dir: Path) -> None:
         )
 
 
+def load_spec(cli_args: CLIArgs) -> Spec:
+    spec = get_network_spec(
+        network=cli_args.network,
+        network_custom_config_path=cli_args.network_custom_config_path,
+    )
+    # Dynamically create some of the SSZ classes
+    SpecAttestation.initialize(spec=spec)
+    SpecBeaconBlock.initialize(spec=spec)
+    SpecSyncCommittee.initialize(spec=spec)
+
+    return spec
+
+
 async def run_services(
     cli_args: CLIArgs,
     task_manager: TaskManager,
@@ -102,17 +117,21 @@ async def run_services(
     validator_duty_services: list[ValidatorDutyService],
     shutdown_event: asyncio.Event,
 ) -> None:
+    spec = load_spec(cli_args=cli_args)
+
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(
             beacon_node_urls=cli_args.beacon_node_urls,
             beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
+            spec=spec,
             scheduler=scheduler,
             task_manager=task_manager,
             cli_args=cli_args,
         ) as multi_beacon_node,
     ):
         beacon_chain = BeaconChain(
+            spec=spec,
             multi_beacon_node=multi_beacon_node,
             task_manager=task_manager,
         )
@@ -138,6 +157,7 @@ async def run_services(
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
+            spec=spec,
             remote_signer=remote_signer,
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,
