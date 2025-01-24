@@ -11,9 +11,9 @@ from spec.common import (
 )
 
 
-# Dynamic block class creation
+# Dynamic spec class creation
 # to account for differing spec values across chains
-class SyncCommitteeContributionClass:
+class SpecSyncCommittee:
     Contribution: Container
     ContributionAndProof: Container
 

@@ -11,32 +11,14 @@ from yarl import URL
 
 from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
-from spec.attestation import Attestation, AttestationData, Checkpoint
+from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec.attestation import AttestationData, Checkpoint
 from spec.base import Fork, Genesis, SpecDeneb
-from spec.block import BeaconBlockClass
-from spec.sync_committee import SyncCommitteeContributionClass
 
 
 @pytest.fixture(scope="session")
 def beacon_node_url() -> str:
     return "http://beacon-node-1:1234"
-
-
-@pytest.fixture(scope="session")
-def spec_deneb() -> SpecDeneb:
-    return SpecDeneb(
-        INTERVALS_PER_SLOT=3,
-        SECONDS_PER_SLOT=1,
-        SLOTS_PER_EPOCH=32,
-        MAX_WITHDRAWALS_PER_PAYLOAD=16,
-        MAX_BLOB_COMMITMENTS_PER_BLOCK=4096,
-        TARGET_AGGREGATORS_PER_COMMITTEE=16,
-        MAX_VALIDATORS_PER_COMMITTEE=2048,
-        EPOCHS_PER_SYNC_COMMITTEE_PERIOD=256,
-        SYNC_COMMITTEE_SIZE=512,
-        SYNC_COMMITTEE_SUBNET_COUNT=4,
-        TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE=16,
-    )
 
 
 @pytest.fixture
@@ -46,12 +28,12 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 @pytest.fixture
 def _beacon_block_class_init(spec_deneb: SpecDeneb) -> None:
-    BeaconBlockClass.initialize(spec=spec_deneb)
+    SpecBeaconBlock.initialize(spec=spec_deneb)
 
 
 @pytest.fixture
 def _sync_committee_contribution_class_init(spec_deneb: SpecDeneb) -> None:
-    SyncCommitteeContributionClass.initialize(spec=spec_deneb)
+    SpecSyncCommittee.initialize(spec=spec_deneb)
 
 
 @pytest.fixture(scope="session")
@@ -128,7 +110,7 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
             if execution_payload_blinded:
-                _data = BeaconBlockClass.DenebBlinded(
+                _data = SpecBeaconBlock.DenebBlinded(
                     slot=int(url.raw_path.split("/")[-1]),
                     proposer_index=123,
                     parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
@@ -137,7 +119,7 @@ def _mocked_beacon_node_endpoints(
                 ).to_obj()
             else:
                 _data = dict(
-                    block=BeaconBlockClass.Deneb(
+                    block=SpecBeaconBlock.Deneb(
                         slot=int(url.raw_path.split("/")[-1]),
                         proposer_index=123,
                         parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
@@ -164,7 +146,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
         if re.match("/eth/v1/validator/aggregate_attestation", url.raw_path):
-            aggregate_attestation = Attestation(
+            aggregate_attestation = SpecAttestation.AttestationDeneb(
                 aggregation_bits=Bitlist[spec_deneb.MAX_VALIDATORS_PER_COMMITTEE](
                     random.choice([0, 1])
                     for _ in range(spec_deneb.MAX_VALIDATORS_PER_COMMITTEE)
@@ -199,7 +181,7 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/validator/sync_committee_contribution", url.raw_path):
-            contribution = SyncCommitteeContributionClass.Contribution(
+            contribution = SpecSyncCommittee.Contribution(
                 slot=int(url.query["slot"]),
                 beacon_block_root=url.query["beacon_block_root"],
                 subcommittee_index=int(url.query["subcommittee_index"]),

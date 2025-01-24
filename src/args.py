@@ -10,6 +10,7 @@ from spec.configs import Network
 
 class CLIArgs(msgspec.Struct, kw_only=True):
     network: Network
+    network_custom_config_path: str | None
     remote_signer_url: str
     beacon_node_urls: list[str]
     beacon_node_urls_proposal: list[str]
@@ -99,7 +100,7 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
         Network.MAINNET: 30_000_000,
         Network.GNOSIS: 17_000_000,
         Network.HOLESKY: 36_000_000,
-        Network.FETCH: 100_000_000,
+        Network.CUSTOM: 100_000_000,
     }
 
     return _defaults[network]
@@ -108,13 +109,20 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
-    _network_choices = [e.value for e in list(Network)]
+    _network_choices = [e.value for e in list(Network) if e != Network._TESTS]  # noqa: SLF001
     parser.add_argument(
         "--network",
         type=str,
         required=True,
         choices=_network_choices,
-        help="The network to use. 'fetch' is a special case where Vero uses the network specs returned by the beacon node(s).",
+        help="The network to use. `custom` is a special case where Vero loads the network spec from the file specified using `--network-custom-config-path`",
+    )
+    parser.add_argument(
+        "--network-custom-config-path",
+        type=str,
+        required=False,
+        default=None,
+        help="Path to a custom network configuration file from which to load the network specs.",
     )
     parser.add_argument(
         "--remote-signer-url", type=str, required=True, help="URL of the remote signer."
@@ -218,8 +226,10 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             )
         ]
         network = Network(parsed_args.network)
+
         return CLIArgs(
             network=network,
+            network_custom_config_path=parsed_args.network_custom_config_path,
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
             beacon_node_urls=beacon_node_urls,
             beacon_node_urls_proposal=[

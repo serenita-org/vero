@@ -27,9 +27,8 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import AggregateAndProof, AttestationData
+from spec.attestation import AttestationData, SpecAttestation
 from spec.common import (
-    MAX_VALIDATORS_PER_COMMITTEE,
     bytes_to_uint64,
     hash_function,
 )
@@ -240,6 +239,7 @@ class AttestationService(ValidatorDutyService):
                 return {**_orig_att_data_obj, "index": committee_index}
 
             _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+
             pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
             with self.tracer.start_as_current_span(
                 name=f"{self.__class__.__name__}.sign_attestations",
@@ -277,7 +277,7 @@ class AttestationService(ValidatorDutyService):
 
                     duty = pubkey_to_duty[pubkey]
 
-                    aggregation_bits = Bitlist[MAX_VALIDATORS_PER_COMMITTEE](
+                    aggregation_bits = Bitlist[self.spec.MAX_VALIDATORS_PER_COMMITTEE](
                         False for _ in range(int(duty.committee_length))
                     )
                     aggregation_bits[int(duty.validator_committee_index)] = True
@@ -447,7 +447,7 @@ class AttestationService(ValidatorDutyService):
                     messages.append(
                         SchemaRemoteSigner.AggregateAndProofSignableMessage(
                             fork_info=_fork_info,
-                            aggregate_and_proof=AggregateAndProof(
+                            aggregate_and_proof=SpecAttestation.AggregateAndProofDeneb(
                                 aggregator_index=int(duty.validator_index),
                                 aggregate=aggregate,
                                 selection_proof=duty.selection_proof,

@@ -17,9 +17,9 @@ from remerkleable.bitfields import Bitlist, Bitvector
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from providers import MultiBeaconNode
-from spec.attestation import Attestation, AttestationData
+from spec.attestation import AttestationData, SpecAttestation
 from spec.base import SpecDeneb
-from spec.sync_committee import SyncCommitteeContributionClass
+from spec.sync_committee import SpecSyncCommittee
 from tasks import TaskManager
 
 
@@ -84,6 +84,7 @@ async def test_initialize(
     mbn = MultiBeaconNode(
         beacon_node_urls=beacon_node_urls,
         beacon_node_urls_proposal=[],
+        spec=spec_deneb,
         scheduler=scheduler,
         task_manager=task_manager,
         cli_args=cli_args,
@@ -196,7 +197,7 @@ async def test_get_aggregate_attestation(
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
-                            data=Attestation(
+                            data=SpecAttestation.AttestationDeneb(
                                 aggregation_bits=_bits,
                             ).to_obj(),
                         ),
@@ -296,7 +297,7 @@ async def test_get_sync_committee_contribution(
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
-                            data=SyncCommitteeContributionClass.Contribution(
+                            data=SpecSyncCommittee.Contribution(
                                 aggregation_bits=_bits,
                             ).to_obj(),
                         ),

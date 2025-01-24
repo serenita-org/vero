@@ -17,14 +17,12 @@ from prometheus_client import Gauge, Histogram
 from remerkleable.complex import Container
 from yarl import URL
 
-from args import CLIArgs
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec.attestation import Attestation, AttestationData
-from spec.base import Genesis, Spec, parse_spec
-from spec.configs import Network, get_network_spec
-from spec.sync_committee import SyncCommitteeContributionClass
+from spec import Spec, SpecAttestation, SpecSyncCommittee
+from spec.attestation import AttestationData
+from spec.base import Genesis, parse_spec
 from tasks import TaskManager
 
 _TIMEOUT_DEFAULT_CONNECT = 1
@@ -129,22 +127,19 @@ class BeaconNode:
         self._score = max(0, min(value, BeaconNode.MAX_SCORE))
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
 
-    async def _initialize_full(self, cli_args: CLIArgs) -> None:
+    async def _initialize_full(self, spec: Spec) -> None:
         self.genesis = await self.get_genesis()
 
-        if cli_args.network == Network.FETCH:
-            # Fetch the spec values from the beacon node
-            self.spec = await self.get_spec()
-        else:
-            # Use included hardcoded spec values for known networks
-            self.spec = get_network_spec(network=cli_args.network)
-            bn_spec = await self.get_spec()
-            if self.spec != bn_spec:
-                self.logger.warning(
-                    f"Spec values returned by beacon node not equal to hardcoded spec values."
-                    f"\nBeacon node:\n{bn_spec}"
-                    f"\nHardcoded:\n{self.spec}"
-                )
+        # Warn if the spec returned by the beacon node differs
+        bn_spec = await self.get_spec()
+        if spec != bn_spec:
+            self.logger.warning(
+                f"Spec values returned by beacon node not equal to hardcoded spec values."
+                f"\nBeacon node:\n{bn_spec}"
+                f"\nHardcoded:\n{spec}"
+            )
+
+        self.spec = bn_spec
 
         # Regularly refresh the version of the beacon node
         self.node_version = await self.get_node_version()
@@ -158,9 +153,9 @@ class BeaconNode:
         self.score = BeaconNode.MAX_SCORE
         self.initialized = True
 
-    async def initialize_full(self, cli_args: CLIArgs) -> None:
+    async def initialize_full(self, spec: Spec) -> None:
         try:
-            await self._initialize_full(cli_args=cli_args)
+            await self._initialize_full(spec=spec)
             self.logger.info(
                 f"Initialized beacon node at {self.base_url}",
             )
@@ -170,9 +165,7 @@ class BeaconNode:
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             # Try to initialize again in 30 seconds
-            self.task_manager.submit_task(
-                self.initialize_full(cli_args=cli_args), delay=30.0
-            )
+            self.task_manager.submit_task(self.initialize_full(spec=spec), delay=30.0)
 
     @staticmethod
     async def _handle_nok_status_code(response: aiohttp.ClientResponse) -> None:
@@ -530,7 +523,7 @@ class BeaconNode:
     async def get_aggregate_attestation(
         self,
         attestation_data: AttestationData,
-    ) -> Attestation:
+    ) -> "SpecAttestation.AttestationDeneb":
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/aggregate_attestation",
@@ -545,7 +538,7 @@ class BeaconNode:
             ),
         )
 
-        return Attestation.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
+        return SpecAttestation.AttestationDeneb.from_obj(json.loads(resp)["data"])
 
     async def publish_aggregate_and_proofs(
         self,
@@ -567,7 +560,7 @@ class BeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> Container:
+    ) -> "SpecSyncCommittee.Contribution":
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/sync_committee_contribution",
@@ -583,7 +576,7 @@ class BeaconNode:
             ),
         )
 
-        return SyncCommitteeContributionClass.Contribution.from_obj(
+        return SpecSyncCommittee.Contribution.from_obj(
             json.loads(resp)["data"],
         )
 

@@ -39,9 +39,14 @@ Check out the [example docker compose file](../compose-example.yaml).
 
 #### `--network`
 
-**[required]** The network to use, one of `mainnet,gnosis,holesky,fetch`.
+**[required]** The network to use, one of `mainnet,gnosis,holesky,custom`.
 
-`fetch` is a special case where Vero uses the network specs as returned by the beacon nodes.
+`custom` is a special case where Vero loads the network spec from the file specified using `--network-custom-config-path`
+___
+
+#### `--network-custom-config-path`
+
+Path to a custom network configuration file from which to load the network specs.
 ___
 
 #### `--remote-signer-url`
@@ -100,7 +105,7 @@ Current defaults per network:
 mainnet: 30M
 gnosis: 17M
 holesky: 36M
-fetch: 100M
+custom: 100M
 ```
 
 ___
