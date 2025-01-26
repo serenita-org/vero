@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "pectra-devnet-5" ]
     tags: [ v* ]
 
 jobs:

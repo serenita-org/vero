@@ -9,6 +9,7 @@ from spec.common import (
     UInt64SerializedAsString,
     ValidatorIndex,
 )
+from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 
 
 # Dynamic spec class creation
@@ -32,7 +33,7 @@ class SpecSyncCommittee:
             # A bit is set if a signature from the validator at the corresponding
             # index in the subcommittee is present in the aggregate `signature`.
             aggregation_bits: Bitvector[
-                spec.SYNC_COMMITTEE_SIZE // spec.SYNC_COMMITTEE_SUBNET_COUNT
+                spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
             ]
             # Signature by the validator(s) over the block root of `slot`
             signature: BLSSignature
