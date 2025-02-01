@@ -37,7 +37,7 @@ from spec.configs import Network
                 "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "data_dir": "/vero/data",
                 "graffiti": b"\x00" * 32,
-                "gas_limit": 30_000_000,
+                "gas_limit": 36_000_000,
                 "use_external_builder": False,
                 "builder_boost_factor": 90,
                 "metrics_address": "localhost",
@@ -300,7 +300,7 @@ from spec.configs import Network
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
             None,
-            {"gas_limit": 30_000_000},
+            {"gas_limit": 36_000_000},
             id="--gas-limit default value Ethereum Mainnet",
         ),
         pytest.param(
