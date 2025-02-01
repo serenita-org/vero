@@ -102,7 +102,7 @@ of the connected CL or EL clients.*
 
 Current defaults per network:
 ```
-mainnet: 30M
+mainnet: 36M
 gnosis: 17M
 holesky: 36M
 custom: 100M
