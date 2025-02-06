@@ -23,6 +23,7 @@ from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import Spec, SpecAttestation, SpecSyncCommittee
 from spec.attestation import AttestationData
 from spec.base import Genesis, parse_spec
+from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 _TIMEOUT_DEFAULT_CONNECT = 1
@@ -76,7 +77,11 @@ class BeaconNode:
     SCORE_DELTA_FAILURE = 5
 
     def __init__(
-        self, base_url: str, scheduler: AsyncIOScheduler, task_manager: TaskManager
+        self,
+        base_url: str,
+        spec: Spec,
+        scheduler: AsyncIOScheduler,
+        task_manager: TaskManager,
     ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
@@ -87,6 +92,8 @@ class BeaconNode:
         self.host = urlparse(base_url).hostname or ""
         if not self.host:
             raise ValueError(f"Failed to parse hostname from {base_url}")
+
+        self.spec = spec
 
         self.scheduler = scheduler
         self.task_manager = task_manager
@@ -127,19 +134,27 @@ class BeaconNode:
         self._score = max(0, min(value, BeaconNode.MAX_SCORE))
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
 
-    async def _initialize_full(self, spec: Spec) -> None:
+    async def _initialize_full(self) -> None:
         self.genesis = await self.get_genesis()
 
         # Warn if the spec returned by the beacon node differs
-        bn_spec = await self.get_spec()
-        if spec != bn_spec:
+        try:
+            bn_spec = await self.get_spec()
+            if self.spec != bn_spec:
+                self.logger.warning(
+                    f"Spec values returned by beacon node not equal to hardcoded spec values."
+                    f"\nBeacon node:\n{bn_spec}"
+                    f"\nHardcoded:\n{self.spec}"
+                )
+        except Exception as e:
+            # This triggers for Nimbus/Prysm because they don't return some spec values
+            # TODO simplify once fixed:
+            #  https://github.com/prysmaticlabs/prysm/issues/14863
+            #  https://github.com/status-im/nimbus-eth2/issues/6903
             self.logger.warning(
-                f"Spec values returned by beacon node not equal to hardcoded spec values."
-                f"\nBeacon node:\n{bn_spec}"
-                f"\nHardcoded:\n{spec}"
+                f"Failed to verify beacon node spec, error: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
-
-        self.spec = bn_spec
 
         # Regularly refresh the version of the beacon node
         self.node_version = await self.get_node_version()
@@ -153,9 +168,9 @@ class BeaconNode:
         self.score = BeaconNode.MAX_SCORE
         self.initialized = True
 
-    async def initialize_full(self, spec: Spec) -> None:
+    async def initialize_full(self) -> None:
         try:
-            await self._initialize_full(spec=spec)
+            await self._initialize_full()
             self.logger.info(
                 f"Initialized beacon node at {self.base_url}",
             )
@@ -165,7 +180,7 @@ class BeaconNode:
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             # Try to initialize again in 30 seconds
-            self.task_manager.submit_task(self.initialize_full(spec=spec), delay=30.0)
+            self.task_manager.submit_task(self.initialize_full(), delay=30.0)
 
     @staticmethod
     async def _handle_nok_status_code(response: aiohttp.ClientResponse) -> None:
@@ -499,11 +514,16 @@ class BeaconNode:
             data=self.json_encoder.encode(messages),
         )
 
-    async def publish_attestations(self, attestations: list[dict]) -> None:  # type: ignore[type-arg]
+    async def publish_attestations(
+        self,
+        attestations: list[dict],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
         await self._make_request(
             method="POST",
-            endpoint="/eth/v1/beacon/pool/attestations",
+            endpoint="/eth/v2/beacon/pool/attestations",
             data=self.json_encoder.encode(attestations),
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def prepare_beacon_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
@@ -520,39 +540,50 @@ class BeaconNode:
             data=self.json_encoder.encode(data),
         )
 
-    async def get_aggregate_attestation(
+    async def get_aggregate_attestation_v2(
         self,
         attestation_data: AttestationData,
-    ) -> "SpecAttestation.AttestationDeneb":
-        resp = await self._make_request(
+        committee_index: int,
+    ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
+        resp_text = await self._make_request(
             method="GET",
-            endpoint="/eth/v1/validator/aggregate_attestation",
+            endpoint="/eth/v2/validator/aggregate_attestation",
             params=dict(
                 attestation_data_root=f"0x{attestation_data.hash_tree_root().hex()}",
                 slot=attestation_data.slot,
+                committee_index=committee_index,
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=int(self.spec.SECONDS_PER_SLOT)
-                / int(self.spec.INTERVALS_PER_SLOT),
+                total=int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
             ),
         )
 
-        return SpecAttestation.AttestationDeneb.from_obj(json.loads(resp)["data"])
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
+        )
+
+        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
+            return SpecAttestation.AttestationPhase0.from_obj(response.data)
+        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+            return SpecAttestation.AttestationElectra.from_obj(response.data)
+        raise NotImplementedError(f"Unsupported fork version {response.version}")
 
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
-            endpoint="/eth/v1/validator/aggregate_and_proofs",
+            endpoint="/eth/v2/validator/aggregate_and_proofs",
             data=self.json_encoder.encode(
                 [
                     dict(message=msg, signature=sig)
                     for msg, sig in signed_aggregate_and_proofs
                 ]
             ),
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def get_sync_committee_contribution(
@@ -571,8 +602,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=int(self.spec.SECONDS_PER_SLOT)
-                / int(self.spec.INTERVALS_PER_SLOT),
+                total=int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
             ),
         )
 
@@ -693,13 +723,16 @@ class BeaconNode:
 
     async def publish_block_v2(
         self,
-        block_version: SchemaBeaconAPI.BeaconBlockVersion,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         block: Container,
         blobs: list,  # type: ignore[type-arg]
         kzg_proofs: list,  # type: ignore[type-arg]
         signature: str,
     ) -> None:
-        if block_version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if fork_version in (
+            SchemaBeaconAPI.ForkVersion.DENEB,
+            SchemaBeaconAPI.ForkVersion.ELECTRA,
+        ):
             data = dict(
                 signed_block=dict(
                     message=block.to_obj(),
@@ -709,7 +742,7 @@ class BeaconNode:
                 blobs=blobs,
             )
         else:
-            raise NotImplementedError(f"Unsupported block version {block_version}")
+            raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
         self.logger.debug(
             f"Publishing block for slot {block.slot},"
@@ -721,22 +754,25 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/beacon/blocks",
             data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": block_version.value},
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def publish_blinded_block_v2(
         self,
-        block_version: SchemaBeaconAPI.BeaconBlockVersion,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         block: Container,
         signature: str,
     ) -> None:
-        if block_version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if fork_version in (
+            SchemaBeaconAPI.ForkVersion.DENEB,
+            SchemaBeaconAPI.ForkVersion.ELECTRA,
+        ):
             data = dict(
                 message=block.to_obj(),
                 signature=signature,
             )
         else:
-            raise NotImplementedError(f"Unsupported block version {block_version}")
+            raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
         self.logger.debug(
             f"Publishing blinded block for slot {block.slot},"
@@ -748,7 +784,7 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/beacon/blinded_blocks",
             data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": block_version.value},
+            headers={"Eth-Consensus-Version": fork_version.value},
         )
 
     async def subscribe_to_events(

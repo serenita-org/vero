@@ -1,7 +1,8 @@
-from remerkleable.bitfields import Bitlist
+from typing import TYPE_CHECKING
+
+from remerkleable.bitfields import Bitlist, Bitvector
 from remerkleable.complex import Container
 
-from spec.base import Spec
 from spec.common import (
     BLSSignature,
     Epoch,
@@ -10,6 +11,9 @@ from spec.common import (
     UInt64SerializedAsString,
     ValidatorIndex,
 )
+
+if TYPE_CHECKING:
+    from spec import Spec
 
 
 class CommitteeIndex(UInt64SerializedAsString):
@@ -34,23 +38,42 @@ class AttestationData(Container):
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecAttestation:
-    AttestationDeneb: Container
-    AggregateAndProofDeneb: Container
+    AttestationPhase0: Container
+    IndexedAttestationPhase0: Container
+    AggregateAndProofPhase0: Container
+    AttestationElectra: Container
+    IndexedAttestationElectra: Container
+    AggregateAndProofElectra: Container
 
     @classmethod
     def initialize(
         cls,
-        spec: Spec,
+        spec: "Spec",
     ) -> None:
-        class Attestation(Container):
+        class AttestationPhase0(Container):
             aggregation_bits: Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE]
             data: AttestationData
             signature: BLSSignature
 
-        class AggregateAndProof(Container):
+        class AggregateAndProofPhase0(Container):
             aggregator_index: ValidatorIndex
-            aggregate: Attestation
+            aggregate: AttestationPhase0
             selection_proof: BLSSignature
 
-        cls.AttestationDeneb = Attestation
-        cls.AggregateAndProofDeneb = AggregateAndProof
+        class AttestationElectra(Container):
+            aggregation_bits: Bitlist[
+                spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
+            ]
+            data: AttestationData
+            signature: BLSSignature
+            committee_bits: Bitvector[spec.MAX_COMMITTEES_PER_SLOT]
+
+        class AggregateAndProofElectra(Container):
+            aggregator_index: ValidatorIndex
+            aggregate: AttestationElectra
+            selection_proof: BLSSignature
+
+        cls.AttestationPhase0 = AttestationPhase0
+        cls.AggregateAndProofPhase0 = AggregateAndProofPhase0
+        cls.AttestationElectra = AttestationElectra
+        cls.AggregateAndProofElectra = AggregateAndProofElectra

@@ -11,7 +11,6 @@ from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
-from spec.base import Spec
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -31,7 +30,6 @@ class ValidatorDuty(Enum):
 class ValidatorDutyServiceOptions(TypedDict):
     multi_beacon_node: MultiBeaconNode
     beacon_chain: BeaconChain
-    spec: Spec
     remote_signer: RemoteSigner
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
@@ -67,7 +65,7 @@ class ValidatorDutyService:
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
         self.beacon_chain = kwargs["beacon_chain"]
-        self.spec = kwargs["spec"]
+        self.spec = self.beacon_chain.spec
         self.remote_signer = kwargs["remote_signer"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"

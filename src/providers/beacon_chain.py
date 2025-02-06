@@ -6,58 +6,44 @@ import logging
 from math import floor
 from typing import TYPE_CHECKING, Any
 
-from schemas import SchemaRemoteSigner
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner
+from spec._ascii import ELECTRA as ELECTRA_ASCII_ART
 from spec.base import Fork, Genesis, Spec
 from tasks import TaskManager
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
-    from providers import MultiBeaconNode
-
 
 class BeaconChain:
     def __init__(
         self,
         spec: Spec,
-        multi_beacon_node: "MultiBeaconNode",
         task_manager: TaskManager,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.getLogger().level)
 
         self.spec = spec
-        self.multi_beacon_node = multi_beacon_node
         self.task_manager = task_manager
+
+        self.genesis = Genesis()
+        self.current_fork_version = SchemaBeaconAPI.ForkVersion.DENEB
 
         self.new_slot_handlers: list[
             Callable[[int, bool], Coroutine[Any, Any, None]]
         ] = []
 
-        self.task_manager.submit_task(self.on_new_slot())
-
-    @property
-    def genesis(self) -> Genesis:
-        return next(
-            bn.genesis for bn in self.multi_beacon_node.beacon_nodes if bn.initialized
-        )
-
     def get_fork(self, slot: int) -> Fork:
         slot_epoch = slot // self.spec.SLOTS_PER_EPOCH
 
-        if (
-            hasattr(self.spec, "ELECTRA_FORK_EPOCH")
-            and slot_epoch >= self.spec.ELECTRA_FORK_EPOCH
-        ):
+        if slot_epoch >= self.spec.ELECTRA_FORK_EPOCH:
             return Fork(
                 previous_version=self.spec.DENEB_FORK_VERSION,
                 current_version=self.spec.ELECTRA_FORK_VERSION,
                 epoch=self.spec.ELECTRA_FORK_EPOCH,
             )
-        if (
-            hasattr(self.spec, "DENEB_FORK_EPOCH")
-            and slot_epoch >= self.spec.DENEB_FORK_EPOCH
-        ):
+        if slot_epoch >= self.spec.DENEB_FORK_EPOCH:
             return Fork(
                 previous_version=self.spec.CAPELLA_FORK_VERSION,
                 current_version=self.spec.DENEB_FORK_VERSION,
@@ -70,6 +56,18 @@ class BeaconChain:
             fork=self.get_fork(slot=slot).to_obj(),
             genesis_validators_root=self.genesis.genesis_validators_root.to_obj(),
         )
+
+    def initialize(self, genesis: Genesis) -> None:
+        self.genesis = genesis
+
+        current_epoch = self.current_slot // self.spec.SLOTS_PER_EPOCH
+        if current_epoch >= self.spec.ELECTRA_FORK_EPOCH:
+            self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
+        else:
+            self.current_fork_version = SchemaBeaconAPI.ForkVersion.DENEB
+
+    def start_slot_ticker(self) -> None:
+        self.task_manager.submit_task(self.on_new_slot())
 
     def get_datetime_for_slot(self, slot: int) -> datetime.datetime:
         slot_timestamp = self.genesis.genesis_time + slot * self.spec.SECONDS_PER_SLOT
@@ -104,6 +102,12 @@ class BeaconChain:
         _current_slot = self.current_slot  # Cache property value
         self.logger.info(f"Slot {_current_slot}")
         _is_new_epoch = _current_slot % self.spec.SLOTS_PER_EPOCH == 0
+
+        if _is_new_epoch:
+            _current_epoch = _current_slot // self.spec.SLOTS_PER_EPOCH
+            if _current_epoch == self.spec.ELECTRA_FORK_EPOCH:
+                self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
+                self.logger.info(f"Electra fork epoch reached! {ELECTRA_ASCII_ART}")
 
         for handler in self.new_slot_handlers:
             self.task_manager.submit_task(handler(_current_slot, _is_new_epoch))

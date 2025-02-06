@@ -119,6 +119,11 @@ async def run_services(
 ) -> None:
     spec = load_spec(cli_args=cli_args)
 
+    beacon_chain = BeaconChain(
+        spec=spec,
+        task_manager=task_manager,
+    )
+
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(
@@ -130,13 +135,9 @@ async def run_services(
             cli_args=cli_args,
         ) as multi_beacon_node,
     ):
-        beacon_chain = BeaconChain(
-            spec=spec,
-            multi_beacon_node=multi_beacon_node,
-            task_manager=task_manager,
-        )
-
+        beacon_chain.initialize(genesis=multi_beacon_node.best_beacon_node.genesis)
         await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
+        beacon_chain.start_slot_ticker()
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")
         _logger.info(f"Current slot: {beacon_chain.current_slot}")
@@ -157,7 +158,6 @@ async def run_services(
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
-            spec=spec,
             remote_signer=remote_signer,
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,

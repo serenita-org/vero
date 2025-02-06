@@ -54,6 +54,7 @@ from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
 from spec.configs import Network
+from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 (_ERRORS_METRIC,) = get_shared_metrics()
@@ -85,13 +86,19 @@ class MultiBeaconNode:
 
         self.beacon_nodes = [
             BeaconNode(
-                base_url=base_url, scheduler=scheduler, task_manager=task_manager
+                base_url=base_url,
+                spec=spec,
+                scheduler=scheduler,
+                task_manager=task_manager,
             )
             for base_url in beacon_node_urls
         ]
         self.beacon_nodes_proposal = [
             BeaconNode(
-                base_url=base_url, scheduler=scheduler, task_manager=task_manager
+                base_url=base_url,
+                spec=spec,
+                scheduler=scheduler,
+                task_manager=task_manager,
             )
             for base_url in beacon_node_urls_proposal
         ]
@@ -103,9 +110,7 @@ class MultiBeaconNode:
 
     async def initialize(self) -> None:
         # Attempt to fully initialize the connected beacon nodes
-        await asyncio.gather(
-            *(bn.initialize_full(spec=self.spec) for bn in self.beacon_nodes)
-        )
+        await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
 
         successful_init_count = len(self.initialized_beacon_nodes)
         if successful_init_count < self._attestation_consensus_threshold:
@@ -211,6 +216,9 @@ class MultiBeaconNode:
             return_exceptions=True,
         ):
             if isinstance(res, Exception):
+                self.logger.warning(
+                    f"Failed to get a response from beacon node: {res!r}"
+                )
                 continue
 
             responses.append(res)
@@ -254,7 +262,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.Deneb | SpecBeaconBlock.DenebBlinded":
+    ) -> "SpecBeaconBlock.Deneb | SpecBeaconBlock.DenebBlinded | SpecBeaconBlock.Electra | SpecBeaconBlock.ElectraBlinded":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -266,10 +274,14 @@ class MultiBeaconNode:
         #  (probably not all CLs support this but still...)
         #  That would help a bit since we wouldn't be deserializing
         #  the execution payload - transactions.
-        if response.version == SchemaBeaconAPI.BeaconBlockVersion.DENEB:
+        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
             if response.execution_payload_blinded:
                 return SpecBeaconBlock.DenebBlinded.from_obj(response.data)
             return SpecBeaconBlock.Deneb.from_obj(response.data["block"])
+        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+            if response.execution_payload_blinded:
+                return SpecBeaconBlock.ElectraBlinded.from_obj(response.data)
+            return SpecBeaconBlock.Electra.from_obj(response.data["block"])
         raise ValueError(
             f"Unsupported block version {response.version} in response {response}",
         )
@@ -293,7 +305,7 @@ class MultiBeaconNode:
         # (e.g. 1.33s for Ethereum, 0.55s for Gnosis Chain).
         # If no block has been returned by that point, it waits indefinitely for the
         # first block to be returned by any beacon node.
-        timeout = (1 / 3) * (int(spec.SECONDS_PER_SLOT) / int(spec.INTERVALS_PER_SLOT))
+        timeout = (1 / 3) * (int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT)
 
         beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
@@ -662,19 +674,22 @@ class MultiBeaconNode:
             **kwargs,
         )
 
-    async def get_aggregate_attestation(
+    async def get_aggregate_attestation_v2(
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationDeneb":
+    ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
         _att_data = attestation_data.copy()
-        _att_data.index = committee_index
+        if isinstance(attestation_data, SpecAttestation.AttestationPhase0):
+            _att_data.index = committee_index
 
-        aggregates: list[
-            SpecAttestation.AttestationDeneb
-        ] = await self._get_all_beacon_node_responses(
-            func_name="get_aggregate_attestation",
+        aggregates: (
+            list[SpecAttestation.AttestationPhase0]
+            | list[SpecAttestation.AttestationElectra]
+        ) = await self._get_all_beacon_node_responses(
+            func_name="get_aggregate_attestation_v2",
             attestation_data=_att_data,
+            committee_index=committee_index,
         )
 
         best_aggregate = None
@@ -694,13 +709,15 @@ class MultiBeaconNode:
 
         return best_aggregate
 
-    async def get_aggregate_attestations(
+    async def get_aggregate_attestations_v2(
         self,
         attestation_data: AttestationData,
         committee_indices: set[int],
-    ) -> AsyncIterator[AttestationData]:
+    ) -> AsyncIterator[
+        "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra"
+    ]:
         tasks = [
-            self.get_aggregate_attestation(
+            self.get_aggregate_attestation_v2(
                 attestation_data=attestation_data,
                 committee_index=committee_index,
             )
@@ -710,18 +727,24 @@ class MultiBeaconNode:
         for task in asyncio.as_completed(tasks):
             try:
                 yield await task
-            except Exception:
+            except Exception as e:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
+                self.logger.error(
+                    f"Failed to produce aggregate attestation for slot {attestation_data.slot}: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
+                )
 
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
             signed_aggregate_and_proofs=signed_aggregate_and_proofs,
+            fork_version=fork_version,
         )
 
     async def get_sync_duties(
