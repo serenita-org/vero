@@ -1,4 +1,3 @@
-import datetime
 import os
 import random
 import re
@@ -16,7 +15,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import Fork, Genesis, SpecElectra
+from spec.base import Genesis, SpecElectra
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -33,35 +32,14 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
 
 
-@pytest.fixture(scope="session")
-def mocked_fork_response() -> dict:  # type: ignore[type-arg]
-    return dict(
-        data=Fork.from_obj(
-            dict(
-                previous_version="0x04017000",
-                current_version="0x05017000",
-                epoch=3,
-            ),
-        ).to_obj(),
-    )
+@pytest.fixture
+def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecElectra) -> dict:  # type: ignore[type-arg]
+    return dict(data=beacon_chain.get_fork(beacon_chain.current_slot).to_obj())
 
 
 @pytest.fixture(scope="session")
-def mocked_genesis_response() -> dict:  # type: ignore[type-arg]
-    return dict(
-        data=Genesis.from_obj(
-            dict(
-                genesis_time=int(
-                    (
-                        datetime.datetime.now(tz=datetime.UTC)
-                        - datetime.timedelta(days=30)
-                    ).timestamp()
-                ),
-                genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
-                genesis_fork_version="0x10000038",
-            ),
-        ).to_obj(),
-    )
+def mocked_genesis_response(genesis: Genesis) -> dict:  # type: ignore[type-arg]
+    return dict(data=genesis.to_obj())
 
 
 @pytest.fixture
