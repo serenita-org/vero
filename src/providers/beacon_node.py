@@ -551,7 +551,7 @@ class BeaconNode:
             params=dict(
                 attestation_data_root=f"0x{attestation_data.hash_tree_root().hex()}",
                 slot=attestation_data.slot,
-                committee_index=committee_index,
+                committee_index=str(committee_index),
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,

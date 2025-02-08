@@ -218,7 +218,7 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
         self.logger.debug(
-            f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
+            f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
         )
 
         self._duty_submission_time_metric.labels(
@@ -238,10 +238,10 @@ class SyncCommitteeService(ValidatorDutyService):
             )
         else:
             self.logger.info(
-                f"Published sync committee messages for slot {duty_slot}, count: {len(sync_committee_members)}",
+                f"Published sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
             )
             _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.inc(
-                amount=len(sync_committee_members),
+                amount=len(sync_messages_to_publish),
             )
         finally:
             self._last_slot_duty_completed_for = duty_slot

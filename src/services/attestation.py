@@ -447,7 +447,7 @@ class AttestationService(ValidatorDutyService):
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-        committee_indices = {d.committee_index for d in aggregator_duties}
+        committee_indices = {int(d.committee_index) for d in aggregator_duties}
 
         aggregate_count = 0
         self.logger.debug(
@@ -460,7 +460,7 @@ class AttestationService(ValidatorDutyService):
 
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data=att_data,
-            committee_indices={int(i) for i in committee_indices},
+            committee_indices=committee_indices,
         ):
             messages: (
                 list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
@@ -668,7 +668,7 @@ class AttestationService(ValidatorDutyService):
                     self.attester_duties[epoch].add(duty_with_proof)
 
             self.logger.debug(
-                f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])}",
+                f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])} duties",
             )
 
         self._prune_duties()
