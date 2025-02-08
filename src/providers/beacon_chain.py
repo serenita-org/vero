@@ -49,7 +49,7 @@ class BeaconChain:
                 current_version=self.spec.DENEB_FORK_VERSION,
                 epoch=self.spec.DENEB_FORK_EPOCH,
             )
-        raise ValueError(f"Unsupported fork for epoch {self.current_epoch}")
+        raise NotImplementedError(f"Unsupported fork for epoch {self.current_epoch}")
 
     def get_fork_info(self, slot: int) -> SchemaRemoteSigner.ForkInfo:
         return SchemaRemoteSigner.ForkInfo(

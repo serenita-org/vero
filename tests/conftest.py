@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import random
 from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator, Generator
@@ -16,7 +17,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecElectra, Fork, Version
+from spec.base import SpecElectra, Fork, Genesis, Version
 from spec.common import Epoch
 from spec.configs import Network, get_network_spec
 from tasks import TaskManager
@@ -217,10 +218,29 @@ async def multi_beacon_node(
         task_manager=task_manager,
         cli_args=cli_args,
     ) as mbn:
-        beacon_chain.initialize(genesis=mbn.best_beacon_node.genesis)
         yield mbn
 
 
+@pytest.fixture(scope="session")
+def genesis(spec: SpecElectra) -> Genesis:
+    # Fake genesis 1 hour ago
+    return Genesis.from_obj(  # type: ignore[no-any-return]
+        dict(
+            genesis_time=int(
+                (
+                    datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
+                ).timestamp()
+            ),
+            genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
+            genesis_fork_version=spec.GENESIS_FORK_VERSION,
+        ),
+    )
+
+
 @pytest.fixture
-async def beacon_chain(spec: SpecElectra, task_manager: TaskManager) -> BeaconChain:
-    return BeaconChain(spec=spec, task_manager=task_manager)
+async def beacon_chain(
+    spec: SpecElectra, task_manager: TaskManager, genesis: Genesis
+) -> BeaconChain:
+    bc = BeaconChain(spec=spec, task_manager=task_manager)
+    bc.initialize(genesis=genesis)
+    return bc
