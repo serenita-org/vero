@@ -91,6 +91,7 @@ aiohttp==3.11.12 \
     # via
     #   -c requirements.txt
     #   aioresponses
+    #   pytest-aiohttp
 aioresponses==0.7.7 \
     --hash=sha256:66292f1d5c94a3cb984f3336d806446042adb17347d3089f2d3962dd6e5ba55a \
     --hash=sha256:6975f31fe5e7f2113a41bd387221f31854f285ecbc05527272cd8ba4c50764a3
@@ -510,12 +511,19 @@ pytest==8.3.4 \
     --hash=sha256:965370d062bce11e73868e0335abac31b4d3de0e82f4007408d242b4f8610761
     # via
     #   -r requirements-dev.in
+    #   pytest-aiohttp
     #   pytest-asyncio
     #   pytest-cov
+pytest-aiohttp==1.1.0 \
+    --hash=sha256:147de8cb164f3fc9d7196967f109ab3c0b93ea3463ab50631e56438eab7b5adc \
+    --hash=sha256:f39a11693a0dce08dd6c542d241e199dd8047a6e6596b2bcfa60d373f143456d
+    # via -r requirements-dev.in
 pytest-asyncio==0.25.3 \
     --hash=sha256:9e89518e0f9bd08928f97a3482fdc4e244df17529460bc038291ccaf8f85c7c3 \
     --hash=sha256:fc1da2cf9f125ada7e710b4ddad05518d4cee187ae9412e9ac9271003497f07a
-    # via -r requirements-dev.in
+    # via
+    #   -r requirements-dev.in
+    #   pytest-aiohttp
 pytest-cov==6.0.0 \
     --hash=sha256:eee6f1b9e61008bd34975a4d5bab25801eb31898b032dd55addc93e96fcaaa35 \
     --hash=sha256:fde0b595ca248bb8e2d76f020b465f3b107c9632e6a1d1705f17834c89dcadc0
