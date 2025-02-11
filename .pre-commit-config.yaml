@@ -28,7 +28,7 @@ repos:
     -   id: mypy
         additional_dependencies:
           [
-          aiohttp==3.11.11,
+          aiohttp==3.11.12,
           msgspec==0.19.0,
           pytest==8.3.4,
           remerkleable==0.1.28,
