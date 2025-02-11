@@ -334,25 +334,33 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/validator/beacon_committee_subscriptions", url.raw_path):
+            _ = msgspec.json.decode(
+                kwargs["data"].decode(),
+                type=list[SchemaBeaconAPI.SubscribeToBeaconCommitteeSubnetRequestBody],
+            )
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/pool/attestations", url.raw_path):
-            data_list = msgspec.json.decode(kwargs["data"])
-            assert len(data_list) == 1
-            data = data_list[0]
-            assert (
-                data["data"]["beacon_block_root"]
-                == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
-            )
-
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
-                assert "committee_index" in data
-                assert "attester_index" in data
+                attestations = msgspec.json.decode(
+                    kwargs["data"].decode(),
+                    type=list[SchemaBeaconAPI.SingleAttestation],
+                )
+                attestation = attestations[0]
             elif beacon_chain.current_fork_version == ForkVersion.DENEB:
-                assert data["aggregation_bits"] == "0x000201"
-                assert "committee_bits" not in data
+                attestations = msgspec.json.decode(
+                    kwargs["data"].decode(),
+                    type=list[SchemaBeaconAPI.AttestationPhase0],
+                )
+                attestation = attestations[0]
+                assert attestation.aggregation_bits == "0x000201"  # type: ignore[attr-defined]
             else:
                 raise ValueError(f"Unsupported spec: {spec}")
+
+            assert (
+                attestation.data["beacon_block_root"]
+                == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
+            )
 
             return CallbackResult(status=200)
 

@@ -224,16 +224,14 @@ async def multi_beacon_node(
 @pytest.fixture(scope="session")
 def genesis(spec: SpecElectra) -> Genesis:
     # Fake genesis 1 hour ago
-    return Genesis.from_obj(  # type: ignore[no-any-return]
-        dict(
-            genesis_time=int(
-                (
-                    datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
-                ).timestamp()
-            ),
-            genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
-            genesis_fork_version=spec.GENESIS_FORK_VERSION,
+    return Genesis(
+        genesis_time=int(
+            (
+                datetime.datetime.now(tz=datetime.UTC) - datetime.timedelta(hours=1)
+            ).timestamp()
         ),
+        genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
+        genesis_fork_version=spec.GENESIS_FORK_VERSION,
     )
 
 

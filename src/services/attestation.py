@@ -228,7 +228,9 @@ class AttestationService(ValidatorDutyService):
             )
 
             # Sign the attestation data
-            attestations_objects_to_publish: list[dict] = []  # type: ignore[type-arg]
+            attestations_objects_to_publish: list[
+                SchemaBeaconAPI.AttestationPhase0 | SchemaBeaconAPI.SingleAttestation
+            ] = []
 
             def _att_data_for_committee_idx(
                 _orig_att_data_obj: dict,  # type: ignore[type-arg]
@@ -288,7 +290,7 @@ class AttestationService(ValidatorDutyService):
                         aggregation_bits[int(duty.validator_committee_index)] = True
 
                         attestations_objects_to_publish.append(
-                            dict(
+                            SchemaBeaconAPI.AttestationPhase0(
                                 aggregation_bits=aggregation_bits.to_obj(),
                                 data=_att_data_for_committee_idx(
                                     att_data_obj,
@@ -300,7 +302,7 @@ class AttestationService(ValidatorDutyService):
                     elif _fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
                         # SingleAttestation object from the CL spec
                         attestations_objects_to_publish.append(
-                            dict(
+                            SchemaBeaconAPI.SingleAttestation(
                                 committee_index=duty.committee_index,
                                 attester_index=duty.validator_index,
                                 data=att_data_obj,
@@ -573,7 +575,7 @@ class AttestationService(ValidatorDutyService):
 
         # Prepare beacon node subnet subscriptions for aggregation duties
         beacon_committee_subscriptions_data = [
-            dict(
+            SchemaBeaconAPI.SubscribeToBeaconCommitteeSubnetRequestBody(
                 validator_index=duty.validator_index,
                 committee_index=duty.committee_index,
                 committees_at_slot=duty.committees_at_slot,

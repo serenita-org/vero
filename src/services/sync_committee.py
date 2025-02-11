@@ -181,7 +181,7 @@ class SyncCommitteeService(ValidatorDutyService):
             for validator in sync_committee_members
         ]
 
-        sync_messages_to_publish = []
+        sync_messages_to_publish: list[SchemaBeaconAPI.SyncCommitteeSignature] = []
         for coro in asyncio.as_completed(coroutines):
             try:
                 msg, sig, pubkey = await coro
@@ -194,7 +194,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 continue
 
             sync_messages_to_publish.append(
-                dict(
+                SchemaBeaconAPI.SyncCommitteeSignature(
                     beacon_block_root=msg.sync_committee_message.beacon_block_root,
                     slot=str(msg.sync_committee_message.slot),
                     validator_index=next(
@@ -527,7 +527,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 sync_period + 1
             ) * self.beacon_chain.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
             sync_committee_subscriptions_data = [
-                dict(
+                SchemaBeaconAPI.SubscribeToSyncCommitteeSubnetRequestBody(
                     validator_index=duty.validator_index,
                     sync_committee_indices=duty.validator_sync_committee_indices,
                     until_epoch=str(until_epoch),

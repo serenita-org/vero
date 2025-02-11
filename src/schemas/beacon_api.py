@@ -56,6 +56,40 @@ class ForkVersion(Enum):
     ELECTRA = "electra"
 
 
+class AttestationPhase0(msgspec.Struct):
+    aggregation_bits: str
+    data: dict  # type: ignore[type-arg]
+    signature: str
+
+
+class SingleAttestation(msgspec.Struct):
+    committee_index: str
+    attester_index: str
+    data: dict  # type: ignore[type-arg]
+    signature: str
+
+
+class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
+    validator_index: str
+    committee_index: str
+    committees_at_slot: str
+    slot: str
+    is_aggregator: bool
+
+
+class SyncCommitteeSignature(msgspec.Struct):
+    slot: str
+    beacon_block_root: str
+    validator_index: str
+    signature: str
+
+
+class SubscribeToSyncCommitteeSubnetRequestBody(msgspec.Struct):
+    validator_index: str
+    sync_committee_indices: list[str]
+    until_epoch: str
+
+
 class GetAggregatedAttestationV2Response(msgspec.Struct):
     version: ForkVersion
     data: dict  # type: ignore[type-arg]
