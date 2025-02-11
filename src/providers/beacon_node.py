@@ -526,14 +526,18 @@ class BeaconNode:
             headers={"Eth-Consensus-Version": fork_version.value},
         )
 
-    async def prepare_beacon_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
+    async def prepare_beacon_committee_subscriptions(
+        self, data: list[SchemaBeaconAPI.SubscribeToBeaconCommitteeSubnetRequestBody]
+    ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/beacon_committee_subscriptions",
             data=self.json_encoder.encode(data),
         )
 
-    async def prepare_sync_committee_subscriptions(self, data: list[dict]) -> None:  # type: ignore[type-arg]
+    async def prepare_sync_committee_subscriptions(
+        self, data: list[SchemaBeaconAPI.SubscribeToSyncCommitteeSubnetRequestBody]
+    ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/sync_committee_subscriptions",
