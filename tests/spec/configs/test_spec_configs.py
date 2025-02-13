@@ -9,6 +9,6 @@ from spec.configs import Network, get_network_spec
 )
 def test_get_network_spec(network: Network) -> None:
     # TODO test currently failing because of missing Electra fork epochs
-    if network in (Network.MAINNET, Network.GNOSIS, Network.HOLESKY):
+    if network in (Network.MAINNET, Network.GNOSIS):
         pytest.xfail("Electra fork epoch not set yet")
     _ = get_network_spec(network=network)
