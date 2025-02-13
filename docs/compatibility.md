@@ -8,7 +8,7 @@ It is currently compatible with all open-source Ethereum clients:
 |----------------|------------|----------------|-------|
 | **Grandine**   | ✅          | 1.0.0+         |       |
 | **Lighthouse** | ✅          | v7.0.0-beta.0+ |       |
-| **Lodestar**   | ✅          | v1.27.0-rc.1+  |       |
+| **Lodestar**   | ✅          | v1.27.0+  |       |
 | **Nimbus**     | ✅          | v25.2.0+       |       |
 | **Prysm**      | ✅          | v5.3.0+        |       |
 | **Teku**       | ✅          | 25.2.0+        |       |
