@@ -678,9 +678,10 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_index: int,
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
         _att_data = attestation_data.copy()
-        if isinstance(attestation_data, SpecAttestation.AttestationPhase0):
+        if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
             _att_data.index = committee_index
 
         aggregates: (
@@ -713,6 +714,7 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_indices: set[int],
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> AsyncIterator[
         "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra"
     ]:
@@ -720,6 +722,7 @@ class MultiBeaconNode:
             self.get_aggregate_attestation_v2(
                 attestation_data=attestation_data,
                 committee_index=committee_index,
+                fork_version=fork_version,
             )
             for committee_index in committee_indices
         ]

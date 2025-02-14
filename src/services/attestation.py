@@ -463,6 +463,7 @@ class AttestationService(ValidatorDutyService):
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data=att_data,
             committee_indices=committee_indices,
+            fork_version=_fork_version,
         ):
             messages: (
                 list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
