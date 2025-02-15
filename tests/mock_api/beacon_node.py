@@ -10,6 +10,7 @@ from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
 
 from providers import BeaconChain
+from providers.beacon_node import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
@@ -33,6 +34,11 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
+def response_content_type(request: pytest.FixtureRequest) -> ContentType:
+    return getattr(request, "param", ContentType.JSON)
+
+
+@pytest.fixture
 def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecElectra) -> dict:  # type: ignore[type-arg]
     return dict(data=beacon_chain.get_fork(beacon_chain.current_slot).to_obj())
 
@@ -51,6 +57,7 @@ def _mocked_beacon_node_endpoints(
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
+    response_content_type: ContentType,
 ) -> None:
     def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match(r"/eth/v1/beacon/states/\w+/fork", url.raw_path):
@@ -91,56 +98,78 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
                 fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
                 if execution_payload_blinded:
-                    _data = SpecBeaconBlock.ElectraBlinded(
+                    _data = SpecBeaconBlock.ElectraBlindedBlock(
                         slot=slot,
                         proposer_index=123,
                         parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
                         state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
                         # body=...
-                    ).to_obj()
+                    )
                 else:
-                    _data = dict(
-                        block=SpecBeaconBlock.Electra(
-                            slot=slot,
-                            proposer_index=123,
-                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                            # body=...
-                        ).to_obj(),
+                    _data = SpecBeaconBlock.ElectraBlockContents.from_obj(
+                        dict(
+                            block=dict(
+                                slot=slot,
+                                proposer_index=123,
+                                parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                                state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                                # body=...
+                            ),
+                            kzg_proofs=[],
+                            blobs=[],
+                        )
                     )
             elif beacon_chain.current_fork_version == ForkVersion.DENEB:
                 fork_version = SchemaBeaconAPI.ForkVersion.DENEB
                 if execution_payload_blinded:
-                    _data = SpecBeaconBlock.DenebBlinded(
+                    _data = SpecBeaconBlock.DenebBlindedBlock(
                         slot=slot,
                         proposer_index=123,
                         parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
                         state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
                         # body=...
-                    ).to_obj()
+                    )
                 else:
-                    _data = dict(
-                        block=SpecBeaconBlock.Deneb(
-                            slot=slot,
-                            proposer_index=123,
-                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                            # body=...
-                        ).to_obj(),
+                    _data = SpecBeaconBlock.DenebBlockContents.from_obj(
+                        dict(
+                            block=dict(
+                                slot=slot,
+                                proposer_index=123,
+                                parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                                state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                                # body=...
+                            ),
+                            kzg_proofs=[],
+                            blobs=[],
+                        )
                     )
             else:
                 raise NotImplementedError(f"Endpoint not implemented for spec {spec}")
+
+            exec_payload_value = random.randint(0, 10_000_000)
+            consensus_block_value = random.randint(0, 10_000_000)
+            headers = {
+                "Content-Type": response_content_type.value,
+                "Eth-Consensus-Version": fork_version.value,
+                "Eth-Execution-Payload-Blinded": str(execution_payload_blinded),
+                "Eth-Execution-Payload-Value": str(exec_payload_value),
+                "Eth-Consensus-Block-Value": str(consensus_block_value),
+            }
+
+            if response_content_type == ContentType.OCTET_STREAM:
+                return CallbackResult(body=_data.encode_bytes(), headers=headers)
 
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.ProduceBlockV3Response(
                         version=fork_version,
                         execution_payload_blinded=execution_payload_blinded,
-                        execution_payload_value=str(random.randint(0, 10_000_000)),
-                        consensus_block_value=str(random.randint(0, 10_000_000)),
-                        data=_data,
+                        execution_payload_value=str(exec_payload_value),
+                        consensus_block_value=str(consensus_block_value),
+                        data=_data.to_obj(),
                     )
-                )
+                ),
+                headers=headers,
             )
 
         if re.match("/eth/v1/validator/attestation_data", url.raw_path):
@@ -285,9 +314,67 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
+            headers = kwargs["headers"]
+            fork_version = SchemaBeaconAPI.ForkVersion[
+                headers["Eth-Consensus-Version"].upper()
+            ]
+
+            if fork_version not in (
+                SchemaBeaconAPI.ForkVersion.DENEB,
+                SchemaBeaconAPI.ForkVersion.ELECTRA,
+            ):
+                raise NotImplementedError
+
+            if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
+                if headers["Content-Type"] == ContentType.JSON.value:
+                    _ = SpecBeaconBlock.DenebBlockContentsSigned.from_obj(
+                        kwargs["data"]
+                    )
+                else:
+                    _ = SpecBeaconBlock.DenebBlockContentsSigned.decode_bytes(
+                        kwargs["data"]
+                    )
+            if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+                if headers["Content-Type"] == ContentType.JSON.value:
+                    _ = SpecBeaconBlock.ElectraBlockContentsSigned.from_obj(
+                        kwargs["data"]
+                    )
+                else:
+                    _ = SpecBeaconBlock.ElectraBlockContentsSigned.decode_bytes(
+                        kwargs["data"]
+                    )
+
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
+            headers = kwargs["headers"]
+            fork_version = SchemaBeaconAPI.ForkVersion[
+                headers["Eth-Consensus-Version"].upper()
+            ]
+
+            if fork_version not in (
+                SchemaBeaconAPI.ForkVersion.DENEB,
+                SchemaBeaconAPI.ForkVersion.ELECTRA,
+            ):
+                raise NotImplementedError
+
+            if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
+                if headers["Content-Type"] == ContentType.JSON.value:
+                    _ = SpecBeaconBlock.DenebBlindedBlockSigned.from_obj(kwargs["data"])
+                else:
+                    _ = SpecBeaconBlock.DenebBlindedBlockSigned.decode_bytes(
+                        kwargs["data"]
+                    )
+            if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+                if headers["Content-Type"] == ContentType.JSON.value:
+                    _ = SpecBeaconBlock.ElectraBlindedBlockSigned.from_obj(
+                        kwargs["data"]
+                    )
+                else:
+                    _ = SpecBeaconBlock.ElectraBlindedBlockSigned.decode_bytes(
+                        kwargs["data"]
+                    )
+
             return CallbackResult(status=200)
 
         if re.match(r"/eth/v1/validator/duties/attester/\d+", url.raw_path):

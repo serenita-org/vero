@@ -97,6 +97,7 @@ class SpecDeneb(SpecCapella):
     MAX_BLOB_COMMITMENTS_PER_BLOCK: uint64
     DENEB_FORK_EPOCH: uint64
     DENEB_FORK_VERSION: Version
+    FIELD_ELEMENTS_PER_BLOB: uint64
 
 
 class SpecElectra(SpecDeneb):

@@ -157,7 +157,7 @@ class ProduceBlockV3Response(msgspec.Struct):
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
-    data: dict  # type: ignore[type-arg]
+    data: dict | bytes  # type: ignore[type-arg]
 
 
 # Events

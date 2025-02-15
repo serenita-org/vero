@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterable
+from enum import Enum
 from typing import Any
 from urllib.parse import urlparse
 
@@ -11,16 +12,16 @@ import aiohttp
 import msgspec
 from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from multidict import CIMultiDictProxy
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from prometheus_client import Gauge, Histogram
-from remerkleable.complex import Container
 from yarl import URL
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec import Spec, SpecAttestation, SpecSyncCommittee
+from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
 from spec.base import Genesis, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
@@ -71,6 +72,11 @@ class BeaconNodeUnsupportedEndpoint(Exception):
     pass
 
 
+class ContentType(Enum):
+    JSON = "application/json"
+    OCTET_STREAM = "application/octet-stream"
+
+
 class BeaconNode:
     MAX_SCORE = 100
     SCORE_DELTA_SUCCESS = 1
@@ -114,8 +120,8 @@ class BeaconNode:
                 total=_TIMEOUT_DEFAULT_TOTAL,
             ),
             headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
+                "Accept": ContentType.JSON.value,
+                "Content-Type": ContentType.JSON.value,
                 "User-Agent": f"{get_service_name()}/{get_service_version()}",
             },
             trace_configs=[
@@ -206,7 +212,7 @@ class BeaconNode:
         **kwargs: Any,
         # can't get this more correct type hint to work with mypy
         # **kwargs: Unpack[_RequestOptions],
-    ) -> str:
+    ) -> tuple[str | bytes, CIMultiDictProxy[str]]:
         if formatted_endpoint_string_params is not None:
             kwargs["trace_request_ctx"] = dict(path=endpoint)
             endpoint = endpoint.format(**formatted_endpoint_string_params)
@@ -227,7 +233,10 @@ class BeaconNode:
 
                 # Request was successfully fulfilled
                 self.score += BeaconNode.SCORE_DELTA_SUCCESS
-                return await resp.text()
+
+                if resp.content_type == ContentType.OCTET_STREAM.value:
+                    return await resp.read(), resp.headers
+                return await resp.text(), resp.headers
         except BeaconNodeUnsupportedEndpoint:
             raise
         except Exception as e:
@@ -246,14 +255,14 @@ class BeaconNode:
             raise ValueError(f"Execution optimistic on {self.host}")
 
     async def get_genesis(self) -> Genesis:
-        resp = await self._make_request(
+        resp, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/beacon/genesis",
         )
         return Genesis.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
     async def get_spec(self) -> Spec:
-        resp = await self._make_request(
+        resp, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
         )
@@ -261,7 +270,7 @@ class BeaconNode:
         return parse_spec(json.loads(resp)["data"])
 
     async def get_node_version(self) -> str:
-        resp = await self._make_request(
+        resp, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/node/version",
         )
@@ -293,7 +302,7 @@ class BeaconNode:
                 "server.address": self.host,
             },
         ) as tracer_span:
-            resp = await self._make_request(
+            resp, _ = await self._make_request(
                 method="GET",
                 endpoint="/eth/v1/validator/attestation_data",
                 params=dict(
@@ -349,7 +358,7 @@ class BeaconNode:
                 await asyncio.sleep(max(0.05 - elapsed_time, 0))
 
     async def get_block_root(self, block_id: str) -> str:
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/beacon/blocks/{block_id}/root",
             formatted_endpoint_string_params=dict(block_id=block_id),
@@ -383,7 +392,7 @@ class BeaconNode:
         for i in range(0, len(ids), _batch_size):
             ids_batch = ids[i : i + _batch_size]
 
-            resp_text = await self._make_request(
+            resp_text, _ = await self._make_request(
                 method="GET",
                 endpoint=_endpoint,
                 formatted_endpoint_string_params=dict(state_id=state_id),
@@ -416,7 +425,7 @@ class BeaconNode:
         if len(ids) == 0:
             return []
 
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/states/{state_id}/validators",
             formatted_endpoint_string_params=dict(state_id=state_id),
@@ -446,7 +455,7 @@ class BeaconNode:
         epoch: int,
         indices: list[int],
     ) -> SchemaBeaconAPI.GetAttesterDutiesResponse:
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/duties/attester/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
@@ -464,7 +473,7 @@ class BeaconNode:
         self,
         epoch: int,
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/duties/proposer/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
@@ -482,7 +491,7 @@ class BeaconNode:
         epoch: int,
         indices: list[int],
     ) -> SchemaBeaconAPI.GetSyncDutiesResponse:
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/duties/sync/{epoch}",
             formatted_endpoint_string_params=dict(epoch=epoch),
@@ -540,7 +549,7 @@ class BeaconNode:
         attestation_data: AttestationData,
         committee_index: int,
     ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
-        resp_text = await self._make_request(
+        resp_text, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
             params=dict(
@@ -587,7 +596,7 @@ class BeaconNode:
         subcommittee_index: int,
         beacon_block_root: str,
     ) -> "SpecSyncCommittee.Contribution":
-        resp = await self._make_request(
+        resp, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/sync_committee_contribution",
             params=dict(
@@ -676,19 +685,37 @@ class BeaconNode:
                 "server.address": self.host,
             },
         ) as tracer_span:
-            resp = await self._make_request(
+            resp, headers = await self._make_request(
                 method="GET",
                 endpoint="/eth/v3/validator/blocks/{slot}",
                 formatted_endpoint_string_params=dict(slot=slot),
+                headers={
+                    "Accept": f"{ContentType.OCTET_STREAM.value};q=1.0,{ContentType.JSON.value};q=0.9",
+                },
                 params=params,
                 timeout=ClientTimeout(
                     connect=self.client_session.timeout.connect,
                 ),
             )
 
-            response = msgspec.json.decode(
-                resp, type=SchemaBeaconAPI.ProduceBlockV3Response
-            )
+            if isinstance(resp, bytes):
+                execution_payload_blinded = headers[
+                    "Eth-Execution-Payload-Blinded"
+                ].lower() in ("true", "1")
+
+                response = SchemaBeaconAPI.ProduceBlockV3Response(
+                    version=SchemaBeaconAPI.ForkVersion[
+                        headers["Eth-Consensus-Version"].upper()
+                    ],
+                    execution_payload_blinded=execution_payload_blinded,
+                    execution_payload_value=headers["Eth-Execution-Payload-Value"],
+                    consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                    data=resp,
+                )
+            else:
+                response = msgspec.json.decode(
+                    resp, type=SchemaBeaconAPI.ProduceBlockV3Response
+                )
 
             consensus_block_value = int(response.consensus_block_value)
             execution_payload_value = int(response.execution_payload_value)
@@ -719,67 +746,60 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        block: Container,
-        blobs: list,  # type: ignore[type-arg]
-        kzg_proofs: list,  # type: ignore[type-arg]
-        signature: str,
+        signed_beacon_block_contents: "SpecBeaconBlock.DenebBlockContentsSigned | SpecBeaconBlock.ElectraBlockContentsSigned",
     ) -> None:
-        if fork_version in (
-            SchemaBeaconAPI.ForkVersion.DENEB,
-            SchemaBeaconAPI.ForkVersion.ELECTRA,
-        ):
-            data = dict(
-                signed_block=dict(
-                    message=block.to_obj(),
-                    signature=signature,
-                ),
-                kzg_proofs=kzg_proofs,
-                blobs=blobs,
+        if self.logger.isEnabledFor(logging.DEBUG):
+            block = signed_beacon_block_contents.signed_block.message
+            self.logger.debug(
+                f"Publishing block for slot {block.slot},"
+                f" block root {block.hash_tree_root().hex()},"
+                f" body root {block.body.hash_tree_root().hex()}",
             )
-        else:
-            raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-        self.logger.debug(
-            f"Publishing block for slot {block.slot},"
-            f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}",
-        )
+        # TODO
+        # based on benchmark (benchmark-ssz-block under Scratches)
+        # --> decoding from SSZ is about 1.6x slower
+        # --> encoding to SSZ is 2x slower
+        # --> total processing time therefore somewhere between 1.5-2x longer
+        # --> resulting SSZ encoded data size is >2x smaller (52KB vs 120KB for this random block)
+        # ... so we spend more time processing but save on data which saves time elsewhere
+        # ... not sure if this is a blatant win-win? does it matter from the CL's point of view?
+        #     Ask Nico
+        # ... ideally we would have a lower-level higher-performing SSZ library for this sort
+        #     of thing, I think Python may be slowing down the en-/decoding too much
+        # ... see if we can use PyO3 or some C library for this sort of processing-heavy stuff
 
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/blocks",
-            data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": fork_version.value},
+            data=signed_beacon_block_contents.encode_bytes(),
+            headers={
+                "Eth-Consensus-Version": fork_version.value,
+                "Content-Type": ContentType.OCTET_STREAM.value,
+            },
         )
 
     async def publish_blinded_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        block: Container,
-        signature: str,
+        signed_blinded_beacon_block: "SpecBeaconBlock.DenebBlindedBlockSigned | SpecBeaconBlock.ElectraBlindedBlockSigned",
     ) -> None:
-        if fork_version in (
-            SchemaBeaconAPI.ForkVersion.DENEB,
-            SchemaBeaconAPI.ForkVersion.ELECTRA,
-        ):
-            data = dict(
-                message=block.to_obj(),
-                signature=signature,
+        if self.logger.isEnabledFor(logging.DEBUG):
+            block = signed_blinded_beacon_block.message
+            self.logger.debug(
+                f"Publishing block for slot {block.slot},"
+                f" block root {block.hash_tree_root().hex()},"
+                f" body root {block.body.hash_tree_root().hex()}",
             )
-        else:
-            raise NotImplementedError(f"Unsupported fork version {fork_version}")
-
-        self.logger.debug(
-            f"Publishing blinded block for slot {block.slot},"
-            f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}",
-        )
 
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/blinded_blocks",
-            data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": fork_version.value},
+            data=signed_blinded_beacon_block.encode_bytes(),
+            headers={
+                "Eth-Consensus-Version": fork_version.value,
+                "Content-Type": ContentType.OCTET_STREAM.value,
+            },
         )
 
     async def subscribe_to_events(
