@@ -765,12 +765,19 @@ class BeaconNode:
             f" body root {block.body.hash_tree_root().hex()}",
         )
 
-        await self._make_request(
-            method="POST",
-            endpoint="/eth/v2/beacon/blocks",
-            data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": fork_version.value},
-        )
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_block_v2",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            await self._make_request(
+                method="POST",
+                endpoint="/eth/v2/beacon/blocks",
+                data=self.json_encoder.encode(data),
+                headers={"Eth-Consensus-Version": fork_version.value},
+            )
 
     async def publish_blinded_block_v2(
         self,
@@ -795,12 +802,19 @@ class BeaconNode:
             f" body root {block.body.hash_tree_root().hex()}",
         )
 
-        await self._make_request(
-            method="POST",
-            endpoint="/eth/v2/beacon/blinded_blocks",
-            data=self.json_encoder.encode(data),
-            headers={"Eth-Consensus-Version": fork_version.value},
-        )
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_blinded_block_v2",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            await self._make_request(
+                method="POST",
+                endpoint="/eth/v2/beacon/blinded_blocks",
+                data=self.json_encoder.encode(data),
+                headers={"Eth-Consensus-Version": fork_version.value},
+            )
 
     async def subscribe_to_events(
         self,
