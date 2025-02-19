@@ -1,6 +1,8 @@
 """Provides methods for interacting with a beacon node through the [Beacon Node API](https://github.com/ethereum/beacon-APIs)."""
 
 import asyncio
+import contextlib
+import datetime
 import json
 import logging
 from collections.abc import AsyncIterable
@@ -157,12 +159,12 @@ class BeaconNode:
             )
 
         # Regularly refresh the version of the beacon node
-        self.node_version = await self.get_node_version()
         self.scheduler.add_job(
-            self.get_node_version,
+            self.update_node_version,
             "interval",
             minutes=10,
-            id=f"{self.__class__.__name__}.get_node_version-{self.base_url}",
+            next_run_time=datetime.datetime.now(tz=datetime.UTC),
+            id=f"{self.__class__.__name__}.update_node_version-{self.base_url}",
         )
 
         self.score = BeaconNode.MAX_SCORE
@@ -260,25 +262,34 @@ class BeaconNode:
 
         return parse_spec(json.loads(resp)["data"])
 
-    async def get_node_version(self) -> str:
+    async def update_node_version(self) -> None:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/node/version",
         )
 
         try:
-            version = json.loads(resp)["data"]["version"]
+            resp_version = json.loads(resp)["data"]["version"]
         except Exception as e:
             self.logger.warning(f"Failed to parse beacon node version: {e}")
-            version = "unknown"
+            resp_version = "unknown"
 
-        if not isinstance(version, str):
+        if not isinstance(resp_version, str):
             raise TypeError(
-                f"Beacon node did not return a string version: {type(version)} : {version}",
+                f"Beacon node did not return a string version: {type(resp_version)} : {resp_version}",
             )
 
-        _BEACON_NODE_VERSION.labels(host=self.host, version=version).set(1)
-        return version
+        if resp_version != self.node_version:
+            self.logger.info(
+                f"Beacon node version changed: {self.node_version} -> {resp_version}"
+            )
+            # Remove old metric value in order not to report multiple values
+            # for the same host
+            with contextlib.suppress(KeyError):
+                _BEACON_NODE_VERSION.remove(self.host, self.node_version)
+
+        self.node_version = resp_version
+        _BEACON_NODE_VERSION.labels(host=self.host, version=self.node_version).set(1)
 
     async def produce_attestation_data(
         self,
