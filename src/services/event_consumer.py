@@ -7,6 +7,7 @@ from uuid import uuid4
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter
 
+from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, BeaconNode, MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
@@ -16,6 +17,7 @@ _VC_PROCESSED_BEACON_NODE_EVENTS = Counter(
     "Successfully processed beacon node events",
     labelnames=["host", "event_type"],
 )
+(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class EventConsumerService:
@@ -111,6 +113,9 @@ class EventConsumerService:
 
         except Exception as e:
             beacon_node.score -= BeaconNode.SCORE_DELTA_FAILURE
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.EVENT_CONSUMER.value,
+            ).inc()
             self.logger.error(
                 f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 1 second...",
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),

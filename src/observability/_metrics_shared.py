@@ -20,6 +20,7 @@ class ErrorType(Enum):
     DUTIES_UPDATE = "duties-update"
     VALIDATOR_STATUS_UPDATE = "validator-status-update"
     SIGNATURE = "signature"
+    EVENT_CONSUMER = "event-consumer"
     OTHER = "other"
 
 
