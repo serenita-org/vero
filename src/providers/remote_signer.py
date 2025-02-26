@@ -87,6 +87,9 @@ class RemoteSigner:
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            # Default aiohttp read buffer is only 64KB which is not always enough,
+            # resulting in ValueError("Chunk too big")
+            read_bufsize=2**19,
         )
 
         self.high_priority_client_session = aiohttp.ClientSession(
@@ -98,6 +101,9 @@ class RemoteSigner:
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            # Default aiohttp read buffer is only 64KB which is not always enough,
+            # resulting in ValueError("Chunk too big")
+            read_bufsize=2**19,
         )
 
         self.json_encoder = msgspec.json.Encoder()

@@ -19,7 +19,12 @@ from prometheus_client import Gauge, Histogram
 from remerkleable.complex import Container
 from yarl import URL
 
-from observability import get_service_name, get_service_version
+from observability import (
+    ErrorType,
+    get_service_name,
+    get_service_version,
+    get_shared_metrics,
+)
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import Spec, SpecAttestation, SpecSyncCommittee
@@ -63,6 +68,7 @@ _BEACON_NODE_EXECUTION_PAYLOAD_VALUE = Histogram(
     labelnames=["host"],
     buckets=_block_value_buckets,
 )
+(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class BeaconNodeNotReady(Exception):
@@ -123,6 +129,9 @@ class BeaconNode:
             trace_configs=[
                 RequestLatency(host=self.host, service_type=ServiceType.BEACON_NODE),
             ],
+            # Default aiohttp read buffer is only 64KB which is not always enough,
+            # resulting in ValueError("Chunk too big")
+            read_bufsize=2**19,
         )
 
         self.json_encoder = msgspec.json.Encoder()
@@ -837,6 +846,9 @@ class BeaconNode:
                 try:
                     event_name = decoded.split(":")[1].strip()
                 except Exception as e:
+                    _ERRORS_METRIC.labels(
+                        error_type=ErrorType.EVENT_CONSUMER.value,
+                    ).inc()
                     self.logger.error(
                         f"Failed to parse event name from {decoded} ({e!r}) -> ignoring event...",
                         exc_info=self.logger.isEnabledFor(logging.DEBUG),
