@@ -7,8 +7,10 @@ from spec.base import Spec, parse_spec
 
 class Network(Enum):
     MAINNET = "mainnet"
-    GNOSIS = "gnosis"
     HOLESKY = "holesky"
+
+    GNOSIS = "gnosis"
+    CHIADO = "chiado"
 
     # Special case that should only be used to execute
     #  Vero's automated test suite

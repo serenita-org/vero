@@ -5,7 +5,7 @@ from remerkleable.basic import uint64
 from remerkleable.byte_arrays import Bytes32, Bytes48, Bytes96
 from remerkleable.core import ObjType
 
-# Some spec values are the same for mainnet, holesky, gnosis
+# Some spec values are the same for mainnet, holesky, gnosis, chiado
 DEPOSIT_CONTRACT_TREE_DEPTH = uint64(2**5)
 
 

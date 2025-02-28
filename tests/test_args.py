@@ -327,6 +327,17 @@ from spec.configs import Network
         ),
         pytest.param(
             [
+                "--network=chiado",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            None,
+            {"gas_limit": 17_000_000},
+            id="--gas-limit default value Chiado testnet",
+        ),
+        pytest.param(
+            [
                 "--network=holesky",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
