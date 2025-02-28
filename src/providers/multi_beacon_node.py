@@ -332,10 +332,13 @@ class MultiBeaconNode:
         start_time = asyncio.get_running_loop().time()
         remaining_timeout = timeout
 
-        # Only compare consensus block value on Gnosis Chain
+        # Only compare consensus block value on Gnosis Chain / Chiado
         # since the execution payload value is in a different
         # currency (xDAI) and not easily comparable
-        _compare_consensus_block_value_only = self.cli_args.network in [Network.GNOSIS]
+        _compare_consensus_block_value_only = self.cli_args.network in [
+            Network.GNOSIS,
+            Network.CHIADO,
+        ]
 
         while pending and remaining_timeout > 0:
             done, pending = await asyncio.wait(
