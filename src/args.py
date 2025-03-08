@@ -108,6 +108,14 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
 
 
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
+    if args == ["--version"]:
+        import sys
+
+        from observability import get_service_version
+
+        print(f"Vero {get_service_version()}")  # noqa: T201
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
     _network_choices = [e.value for e in list(Network) if e != Network._TESTS]  # noqa: SLF001
