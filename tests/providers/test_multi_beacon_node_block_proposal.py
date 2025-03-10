@@ -15,7 +15,6 @@ from aioresponses import CallbackResult, aioresponses
 
 from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
-from spec import SpecBeaconBlock
 
 
 class BeaconNodeResponse(TypedDict):
@@ -276,8 +275,6 @@ async def test_produce_block_v3(
     """Tests that the multi-beacon requests blocks from all beacon nodes
     and returns the one with the highest value.
     """
-    _empty_beacon_block = SpecBeaconBlock.Deneb().to_obj()
-
     with aioresponses() as m:
         for sequence in bn_response_sequences:
             bn_host = sequence["host"]
@@ -287,9 +284,6 @@ async def test_produce_block_v3(
 
             for r in sequence["responses"]:
                 response, exception, delay = r["response"], r["exception"], r["delay"]
-
-                if response:
-                    response.data["block"] = _empty_beacon_block
 
                 async def _f(
                     _response: SchemaBeaconAPI.ProduceBlockV3Response | None,

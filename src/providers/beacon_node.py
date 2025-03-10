@@ -6,6 +6,7 @@ import datetime
 import json
 import logging
 from collections.abc import AsyncIterable
+from enum import Enum
 from typing import Any
 from urllib.parse import urlparse
 
@@ -16,7 +17,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from prometheus_client import Gauge, Histogram
-from remerkleable.complex import Container
 from yarl import URL
 
 from observability import (
@@ -27,7 +27,7 @@ from observability import (
 )
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec import Spec, SpecAttestation, SpecSyncCommittee
+from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
 from spec.base import Genesis, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
@@ -79,6 +79,11 @@ class BeaconNodeUnsupportedEndpoint(Exception):
     pass
 
 
+class ContentType(Enum):
+    JSON = "application/json"
+    OCTET_STREAM = "application/octet-stream"
+
+
 class BeaconNode:
     MAX_SCORE = 100
     SCORE_DELTA_SUCCESS = 1
@@ -122,8 +127,8 @@ class BeaconNode:
                 total=_TIMEOUT_DEFAULT_TOTAL,
             ),
             headers={
-                "Accept": "application/json",
-                "Content-Type": "application/json",
+                "Accept": ContentType.JSON.value,
+                "Content-Type": ContentType.JSON.value,
                 "User-Agent": f"{get_service_name()}/{get_service_version()}",
             },
             trace_configs=[
@@ -238,6 +243,12 @@ class BeaconNode:
 
                 # Request was successfully fulfilled
                 self.score += BeaconNode.SCORE_DELTA_SUCCESS
+
+                if resp.content_type != ContentType.JSON.value:
+                    raise NotImplementedError(  # noqa: TRY301
+                        f"Content type in response unsupported: {resp.content_type}"
+                    )
+
                 return await resp.text()
         except BeaconNodeUnsupportedEndpoint:
             raise
@@ -739,31 +750,15 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        block: Container,
-        blobs: list,  # type: ignore[type-arg]
-        kzg_proofs: list,  # type: ignore[type-arg]
-        signature: str,
+        signed_beacon_block_contents: "SpecBeaconBlock.DenebBlockContentsSigned | SpecBeaconBlock.ElectraBlockContentsSigned",
     ) -> None:
-        if fork_version in (
-            SchemaBeaconAPI.ForkVersion.DENEB,
-            SchemaBeaconAPI.ForkVersion.ELECTRA,
-        ):
-            data = dict(
-                signed_block=dict(
-                    message=block.to_obj(),
-                    signature=signature,
-                ),
-                kzg_proofs=kzg_proofs,
-                blobs=blobs,
+        if self.logger.isEnabledFor(logging.DEBUG):
+            block = signed_beacon_block_contents.signed_block.message
+            self.logger.debug(
+                f"Publishing block for slot {block.slot},"
+                f" block root {block.hash_tree_root().hex()},"
+                f" body root {block.body.hash_tree_root().hex()}",
             )
-        else:
-            raise NotImplementedError(f"Unsupported fork version {fork_version}")
-
-        self.logger.debug(
-            f"Publishing block for slot {block.slot},"
-            f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}",
-        )
 
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_block_v2",
@@ -775,32 +770,25 @@ class BeaconNode:
             await self._make_request(
                 method="POST",
                 endpoint="/eth/v2/beacon/blocks",
-                data=self.json_encoder.encode(data),
-                headers={"Eth-Consensus-Version": fork_version.value},
+                data=self.json_encoder.encode(signed_beacon_block_contents.to_obj()),
+                headers={
+                    "Eth-Consensus-Version": fork_version.value,
+                    "Content-Type": ContentType.JSON.value,
+                },
             )
 
     async def publish_blinded_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        block: Container,
-        signature: str,
+        signed_blinded_beacon_block: "SpecBeaconBlock.DenebBlindedBlockSigned | SpecBeaconBlock.ElectraBlindedBlockSigned",
     ) -> None:
-        if fork_version in (
-            SchemaBeaconAPI.ForkVersion.DENEB,
-            SchemaBeaconAPI.ForkVersion.ELECTRA,
-        ):
-            data = dict(
-                message=block.to_obj(),
-                signature=signature,
+        if self.logger.isEnabledFor(logging.DEBUG):
+            block = signed_blinded_beacon_block.message
+            self.logger.debug(
+                f"Publishing blinded block for slot {block.slot},"
+                f" block root {block.hash_tree_root().hex()},"
+                f" body root {block.body.hash_tree_root().hex()}",
             )
-        else:
-            raise NotImplementedError(f"Unsupported fork version {fork_version}")
-
-        self.logger.debug(
-            f"Publishing blinded block for slot {block.slot},"
-            f" block root {block.hash_tree_root().hex()},"
-            f" body root {block.body.hash_tree_root().hex()}",
-        )
 
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_blinded_block_v2",
@@ -812,8 +800,11 @@ class BeaconNode:
             await self._make_request(
                 method="POST",
                 endpoint="/eth/v2/beacon/blinded_blocks",
-                data=self.json_encoder.encode(data),
-                headers={"Eth-Consensus-Version": fork_version.value},
+                data=self.json_encoder.encode(signed_blinded_beacon_block.to_obj()),
+                headers={
+                    "Eth-Consensus-Version": fork_version.value,
+                    "Content-Type": ContentType.JSON.value,
+                },
             )
 
     async def subscribe_to_events(
