@@ -262,7 +262,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.Deneb | SpecBeaconBlock.DenebBlinded | SpecBeaconBlock.Electra | SpecBeaconBlock.ElectraBlinded":
+    ) -> "SpecBeaconBlock.DenebBlockContents | SpecBeaconBlock.DenebBlindedBlock | SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -274,17 +274,30 @@ class MultiBeaconNode:
         #  (probably not all CLs support this but still...)
         #  That would help a bit since we wouldn't be deserializing
         #  the execution payload - transactions.
-        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
-            if response.execution_payload_blinded:
-                return SpecBeaconBlock.DenebBlinded.from_obj(response.data)
-            return SpecBeaconBlock.Deneb.from_obj(response.data["block"])
-        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-            if response.execution_payload_blinded:
-                return SpecBeaconBlock.ElectraBlinded.from_obj(response.data)
-            return SpecBeaconBlock.Electra.from_obj(response.data["block"])
-        raise ValueError(
-            f"Unsupported block version {response.version} in response {response}",
+        decode_function = (
+            "decode_bytes" if isinstance(response.data, bytes) else "from_obj"
         )
+
+        block_map = {
+            SchemaBeaconAPI.ForkVersion.DENEB: (
+                SpecBeaconBlock.DenebBlindedBlock
+                if response.execution_payload_blinded
+                else SpecBeaconBlock.DenebBlockContents
+            ),
+            SchemaBeaconAPI.ForkVersion.ELECTRA: (
+                SpecBeaconBlock.ElectraBlindedBlock
+                if response.execution_payload_blinded
+                else SpecBeaconBlock.ElectraBlockContents
+            ),
+        }
+
+        try:
+            block_cls = block_map[response.version]
+            return getattr(block_cls, decode_function)(response.data)
+        except KeyError:
+            raise ValueError(
+                f"Unsupported block version {response.version} in response {response}"
+            ) from None
 
     async def _produce_best_block(
         self,

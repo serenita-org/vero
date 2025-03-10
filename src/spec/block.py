@@ -10,7 +10,6 @@ from spec.attestation import (
 )
 from spec.base import Spec
 from spec.common import (
-    DEPOSIT_CONTRACT_TREE_DEPTH,
     BLSPubkey,
     BLSSignature,
     Epoch,
@@ -20,6 +19,7 @@ from spec.common import (
     UInt64SerializedAsString,
     ValidatorIndex,
 )
+from spec.constants import BYTES_PER_FIELD_ELEMENT, DEPOSIT_CONTRACT_TREE_DEPTH
 
 
 class Eth1Data(Container):
@@ -130,13 +130,24 @@ class ConsolidationRequest(Container):
     target_pubkey: BLSPubkey
 
 
+class KZGProof(Bytes48):
+    pass
+
+
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecBeaconBlock:
-    Deneb: Container
-    DenebBlinded: Container
-    Electra: Container
-    ElectraBlinded: Container
+    DenebBlockSigned: Container
+    DenebBlockContents: Container
+    DenebBlockContentsSigned: Container
+    DenebBlindedBlock: Container
+    DenebBlindedBlockSigned: Container
+
+    ElectraBlockSigned: Container
+    ElectraBlockContents: Container
+    ElectraBlockContentsSigned: Container
+    ElectraBlindedBlock: Container
+    ElectraBlindedBlockSigned: Container
 
     @classmethod
     def initialize(
@@ -351,12 +362,33 @@ class SpecBeaconBlock:
             state_root: Root
             body: BeaconBlockBodyDeneb
 
+        class Blob(ByteVector[BYTES_PER_FIELD_ELEMENT * spec.FIELD_ELEMENTS_PER_BLOB]):  # type: ignore[misc]
+            pass
+
+        class BlockContentsDeneb(Container):
+            block: BeaconBlockDeneb
+            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+
+        class SignedBeaconBlockDeneb(Container):
+            message: BeaconBlockDeneb
+            signature: BLSSignature
+
+        class SignedBlockContentsDeneb(Container):
+            signed_block: SignedBeaconBlockDeneb
+            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+
         class BlindedBeaconBlockDeneb(Container):
             slot: Slot
             proposer_index: ValidatorIndex
             parent_root: Root
             state_root: Root
             body: BlindedBeaconBlockBodyDeneb
+
+        class SignedBlindedBeaconBlockDeneb(Container):
+            message: BlindedBeaconBlockDeneb
+            signature: BLSSignature
 
         class BeaconBlockElectra(Container):
             slot: Slot
@@ -365,6 +397,20 @@ class SpecBeaconBlock:
             state_root: Root
             body: BeaconBlockBodyElectra
 
+        class BlockContentsElectra(Container):
+            block: BeaconBlockElectra
+            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+
+        class SignedBeaconBlockElectra(Container):
+            message: BeaconBlockElectra
+            signature: BLSSignature
+
+        class SignedBlockContentsElectra(Container):
+            signed_block: SignedBeaconBlockElectra
+            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
+
         class BlindedBeaconBlockElectra(Container):
             slot: Slot
             proposer_index: ValidatorIndex
@@ -372,7 +418,18 @@ class SpecBeaconBlock:
             state_root: Root
             body: BlindedBeaconBlockBodyElectra
 
-        cls.Deneb = BeaconBlockDeneb
-        cls.DenebBlinded = BlindedBeaconBlockDeneb
-        cls.Electra = BeaconBlockElectra
-        cls.ElectraBlinded = BlindedBeaconBlockElectra
+        class SignedBlindedBeaconBlockElectra(Container):
+            message: BlindedBeaconBlockElectra
+            signature: BLSSignature
+
+        cls.DenebBlockSigned = SignedBeaconBlockDeneb
+        cls.DenebBlockContents = BlockContentsDeneb
+        cls.DenebBlockContentsSigned = SignedBlockContentsDeneb
+        cls.DenebBlindedBlock = BlindedBeaconBlockDeneb
+        cls.DenebBlindedBlockSigned = SignedBlindedBeaconBlockDeneb
+
+        cls.ElectraBlockSigned = SignedBeaconBlockElectra
+        cls.ElectraBlockContents = BlockContentsElectra
+        cls.ElectraBlockContentsSigned = SignedBlockContentsElectra
+        cls.ElectraBlindedBlock = BlindedBeaconBlockElectra
+        cls.ElectraBlindedBlockSigned = SignedBlindedBeaconBlockElectra

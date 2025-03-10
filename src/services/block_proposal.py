@@ -19,6 +19,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
+from spec import SpecBeaconBlock
 from spec.block import BeaconBlockHeader
 
 _VC_PUBLISHED_BLOCKS = Counter(
@@ -327,7 +328,7 @@ class BlockProposalService(ValidatorDutyService):
             ):
                 try:
                     (
-                        beacon_block,
+                        block_contents_or_blinded_block,
                         full_response,
                     ) = await self.multi_beacon_node.produce_block_v3(
                         slot=slot,
@@ -345,6 +346,11 @@ class BlockProposalService(ValidatorDutyService):
                     )
                     self._last_slot_duty_completed_for = slot
                     raise
+
+            if full_response.execution_payload_blinded:
+                beacon_block = block_contents_or_blinded_block
+            else:
+                beacon_block = block_contents_or_blinded_block.block
 
             beacon_block_header = BeaconBlockHeader(
                 slot=beacon_block.slot,
@@ -393,19 +399,45 @@ class BlockProposalService(ValidatorDutyService):
             ):
                 try:
                     if not full_response.execution_payload_blinded:
+                        class_map = {
+                            SchemaBeaconAPI.ForkVersion.DENEB: (
+                                SpecBeaconBlock.DenebBlockSigned,
+                                SpecBeaconBlock.DenebBlockContentsSigned,
+                            ),
+                            SchemaBeaconAPI.ForkVersion.ELECTRA: (
+                                SpecBeaconBlock.ElectraBlockSigned,
+                                SpecBeaconBlock.ElectraBlockContentsSigned,
+                            ),
+                        }
+
+                        block_class, block_contents_class = class_map[
+                            full_response.version
+                        ]
                         await self.multi_beacon_node.publish_block_v2(
                             fork_version=full_response.version,
-                            block=beacon_block,
-                            blobs=full_response.data.get("blobs", []),
-                            kzg_proofs=full_response.data.get("kzg_proofs", []),
-                            signature=signature,
+                            signed_beacon_block_contents=block_contents_class(
+                                signed_block=block_class(
+                                    message=block_contents_or_blinded_block.block,
+                                    signature=signature,
+                                ),
+                                kzg_proofs=block_contents_or_blinded_block.kzg_proofs,
+                                blobs=block_contents_or_blinded_block.blobs,
+                            ),
                         )
                     else:
                         # Blinded block
+                        class_map = {
+                            SchemaBeaconAPI.ForkVersion.DENEB: SpecBeaconBlock.DenebBlindedBlockSigned,
+                            SchemaBeaconAPI.ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlockSigned,
+                        }
+                        block_class = class_map[full_response.version]
+
                         await self.multi_beacon_node.publish_blinded_block_v2(
                             fork_version=full_response.version,
-                            block=beacon_block,
-                            signature=signature,
+                            signed_blinded_beacon_block=block_class(
+                                message=block_contents_or_blinded_block,
+                                signature=signature,
+                            ),
                         )
                 except Exception as e:
                     _ERRORS_METRIC.labels(
