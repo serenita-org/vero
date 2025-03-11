@@ -20,7 +20,6 @@
   "graphTooltip": 1,
   "id": 39,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -83,7 +82,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -149,7 +148,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -217,7 +216,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -283,7 +282,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -350,7 +349,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -386,6 +385,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -447,7 +447,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -577,7 +577,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -675,7 +675,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -762,7 +762,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -835,7 +835,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -902,7 +902,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -986,7 +986,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "10.2.6",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4211,7 +4211,7 @@
             "textMode": "name",
             "wideLayout": true
           },
-          "pluginVersion": "11.1.1",
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4247,6 +4247,7 @@
                 "axisLabel": "",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -4307,6 +4308,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4343,6 +4345,7 @@
                 "axisPlacement": "auto",
                 "axisSoftMin": 0,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -4402,6 +4405,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4439,6 +4443,7 @@
                 "axisSoftMax": 100,
                 "axisSoftMin": 0,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -4504,6 +4509,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4530,6 +4536,96 @@
           "fieldConfig": {
             "defaults": {
               "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "fillOpacity": 70,
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byRegexp",
+                  "options": "/.*Slashing.*/"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "fixedColor": "orange",
+                      "mode": "fixed"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": {
+            "h": 6,
+            "w": 24,
+            "x": 0,
+            "y": 42
+          },
+          "id": 49,
+          "interval": "1m",
+          "maxDataPoints": 100,
+          "options": {
+            "colWidth": 0.9,
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "rowHeight": 0.9,
+            "showValue": "never",
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "pluginVersion": "11.4.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "expr": "round(increase(vc_processed_beacon_node_events_total{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__interval])) > 0",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ event_type }}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Processed beacon node events [$__interval]",
+          "type": "status-history"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
                 "mode": "palette-classic"
               },
               "custom": {
@@ -4540,6 +4636,7 @@
                 "axisPlacement": "auto",
                 "axisSoftMin": 0,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -4597,6 +4694,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4634,6 +4732,7 @@
                 "axisPlacement": "auto",
                 "axisSoftMin": 0,
                 "barAlignment": 0,
+                "barWidthFactor": 0.6,
                 "drawStyle": "line",
                 "fillOpacity": 0,
                 "gradientMode": "none",
@@ -4691,6 +4790,7 @@
               "sort": "none"
             }
           },
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4717,70 +4817,62 @@
           "description": "",
           "fieldConfig": {
             "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
               "custom": {
-                "fillOpacity": 70,
                 "hideFrom": {
                   "legend": false,
                   "tooltip": false,
                   "viz": false
                 },
-                "lineWidth": 1
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  }
-                ]
+                "scaleDistribution": {
+                  "type": "linear"
+                }
               }
             },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byRegexp",
-                  "options": "/.*Slashing.*/"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "orange",
-                      "mode": "fixed"
-                    }
-                  }
-                ]
-              }
-            ]
+            "overrides": []
           },
           "gridPos": {
-            "h": 6,
-            "w": 24,
+            "h": 8,
+            "w": 12,
             "x": 0,
             "y": 58
           },
-          "id": 49,
-          "interval": "1m",
+          "id": 294,
           "maxDataPoints": 100,
           "options": {
-            "colWidth": 0.9,
-            "legend": {
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": false
+            "calculate": false,
+            "cellGap": 1,
+            "color": {
+              "exponent": 0.5,
+              "fill": "dark-orange",
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 64
             },
-            "rowHeight": 0.9,
-            "showValue": "never",
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
             "tooltip": {
               "mode": "single",
-              "sort": "none"
+              "showColorScale": false,
+              "yHistogram": false
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "reverse": false
             }
           },
-          "pluginVersion": "10.2.6",
+          "pluginVersion": "11.4.0",
           "targets": [
             {
               "datasource": {
@@ -4788,20 +4880,103 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(increase(vc_processed_beacon_node_events_total{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__interval])) > 0",
-              "format": "time_series",
+              "exemplar": false,
+              "expr": "sum(increase(beacon_node_aggregate_attestation_participant_count_bucket{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__rate_interval])) by (le)",
+              "format": "heatmap",
               "instant": false,
-              "legendFormat": "{{ event_type }}",
+              "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Processed beacon node events [$__interval]",
-          "type": "status-history"
+          "title": "Aggregate Attestation Participant Count",
+          "type": "heatmap"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "description": "",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "scaleDistribution": {
+                  "type": "linear"
+                }
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 56
+          },
+          "id": 295,
+          "maxDataPoints": 100,
+          "options": {
+            "calculate": false,
+            "cellGap": 1,
+            "color": {
+              "exponent": 0.5,
+              "fill": "dark-orange",
+              "mode": "scheme",
+              "reverse": false,
+              "scale": "exponential",
+              "scheme": "Oranges",
+              "steps": 64
+            },
+            "exemplars": {
+              "color": "rgba(255,0,255,0.7)"
+            },
+            "filterValues": {
+              "le": 1e-9
+            },
+            "legend": {
+              "show": true
+            },
+            "rowsFrame": {
+              "layout": "auto"
+            },
+            "tooltip": {
+              "mode": "single",
+              "showColorScale": false,
+              "yHistogram": false
+            },
+            "yAxis": {
+              "axisPlacement": "left",
+              "reverse": false
+            }
+          },
+          "pluginVersion": "11.4.0",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource}"
+              },
+              "editorMode": "code",
+              "exemplar": false,
+              "expr": "sum(increase(beacon_node_sync_contribution_participant_count_bucket{instance=\"$instance\", host=~\"$beacon_node_host\"}[$__rate_interval])) by (le)",
+              "format": "heatmap",
+              "instant": false,
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Sync Contribution Participant Count",
+          "type": "heatmap"
         }
       ],
       "repeat": "beacon_node_host",
-      "repeatDirection": "h",
       "title": "Beacon node - $beacon_node_host",
       "type": "row"
     },
@@ -6065,28 +6240,24 @@
       "type": "row"
     }
   ],
+  "preload": false,
   "refresh": "1m",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "default",
           "value": "default"
         },
-        "hide": 0,
         "includeAll": false,
         "label": "Data Source",
-        "multi": false,
         "name": "datasource",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
@@ -6100,10 +6271,8 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(vero_info,instance)",
-        "hide": 0,
         "includeAll": false,
         "label": "Instance",
-        "multi": false,
         "name": "instance",
         "options": [],
         "query": {
@@ -6113,13 +6282,10 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "All",
           "value": "$__all"
         },
@@ -6131,7 +6297,6 @@
         "hide": 2,
         "includeAll": true,
         "label": "Beacon Node",
-        "multi": false,
         "name": "beacon_node_host",
         "options": [],
         "query": {
@@ -6141,8 +6306,6 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -6155,6 +6318,6 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 8,
+  "version": 9,
   "weekStart": ""
 }
