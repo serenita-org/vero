@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 import aiohttp
 import msgspec
 from aiohttp import ClientTimeout
+from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
@@ -139,9 +140,9 @@ class BeaconNode:
                 total=_TIMEOUT_DEFAULT_TOTAL,
             ),
             headers={
-                "Accept": ContentType.JSON.value,
-                "Content-Type": ContentType.JSON.value,
-                "User-Agent": f"{get_service_name()}/{get_service_version()}",
+                ACCEPT: ContentType.JSON.value,
+                CONTENT_TYPE: ContentType.JSON.value,
+                USER_AGENT: f"{get_service_name()}/{get_service_version()}",
             },
             trace_configs=[
                 RequestLatency(host=self.host, service_type=ServiceType.BEACON_NODE),
@@ -256,7 +257,15 @@ class BeaconNode:
                 # Request was successfully fulfilled
                 self.score += BeaconNode.SCORE_DELTA_SUCCESS
 
-                if resp.content_type != ContentType.JSON.value:
+                # The naive `resp.content_type` approach defaults to
+                # a content type of `application/octet-stream` if
+                # no Content-Type header is present in the response.
+                # Therefore we can only check its value it
+                # it is defined in the response header
+                if (
+                    resp.headers.get(CONTENT_TYPE) is not None
+                    and resp.content_type != ContentType.JSON.value
+                ):
                     raise NotImplementedError(  # noqa: TRY301
                         f"Content type in response unsupported: {resp.content_type}"
                     )
