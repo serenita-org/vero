@@ -5,6 +5,7 @@ import contextlib
 import datetime
 import json
 import logging
+import warnings
 from collections.abc import AsyncIterable
 from enum import Enum
 from typing import Any
@@ -317,7 +318,8 @@ class BeaconNode:
             )
             # Remove old metric value in order not to report multiple values
             # for the same host
-            with contextlib.suppress(KeyError):
+            with contextlib.suppress(KeyError), warnings.catch_warnings():
+                warnings.simplefilter("ignore")
                 _BEACON_NODE_VERSION.remove(self.host, self.node_version)
 
         self.node_version = resp_version
