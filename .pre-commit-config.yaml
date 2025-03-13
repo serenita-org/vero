@@ -28,9 +28,9 @@ repos:
     -   id: mypy
         additional_dependencies:
           [
-          aiohttp==3.11.12,
+          aiohttp==3.11.13,
           msgspec==0.19.0,
-          pytest==8.3.4,
+          pytest==8.3.5,
           remerkleable==0.1.28,
           ]
 
@@ -38,3 +38,15 @@ repos:
     rev: v2.12.0
     hooks:
       - id: hadolint-docker
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.6.5
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+        name: export dependencies -> requirements.txt
+        args: ["--no-dev", "--output-file=requirements.txt"]
+      - id: uv-export
+        name: export dev dependencies -> requirements-dev.txt
+        args: ["--dev", "--output-file=requirements-dev.txt"]

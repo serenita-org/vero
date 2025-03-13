@@ -1,3 +1,31 @@
+[project]
+name = "vero"
+version = "1.0.0"
+description = "Vero is a multi-node validator client software implementation, targeting Ethereum and Gnosis Chain."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.11.13",
+    "apscheduler>=3.11.0",
+    "msgspec>=0.19.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.31.0",
+    "opentelemetry-sdk>=1.31.0",
+    "prometheus-client>=0.21.1",
+    "pyroscope-io>=0.8.8",
+    "pyroscope-otel>=0.4.0",
+    "remerkleable>=0.1.28",
+]
+
+[dependency-groups]
+dev = [
+    "aioresponses>=0.7.8",
+    "milagro-bls-binding>=1.9.0",
+    "pre-commit>=4.1.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.25.3",
+    "pytest-cov>=6.0.0",
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
@@ -29,3 +57,9 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 "tests/mock_api/beacon_node.py" = ["C901"]
 "tests/*" = ["S", "SLF", "ARG", "INP", "FBT"]
 "tests/conftest.py" = ["F401", "F403", "F811", "I"]
+
+[tool.uv]
+required-version = "==0.6.5"
+
+[tool.uv.pip]
+generate-hashes = true
