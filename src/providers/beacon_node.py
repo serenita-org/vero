@@ -418,47 +418,6 @@ class BeaconNode:
 
         return response.data.root
 
-    async def _get_validators_fallback(
-        self,
-        ids: list[str],
-        statuses: list[SchemaBeaconAPI.ValidatorStatus],
-        state_id: str = "head",
-    ) -> list[SchemaValidator.ValidatorIndexPubkey]:
-        if len(ids) == 0:
-            return []
-
-        _endpoint = "/eth/v1/beacon/states/{state_id}/validators"
-
-        _batch_size = 64
-
-        results = []
-        for i in range(0, len(ids), _batch_size):
-            ids_batch = ids[i : i + _batch_size]
-
-            resp_text = await self._make_request(
-                method="GET",
-                endpoint=_endpoint,
-                formatted_endpoint_string_params=dict(state_id=state_id),
-                params={
-                    "id": ids_batch,
-                    "status": [s.value for s in statuses],
-                },
-            )
-
-            resp_decoded = msgspec.json.decode(
-                resp_text, type=SchemaBeaconAPI.GetStateValidatorsResponse
-            )
-
-            results += [
-                SchemaValidator.ValidatorIndexPubkey(
-                    index=int(v.index),
-                    pubkey=v.validator.pubkey,
-                    status=v.status,
-                )
-                for v in resp_decoded.data
-            ]
-        return results
-
     async def get_validators(
         self,
         ids: list[str],
