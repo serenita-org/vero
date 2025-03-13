@@ -20,7 +20,7 @@ if the data to-be-signed could result in a slashable offense.
 
 Vero's surface area for bugs is limited thanks to
 the small size of its own codebase and a [very small set
-of external dependencies](../requirements.in)
+of external dependencies](../pyproject.toml)
 and high test coverage.
 
 Vero is also regularly tested against all

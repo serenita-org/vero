@@ -35,20 +35,39 @@ significant.
 If you're considering working on a larger change that has not
 been discussed, please create an issue to discuss it before working on it.
 
-### Tests
+### Development
 
-To run tests locally, install the dev requirements:
+We use [uv](https://docs.astral.sh/uv/) to manage project dependencies but
+you can use any other dependency management tool including `pip`.
 
+Any larger change is required to be tested on a local devnet
+using the Kurtosis
+[ethereum-package](https://github.com/ethpandaops/ethereum-package)
+in which Vero is a supported validator client option.
+The process is very simple: build a Vero image locally and
+specify it under `vc_image` in your local network configuration.
+
+#### Tests
+
+To run tests locally, install the project dev requirements:
+
+_(`uv sync` also installs the dev dependency group by default)_
 ```shell
-pip install -r requirements-dev.txt
+uv sync
 ```
 
-Then run `pytest`.
+Then run `uv run pytest`.
+
+If you're not using `uv`, make sure to install the dependencies
+from both `requirements.txt` and `requirements-dev.txt`.
 
 
 ### Linting
 
-This repository uses pre-commit hooks for linting. In order
-to run these locally, first install pre-commit
-(`pip install pre-commit`).
-You should then be able to run `pre-commit run --all-files`.
+This repository uses pre-commit hooks for linting.
+`pre-commit` is included as a dev dependency. It is
+necessary to manually install the git hooks by running
+`uv run pre-commit install`. A pre-commit hook is then
+automatically ran before every change you commit.
+You can also manually run the hooks without commiting by running
+`uv run pre-commit run --all-files`.

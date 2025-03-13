@@ -1,9 +1,0 @@
-aiohttp
-apscheduler
-msgspec
-opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-sdk
-prometheus-client
-pyroscope-io
-pyroscope-otel
-remerkleable

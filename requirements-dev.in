@@ -1,7 +1,0 @@
--c requirements.txt
-aioresponses
-milagro-bls-binding
-pre-commit
-pytest
-pytest-asyncio
-pytest-cov
