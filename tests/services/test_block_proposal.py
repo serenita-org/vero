@@ -3,6 +3,7 @@ import asyncio
 import pytest
 
 from providers import BeaconChain
+from providers.beacon_node import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
@@ -44,6 +45,14 @@ async def test_register_validators(
     indirect=True,
 )
 @pytest.mark.parametrize(
+    "response_content_type",
+    [
+        pytest.param(ContentType.JSON, id="JSON"),
+        pytest.param(ContentType.OCTET_STREAM, id="SSZ"),
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
     "fork_version",
     [
         pytest.param(ForkVersion.DENEB, id="Deneb"),
@@ -56,9 +65,13 @@ async def test_publish_block(
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
     execution_payload_blinded: bool,
+    response_content_type: ContentType,
     fork_version: ForkVersion,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    if response_content_type == ContentType.OCTET_STREAM:
+        pytest.skip("SSZ not supported yet")
+
     # Populate the service with a proposal duty
     duty_slot = beacon_chain.current_slot + 1
 
