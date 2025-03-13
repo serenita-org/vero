@@ -68,6 +68,18 @@ _BEACON_NODE_EXECUTION_PAYLOAD_VALUE = Histogram(
     labelnames=["host"],
     buckets=_block_value_buckets,
 )
+_BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT = Histogram(
+    "beacon_node_aggregate_attestation_participant_count",
+    "Tracks the number of participants included in aggregates returned by this beacon node.",
+    labelnames=["host"],
+    buckets=[16, 32, 64, 128, 256, 512, 1_024, 2_048],
+)
+_BEACON_NODE_SYNC_CONTRIBUTION_PARTICIPANT_COUNT = Histogram(
+    "beacon_node_sync_contribution_participant_count",
+    "Tracks the number of participants included in sync contributions returned by this beacon node.",
+    labelnames=["host"],
+    buckets=[8, 16, 32, 64, 128],
+)
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
@@ -579,10 +591,16 @@ class BeaconNode:
         )
 
         if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
-            return SpecAttestation.AttestationPhase0.from_obj(response.data)
-        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-            return SpecAttestation.AttestationElectra.from_obj(response.data)
-        raise NotImplementedError(f"Unsupported fork version {response.version}")
+            att = SpecAttestation.AttestationPhase0.from_obj(response.data)
+        elif response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+            att = SpecAttestation.AttestationElectra.from_obj(response.data)
+        else:
+            raise NotImplementedError(f"Unsupported fork version {response.version}")
+
+        _BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT.labels(
+            host=self.host
+        ).observe(sum(att.aggregation_bits))
+        return att
 
     async def publish_aggregate_and_proofs(
         self,
@@ -621,9 +639,13 @@ class BeaconNode:
             ),
         )
 
-        return SpecSyncCommittee.Contribution.from_obj(
+        contribution = SpecSyncCommittee.Contribution.from_obj(
             json.loads(resp)["data"],
         )
+        _BEACON_NODE_SYNC_CONTRIBUTION_PARTICIPANT_COUNT.labels(host=self.host).observe(
+            sum(contribution.aggregation_bits)
+        )
+        return contribution
 
     async def publish_sync_committee_contribution_and_proofs(
         self,
