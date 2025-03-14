@@ -25,6 +25,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     metrics_port: int
     metrics_multiprocess_mode: bool
     log_level: str
+    disable_slashing_detection: bool
 
 
 def _validate_url(url: str) -> str:
@@ -107,15 +108,7 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
     return _defaults[network]
 
 
-def parse_cli_args(args: Sequence[str]) -> CLIArgs:
-    if args == ["--version"]:
-        import sys
-
-        from observability import get_service_version
-
-        print(f"Vero {get_service_version()}")  # noqa: T201
-        sys.exit(0)
-
+def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
     _network_choices = [e.value for e in list(Network) if e != Network._TESTS]  # noqa: SLF001
@@ -221,7 +214,24 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         choices=getLevelNamesMapping().keys(),
         help="The logging level to use. Defaults to INFO.",
     )
+    parser.add_argument(
+        "----DANGER----disable-slashing-detection",
+        action="store_true",
+        help="[DANGEROUS] Disables Vero's proactive slashing detection.",
+    )
+    return parser
 
+
+def parse_cli_args(args: Sequence[str]) -> CLIArgs:
+    if args == ["--version"]:
+        import sys
+
+        from observability import get_service_version
+
+        print(f"Vero {get_service_version()}")  # noqa: T201
+        sys.exit(0)
+
+    parser = get_parser()
     parsed_args = parser.parse_args(args=args)
 
     try:
@@ -265,6 +275,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             metrics_port=parsed_args.metrics_port,
             metrics_multiprocess_mode=parsed_args.metrics_multiprocess_mode,
             log_level=parsed_args.log_level,
+            disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )
     except ValueError as e:
         parser.error(repr(e))

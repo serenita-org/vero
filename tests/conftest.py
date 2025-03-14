@@ -62,6 +62,7 @@ def cli_args(
         metrics_port=8000,
         metrics_multiprocess_mode=False,
         log_level="INFO",
+        disable_slashing_detection=False,
     )
 
 

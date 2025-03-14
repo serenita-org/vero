@@ -242,7 +242,10 @@ class BlockProposalService(ValidatorDutyService):
             )
 
     async def propose_block(self, slot: int) -> None:
-        if self.validator_status_tracker_service.slashing_detected:
+        if (
+            self.validator_status_tracker_service.slashing_detected
+            and not self.cli_args.disable_slashing_detection
+        ):
             raise RuntimeError("Slashing detected, not producing block")
 
         if slot <= self._last_slot_duty_started_for:

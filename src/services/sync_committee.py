@@ -93,11 +93,6 @@ class SyncCommitteeService(ValidatorDutyService):
         duty_slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
     ) -> None:
-        if self.validator_status_tracker_service.slashing_detected:
-            raise RuntimeError(
-                "Slashing detected, not producing sync committee message",
-            )
-
         # Using < and not <= on purpose: if a head event comes in late,
         # we still want to produce a sync message for that block root too
         # since it is not slashable to publish 2 different sync messages
