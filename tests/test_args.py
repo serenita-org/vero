@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from args import parse_cli_args
+from args import CLIArgs, get_parser, parse_cli_args
 from spec.configs import Network
 
 
@@ -18,74 +18,6 @@ from spec.configs import Network
             "the following arguments are required: --network, --remote-signer-url, --beacon-node-urls, --fee-recipient\n",
             {},
             id="No arguments provided",
-        ),
-        pytest.param(
-            [
-                "--network=mainnet",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
-            None,
-            {
-                "network": Network.MAINNET,
-                "network_custom_config_path": None,
-                "remote_signer_url": "http://signer:9000",
-                "beacon_node_urls": ["http://beacon-node:5052"],
-                "beacon_node_urls_proposal": [],
-                "attestation_consensus_threshold": 1,
-                "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "data_dir": "/vero/data",
-                "graffiti": b"\x00" * 32,
-                "gas_limit": 36_000_000,
-                "use_external_builder": False,
-                "builder_boost_factor": 90,
-                "metrics_address": "localhost",
-                "metrics_port": 8000,
-                "metrics_multiprocess_mode": False,
-                "log_level": "INFO",
-            },
-            id="Minimal valid list of arguments with fallback to default values",
-        ),
-        pytest.param(
-            [
-                "--network=custom",
-                "--network-custom-config-path=/path/to/config.yaml",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
-                "--attestation-consensus-threshold=1",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--data-dir=/tmp/vero",
-                "--graffiti=test-graffiti",
-                "--gas-limit=31000000",
-                "--use-external-builder",
-                "--builder-boost-factor=80",
-                "--metrics-address=1.2.3.4",
-                "--metrics-port=4321",
-                "--metrics-multiprocess-mode",
-                "--log-level=DEBUG",
-            ],
-            None,
-            {
-                "network": Network.CUSTOM,
-                "network_custom_config_path": "/path/to/config.yaml",
-                "remote_signer_url": "http://signer:9000",
-                "beacon_node_urls": ["http://beacon-node:5052"],
-                "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
-                "attestation_consensus_threshold": 1,
-                "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "data_dir": "/tmp/vero",
-                "graffiti": b"test-graffiti".ljust(32, b"\x00"),
-                "gas_limit": 31_000_000,
-                "use_external_builder": True,
-                "builder_boost_factor": 80,
-                "metrics_address": "1.2.3.4",
-                "metrics_port": 4321,
-                "metrics_multiprocess_mode": True,
-                "log_level": "DEBUG",
-            },
-            id="Full valid list of arguments",
         ),
         pytest.param(
             [
@@ -365,3 +297,103 @@ def test_parse_cli_args(
         parsed_args = parse_cli_args(list_of_args)
         for attr_name, attr_value in expected_attr_values.items():
             assert getattr(parsed_args, attr_name) == attr_value
+
+
+def test_parse_cli_args_full_set() -> None:
+    list_of_args = [
+        "--network=custom",
+        "--network-custom-config-path=/path/to/config.yaml",
+        "--remote-signer-url=http://signer:9000",
+        "--beacon-node-urls=http://beacon-node:5052",
+        "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
+        "--attestation-consensus-threshold=1",
+        "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+        "--data-dir=/tmp/vero",
+        "--graffiti=test-graffiti",
+        "--gas-limit=31000000",
+        "--use-external-builder",
+        "--builder-boost-factor=80",
+        "--metrics-address=1.2.3.4",
+        "--metrics-port=4321",
+        "--metrics-multiprocess-mode",
+        "--log-level=DEBUG",
+        "----DANGER----disable-slashing-detection",
+    ]
+    expected_attr_values = {
+        "network": Network.CUSTOM,
+        "network_custom_config_path": "/path/to/config.yaml",
+        "remote_signer_url": "http://signer:9000",
+        "beacon_node_urls": ["http://beacon-node:5052"],
+        "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
+        "attestation_consensus_threshold": 1,
+        "fee_recipient": "0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+        "data_dir": "/tmp/vero",
+        "graffiti": b"test-graffiti".ljust(32, b"\x00"),
+        "gas_limit": 31_000_000,
+        "use_external_builder": True,
+        "builder_boost_factor": 80,
+        "metrics_address": "1.2.3.4",
+        "metrics_port": 4321,
+        "metrics_multiprocess_mode": True,
+        "log_level": "DEBUG",
+        "disable_slashing_detection": True,
+    }
+
+    # Ensure the list is not missing any possible arguments
+    arg_names = []
+    for arg in list_of_args:
+        if "=" in arg:
+            name, value = arg.split("=", 1)
+            arg_names.append(name)
+        else:
+            arg_names.append(arg)
+
+    parsed_args = parse_cli_args(list_of_args)
+
+    for action in get_parser()._actions:
+        if action.dest in ("help",):
+            continue
+
+        assert all(os in arg_names for os in action.option_strings), (
+            f"Missing flag: {action.option_strings}"
+        )
+
+        dest_attribute = action.dest.removeprefix("DANGER____")
+        assert (
+            getattr(parsed_args, dest_attribute) == expected_attr_values[dest_attribute]
+        )
+
+
+def test_parse_cli_args_minimal_set_with_defaults() -> None:
+    list_of_args = [
+        "--network=mainnet",
+        "--remote-signer-url=http://signer:9000",
+        "--beacon-node-urls=http://beacon-node:5052",
+        "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+    ]
+    expected_result = CLIArgs(
+        network=Network.MAINNET,
+        network_custom_config_path=None,
+        remote_signer_url="http://signer:9000",
+        beacon_node_urls=["http://beacon-node:5052"],
+        beacon_node_urls_proposal=[],
+        attestation_consensus_threshold=1,
+        fee_recipient="0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+        data_dir="/vero/data",
+        graffiti=b"\x00" * 32,
+        gas_limit=36_000_000,
+        use_external_builder=False,
+        builder_boost_factor=90,
+        metrics_address="localhost",
+        metrics_port=8000,
+        metrics_multiprocess_mode=False,
+        log_level="INFO",
+        disable_slashing_detection=False,
+    )
+
+    parsed = parse_cli_args(list_of_args)
+    for attr_name in dir(expected_result):
+        if attr_name.startswith("__"):
+            continue
+        assert getattr(parsed, attr_name) == getattr(expected_result, attr_name)
+    assert parsed == expected_result

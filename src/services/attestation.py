@@ -119,7 +119,10 @@ class AttestationService(ValidatorDutyService):
         slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
     ) -> None:
-        if self.validator_status_tracker_service.slashing_detected:
+        if (
+            self.validator_status_tracker_service.slashing_detected
+            and not self.cli_args.disable_slashing_detection
+        ):
             raise RuntimeError("Slashing detected, not attesting")
 
         if slot <= self._last_slot_duty_started_for:

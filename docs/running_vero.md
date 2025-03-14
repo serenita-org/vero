@@ -146,3 +146,16 @@ ___
 #### `--log-level`
 
 The logging level to use, one of `CRITICAL,ERROR,WARNING,INFO,DEBUG`. Defaults to `INFO`.
+___
+
+#### `----DANGER----disable-slashing-detection`
+
+**_!!! This flag is extremely dangerous and should not be provided to Vero under normal circumstances!!!_**
+
+**_Do not provide this flag unless you fully understand its implications!_**
+
+Disables Vero's proactive slashing detection.
+
+With this flag provided, Vero will keep attesting and producing blocks
+even if it detects some of its managed validators have been slashed.
+___
