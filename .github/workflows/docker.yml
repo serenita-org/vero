@@ -50,3 +50,18 @@ jobs:
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.docker_metadata.outputs.tags }}
         labels: ${{ steps.docker_metadata.outputs.labels }}
+
+  delete-old-package-versions:
+    runs-on: ubuntu-latest
+
+    # Runs after the build-and-push job
+    needs: build-and-push
+
+    steps:
+    - name: Delete old untagged package versions
+      uses: actions/delete-package-versions@v5
+      with:
+        package-name: 'vero'
+        package-type: 'container'
+        min-versions-to-keep: 30
+        delete-only-untagged-versions: 'true'
