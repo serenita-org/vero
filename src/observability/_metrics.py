@@ -21,6 +21,6 @@ def setup_metrics(addr: str, port: int, multiprocess_mode: bool = False) -> None
         for file in _multiprocessing_data_path.iterdir():
             Path.unlink(_multiprocessing_data_dir / file)
 
-        multiprocess.MultiProcessCollector(REGISTRY)
+        multiprocess.MultiProcessCollector(REGISTRY)  # type: ignore[no-untyped-call]
 
     start_http_server(addr=addr, port=port)

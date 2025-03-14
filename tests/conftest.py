@@ -3,6 +3,7 @@ import random
 import time
 from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator, Generator
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 import milagro_bls_binding as bls
@@ -43,6 +44,8 @@ def cli_args(
     beacon_node_url: str,
     beacon_node_urls_proposal: list[str],
 ) -> CLIArgs:
+    tmp_dir = TemporaryDirectory()
+
     return CLIArgs(
         network=Network._TESTS,
         network_custom_config_path=None,
@@ -53,7 +56,7 @@ def cli_args(
             None, [beacon_node_url]
         ),
         fee_recipient="0x0000000000000000000000000000000000000000",
-        data_dir="/tmp/vero_tests",
+        data_dir=tmp_dir.name,
         use_external_builder=False,
         builder_boost_factor=90,
         graffiti=b"pytest",

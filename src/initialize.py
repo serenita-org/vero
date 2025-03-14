@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from observability.event_loop import monitor_event_loop
-from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from providers import DB, BeaconChain, MultiBeaconNode, RemoteSigner
 from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
@@ -157,6 +157,9 @@ async def run_services(
             validator_status_tracker_service.on_new_slot
         )
         _logger.info("Initialized validator status tracker")
+
+        db = DB(data_dir=cli_args.data_dir)
+        db.run_migrations()
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
