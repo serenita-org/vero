@@ -11,7 +11,7 @@ services:
     # This feature can make the shutdown process take several seconds.
     stop_grace_period: 1m
     command:
-      - "--network=holesky"
+      - "--network=hoodi"
       - "--remote-signer-url=http://remote-signer:9000"
       - "--beacon-node-urls=http://beacon-node-1:1234,http://beacon-node-2:1234,http://beacon-node-3:1234"
       - "--fee-recipient=0x0000000000000000000000000000000000000000"
