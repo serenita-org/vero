@@ -39,7 +39,7 @@ Check out the [example docker compose file](../compose-example.yaml).
 
 #### `--network`
 
-**[required]** The network to use, one of `mainnet,gnosis,holesky,chiado,custom`.
+**[required]** The network to use, one of `mainnet,gnosis,holesky,hoodi,chiado,custom`.
 
 `custom` is a special case where Vero loads the network spec from the file specified using `--network-custom-config-path`
 ___
@@ -105,6 +105,7 @@ Current defaults per network:
 mainnet: 36M
 gnosis: 17M
 holesky: 36M
+hoodi: 36M
 chiado: 17M
 custom: 100M
 ```

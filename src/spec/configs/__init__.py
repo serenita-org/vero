@@ -8,6 +8,7 @@ from spec.base import Spec, parse_spec
 class Network(Enum):
     MAINNET = "mainnet"
     HOLESKY = "holesky"
+    HOODI = "hoodi"
 
     GNOSIS = "gnosis"
     CHIADO = "chiado"
