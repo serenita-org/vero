@@ -5,19 +5,30 @@ import logging
 from enum import Enum
 from functools import partial
 from types import SimpleNamespace
+from typing import TypedDict, get_type_hints
 
 import aiohttp
 from prometheus_client import Counter, Histogram
 
+
+class _RequestMetricLabelValues(TypedDict):
+    service_type: str
+    host: str
+    method: str
+    path: str
+    status: str
+    request_type: str
+
+
 _REQUEST_DURATION = Histogram(
     "request_duration_seconds",
     "Request duration in seconds",
-    labelnames=["service_type", "host", "method", "path", "status", "request_type"],
+    labelnames=list(get_type_hints(_RequestMetricLabelValues).keys()),
 )
 _REQUESTS_COUNTER = Counter(
     "requests",
     "Number of requests",
-    labelnames=["service_type", "host", "method", "path", "status", "request_type"],
+    labelnames=list(get_type_hints(_RequestMetricLabelValues).keys()),
 )
 
 _logger = logging.getLogger(__name__)
@@ -51,13 +62,13 @@ async def _on_request_end(
             path = trace_request_ctx_dict.get("path", path)
             request_type = trace_request_ctx_dict.get("request_type", request_type)
 
-    _labels = dict(
+    _labels = _RequestMetricLabelValues(
         service_type=trace_config_ctx.service_type,
         host=trace_config_ctx.host,
         method=params.method,
         path=path,
-        status=params.response.status,
-        request_type=request_type,
+        status=str(params.response.status),
+        request_type=str(request_type),
     )
 
     elapsed = asyncio.get_running_loop().time() - trace_config_ctx.start
