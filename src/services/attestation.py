@@ -570,11 +570,11 @@ class AttestationService(ValidatorDutyService):
             )
 
             duties_with_proofs.append(
-                SchemaBeaconAPI.AttesterDutyWithSelectionProof(
-                    **duty.to_dict(),
+                SchemaBeaconAPI.AttesterDutyWithSelectionProof.from_duty(
+                    duty=duty,
                     is_aggregator=is_aggregator,
                     selection_proof=selection_proof,
-                ),
+                )
             )
 
         # Prepare beacon node subnet subscriptions for aggregation duties
