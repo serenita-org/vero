@@ -39,7 +39,7 @@ import logging
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
@@ -138,7 +138,7 @@ class MultiBeaconNode:
             f" beacon nodes",
         )
 
-    async def __aenter__(self) -> "MultiBeaconNode":
+    async def __aenter__(self) -> Self:
         await self.initialize()
         return self
 

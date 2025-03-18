@@ -1,5 +1,5 @@
 import copy
-from typing import TypeVar
+from typing import Self
 
 from remerkleable.basic import uint64
 from remerkleable.byte_arrays import Bytes4
@@ -25,9 +25,6 @@ class Genesis(Container):
     genesis_fork_version: Version
 
 
-SpecV = TypeVar("SpecV", bound="Spec")
-
-
 class Spec(Container):
     # This value is not used anywhere but
     # the Container subclass creation fails without
@@ -35,7 +32,7 @@ class Spec(Container):
     MIN_GENESIS_TIME: uint64
 
     @classmethod
-    def from_obj(cls: type[SpecV], obj: ObjType) -> SpecV:
+    def from_obj(cls, obj: ObjType) -> Self:
         if not isinstance(obj, dict):
             raise ObjParseException(f"obj '{obj}' is not a dict")
 

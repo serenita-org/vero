@@ -1,4 +1,3 @@
-import os
 from enum import Enum
 from pathlib import Path
 
@@ -55,7 +54,7 @@ def get_network_spec(
     preset_files_dir = (
         Path(__file__).parent / "presets" / f"{spec_dict['PRESET_BASE'].strip("'")}"
     )
-    for fname in os.listdir(preset_files_dir):
+    for fname in preset_files_dir.iterdir():
         spec_dict.update(
             parse_yaml_file(
                 Path(preset_files_dir) / fname,

@@ -5,6 +5,7 @@ import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from types import TracebackType
+from typing import Self
 from urllib.parse import urlparse
 
 import aiohttp
@@ -59,7 +60,7 @@ class RemoteSigner:
 
         self.process_pool_executor = ProcessPoolExecutor()
 
-    async def __aenter__(self) -> "RemoteSigner":
+    async def __aenter__(self) -> Self:
         if not self.host:
             raise ValueError(f"Failed to parse hostname from {self.url}")
 
