@@ -22,7 +22,7 @@ def validator_duty_service_options(
     task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> ValidatorDutyServiceOptions:
-    return dict(
+    return ValidatorDutyServiceOptions(
         multi_beacon_node=multi_beacon_node,
         beacon_chain=beacon_chain,
         remote_signer=remote_signer,

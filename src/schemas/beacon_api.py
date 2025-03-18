@@ -9,6 +9,7 @@ https://docs.nodereal.io/reference/eventstream
 """
 
 from enum import Enum
+from typing import Self
 
 import msgspec
 
@@ -123,6 +124,22 @@ class AttesterDuty(msgspec.Struct, frozen=True):
 class AttesterDutyWithSelectionProof(AttesterDuty, frozen=True):
     is_aggregator: bool
     selection_proof: bytes
+
+    @classmethod
+    def from_duty(
+        cls, duty: AttesterDuty, is_aggregator: bool, selection_proof: bytes
+    ) -> Self:
+        return cls(
+            pubkey=duty.pubkey,
+            validator_index=duty.validator_index,
+            committee_index=duty.committee_index,
+            committee_length=duty.committee_length,
+            committees_at_slot=duty.committees_at_slot,
+            validator_committee_index=duty.validator_committee_index,
+            slot=duty.slot,
+            is_aggregator=is_aggregator,
+            selection_proof=selection_proof,
+        )
 
 
 class GetAttesterDutiesResponse(ExecutionOptimisticResponse):
