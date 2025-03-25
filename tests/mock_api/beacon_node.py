@@ -287,22 +287,27 @@ def _mocked_beacon_node_endpoints(
             ids = data["ids"]
             statuses = data["statuses"]
 
+            return_list = []
+            for validator in validators:
+                if validator.pubkey not in ids:
+                    continue
+
+                if statuses is not None and validator.status.value not in statuses:
+                    continue
+
+                return_list.append(
+                    SchemaBeaconAPI.ValidatorInfo(
+                        index=str(validator.index),
+                        status=validator.status,
+                        validator=SchemaBeaconAPI.Validator(pubkey=validator.pubkey),
+                    )
+                )
+
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetStateValidatorsResponse(
                         execution_optimistic=False,
-                        data=[
-                            SchemaBeaconAPI.ValidatorInfo(
-                                index=str(validator.index),
-                                status=validator.status,
-                                validator=SchemaBeaconAPI.Validator(
-                                    pubkey=validator.pubkey
-                                ),
-                            )
-                            for validator in validators
-                            if validator.status.value in statuses
-                            and validator.pubkey in ids
-                        ],
+                        data=return_list,
                     )
                 )
             )

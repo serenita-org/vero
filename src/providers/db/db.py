@@ -12,7 +12,6 @@ class DB:
         data_dir: str,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
 
         self.db_filepath = Path(data_dir) / "vero.db"
         self.connection = sqlite3.connect(self.db_filepath, autocommit=False)

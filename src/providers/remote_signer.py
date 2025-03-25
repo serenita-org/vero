@@ -16,6 +16,8 @@ from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaRemoteSigner
 
+from .signature_provider import SignatureProvider
+
 _SIGNED_MESSAGES = Counter(
     "signed_messages",
     "Number of signed messages",
@@ -51,23 +53,22 @@ def _sign_messages_in_separate_process(
     return asyncio.run(_sign_messages())
 
 
-class RemoteSigner:
+class RemoteSigner(SignatureProvider):
     def __init__(self, url: str):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.url = url
         self.host = urlparse(url).hostname or ""
+        if not self.host:
+            raise ValueError(f"Failed to parse hostname from {self.url}")
 
         self.process_pool_executor = ProcessPoolExecutor()
 
     async def __aenter__(self) -> Self:
-        if not self.host:
-            raise ValueError(f"Failed to parse hostname from {self.url}")
-
         _user_agent = f"{get_service_name()}/{get_service_version()}"
 
         self._trace_default_request_ctx = dict(
-            host=self.host or "",
+            host=self.host,
             service_type=ServiceType.REMOTE_SIGNER.value,
         )
 
