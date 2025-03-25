@@ -417,7 +417,7 @@ class BeaconNode:
     async def get_validators(
         self,
         ids: list[str],
-        statuses: list[SchemaBeaconAPI.ValidatorStatus],
+        statuses: list[SchemaBeaconAPI.ValidatorStatus] | None = None,
         state_id: str = "head",
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
         if len(ids) == 0:
@@ -430,7 +430,7 @@ class BeaconNode:
             data=self.json_encoder.encode(
                 {
                     "ids": ids,
-                    "statuses": [s.value for s in statuses],
+                    "statuses": [s.value for s in statuses] if statuses else None,
                 }
             ),
         )

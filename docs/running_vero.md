@@ -51,7 +51,13 @@ ___
 
 #### `--remote-signer-url`
 
-**[required]** URL of the remote signer, e.g. `http://remote-signer:9000`
+URL of the remote signer, e.g. `http://remote-signer:9000`.
+If provided, Vero automatically handles duties for all validator keys
+present on the remote signer.
+
+_Note: This flag is mutually exclusive with `--enable-keymanager-api`.
+One of these flags must be provided to server as a source of validator
+keys._
 ___
 
 #### `--beacon-node-urls`
@@ -87,11 +93,20 @@ ___
 #### `--fee-recipient`
 
 **[required]** The fee recipient address to use during block proposals.
+
+Can be set individually for each validator through the Keymanager API.
+___
+
+#### `--data-dir`
+
+The directory to use for storing persistent data. Defaults to `/vero/data`.
 ___
 
 #### `--graffiti`
 
 The graffiti string to use during block proposals. Defaults to an empty string.
+
+Can be set individually for each validator through the Keymanager API.
 ___
 
 #### `--gas-limit`
@@ -110,6 +125,7 @@ chiado: 17M
 custom: 100M
 ```
 
+Can be set individually for each validator through the Keymanager API.
 ___
 
 #### `--use-external-builder`
@@ -124,9 +140,33 @@ to locally built blocks. The externally built block is only chosen if its value,
 post-multiplication, is higher than the locally built block's value. Defaults to `90`.
 ___
 
-#### `--data-dir`
+#### `--enable-keymanager-api`
 
-The directory to use for storing persistent data. Defaults to `/vero/data`.
+Enables the Keymanager API.
+
+_Note: This flag is mutually exclusive with `--remote-signer-url`.
+One of these flags must be provided to server as a source of validator
+keys._
+___
+
+#### `--keymanager-api-token-file-path`
+
+Path to a file containing the bearer token used for Keymanager API
+authentication. If none is provided, a file called
+`keymanager-api-token.txt` will be created in Vero's data directory.
+
+___
+
+#### `--keymanager-api-address`
+
+The Keymanager API server listen address. Defaults to `localhost`.
+
+___
+
+#### `--keymanager-api-port`
+
+The Keymanager API server port number. Defaults to `8001`.
+
 ___
 
 #### `--metrics-address`
