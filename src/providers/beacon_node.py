@@ -29,9 +29,9 @@ from observability import (
 )
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
-from spec.base import Genesis, parse_spec
+from spec.base import Genesis, SpecElectra, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
@@ -106,7 +106,7 @@ class BeaconNode:
     def __init__(
         self,
         base_url: str,
-        spec: Spec,
+        spec: SpecElectra,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
     ) -> None:
@@ -296,7 +296,7 @@ class BeaconNode:
         )
         return Genesis.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
-    async def get_spec(self) -> Spec:
+    async def get_spec(self) -> SpecElectra:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",

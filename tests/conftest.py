@@ -16,7 +16,7 @@ from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
-from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.base import SpecElectra, Fork, Genesis, Version
 from spec.common import Epoch
 from spec.configs import Network, get_network_spec
@@ -77,7 +77,7 @@ def _init_observability() -> None:
 
 
 @pytest.fixture(scope="session")
-def spec(request: pytest.FixtureRequest) -> Spec:
+def spec(request: pytest.FixtureRequest) -> SpecElectra:
     return get_network_spec(network=Network._TESTS)
 
 

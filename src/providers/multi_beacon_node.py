@@ -51,8 +51,9 @@ from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
-from spec import Spec, SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
+from spec.base import SpecElectra
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
@@ -74,7 +75,7 @@ class MultiBeaconNode:
         self,
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
-        spec: Spec,
+        spec: SpecElectra,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
         cli_args: CLIArgs,
