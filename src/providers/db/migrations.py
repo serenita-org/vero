@@ -30,4 +30,20 @@ MIGRATIONS = [
         ],
         bump_version=False,
     ),
+    DbMigration(
+        version=2,
+        description="Create tables needed for the Keymanager API",
+        statements=[
+            """
+            CREATE TABLE keymanager_data (
+                pubkey TEXT PRIMARY KEY,
+                url TEXT NOT NULL,
+                fee_recipient TEXT,
+                gas_limit TEXT,
+                graffiti TEXT
+            ) STRICT;
+            """
+        ],
+        bump_version=True,
+    ),
 ]

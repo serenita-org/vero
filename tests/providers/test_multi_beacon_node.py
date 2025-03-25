@@ -5,6 +5,7 @@ when multiple beacon nodes are provided to it. That includes:
 - requesting sync committee contributions from all beacon nodes and returning the best one
 """
 
+import contextlib
 import os
 import re
 from copy import deepcopy
@@ -86,16 +87,9 @@ async def test_initialize(
         _process_attestation_consensus_threshold(None, beacon_node_urls)
     )
 
-    mbn = MultiBeaconNode(
-        beacon_node_urls=beacon_node_urls,
-        beacon_node_urls_proposal=[],
-        spec=spec,
-        scheduler=scheduler,
-        task_manager=task_manager,
-        cli_args=_cli_args_for_test,
-    )
+    async with contextlib.AsyncExitStack() as exit_stack:
+        m = exit_stack.enter_context(aioresponses())
 
-    with aioresponses() as m:
         for _url, beacon_node_available in zip(
             beacon_node_urls,
             beacon_node_availabilities,
@@ -137,16 +131,22 @@ async def test_initialize(
                     exception=ValueError("Beacon node unavailable"),
                 )
 
+        mbn_base = MultiBeaconNode(
+            beacon_node_urls=beacon_node_urls,
+            beacon_node_urls_proposal=[],
+            spec=spec,
+            scheduler=scheduler,
+            task_manager=task_manager,
+            cli_args=_cli_args_for_test,
+        )
         if expected_initialization_success:
-            await mbn.initialize()
+            await exit_stack.enter_async_context(mbn_base)
         else:
             with pytest.raises(
                 RuntimeError,
                 match="Failed to fully initialize a sufficient amount of beacon nodes",
             ):
-                await mbn.initialize()
-
-    await mbn.__aexit__(None, None, None)
+                await exit_stack.enter_async_context(mbn_base)
 
 
 @pytest.mark.parametrize(

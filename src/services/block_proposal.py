@@ -21,6 +21,7 @@ from services.validator_duty_service import (
 )
 from spec import SpecBeaconBlock
 from spec.block import BeaconBlockHeader
+from spec.utils import encode_graffiti
 
 _VC_PUBLISHED_BLOCKS = Counter(
     "vc_published_blocks",
@@ -164,22 +165,29 @@ class BlockProposalService(ValidatorDutyService):
     async def prepare_beacon_proposer(self) -> None:
         self.logger.debug("Calling prepare_beacon_proposer")
 
-        our_indices = [
-            v.index
-            for v in self.validator_status_tracker_service.active_validators
+        our_validators = (
+            self.validator_status_tracker_service.active_validators
             + self.validator_status_tracker_service.pending_validators
-        ]
+        )
 
-        if len(our_indices) == 0:
+        if len(our_validators) == 0:
             return
+
+        # Default to values provided via the CLI arguments unless overridden
+        # via the Keymanager API
+        default_fee_recipient = self.cli_args.fee_recipient
 
         await self.multi_beacon_node.prepare_beacon_proposer(
             data=[
                 {
-                    "validator_index": str(val_idx),
-                    "fee_recipient": self.cli_args.fee_recipient,
+                    "validator_index": str(v.index),
+                    "fee_recipient": default_fee_recipient
+                    if not self.keymanager.enabled
+                    else self.keymanager.pubkey_to_fee_recipient_override.get(
+                        v.pubkey, default_fee_recipient
+                    ),
                 }
-                for val_idx in our_indices
+                for v in our_validators
             ],
         )
 
@@ -203,17 +211,30 @@ class BlockProposalService(ValidatorDutyService):
 
         _timestamp = int(time.time())
 
+        # Default to values provided via the CLI arguments unless overridden
+        # via the Keymanager API
+        default_fee_recipient = self.cli_args.fee_recipient
+        default_gas_limit = str(self.cli_args.gas_limit)
+
         for i in range(0, len(validators_to_register), _batch_size):
             validator_batch = validators_to_register[i : i + _batch_size]
 
             try:
                 responses = await asyncio.gather(
                     *[
-                        self.remote_signer.sign(
+                        self.signature_provider.sign(
                             message=SchemaRemoteSigner.ValidatorRegistrationSignableMessage(
                                 validator_registration=SchemaRemoteSigner.ValidatorRegistration(
-                                    fee_recipient=self.cli_args.fee_recipient,
-                                    gas_limit=str(self.cli_args.gas_limit),
+                                    fee_recipient=default_fee_recipient
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_fee_recipient_override.get(
+                                        v.pubkey, default_fee_recipient
+                                    ),
+                                    gas_limit=default_gas_limit
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_gas_limit_override.get(
+                                        v.pubkey, default_gas_limit
+                                    ),
                                     timestamp=str(_timestamp),
                                     pubkey=v.pubkey,
                                 ),
@@ -301,7 +322,7 @@ class BlockProposalService(ValidatorDutyService):
                 name=f"{self.__class__.__name__}.sign_randao",
             ):
                 try:
-                    _, randao_reveal, _ = await self.remote_signer.sign(
+                    _, randao_reveal, _ = await self.signature_provider.sign(
                         message=SchemaRemoteSigner.RandaoRevealSignableMessage(
                             fork_info=self.beacon_chain.get_fork_info(slot=slot),
                             randao_reveal=SchemaRemoteSigner.RandaoReveal(
@@ -324,13 +345,24 @@ class BlockProposalService(ValidatorDutyService):
             with self.tracer.start_as_current_span(
                 name=f"{self.__class__.__name__}.produce_block",
             ):
+                graffiti = self.cli_args.graffiti
+                if self.keymanager.enabled:
+                    kmgr_graffiti_str = self.keymanager.get_graffiti(
+                        duty.pubkey
+                    ).graffiti
+                    if kmgr_graffiti_str is not None:
+                        self.logger.info(
+                            f"Using Keymanager-provided graffiti: {kmgr_graffiti_str}"
+                        )
+                        graffiti = encode_graffiti(kmgr_graffiti_str)
+
                 try:
                     (
                         block_contents_or_blinded_block,
                         full_response,
                     ) = await self.multi_beacon_node.produce_block_v3(
                         slot=slot,
-                        graffiti=self.cli_args.graffiti,
+                        graffiti=graffiti,
                         builder_boost_factor=self.cli_args.builder_boost_factor,
                         randao_reveal=randao_reveal,
                     )
@@ -362,7 +394,7 @@ class BlockProposalService(ValidatorDutyService):
                 name=f"{self.__class__.__name__}.sign_block",
             ):
                 try:
-                    _, signature, _ = await self.remote_signer.sign(
+                    _, signature, _ = await self.signature_provider.sign(
                         message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
                             fork_info=self.beacon_chain.get_fork_info(slot=slot),
                             beacon_block=SchemaRemoteSigner.BeaconBlock(

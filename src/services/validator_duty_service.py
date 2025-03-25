@@ -9,7 +9,7 @@ from prometheus_client import Histogram
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
@@ -30,7 +30,8 @@ class ValidatorDuty(Enum):
 class ValidatorDutyServiceOptions(TypedDict):
     multi_beacon_node: MultiBeaconNode
     beacon_chain: BeaconChain
-    remote_signer: RemoteSigner
+    signature_provider: SignatureProvider
+    keymanager: Keymanager
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
     task_manager: TaskManager
@@ -65,7 +66,8 @@ class ValidatorDutyService:
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
         self.beacon_chain = kwargs["beacon_chain"]
-        self.remote_signer = kwargs["remote_signer"]
+        self.signature_provider = kwargs["signature_provider"]
+        self.keymanager = kwargs["keymanager"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]

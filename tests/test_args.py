@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,7 +17,7 @@ from spec.configs import Network
     argvalues=[
         pytest.param(
             [],
-            "the following arguments are required: --network, --remote-signer-url, --beacon-node-urls, --fee-recipient\n",
+            "the following arguments are required: --network, --beacon-node-urls, --fee-recipient\n",
             {},
             [],
             id="No arguments provided",
@@ -367,6 +368,31 @@ from spec.configs import Network
             ],
             id="--network-custom-config-path",
         ),
+        pytest.param(
+            [
+                "--network=mainnet",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+                "--enable-keymanager-api",
+            ],
+            None,
+            "argument --enable-keymanager-api: not allowed with argument --remote-signer-url",
+            {},
+            id="mutually exclusive group - key source",
+        ),
+        pytest.param(
+            [
+                "--network=mainnet",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+                "--enable-keymanager-api",
+            ],
+            None,
+            None,
+            {},
+            id="Keymanager API enabled - no remote signer",
+        ),
     ],
 )
 def test_parse_cli_args(
@@ -405,6 +431,9 @@ def test_parse_cli_args_full_set() -> None:
         "--gas-limit=31000000",
         "--use-external-builder",
         "--builder-boost-factor=80",
+        "--keymanager-api-token-file-path=/tmp/vero/token.txt",
+        "--keymanager-api-address=3.3.3.3",
+        "--keymanager-api-port=3333",
         "--metrics-address=1.2.3.4",
         "--metrics-port=4321",
         "--metrics-multiprocess-mode",
@@ -424,6 +453,10 @@ def test_parse_cli_args_full_set() -> None:
         "gas_limit": 31_000_000,
         "use_external_builder": True,
         "builder_boost_factor": 80,
+        "enable_keymanager_api": False,
+        "keymanager_api_token_file_path": Path("/tmp/vero/token.txt"),
+        "keymanager_api_address": "3.3.3.3",
+        "keymanager_api_port": 3333,
         "metrics_address": "1.2.3.4",
         "metrics_port": 4321,
         "metrics_multiprocess_mode": True,
@@ -443,7 +476,7 @@ def test_parse_cli_args_full_set() -> None:
     parsed_args = parse_cli_args(list_of_args)
 
     for action in get_parser()._actions:
-        if action.dest in ("help",):
+        if action.dest in ("help", "enable_keymanager_api"):
             continue
 
         assert all(os in arg_names for os in action.option_strings), (
@@ -476,6 +509,10 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         gas_limit=36_000_000,
         use_external_builder=False,
         builder_boost_factor=90,
+        enable_keymanager_api=False,
+        keymanager_api_token_file_path=Path("/vero/data") / "keymanager-api-token.txt",
+        keymanager_api_address="localhost",
+        keymanager_api_port=8001,
         metrics_address="localhost",
         metrics_port=8000,
         metrics_multiprocess_mode=False,

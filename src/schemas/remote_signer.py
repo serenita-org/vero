@@ -15,6 +15,7 @@ class SigningRequestType(Enum):
     SYNC_COMMITTEE_MESSAGE = "SYNC_COMMITTEE_MESSAGE"
     SYNC_COMMITTEE_SELECTION_PROOF = "SYNC_COMMITTEE_SELECTION_PROOF"
     VALIDATOR_REGISTRATION = "VALIDATOR_REGISTRATION"
+    VOLUNTARY_EXIT = "VOLUNTARY_EXIT"
 
 
 SignableMessageT = TypeVar("SignableMessageT", bound="SignableMessage")
@@ -134,3 +135,13 @@ class ValidatorRegistration(msgspec.Struct):
 class ValidatorRegistrationSignableMessage(SignableMessage, kw_only=True):
     type: SigningRequestType = SigningRequestType.VALIDATOR_REGISTRATION
     validator_registration: ValidatorRegistration
+
+
+class VoluntaryExit(msgspec.Struct):
+    epoch: str
+    validator_index: str
+
+
+class VoluntaryExitSignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.VOLUNTARY_EXIT
+    voluntary_exit: VoluntaryExit

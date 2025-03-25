@@ -22,6 +22,7 @@ dev = [
     "milagro-bls-binding>=1.9.0",
     "pre-commit>=4.1.0",
     "pytest>=8.3.5",
+    "pytest-aiohttp>=1.1.0",
     "pytest-asyncio>=0.25.3",
     "pytest-cov>=6.0.0",
 ]

@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Gauge
 
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from providers import BeaconChain, MultiBeaconNode, SignatureProvider
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
@@ -36,13 +36,13 @@ class ValidatorStatusTrackerService:
         self,
         multi_beacon_node: MultiBeaconNode,
         beacon_chain: BeaconChain,
-        remote_signer: RemoteSigner,
+        signature_provider: SignatureProvider,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
     ):
         self.multi_beacon_node = multi_beacon_node
         self.beacon_chain = beacon_chain
-        self.remote_signer = remote_signer
+        self.signature_provider = signature_provider
         self.scheduler = scheduler
         self.task_manager = task_manager
 
@@ -123,10 +123,10 @@ class ValidatorStatusTrackerService:
         """
         self.logger.debug("Updating validator statuses")
 
-        remote_signer_pubkeys = set(await self.remote_signer.get_public_keys())
+        managed_pubkeys = set(await self.signature_provider.get_public_keys())
 
         slashed_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys),
+            ids=list(managed_pubkeys),
             statuses=SLASHED_STATUSES,
         )
 
@@ -137,13 +137,13 @@ class ValidatorStatusTrackerService:
             )
 
         self.active_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys),
+            ids=list(managed_pubkeys),
             statuses=ACTIVE_STATUSES,
         )
         active_pubkeys = {v.pubkey for v in self.active_validators}
 
         self.pending_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys - active_pubkeys),
+            ids=list(managed_pubkeys - active_pubkeys),
             statuses=PENDING_STATUSES,
         )
         pending_pubkeys = {v.pubkey for v in self.pending_validators}
@@ -155,17 +155,14 @@ class ValidatorStatusTrackerService:
             return
 
         self.exited_validators = await self.multi_beacon_node.get_validators(
-            ids=list(remote_signer_pubkeys - active_pubkeys - pending_pubkeys),
+            ids=list(managed_pubkeys - active_pubkeys - pending_pubkeys),
             statuses=EXITED_STATUSES,
         )
         exited_pubkeys = {v.pubkey for v in self.exited_validators}
 
         self.withdrawal_validators = await self.multi_beacon_node.get_validators(
             ids=list(
-                remote_signer_pubkeys
-                - active_pubkeys
-                - pending_pubkeys
-                - exited_pubkeys
+                managed_pubkeys - active_pubkeys - pending_pubkeys - exited_pubkeys
             ),
             statuses=WITHDRAWAL_STATUSES,
         )
@@ -175,7 +172,7 @@ class ValidatorStatusTrackerService:
         known_pubkeys = (
             active_pubkeys | pending_pubkeys | exited_pubkeys | withdrawal_pubkeys
         )
-        unknown_pubkeys = remote_signer_pubkeys - known_pubkeys
+        unknown_pubkeys = managed_pubkeys - known_pubkeys
 
         self.logger.debug(
             f"Updated validator statuses."

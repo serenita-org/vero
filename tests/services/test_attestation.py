@@ -15,6 +15,14 @@ from services.attestation import (
 from spec.attestation import AttestationData
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_update_duties(attestation_service: AttestationService) -> None:
     # This test just checks that no exception is thrown
     assert len(attestation_service.attester_duties) == 0
@@ -30,11 +38,20 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     validators: list[ValidatorIndexPubkey],
     fork_version: ForkVersion,
+    enable_keymanager_api: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with an attester duty
@@ -100,10 +117,19 @@ async def test_attest_to_invalid_slot(
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     fork_version: ForkVersion,
+    enable_keymanager_api: bool,
     validators: list[ValidatorIndexPubkey],
     caplog: pytest.LogCaptureFixture,
 ) -> None:

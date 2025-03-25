@@ -34,7 +34,7 @@ ENV PROMETHEUS_MULTIPROC_DIR=/tmp/multiprocessing
 
 COPY --chown=vero:vero src .
 
-EXPOSE 8000
+EXPOSE 8000 8001
 
 ARG GIT_TAG
 ARG GIT_COMMIT
