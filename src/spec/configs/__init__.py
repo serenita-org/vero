@@ -1,7 +1,7 @@
 from enum import Enum
 from pathlib import Path
 
-from spec.base import Spec, parse_spec
+from spec.base import SpecElectra, parse_spec
 
 
 class Network(Enum):
@@ -37,7 +37,7 @@ def parse_yaml_file(fp: Path) -> dict[str, str]:
 
 def get_network_spec(
     network: Network, network_custom_config_path: str | None = None
-) -> Spec:
+) -> SpecElectra:
     spec_dict = {}
 
     if network == Network.CUSTOM:

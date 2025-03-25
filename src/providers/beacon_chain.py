@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec._ascii import ELECTRA as ELECTRA_ASCII_ART
-from spec.base import Fork, Genesis, Spec
+from spec.base import Fork, Genesis, SpecElectra
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class BeaconChain:
     def __init__(
         self,
-        spec: Spec,
+        spec: SpecElectra,
         task_manager: TaskManager,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -57,6 +57,9 @@ class BeaconChain:
             genesis_validators_root=self.genesis.genesis_validators_root.to_obj(),
         )
 
+    def _log_fork_readiness(self) -> None:
+        self.logger.info(f"Ready for Electra at epoch {self.spec.ELECTRA_FORK_EPOCH}")
+
     def initialize(self, genesis: Genesis) -> None:
         self.genesis = genesis
 
@@ -64,6 +67,7 @@ class BeaconChain:
         if current_epoch >= self.spec.ELECTRA_FORK_EPOCH:
             self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
         else:
+            self._log_fork_readiness()
             self.current_fork_version = SchemaBeaconAPI.ForkVersion.DENEB
 
     def start_slot_ticker(self) -> None:
@@ -100,12 +104,16 @@ class BeaconChain:
 
     async def on_new_slot(self) -> None:
         _current_slot = self.current_slot  # Cache property value
-        self.logger.info(f"Slot {_current_slot}")
+        _current_epoch = _current_slot // self.spec.SLOTS_PER_EPOCH
         _is_new_epoch = _current_slot % self.spec.SLOTS_PER_EPOCH == 0
+        if _is_new_epoch:
+            self.logger.info(f"Epoch {_current_epoch}")
+        self.logger.info(f"Slot {_current_slot}")
 
         if _is_new_epoch:
-            _current_epoch = _current_slot // self.spec.SLOTS_PER_EPOCH
-            if _current_epoch == self.spec.ELECTRA_FORK_EPOCH:
+            if _current_epoch < self.spec.ELECTRA_FORK_EPOCH:
+                self._log_fork_readiness()
+            elif _current_epoch == self.spec.ELECTRA_FORK_EPOCH:
                 self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
                 self.logger.info(f"Electra fork epoch reached! {ELECTRA_ASCII_ART}")
 

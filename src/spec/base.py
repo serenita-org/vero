@@ -107,5 +107,5 @@ class SpecElectra(SpecDeneb):
     MAX_ATTESTER_SLASHINGS_ELECTRA: uint64
 
 
-def parse_spec(data: dict[str, str]) -> Spec:
+def parse_spec(data: dict[str, str]) -> SpecElectra:
     return SpecElectra.from_obj(data)
