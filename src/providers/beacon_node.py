@@ -111,7 +111,6 @@ class BeaconNode:
         task_manager: TaskManager,
     ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
 
         self.tracer = trace.get_tracer(self.__class__.__name__)
 

@@ -15,7 +15,6 @@ def setup_logging(log_level: str) -> None:
     )
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
-    stream_handler.setLevel(log_level)
     root_logger.addHandler(stream_handler)
     root_logger.setLevel(log_level)
     if log_level != logging.getLevelName(logging.DEBUG):
