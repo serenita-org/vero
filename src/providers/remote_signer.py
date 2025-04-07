@@ -54,7 +54,7 @@ def _sign_messages_in_separate_process(
 class RemoteSigner:
     def __init__(self, url: str):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
+
         self.url = url
         self.host = urlparse(url).hostname or ""
 

@@ -75,7 +75,6 @@ class ValidatorDutyService:
         self.cli_args = kwargs["cli_args"]
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
         # Keeps track of the last slot for which this service started performing its

@@ -12,7 +12,6 @@ from observability import ErrorType, get_shared_metrics
 class TaskManager:
     def __init__(self, shutdown_event: asyncio.Event) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
 
         self.shutdown_event = shutdown_event
 

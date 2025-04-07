@@ -34,7 +34,6 @@ class EventConsumerService:
         self.task_manager = task_manager
 
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
 
         self.event_handlers: dict[
             type[SchemaBeaconAPI.BeaconNodeEvent],

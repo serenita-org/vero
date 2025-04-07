@@ -81,8 +81,6 @@ class MultiBeaconNode:
         cli_args: CLIArgs,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.setLevel(logging.getLogger().level)
-
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
         self.beacon_nodes = [
