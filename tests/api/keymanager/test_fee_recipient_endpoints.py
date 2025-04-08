@@ -5,11 +5,13 @@ import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
+from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
 
 
 @pytest.mark.enable_keymanager_api
 async def test_fee_recipient_lifecycle(
+    keymanager: Keymanager,
     test_client: TestClient[Any, Application],
 ) -> None:
     # Import a key
@@ -34,6 +36,7 @@ async def test_fee_recipient_lifecycle(
     )
     assert response.data.pubkey == pubkey
     assert response.data.ethaddress is None
+    assert keymanager.pubkey_to_fee_recipient_override.get(pubkey) is None
 
     # Set its fee recipient
     fee_recipient_address = "0x" + "a" * 40
@@ -55,6 +58,9 @@ async def test_fee_recipient_lifecycle(
     )
     assert response.data.pubkey == pubkey
     assert response.data.ethaddress == fee_recipient_address
+    assert (
+        keymanager.pubkey_to_fee_recipient_override.get(pubkey) == fee_recipient_address
+    )
 
     # Delete its configured fee recipient
     resp = await test_client.delete(f"/eth/v1/validator/{pubkey}/feerecipient")
@@ -68,6 +74,7 @@ async def test_fee_recipient_lifecycle(
     )
     assert response.data.pubkey == pubkey
     assert response.data.ethaddress is None
+    assert keymanager.pubkey_to_fee_recipient_override.get(pubkey) is None
 
 
 async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> None:

@@ -47,11 +47,6 @@ async def test_prepare_beacon_proposer(
     # This test just checks that no exception is thrown
     await block_proposal_service.prepare_beacon_proposer()
 
-    if enable_keymanager_api:
-        assert any(
-            "Retrieved overridden fee recipient values" in m for m in caplog.messages
-        )
-
 
 @pytest.mark.parametrize(
     "enable_keymanager_api",
@@ -71,14 +66,6 @@ async def test_register_validators(
     await block_proposal_service.register_validators(
         current_slot=beacon_chain.current_slot
     )
-
-    if enable_keymanager_api:
-        assert any(
-            "Retrieved overridden fee recipient values" in m for m in caplog.messages
-        )
-        assert any(
-            "Retrieved overridden gas limit values" in m for m in caplog.messages
-        )
 
 
 @pytest.mark.parametrize(

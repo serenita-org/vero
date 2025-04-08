@@ -170,17 +170,12 @@ class BlockProposalService(ValidatorDutyService):
             + self.validator_status_tracker_service.pending_validators
         )
 
+        if len(our_validators) == 0:
+            return
+
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
         default_fee_recipient = self.cli_args.fee_recipient
-        pubkey_to_fr_override = {}
-        if self.keymanager.enabled:
-            pubkey_to_fr_override = self.keymanager.get_fee_recipient_override_values(
-                pubkeys=[v.pubkey for v in our_validators]
-            )
-
-        if len(our_validators) == 0:
-            return
 
         await self.multi_beacon_node.prepare_beacon_proposer(
             data=[
@@ -188,7 +183,9 @@ class BlockProposalService(ValidatorDutyService):
                     "validator_index": str(v.index),
                     "fee_recipient": default_fee_recipient
                     if not self.keymanager.enabled
-                    else pubkey_to_fr_override.get(v.pubkey, default_fee_recipient),
+                    else self.keymanager.pubkey_to_fee_recipient_override.get(
+                        v.pubkey, default_fee_recipient
+                    ),
                 }
                 for v in our_validators
             ],
@@ -219,17 +216,6 @@ class BlockProposalService(ValidatorDutyService):
         default_fee_recipient = self.cli_args.fee_recipient
         default_gas_limit = str(self.cli_args.gas_limit)
 
-        pubkey_to_fr_override = {}
-        pubkey_to_gl_override = {}
-        if self.keymanager.enabled:
-            pubkeys = [v.pubkey for v in validators_to_register]
-            pubkey_to_fr_override = self.keymanager.get_fee_recipient_override_values(
-                pubkeys=pubkeys
-            )
-            pubkey_to_gl_override = self.keymanager.get_gas_limit_override_values(
-                pubkeys=pubkeys
-            )
-
         for i in range(0, len(validators_to_register), _batch_size):
             validator_batch = validators_to_register[i : i + _batch_size]
 
@@ -241,12 +227,12 @@ class BlockProposalService(ValidatorDutyService):
                                 validator_registration=SchemaRemoteSigner.ValidatorRegistration(
                                     fee_recipient=default_fee_recipient
                                     if not self.keymanager.enabled
-                                    else pubkey_to_fr_override.get(
+                                    else self.keymanager.pubkey_to_fee_recipient_override.get(
                                         v.pubkey, default_fee_recipient
                                     ),
                                     gas_limit=default_gas_limit
                                     if not self.keymanager.enabled
-                                    else pubkey_to_gl_override.get(
+                                    else self.keymanager.pubkey_to_gas_limit_override.get(
                                         v.pubkey, default_gas_limit
                                     ),
                                     timestamp=str(_timestamp),

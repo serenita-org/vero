@@ -5,11 +5,14 @@ import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
+from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
 
 
 @pytest.mark.enable_keymanager_api
-async def test_graffiti_lifecycle(test_client: TestClient[Any, Application]) -> None:
+async def test_graffiti_lifecycle(
+    keymanager: Keymanager, test_client: TestClient[Any, Application]
+) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
     resp = await test_client.post(
@@ -32,6 +35,7 @@ async def test_graffiti_lifecycle(test_client: TestClient[Any, Application]) -> 
     )
     assert response.data.pubkey == pubkey
     assert response.data.graffiti is None
+    assert keymanager.pubkey_to_graffiti_override.get(pubkey) is None
 
     # Set its graffiti
     graffiti_value = "Vero rocks"
@@ -53,6 +57,7 @@ async def test_graffiti_lifecycle(test_client: TestClient[Any, Application]) -> 
     )
     assert response.data.pubkey == pubkey
     assert response.data.graffiti == graffiti_value
+    assert keymanager.pubkey_to_graffiti_override.get(pubkey) == graffiti_value
 
     # Delete its configured graffiti
     resp = await test_client.delete(f"/eth/v1/validator/{pubkey}/graffiti")
@@ -66,6 +71,7 @@ async def test_graffiti_lifecycle(test_client: TestClient[Any, Application]) -> 
     )
     assert response.data.pubkey == pubkey
     assert response.data.graffiti is None
+    assert keymanager.pubkey_to_graffiti_override.get(pubkey) is None
 
 
 async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> None:
@@ -130,7 +136,9 @@ async def test_set_emoji(test_client: TestClient[Any, Application]) -> None:
     assert response.data.graffiti == graffiti_value
 
 
-async def test_set_graffiti_too_long(test_client: TestClient[Any, Application]) -> None:
+async def test_set_graffiti_too_long(
+    keymanager: Keymanager, test_client: TestClient[Any, Application]
+) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
     resp = await test_client.post(
@@ -158,3 +166,4 @@ async def test_set_graffiti_too_long(test_client: TestClient[Any, Application]) 
     assert (
         "Encoded graffiti exceeds the maximum length of 32 bytes" in response["message"]
     )
+    assert keymanager.pubkey_to_graffiti_override.get(pubkey) is None

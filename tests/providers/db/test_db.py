@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from providers import DB
 from providers.db.migrations import MIGRATIONS
 
@@ -39,3 +41,23 @@ def test_db_run_migrations_with_data_in_db(tmp_path: Path) -> None:
     # Add data to tables here when you introduce new tables in a DB migration
 
     assert db.current_version == max(m.version for m in MIGRATIONS)
+
+
+def test_too_many_host_params(tmp_path: Path) -> None:
+    db = DB(data_dir=str(tmp_path))
+    db.run_migrations()
+
+    parameters = [str(i) for i in range(50_000)]
+
+    with pytest.raises(ValueError, match=r"Too many host parameters provided"):
+        db.fetch_all(
+            f"SELECT * from keymanager_data WHERE pubkey IN ({','.join('?' for _ in parameters)});",
+            parameters=parameters,
+        )
+
+    # Smaller batches work just fine
+    for batch in db.batch_host_parameters(parameters):
+        db.fetch_all(
+            f"SELECT * from keymanager_data WHERE pubkey IN ({','.join('?' for _ in batch)});",
+            parameters=batch,
+        )

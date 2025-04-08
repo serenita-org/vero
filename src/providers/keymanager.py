@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import sys
 from collections import defaultdict
@@ -52,8 +53,15 @@ class Keymanager(SignatureProvider):
 
         self.enabled = cli_args.enable_keymanager_api
         self.pubkey_to_remote_signer: dict[str, RemoteSigner] = {}
+        self.pubkey_to_fee_recipient_override: dict[str, EthAddress] = {}
+        self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
+        self.pubkey_to_graffiti_override: dict[str, str] = {}
 
         if self.enabled:
+            self.pubkey_to_fee_recipient_override = self._load_fee_recipient_override()
+            self.pubkey_to_gas_limit_override = self._load_gas_limit_override()
+            self.pubkey_to_graffiti_override = self._load_graffiti_override()
+
             # Spin up API app
             from api.keymanager import start_server
 
@@ -80,25 +88,74 @@ class Keymanager(SignatureProvider):
             await signer.__aexit__(exc_type, exc_val, exc_tb)
 
     async def _update_pubkey_to_remote_signer_mapping(self) -> None:
-        for pubkey, url in self.db.fetch_all(
-            "SELECT pubkey, url FROM keymanager_data;"
-        ):
+        """
+        Update the pubkey-to-RemoteSigner mapping based on records in keymanager_data.
+        Any pubkey not in the DB is removed.
+
+        - If a pubkey already has a matching RemoteSigner (same URL), it is reused.
+        - If another pubkey's RemoteSigner (same URL) can be reused, do so.
+        - Otherwise, a new RemoteSigner is instantiated.
+        """
+        # Fetch all (pubkey, url) pairs from the DB
+        rows = self.db.fetch_all("SELECT pubkey, url FROM keymanager_data;")
+
+        # Keep a quick-lookup dict from URL -> RemoteSigner so we can easily
+        # reuse any existing signers without scanning pubkey_to_remote_signer.
+        signers_by_url = {
+            signer.url: signer for signer in self.pubkey_to_remote_signer.values()
+        }
+
+        # Build a new mapping for pubkey -> RemoteSigner
+        new_mapping = {}
+
+        for pubkey, url in rows:
+            # If the pubkey already has a matching signer, just reuse it
             existing_signer = self.pubkey_to_remote_signer.get(pubkey)
             if existing_signer and existing_signer.url == url:
-                # Mapping already correct for this pubkey
+                new_mapping[pubkey] = existing_signer
                 continue
 
-            # Check if there's already an instantiated signer for the url
-            try:
-                signer = next(
-                    s for _, s in self.pubkey_to_remote_signer.items() if s.url == url
-                )
-                self.pubkey_to_remote_signer[pubkey] = signer
-            except StopIteration:
-                # We need to instantiate a new RemoteSigner
-                self.pubkey_to_remote_signer[pubkey] = await RemoteSigner(
-                    url
-                ).__aenter__()
+            # Otherwise, see if we can reuse a signer from signers_by_url
+            signer = signers_by_url.get(url)
+            if signer is not None:
+                new_mapping[pubkey] = signer
+                continue
+
+            # If we still don't have a signer, create a new one
+            signer = await RemoteSigner(url).__aenter__()
+            signers_by_url[url] = signer
+            new_mapping[pubkey] = signer
+
+        # Overwrite the old mapping with the new one
+        # This automatically drops any pubkey not present in the DB anymore
+        self.pubkey_to_remote_signer = new_mapping
+
+    def _load_fee_recipient_override(self) -> dict[str, str]:
+        return {
+            pk: fr
+            for pk, fr in self.db.fetch_all(
+                "SELECT pubkey, fee_recipient FROM keymanager_data;",
+            )
+            if fr is not None
+        }
+
+    def _load_gas_limit_override(self) -> dict[str, str]:
+        return {
+            pk: gl
+            for pk, gl in self.db.fetch_all(
+                "SELECT pubkey, gas_limit FROM keymanager_data;",
+            )
+            if gl is not None
+        }
+
+    def _load_graffiti_override(self) -> dict[str, str]:
+        return {
+            pk: graffiti
+            for pk, graffiti in self.db.fetch_all(
+                "SELECT pubkey, graffiti FROM keymanager_data;",
+            )
+            if graffiti is not None
+        }
 
     def get_fee_recipient(self, pubkey: Pubkey) -> ValidatorFeeRecipient:
         res, rowcount = self.db.fetch_one(
@@ -109,36 +166,6 @@ class Keymanager(SignatureProvider):
 
         return ValidatorFeeRecipient(pubkey=pubkey, ethaddress=res[0])
 
-    def get_fee_recipient_override_values(
-        self, pubkeys: list[Pubkey]
-    ) -> dict[Pubkey, EthAddress]:
-        return_dict = {
-            pk: fr
-            for pk, fr in self.db.fetch_all(
-                f"SELECT pubkey, fee_recipient FROM keymanager_data WHERE pubkey IN ({','.join('?' for _ in pubkeys)});",  # noqa: S608
-                (*pubkeys,),
-            )
-            if fr is not None
-        }
-
-        self.logger.debug(f"Retrieved overridden fee recipient values: {return_dict}")
-        return return_dict
-
-    def get_gas_limit_override_values(
-        self, pubkeys: list[Pubkey]
-    ) -> dict[Pubkey, UInt64String]:
-        return_dict = {
-            pk: gl
-            for pk, gl in self.db.fetch_all(
-                f"SELECT pubkey, gas_limit FROM keymanager_data WHERE pubkey IN ({','.join('?' for _ in pubkeys)});",  # noqa: S608
-                (*pubkeys,),
-            )
-            if gl is not None
-        }
-
-        self.logger.debug(f"Retrieved overridden gas limit values: {return_dict}")
-        return return_dict
-
     def set_fee_recipient(self, pubkey: Pubkey, fee_recipient: EthAddress) -> None:
         res, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET fee_recipient=? WHERE pubkey=?;",
@@ -146,6 +173,7 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        self.pubkey_to_fee_recipient_override[pubkey] = fee_recipient
 
     def delete_configured_fee_recipient(self, pubkey: Pubkey) -> None:
         res, rowcount = self.db.fetch_one(
@@ -154,6 +182,8 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        with contextlib.suppress(KeyError):
+            del self.pubkey_to_fee_recipient_override[pubkey]
 
     def get_gas_limit(self, pubkey: Pubkey) -> ValidatorGasLimit:
         res, rowcount = self.db.fetch_one(
@@ -171,6 +201,7 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        self.pubkey_to_gas_limit_override[pubkey] = gas_limit
 
     def delete_configured_gas_limit(self, pubkey: Pubkey) -> None:
         res, rowcount = self.db.fetch_one(
@@ -179,6 +210,8 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        with contextlib.suppress(KeyError):
+            del self.pubkey_to_gas_limit_override[pubkey]
 
     def get_graffiti(self, pubkey: Pubkey) -> ValidatorGraffiti:
         res, rowcount = self.db.fetch_one(
@@ -196,6 +229,7 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        self.pubkey_to_graffiti_override[pubkey] = graffiti
 
     def delete_configured_graffiti_value(self, pubkey: Pubkey) -> None:
         res, rowcount = self.db.fetch_one(
@@ -204,11 +238,13 @@ class Keymanager(SignatureProvider):
         )
         if rowcount == 0:
             raise PubkeyNotFound(pubkey)
+        with contextlib.suppress(KeyError):
+            del self.pubkey_to_graffiti_override[pubkey]
 
     def list_remote_keys(self) -> list[RemoteKey]:
         return [
-            RemoteKey(pk, url)
-            for pk, url in self.db.fetch_all("SELECT pubkey, url FROM keymanager_data;")
+            RemoteKey(pk, signer.url)
+            for pk, signer in self.pubkey_to_remote_signer.items()
         ]
 
     async def import_remote_keys(
