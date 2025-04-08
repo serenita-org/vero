@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import datetime
 import logging
 from pathlib import Path
@@ -133,16 +134,18 @@ async def run_services(
     db = DB(data_dir=cli_args.data_dir)
     db.run_migrations()
 
-    async with (
-        MultiBeaconNode(
-            beacon_node_urls=cli_args.beacon_node_urls,
-            beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-            spec=spec,
-            scheduler=scheduler,
-            task_manager=task_manager,
-            cli_args=cli_args,
-        ) as multi_beacon_node,
-    ):
+    async with contextlib.AsyncExitStack() as exit_stack:
+        multi_beacon_node = await exit_stack.enter_async_context(
+            MultiBeaconNode(
+                beacon_node_urls=cli_args.beacon_node_urls,
+                beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
+                spec=spec,
+                scheduler=scheduler,
+                task_manager=task_manager,
+                cli_args=cli_args,
+            )
+        )
+
         beacon_chain.initialize(genesis=multi_beacon_node.best_beacon_node.genesis)
         await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
 
@@ -154,15 +157,15 @@ async def run_services(
         )
         signature_provider: Keymanager | RemoteSigner
         if cli_args.enable_keymanager_api:
-            signature_provider = await keymanager.__aenter__()
+            signature_provider = await exit_stack.enter_async_context(keymanager)
         else:
             if cli_args.remote_signer_url is None:
                 raise RuntimeError(
                     "remote_signer_url is None despite disabled Keymanager API"
                 )
-            signature_provider = await RemoteSigner(
-                url=cli_args.remote_signer_url
-            ).__aenter__()
+            signature_provider = await exit_stack.enter_async_context(
+                RemoteSigner(url=cli_args.remote_signer_url)
+            )
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")
         _logger.info(f"Current slot: {beacon_chain.current_slot}")
@@ -227,4 +230,3 @@ async def run_services(
         await monitor_event_loop(
             beacon_chain=beacon_chain, shutdown_event=shutdown_event
         )
-        await signature_provider.__aexit__(None, None, None)
