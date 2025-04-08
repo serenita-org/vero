@@ -1,0 +1,16 @@
+participants:
+  - el_type: nethermind
+    cl_type: lodestar
+    use_separate_vc: true
+    vc_type: vero
+    use_remote_signer: true
+
+network_params:
+  seconds_per_slot: 3
+
+additional_services:
+  - assertoor
+
+assertoor_params:
+  run_stability_check: true
+  run_block_proposal_check: true
