@@ -41,7 +41,7 @@ MIGRATIONS = [
                 fee_recipient TEXT,
                 gas_limit TEXT,
                 graffiti TEXT
-            );
+            ) STRICT;
             """
         ],
         bump_version=True,
