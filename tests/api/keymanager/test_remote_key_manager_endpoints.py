@@ -2,7 +2,6 @@ import random
 from typing import Any
 
 import msgspec.json
-import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
@@ -77,7 +76,6 @@ async def test_remote_keymanager_lifecycle(
     assert response_list_3.data[0].pubkey != key_to_delete.pubkey
 
 
-@pytest.mark.enable_keymanager_api
 async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> None:
     nonexistent_pubkey = "0x" + "a" * 96
 

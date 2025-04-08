@@ -1,7 +1,6 @@
 from typing import Any
 
 import msgspec.json
-import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
@@ -9,7 +8,6 @@ from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
 
 
-@pytest.mark.enable_keymanager_api
 async def test_graffiti_lifecycle(
     keymanager: Keymanager, test_client: TestClient[Any, Application]
 ) -> None:

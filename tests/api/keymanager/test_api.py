@@ -2,7 +2,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import msgspec
-import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
@@ -12,7 +11,6 @@ from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
 
 
-@pytest.mark.enable_keymanager_api
 async def test_bearer_auth(
     aiohttp_client: Callable[[Application], Awaitable[TestClient[Any, Application]]],
     keymanager: Keymanager,
@@ -51,7 +49,6 @@ async def test_bearer_auth(
     assert resp.status == 200
 
 
-@pytest.mark.enable_keymanager_api
 async def test_bad_request(
     test_client: TestClient[Any, Application],
     keymanager: Keymanager,

@@ -158,7 +158,7 @@ class Keymanager(SignatureProvider):
         }
 
     def get_fee_recipient(self, pubkey: Pubkey) -> ValidatorFeeRecipient:
-        res, rowcount = self.db.fetch_one(
+        res, _ = self.db.fetch_one(
             "SELECT fee_recipient FROM keymanager_data WHERE pubkey=?;", (pubkey,)
         )
         if res is None:
@@ -167,7 +167,7 @@ class Keymanager(SignatureProvider):
         return ValidatorFeeRecipient(pubkey=pubkey, ethaddress=res[0])
 
     def set_fee_recipient(self, pubkey: Pubkey, fee_recipient: EthAddress) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET fee_recipient=? WHERE pubkey=?;",
             (fee_recipient, pubkey),
         )
@@ -176,7 +176,7 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_fee_recipient_override[pubkey] = fee_recipient
 
     def delete_configured_fee_recipient(self, pubkey: Pubkey) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET fee_recipient=? WHERE pubkey=?;",
             (None, pubkey),
         )
@@ -186,7 +186,7 @@ class Keymanager(SignatureProvider):
             del self.pubkey_to_fee_recipient_override[pubkey]
 
     def get_gas_limit(self, pubkey: Pubkey) -> ValidatorGasLimit:
-        res, rowcount = self.db.fetch_one(
+        res, _ = self.db.fetch_one(
             "SELECT gas_limit FROM keymanager_data WHERE pubkey=?;", (pubkey,)
         )
         if res is None:
@@ -195,7 +195,7 @@ class Keymanager(SignatureProvider):
         return ValidatorGasLimit(pubkey=pubkey, gas_limit=res[0])
 
     def set_gas_limit(self, pubkey: Pubkey, gas_limit: UInt64String) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET gas_limit=? WHERE pubkey=?;",
             (gas_limit, pubkey),
         )
@@ -204,7 +204,7 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_gas_limit_override[pubkey] = gas_limit
 
     def delete_configured_gas_limit(self, pubkey: Pubkey) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET gas_limit=? WHERE pubkey=?;",
             (None, pubkey),
         )
@@ -214,7 +214,7 @@ class Keymanager(SignatureProvider):
             del self.pubkey_to_gas_limit_override[pubkey]
 
     def get_graffiti(self, pubkey: Pubkey) -> ValidatorGraffiti:
-        res, rowcount = self.db.fetch_one(
+        res, _ = self.db.fetch_one(
             "SELECT graffiti FROM keymanager_data WHERE pubkey=?;", (pubkey,)
         )
         if res is None:
@@ -223,7 +223,7 @@ class Keymanager(SignatureProvider):
         return ValidatorGraffiti(pubkey=pubkey, graffiti=res[0])
 
     def set_graffiti(self, pubkey: Pubkey, graffiti: str) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET graffiti=? WHERE pubkey=?;",
             (graffiti, pubkey),
         )
@@ -232,7 +232,7 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_graffiti_override[pubkey] = graffiti
 
     def delete_configured_graffiti_value(self, pubkey: Pubkey) -> None:
-        res, rowcount = self.db.fetch_one(
+        _, rowcount = self.db.fetch_one(
             "UPDATE keymanager_data SET graffiti=? WHERE pubkey=?;",
             (None, pubkey),
         )
@@ -291,7 +291,7 @@ class Keymanager(SignatureProvider):
 
         for pubkey in pubkeys:
             try:
-                res, rowcount = self.db.fetch_one(
+                _, rowcount = self.db.fetch_one(
                     "DELETE FROM keymanager_data WHERE pubkey=?;", (pubkey,)
                 )
             except Exception as e:
@@ -318,13 +318,6 @@ class Keymanager(SignatureProvider):
     async def sign_voluntary_exit_message(
         self, pubkey: Pubkey, epoch: int | None
     ) -> SignedVoluntaryExit:
-        # Get remote signer for pubkey
-        res, rowcount = self.db.fetch_one(
-            "SELECT url FROM keymanager_data WHERE pubkey=?;", (pubkey,)
-        )
-        if res is None:
-            raise PubkeyNotFound(pubkey)
-
         # Determine if validator is active and its validator index
         if self.multi_beacon_node is None:
             raise ValueError("Keymanager.multi_beacon_node is None")
@@ -338,7 +331,8 @@ class Keymanager(SignatureProvider):
         validator_index = next(iter(val_idx_pubkeys)).index
 
         # Per Keymanager API spec - if no epoch is provided, use the current one
-        epoch = epoch or self.beacon_chain.current_epoch
+        if epoch is None:
+            epoch = self.beacon_chain.current_epoch
 
         msg, sig, pubkey = await self.sign(
             message=SchemaRemoteSigner.VoluntaryExitSignableMessage(

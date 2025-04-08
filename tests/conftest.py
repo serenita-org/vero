@@ -47,12 +47,6 @@ def beacon_node_urls_proposal(request: pytest.FixtureRequest) -> list[str]:
 
 @pytest.fixture
 def enable_keymanager_api(request: pytest.FixtureRequest) -> bool:
-    # If a test is marked with @pytest.mark.enable_keymanager_api,
-    # return True.
-    marker = request.node.get_closest_marker("enable_keymanager_api")
-    if marker:
-        return True
-
     # Default to false if not otherwise requested through indirect parametrization
     return getattr(request, "param", False)
 
@@ -210,7 +204,6 @@ async def keymanager(
     empty_db: DB,
     beacon_chain: BeaconChain,
     cli_args: CLIArgs,
-    enable_keymanager_api: bool,
     multi_beacon_node: MultiBeaconNode,
     remote_signer_url: str,
     validators: list[ValidatorIndexPubkey],
@@ -222,16 +215,6 @@ async def keymanager(
         multi_beacon_node=multi_beacon_node,
         cli_args=cli_args,
     ) as keymanager:
-        # import the default fixture validators
-        if enable_keymanager_api:
-            await keymanager.import_remote_keys(
-                remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(
-                        pubkey=v.pubkey, url=remote_signer_url
-                    )
-                    for v in validators
-                ],
-            )
         yield keymanager
 
 
@@ -240,8 +223,17 @@ async def signature_provider(
     enable_keymanager_api: bool,
     cli_args: CLIArgs,
     keymanager: Keymanager,
+    remote_signer_url: str,
+    validators: list[ValidatorIndexPubkey],
 ) -> AsyncGenerator[SignatureProvider, None]:
     if enable_keymanager_api:
+        # import the default fixture validators into the Keymanager provider
+        await keymanager.import_remote_keys(
+            remote_keys=[
+                SchemaKeymanagerAPI.RemoteKey(pubkey=v.pubkey, url=remote_signer_url)
+                for v in validators
+            ],
+        )
         yield keymanager
     else:
         if cli_args.remote_signer_url is None:
