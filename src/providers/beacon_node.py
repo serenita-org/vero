@@ -166,24 +166,18 @@ class BeaconNode:
     async def _initialize_full(self) -> None:
         self.genesis = await self.get_genesis()
 
-        # Warn if the spec returned by the beacon node differs
-        try:
-            bn_spec = await self.get_spec()
-            if self.spec != bn_spec:
-                self.logger.warning(
-                    f"Spec values returned by beacon node not equal to hardcoded spec values."
-                    f"\nBeacon node:\n{bn_spec}"
-                    f"\nHardcoded:\n{self.spec}"
-                )
-        except Exception as e:
-            # This triggers for Nimbus/Prysm because they don't return some spec values
-            # TODO simplify once fixed:
-            #  https://github.com/prysmaticlabs/prysm/issues/14863
-            #  https://github.com/status-im/nimbus-eth2/issues/6903
-            self.logger.warning(
-                f"Failed to verify beacon node spec, error: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
+        # Raise if the spec returned by the beacon node differs
+        bn_spec = await self.get_spec()
+        if self.spec != bn_spec:
+            msg = f"Spec values returned by beacon node {self.host} not equal to hardcoded spec values:"
+            for field in self.spec.fields():
+                if getattr(self.spec, field) != getattr(bn_spec, field):
+                    msg += (
+                        f"\n{field}:"
+                        f"\n\tIncluded value: {getattr(self.spec, field)}"
+                        f"\n\tValue returned by beacon node: {getattr(bn_spec, field)}"
+                    )
+            raise ValueError(msg)
 
         # Regularly refresh the version of the beacon node
         self.scheduler.add_job(
@@ -322,7 +316,7 @@ class BeaconNode:
 
         if resp_version != self.node_version:
             self.logger.info(
-                f"Beacon node version changed: {self.node_version} -> {resp_version}"
+                f"Beacon node version changed on {self.host}: {self.node_version} -> {resp_version}"
             )
             # Remove old metric value in order not to report multiple values
             # for the same host
