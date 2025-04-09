@@ -48,6 +48,23 @@ async def test_remote_keymanager_lifecycle(
     )
     assert len(response_list_2.data) == 2
 
+    # Try to import the same keys again
+    # -> their import status should be reported as DUPLICATE
+    resp = await test_client.post(
+        "/eth/v1/remotekeys",
+        data=msgspec.json.encode(
+            SchemaKeymanagerAPI.ImportRemoteKeysRequest(remote_keys=keys_to_add)
+        ),
+    )
+    assert resp.status == 200
+    response_import_2 = msgspec.json.decode(
+        await resp.text(), type=SchemaKeymanagerAPI.ImportRemoteKeysResponse
+    )
+    assert all(
+        d.status == SchemaKeymanagerAPI.ImportStatus.DUPLICATE
+        for d in response_import_2.data
+    )
+
     # Delete one of the keys
     key_to_delete: SchemaKeymanagerAPI.RemoteKey = random.choice(keys_to_add)
     resp = await test_client.delete(

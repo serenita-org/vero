@@ -332,9 +332,6 @@ class Keymanager(SignatureProvider):
         self, pubkey: Pubkey, epoch: int | None
     ) -> SignedVoluntaryExit:
         # Determine if validator is active and its validator index
-        if self.multi_beacon_node is None:
-            raise ValueError("Keymanager.multi_beacon_node is None")
-
         val_idx_pubkeys = await self.multi_beacon_node.get_validators(
             ids=[pubkey],
         )
