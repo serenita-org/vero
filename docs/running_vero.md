@@ -149,7 +149,7 @@ ___
 The logging level to use, one of `CRITICAL,ERROR,WARNING,INFO,DEBUG`. Defaults to `INFO`.
 ___
 
-#### `----DANGER----disable-slashing-detection`
+#### `---DANGER----disable-slashing-detection`
 
 **_!!! This flag is extremely dangerous and should not be provided to Vero under normal circumstances!!!_**
 
