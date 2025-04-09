@@ -1,4 +1,4 @@
-name: docker
+name: Docker - build & push
 
 permissions:
   contents: read
@@ -11,35 +11,7 @@ on:
 
 jobs:
   verify-configs:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Compare config files
-        run: |
-          declare -A FILES_TO_CHECK=(
-            ["chiado.yaml"]="https://raw.githubusercontent.com/gnosischain/configs/main/chiado/config.yaml"
-            ["gnosis.yaml"]="https://raw.githubusercontent.com/gnosischain/configs/main/mainnet/config.yaml"
-            ["holesky.yaml"]="https://raw.githubusercontent.com/eth-clients/holesky/main/metadata/config.yaml"
-            ["hoodi.yaml"]="https://raw.githubusercontent.com/eth-clients/hoodi/main/metadata/config.yaml"
-            ["mainnet.yaml"]="https://raw.githubusercontent.com/eth-clients/mainnet/main/metadata/config.yaml"
-          )
-
-          for LOCAL_FILE in "${!FILES_TO_CHECK[@]}"; do
-            REMOTE_URL="${FILES_TO_CHECK[$LOCAL_FILE]}"
-            wget -q -O "/tmp/${LOCAL_FILE}" "${REMOTE_URL}"
-
-            if ! cmp -s "/tmp/${LOCAL_FILE}" "src/spec/configs/${LOCAL_FILE}"; then
-              echo "Mismatch detected in ${LOCAL_FILE}!"
-              echo "----- DIFF -----"
-              diff -u "src/spec/configs/${LOCAL_FILE}" "/tmp/${LOCAL_FILE}" || true
-              echo "----------------"
-              echo "Please update src/spec/configs/${LOCAL_FILE} to match upstream."
-              exit 1
-            else
-              echo "${LOCAL_FILE} is up-to-date."
-            fi
-          done
+    uses: ./.github/workflows/verify-configs.yml
 
   build-and-push:
     # This depends on the verify-configs job above
