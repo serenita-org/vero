@@ -6,6 +6,7 @@ from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvide
 from services import (
     AttestationService,
     BlockProposalService,
+    SyncCommitteeService,
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
@@ -47,3 +48,10 @@ def block_proposal_service(
     validator_duty_service_options: ValidatorDutyServiceOptions,
 ) -> BlockProposalService:
     return BlockProposalService(**validator_duty_service_options)
+
+
+@pytest.fixture
+def sync_committee_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> SyncCommitteeService:
+    return SyncCommitteeService(**validator_duty_service_options)

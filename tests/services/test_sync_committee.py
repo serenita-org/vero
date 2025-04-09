@@ -10,14 +10,6 @@ from services.sync_committee import (
     _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS,
     _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
 )
-from services.validator_duty_service import ValidatorDutyServiceOptions
-
-
-@pytest.fixture
-def sync_committee_service(
-    validator_duty_service_options: ValidatorDutyServiceOptions,
-) -> SyncCommitteeService:
-    return SyncCommitteeService(**validator_duty_service_options)
 
 
 @pytest.mark.parametrize(

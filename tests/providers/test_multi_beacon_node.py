@@ -198,9 +198,7 @@ async def test_get_aggregate_attestation(
                     beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
                     * beacon_chain.MAX_COMMITTEES_PER_SLOT
                 )
-                agg_bits_to_return = Bitlist[bitlist_length](
-                    False for _ in range(bitlist_length)
-                )
+                agg_bits_to_return = Bitlist[bitlist_length](False for _ in range(10))
                 for idx in range(number_of_attesting_indices):
                     agg_bits_to_return[idx] = True
                 _callback = partial(
