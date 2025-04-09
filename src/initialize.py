@@ -239,3 +239,7 @@ async def run_services(
         await monitor_event_loop(
             beacon_chain=beacon_chain, shutdown_event=shutdown_event
         )
+
+        # Reaching this point means the shutdown_event was set
+        # -> cancel all pending tasks
+        task_manager.cancel_all()

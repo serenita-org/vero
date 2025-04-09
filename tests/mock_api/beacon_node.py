@@ -73,21 +73,39 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(payload=dict(data=dict(version="vero/test")))
 
         if re.match(r"/eth/v1/validator/duties/proposer/\d+", url.raw_path):
+            # This endpoint returns all proposer duties for the epoch
             epoch_no = int(url.raw_path.split("/")[-1])
+
+            proposer_duties = []
+            for duty_slot in range(
+                epoch_no * spec.SLOTS_PER_EPOCH, (epoch_no + 1) * spec.SLOTS_PER_EPOCH
+            ):
+                # For our managed validators, only schedule duties for the next 2 slots
+                # so we don't block the shutdown_handler for long
+                if duty_slot <= beacon_chain.current_slot + 2:
+                    proposer = random.choice(validators)
+                    proposer_duties.append(
+                        SchemaBeaconAPI.ProposerDuty(
+                            pubkey=proposer.pubkey,
+                            validator_index=str(proposer.index),
+                            slot=str(duty_slot),
+                        ),
+                    )
+                else:
+                    proposer_duties.append(
+                        SchemaBeaconAPI.ProposerDuty(
+                            pubkey="0x" + os.urandom(48).hex(),
+                            validator_index=str(random.randint(0, 1_000_000)),
+                            slot=str(duty_slot),
+                        ),
+                    )
 
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetProposerDutiesResponse(
                         dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
                         execution_optimistic=False,
-                        data=[
-                            SchemaBeaconAPI.ProposerDuty(
-                                pubkey="0x" + os.urandom(48).hex(),
-                                validator_index=str(random.randint(0, 1_000_000)),
-                                slot=str(epoch_no * spec.SLOTS_PER_EPOCH + slot_no),
-                            )
-                            for slot_no in range(spec.SLOTS_PER_EPOCH)
-                        ],
+                        data=proposer_duties,
                     )
                 ),
             )
@@ -191,9 +209,9 @@ def _mocked_beacon_node_endpoints(
                 _agg_bitlist_size = (
                     spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
                 )
-                _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1] + [
-                    1 for _ in range(_agg_bitlist_size - 10)
-                ]
+                # Populating the full bitlist is expensive
+                # -> a smaller agg bits bitlist is fine for testing purposes too
+                _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
                 aggregate_attestation = SpecAttestation.AttestationElectra(
                     aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),
                     data=AttestationData(
@@ -217,9 +235,9 @@ def _mocked_beacon_node_endpoints(
                 # Deterministic return data to make it possible to
                 # check the submitted aggregate in the other endpoint
                 _agg_bitlist_size = spec.MAX_VALIDATORS_PER_COMMITTEE
-                _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1] + [
-                    1 for _ in range(_agg_bitlist_size - 10)
-                ]
+                # Populating the full bitlist is expensive
+                # -> a smaller agg bits bitlist is fine for testing purposes too
+                _agg_bits = [0, 1, 1, 0, 0, 1, 1, 0, 1, 1]
                 aggregate_attestation = SpecAttestation.AttestationPhase0(
                     aggregation_bits=Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE](
                         _agg_bits
@@ -391,10 +409,15 @@ def _mocked_beacon_node_endpoints(
             # specified in the response
             attester_duties = []
             for v in validators:
-                duty_slot = epoch_no * spec.SLOTS_PER_EPOCH + random.randint(
-                    0,
-                    spec.SLOTS_PER_EPOCH,
-                )
+                # We want to schedule our validator's duties to happen soon
+                last_slot_in_epoch = (epoch_no + 1) * spec.SLOTS_PER_EPOCH - 1
+                if beacon_chain.current_slot == last_slot_in_epoch:
+                    # Last slot in epoch, don't schedule anything anymore,
+                    # we'll attest in the next epoch
+                    continue
+
+                # Schedule our validators to attest in the next scheduled slot
+                duty_slot = beacon_chain.current_slot + 1
                 attester_duties.append(
                     SchemaBeaconAPI.AttesterDuty(
                         pubkey=v.pubkey,
@@ -468,17 +491,15 @@ def _mocked_beacon_node_endpoints(
 
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
                 assert aggregate["committee_bits"] == "0x0040000000000000"
-                assert aggregate["aggregation_bits"] == f"0x75{32766 * 'f'}01"
+                assert aggregate["aggregation_bits"] == "0x7507"
             elif beacon_chain.current_fork_version == ForkVersion.DENEB:
                 assert aggregate["data"]["index"] == "14"
-                assert aggregate["aggregation_bits"] == f"0x75{510 * 'f'}01"
+                assert aggregate["aggregation_bits"] == "0x6607"
             else:
                 raise ValueError(f"Unsupported spec: {spec}")
             return CallbackResult(status=200)
 
         if re.match(r"/eth/v1/validator/duties/sync/\d+", url.raw_path):
-            epoch_no = int(url.raw_path.split("/")[-1])
-
             # This endpoint returns only duties for the validators
             # specified in the response
             sync_duties = [

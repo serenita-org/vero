@@ -188,9 +188,18 @@ async def scheduler() -> AsyncGenerator[AsyncIOScheduler, None]:
     _scheduler.shutdown(wait=False)
 
 
+@pytest.fixture
+def shutdown_event() -> asyncio.Event:
+    return asyncio.Event()
+
+
 @pytest.fixture(scope="session")
-def task_manager() -> TaskManager:
-    return TaskManager(shutdown_event=asyncio.Event())
+async def task_manager(
+    shutdown_event: asyncio.Event,
+) -> AsyncGenerator[TaskManager, None]:
+    t = TaskManager(shutdown_event=shutdown_event)
+    yield t
+    t.cancel_all()
 
 
 @pytest.fixture

@@ -53,8 +53,6 @@ class DB:
         if self.current_version == max(m.version for m in MIGRATIONS):
             return
 
-        self.logger.info("Running database migrations")
-
         for migration in sorted(MIGRATIONS, key=lambda m: m.version):
             if self.current_version >= migration.version:
                 # Migration already applied
