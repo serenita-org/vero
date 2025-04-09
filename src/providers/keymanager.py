@@ -3,6 +3,7 @@ import contextlib
 import logging
 import sys
 from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor
 from sqlite3 import IntegrityError
 from types import TracebackType
 from typing import Self
@@ -44,6 +45,7 @@ class Keymanager(SignatureProvider):
         beacon_chain: BeaconChain,
         multi_beacon_node: MultiBeaconNode,
         cli_args: CLIArgs,
+        process_pool_executor: ProcessPoolExecutor,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -56,6 +58,8 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_fee_recipient_override: dict[str, EthAddress] = {}
         self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
         self.pubkey_to_graffiti_override: dict[str, str] = {}
+
+        self.process_pool_executor = process_pool_executor
 
         # We'll create this in `Keymanager.__aenter__`
         self._exit_stack: contextlib.AsyncExitStack | None = None
@@ -135,7 +139,9 @@ class Keymanager(SignatureProvider):
                 continue
 
             # If we still don't have a signer, create a new one
-            signer = await self._exit_stack.enter_async_context(RemoteSigner(url))
+            signer = await self._exit_stack.enter_async_context(
+                RemoteSigner(url, process_pool_executor=self.process_pool_executor)
+            )
             signers_by_url[url] = signer
             new_mapping[pubkey] = signer
 

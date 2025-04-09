@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import datetime
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -149,11 +150,13 @@ async def run_services(
         beacon_chain.initialize(genesis=multi_beacon_node.best_beacon_node.genesis)
         await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
 
+        process_pool_executor = ProcessPoolExecutor()
         keymanager = Keymanager(
             db=db,
             beacon_chain=beacon_chain,
             multi_beacon_node=multi_beacon_node,
             cli_args=cli_args,
+            process_pool_executor=process_pool_executor,
         )
         signature_provider: Keymanager | RemoteSigner
         if cli_args.enable_keymanager_api:
@@ -164,7 +167,10 @@ async def run_services(
                     "remote_signer_url is None despite disabled Keymanager API"
                 )
             signature_provider = await exit_stack.enter_async_context(
-                RemoteSigner(url=cli_args.remote_signer_url)
+                RemoteSigner(
+                    url=cli_args.remote_signer_url,
+                    process_pool_executor=process_pool_executor,
+                )
             )
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")

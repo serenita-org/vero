@@ -3,6 +3,7 @@ import datetime
 import random
 from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator, Generator
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -199,6 +200,11 @@ def empty_db(tmp_path: Path) -> DB:
     return db
 
 
+@pytest.fixture(scope="session")
+def process_pool_executor() -> ProcessPoolExecutor:
+    return ProcessPoolExecutor()
+
+
 @pytest.fixture
 async def keymanager(
     empty_db: DB,
@@ -206,6 +212,7 @@ async def keymanager(
     cli_args: CLIArgs,
     multi_beacon_node: MultiBeaconNode,
     remote_signer_url: str,
+    process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[Keymanager, None]:
@@ -214,6 +221,7 @@ async def keymanager(
         beacon_chain=beacon_chain,
         multi_beacon_node=multi_beacon_node,
         cli_args=cli_args,
+        process_pool_executor=process_pool_executor,
     ) as keymanager:
         yield keymanager
 
@@ -224,6 +232,7 @@ async def signature_provider(
     cli_args: CLIArgs,
     keymanager: Keymanager,
     remote_signer_url: str,
+    process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
 ) -> AsyncGenerator[SignatureProvider, None]:
     if enable_keymanager_api:
@@ -240,7 +249,9 @@ async def signature_provider(
             raise RuntimeError(
                 "remote_signer_url is None despite disabled Keymanager API"
             )
-        async with RemoteSigner(url=cli_args.remote_signer_url) as remote_signer:
+        async with RemoteSigner(
+            url=cli_args.remote_signer_url, process_pool_executor=process_pool_executor
+        ) as remote_signer:
             yield remote_signer
 
 

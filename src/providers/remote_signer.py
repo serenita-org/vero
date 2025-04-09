@@ -35,7 +35,9 @@ def _sign_messages_in_separate_process(
         tuple[SchemaRemoteSigner.SignableMessageT, str, str]
     ]:
         results = []
-        async with RemoteSigner(url=remote_signer_url) as signer:
+        async with RemoteSigner(
+            url=remote_signer_url, process_pool_executor=None
+        ) as signer:
             for i in range(0, len(messages), batch_size):
                 messages_batch = messages[i : i + batch_size]
                 identifiers_batch = identifiers[i : i + batch_size]
@@ -54,7 +56,7 @@ def _sign_messages_in_separate_process(
 
 
 class RemoteSigner(SignatureProvider):
-    def __init__(self, url: str):
+    def __init__(self, url: str, process_pool_executor: ProcessPoolExecutor | None):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.url = url
@@ -62,7 +64,7 @@ class RemoteSigner(SignatureProvider):
         if not self.host:
             raise ValueError(f"Failed to parse hostname from {self.url}")
 
-        self.process_pool_executor = ProcessPoolExecutor()
+        self.process_pool_executor = process_pool_executor
 
     async def __aenter__(self) -> Self:
         _user_agent = f"{get_service_name()}/{get_service_version()}"
@@ -124,7 +126,8 @@ class RemoteSigner(SignatureProvider):
         ):
             if not session.closed:
                 await session.close()
-        self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
+        if self.process_pool_executor is not None:
+            self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -199,6 +202,9 @@ class RemoteSigner(SignatureProvider):
         Large amounts of messages (more than `batch_size`) are signed in a separate
         process to avoid blocking the event loop.
         """
+        if self.process_pool_executor is None:
+            raise RuntimeError("self.process_pool_executor is None")
+
         if len(messages) != len(identifiers):
             raise ValueError(
                 "Number of messages does not match the number of identifiers",
