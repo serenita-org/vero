@@ -20,8 +20,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
 
@@ -48,7 +46,6 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v6
       with:
-        context: .
         build-args: |
           GIT_TAG=${{ github.ref_name }}
           GIT_COMMIT=${{ github.sha }}
