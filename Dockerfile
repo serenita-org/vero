@@ -1,5 +1,5 @@
 ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm@sha256:123be5684f39d8476e64f47a5fddf38f5e9d839baff5c023c815ae5bdfae0df7"
-ARG UV_IMAGE_TAG="0.6.5@sha256:562193a4a9d398f8aedddcb223e583da394ee735de36b5815f8f1d22cb49be15"
+ARG UV_IMAGE_TAG="0.6.13@sha256:0b6dc79013b689f3bc0cbf12807cb1c901beaafe80f2ee10a1d76aa3842afb92"
 
 # uv image
 FROM ghcr.io/astral-sh/uv:${UV_IMAGE_TAG} AS uv-image
