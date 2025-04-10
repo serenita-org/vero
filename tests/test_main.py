@@ -1,12 +1,56 @@
 import asyncio
+import cProfile
 import logging
 import os
+import pstats
 import signal
+import time
+from _lsprof import profiler_entry
+from collections.abc import Generator
 
 import pytest
 
 from args import CLIArgs
 from main import main
+
+
+@pytest.fixture
+def _profile_program_run() -> Generator[None, None, None]:
+    # CI environments report artificially high CPU usage due to virtualization
+    # -> skipping the check of CPU usage there
+    if os.getenv("CI") == "true":
+        yield
+        return
+
+    def is_idle_stat(stat: profiler_entry) -> bool:
+        """
+        Some stats are treated as 'idle time' when evaluating CPU usage,
+        since the program is waiting on I/O and not actively consuming CPU.
+        """
+        if isinstance(stat.code, str):
+            return any(
+                substr in stat.code
+                for substr in (
+                    "of 'select.kqueue' objects>",
+                    "of 'select.poll' objects>",
+                )
+            )
+        return False
+
+    prof = cProfile.Profile()
+    with prof:
+        start_wall_time = time.perf_counter()
+        yield
+        wall_time = time.perf_counter() - start_wall_time
+
+    idle_time = sum(s.totaltime for s in prof.getstats() if is_idle_stat(s))
+    adjusted_cpu_time = pstats.Stats(prof).total_tt - idle_time  # type: ignore[attr-defined]
+    cpu_utilization = adjusted_cpu_time / wall_time
+
+    # Vero should be able to perform all its duties without
+    # keeping the event loop busy 100% of the time, even with
+    # the very short 1s slot time in the test config.
+    assert 0.05 < cpu_utilization < 0.5
 
 
 @pytest.mark.parametrize(
@@ -19,6 +63,7 @@ from main import main
 )
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
+@pytest.mark.usefixtures("_profile_program_run")
 async def test_lifecycle(
     cli_args: CLIArgs,
     shutdown_event: asyncio.Event,
@@ -26,7 +71,7 @@ async def test_lifecycle(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
-    Sanity check that Vero can start running and shut down cleanly.
+    Sanity check that Vero can start running, perform its duties and shut down cleanly.
     """
     run_services_task = asyncio.create_task(
         main(
