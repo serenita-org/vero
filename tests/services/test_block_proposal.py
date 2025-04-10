@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from providers import BeaconChain
+from providers import BeaconChain, Keymanager
 from providers.beacon_node import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
@@ -11,8 +11,17 @@ from services import BlockProposalService
 from services.block_proposal import _VC_PUBLISHED_BLOCKS
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_update_duties(
     block_proposal_service: BlockProposalService,
+    enable_keymanager_api: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # This test just checks that no exception is thrown
@@ -22,16 +31,36 @@ async def test_update_duties(
     assert len(block_proposal_service.proposer_duties) > 0
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_prepare_beacon_proposer(
     block_proposal_service: BlockProposalService,
+    enable_keymanager_api: bool,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # This test just checks that no exception is thrown
     await block_proposal_service.prepare_beacon_proposer()
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_register_validators(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
+    enable_keymanager_api: bool,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     # This test just checks that no exception is thrown
     await block_proposal_service.register_validators(
@@ -60,6 +89,14 @@ async def test_register_validators(
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_publish_block(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
@@ -67,10 +104,15 @@ async def test_publish_block(
     execution_payload_blinded: bool,
     response_content_type: ContentType,
     fork_version: ForkVersion,
+    enable_keymanager_api: bool,
+    keymanager: Keymanager,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     if response_content_type == ContentType.OCTET_STREAM:
         pytest.skip("SSZ not supported yet")
+
+    if keymanager.enabled:
+        keymanager.set_graffiti(random_active_validator.pubkey, "overridden")
 
     # Populate the service with a proposal duty
     duty_slot = beacon_chain.current_slot + 1
@@ -98,6 +140,12 @@ async def test_publish_block(
     assert _VC_PUBLISHED_BLOCKS._value.get() == blocks_published_before + 1
     assert block_proposal_service._last_slot_duty_started_for == duty_slot
     assert block_proposal_service._last_slot_duty_completed_for == duty_slot
+
+    if keymanager.enabled:
+        assert any(
+            "Using Keymanager-provided graffiti: overridden" in m
+            for m in caplog.messages
+        )
 
 
 @pytest.mark.parametrize(

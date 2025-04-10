@@ -41,7 +41,7 @@ def _reset_slashing_detected_metric() -> None:
                 ),
             ),
             False,
-            id="Attester slashings for a validator not managed by 'us' (#10, #11)",
+            id="Attester slashings for validators not managed by 'us' (#10, #11)",
         ),
         pytest.param(
             SchemaBeaconAPI.ProposerSlashingEvent(
@@ -73,7 +73,7 @@ def _reset_slashing_detected_metric() -> None:
                 ),
             ),
             False,
-            id="Proposer slashing for 'our' validator (#4)",
+            id="Proposer slashing for a validator not managed by 'us' (#10)",
         ),
     ],
 )

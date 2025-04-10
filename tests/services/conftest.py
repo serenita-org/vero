@@ -2,10 +2,11 @@ import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
 from services import (
     AttestationService,
     BlockProposalService,
+    SyncCommitteeService,
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
@@ -16,7 +17,8 @@ from tasks import TaskManager
 def validator_duty_service_options(
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
-    remote_signer: RemoteSigner,
+    signature_provider: SignatureProvider,
+    keymanager: Keymanager,
     validator_status_tracker: ValidatorStatusTrackerService,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
@@ -25,7 +27,8 @@ def validator_duty_service_options(
     return ValidatorDutyServiceOptions(
         multi_beacon_node=multi_beacon_node,
         beacon_chain=beacon_chain,
-        remote_signer=remote_signer,
+        signature_provider=signature_provider,
+        keymanager=keymanager,
         validator_status_tracker_service=validator_status_tracker,
         scheduler=scheduler,
         task_manager=task_manager,
@@ -45,3 +48,10 @@ def block_proposal_service(
     validator_duty_service_options: ValidatorDutyServiceOptions,
 ) -> BlockProposalService:
     return BlockProposalService(**validator_duty_service_options)
+
+
+@pytest.fixture
+def sync_committee_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> SyncCommitteeService:
+    return SyncCommitteeService(**validator_duty_service_options)
