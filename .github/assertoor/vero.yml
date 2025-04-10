@@ -3,6 +3,7 @@ participants:
     cl_type: lodestar
     use_separate_vc: true
     vc_type: vero
+    vc_image: vero:custom
     use_remote_signer: true
 
 network_params:
