@@ -78,10 +78,10 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to attest 1/3 into the slot at the latest.
-        _produce_deadline = self.beacon_chain.get_datetime_for_slot(
-            slot=slot
-        ) + datetime.timedelta(
-            seconds=int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+        _produce_deadline = datetime.datetime.fromtimestamp(
+            timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
+            + int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            tz=datetime.UTC,
         )
 
         self.scheduler.add_job(
@@ -186,12 +186,9 @@ class AttestationService(ValidatorDutyService):
             # That is quite late into the slot, we do not want to attest that late.
             # Consensus on the latest head block is normally reached
             # much faster though.
-            deadline = self.beacon_chain.get_datetime_for_slot(
-                slot,
-            ) + datetime.timedelta(
-                seconds=2
-                * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-                / INTERVALS_PER_SLOT,
+            deadline_timestamp = (
+                self.beacon_chain.get_timestamp_for_slot(slot)
+                + 2 * int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
             )
 
             consensus_start = asyncio.get_running_loop().time()
@@ -200,7 +197,7 @@ class AttestationService(ValidatorDutyService):
             ):
                 try:
                     att_data = await self.multi_beacon_node.produce_attestation_data(
-                        deadline=deadline,
+                        deadline_timestamp=deadline_timestamp,
                         head_event=head_event,
                         slot=slot,
                         committee_index=0,
@@ -371,12 +368,10 @@ class AttestationService(ValidatorDutyService):
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation at 2/3 of the slot
-        aggregation_run_time = self.beacon_chain.get_datetime_for_slot(
-            slot,
-        ) + datetime.timedelta(
-            seconds=2
-            * int(self.beacon_chain.spec.SECONDS_PER_SLOT)
-            / INTERVALS_PER_SLOT,
+        aggregation_run_time = datetime.datetime.fromtimestamp(
+            timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
+            + 2 * int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            tz=datetime.UTC,
         )
         self.scheduler.add_job(
             self.aggregate_attestations,

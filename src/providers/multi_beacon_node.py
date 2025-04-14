@@ -34,8 +34,8 @@ connected beacon nodes have equal scores, the first beacon node will be used.
 """
 
 import asyncio
-import datetime
 import logging
+import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
@@ -478,7 +478,7 @@ class MultiBeaconNode:
         self,
         slot: int,
         committee_index: int,
-        deadline: datetime.datetime,
+        deadline_timestamp: float,
         head_event: SchemaBeaconAPI.HeadEvent,
         tracer_span: Span,
     ) -> AttestationData:
@@ -495,7 +495,7 @@ class MultiBeaconNode:
         head_match_count = 0
         for coro in asyncio.as_completed(
             tasks,
-            timeout=(deadline - datetime.datetime.now(tz=datetime.UTC)).total_seconds(),
+            timeout=deadline_timestamp - time.time(),
         ):
             try:
                 host, att_data = await coro
@@ -533,14 +533,14 @@ class MultiBeaconNode:
         self,
         slot: int,
         committee_index: int,
-        deadline: datetime.datetime,
+        deadline_timestamp: float,
         tracer_span: Span,
     ) -> AttestationData:
         # Maps beacon node hosts to their last known head block root
         host_to_block_root: dict[str, str] = dict()
         head_block_root_counter: Counter[str] = Counter()
 
-        while datetime.datetime.now(datetime.UTC) < deadline:
+        while time.time() < deadline_timestamp:
             _round_start = asyncio.get_running_loop().time()
 
             tasks = [
@@ -619,7 +619,7 @@ class MultiBeaconNode:
         self,
         slot: int,
         committee_index: int,
-        deadline: datetime.datetime,
+        deadline_timestamp: float,
         head_event: SchemaBeaconAPI.HeadEvent | None,
         tracer_span: Span,
     ) -> AttestationData:
@@ -635,14 +635,14 @@ class MultiBeaconNode:
             return await self._produce_attestation_data_from_head_event(
                 slot=slot,
                 committee_index=committee_index,
-                deadline=deadline,
+                deadline_timestamp=deadline_timestamp,
                 head_event=head_event,
                 tracer_span=tracer_span,
             )
         return await self._produce_attestation_data_without_head_event(
             slot=slot,
             committee_index=committee_index,
-            deadline=deadline,
+            deadline_timestamp=deadline_timestamp,
             tracer_span=tracer_span,
         )
 
@@ -650,7 +650,7 @@ class MultiBeaconNode:
         self,
         slot: int,
         committee_index: int,
-        deadline: datetime.datetime,
+        deadline_timestamp: float,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
     ) -> AttestationData:
         """Returns attestation data from the connected beacon nodes.
@@ -678,7 +678,7 @@ class MultiBeaconNode:
             return await self._produce_attestation_data(
                 slot=slot,
                 committee_index=committee_index,
-                deadline=deadline,
+                deadline_timestamp=deadline_timestamp,
                 head_event=head_event,
                 tracer_span=tracer_span,
             )

@@ -1,6 +1,6 @@
 import asyncio
-import datetime
 import logging
+import time
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -26,13 +26,14 @@ from tasks import TaskManager
 _logger = logging.getLogger("vero-init")
 
 
-async def _wait_for_genesis(genesis_datetime: datetime.datetime) -> None:
-    # Waits for genesis to occur
-    time_to_genesis = genesis_datetime - datetime.datetime.now(tz=datetime.UTC)
-    while time_to_genesis.total_seconds() > 0:
-        _logger.info(f"Waiting for genesis - {time_to_genesis} remaining")
-        await asyncio.sleep(min(time_to_genesis.total_seconds(), 10))
-        time_to_genesis = genesis_datetime - datetime.datetime.now(tz=datetime.UTC)
+async def _wait_for_genesis(genesis_timestamp: int) -> None:
+    while True:
+        time_remaining = genesis_timestamp - time.time()
+        if time_remaining <= 0:
+            break
+
+        _logger.info(f"Waiting for genesis: {time_remaining:.2f}s remaining")
+        await asyncio.sleep(min(time_remaining, 10))
 
 
 def _register_event_handlers(
@@ -137,7 +138,9 @@ async def run_services(
         ) as multi_beacon_node,
     ):
         beacon_chain.initialize(genesis=multi_beacon_node.best_beacon_node.genesis)
-        await _wait_for_genesis(genesis_datetime=beacon_chain.get_datetime_for_slot(0))
+        await _wait_for_genesis(
+            genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
+        )
         beacon_chain.start_slot_ticker()
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")
