@@ -577,7 +577,7 @@ class AttestationService(ValidatorDutyService):
                 )
             )
 
-        # Prepare beacon node subnet subscriptions for aggregation duties
+        # Prepare beacon node subnet subscriptions
         beacon_committee_subscriptions_data = [
             SchemaBeaconAPI.SubscribeToBeaconCommitteeSubnetRequestBody(
                 validator_index=duty.validator_index,
@@ -587,7 +587,6 @@ class AttestationService(ValidatorDutyService):
                 is_aggregator=duty.is_aggregator,
             )
             for duty in duties_with_proofs
-            if duty.is_aggregator
         ]
 
         if len(beacon_committee_subscriptions_data) > 0:
