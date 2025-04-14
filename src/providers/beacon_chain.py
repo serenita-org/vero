@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec._ascii import ELECTRA as ELECTRA_ASCII_ART
 from spec.base import Genesis, SpecElectra
+from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -34,6 +35,7 @@ class BeaconChain:
         # wastes a noticeable amount of CPU)
         self.SLOTS_PER_EPOCH = int(spec.SLOTS_PER_EPOCH)
         self.SECONDS_PER_SLOT = int(spec.SECONDS_PER_SLOT)
+        self.SECONDS_PER_INTERVAL = self.SECONDS_PER_SLOT / INTERVALS_PER_SLOT
         self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD = int(
             spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
         )

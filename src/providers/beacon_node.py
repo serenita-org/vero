@@ -120,7 +120,7 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.spec = spec
-        self._slot_interval = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.seconds_per_interval = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
         self.scheduler = scheduler
         self.task_manager = task_manager
@@ -557,7 +557,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self._slot_interval,
+                total=self.seconds_per_interval,
             ),
         )
 
@@ -610,7 +610,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self._slot_interval,
+                total=self.seconds_per_interval,
             ),
         )
 

@@ -32,7 +32,7 @@ from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
-from spec.constants import INTERVALS_PER_SLOT, TARGET_AGGREGATORS_PER_COMMITTEE
+from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -80,7 +80,7 @@ class AttestationService(ValidatorDutyService):
         # aiming to attest 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
+            + self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
 
@@ -188,7 +188,7 @@ class AttestationService(ValidatorDutyService):
             # much faster though.
             deadline_timestamp = (
                 self.beacon_chain.get_timestamp_for_slot(slot)
-                + 2 * self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT
+                + 2 * self.beacon_chain.SECONDS_PER_INTERVAL
             )
 
             consensus_start = asyncio.get_running_loop().time()
@@ -370,7 +370,7 @@ class AttestationService(ValidatorDutyService):
         # Schedule aggregated attestation at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + 2 * self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
+            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(

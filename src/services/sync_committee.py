@@ -18,7 +18,6 @@ from services.validator_duty_service import (
 )
 from spec.common import bytes_to_uint64, hash_function
 from spec.constants import (
-    INTERVALS_PER_SLOT,
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
@@ -65,7 +64,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # aiming to produce it 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
+            + self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
 
@@ -310,7 +309,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Sign and submit aggregated sync committee contributions at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + 2 * self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
+            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
@@ -448,7 +447,7 @@ class SyncCommitteeService(ValidatorDutyService):
         for idx in indexes_in_committee:
             subnets.add(
                 idx
-                // self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT,
+                // (self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT),
             )
 
         return subnets
