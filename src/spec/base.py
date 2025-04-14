@@ -25,35 +25,8 @@ class Genesis(Container):
     genesis_fork_version: Version
 
 
-class Spec(Container):
-    # This value is not used anywhere but
-    # the Container subclass creation fails without
-    # at least one field
-    MIN_GENESIS_TIME: uint64
-
-    @classmethod
-    def from_obj(cls, obj: ObjType) -> Self:
-        if not isinstance(obj, dict):
-            raise ObjParseException(f"obj '{obj}' is not a dict")
-
-        # Create a copy since we manipulate the dict
-        _obj = copy.deepcopy(obj)
-
-        fields = cls.fields()
-        for k in list(_obj.keys()):
-            if k not in fields:
-                del _obj[k]  # Remove extra keys/fields
-
-        if any(field not in _obj for field in fields):
-            missing = set(fields.keys()) - set(_obj.keys())
-            raise ObjParseException(
-                f"Required field(s) ({missing}) missing from {_obj}"
-            )
-
-        return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
-
-
-class SpecPhase0(Spec):
+class SpecElectra(Container):
+    # Phase 0
     SECONDS_PER_SLOT: uint64
     SLOTS_PER_EPOCH: uint64
     MAX_VALIDATORS_PER_COMMITTEE: uint64
@@ -65,15 +38,13 @@ class SpecPhase0(Spec):
     MAX_DEPOSITS: uint64
     MAX_VOLUNTARY_EXITS: uint64
 
-
-class SpecAltair(SpecPhase0):
+    # Altair
     EPOCHS_PER_SYNC_COMMITTEE_PERIOD: uint64
     SYNC_COMMITTEE_SIZE: uint64
     ALTAIR_FORK_EPOCH: uint64
     ALTAIR_FORK_VERSION: Version
 
-
-class SpecBellatrix(SpecAltair):
+    # Bellatrix
     BELLATRIX_FORK_EPOCH: uint64
     BELLATRIX_FORK_VERSION: Version
 
@@ -82,22 +53,19 @@ class SpecBellatrix(SpecAltair):
     MAX_TRANSACTIONS_PER_PAYLOAD: uint64
     MAX_BYTES_PER_TRANSACTION: uint64
 
-
-class SpecCapella(SpecBellatrix):
+    # Capella
     MAX_WITHDRAWALS_PER_PAYLOAD: uint64
     CAPELLA_FORK_EPOCH: uint64
     CAPELLA_FORK_VERSION: Version
     MAX_BLS_TO_EXECUTION_CHANGES: uint64
 
-
-class SpecDeneb(SpecCapella):
+    # Deneb
     MAX_BLOB_COMMITMENTS_PER_BLOCK: uint64
     DENEB_FORK_EPOCH: uint64
     DENEB_FORK_VERSION: Version
     FIELD_ELEMENTS_PER_BLOB: uint64
 
-
-class SpecElectra(SpecDeneb):
+    # Electra
     ELECTRA_FORK_EPOCH: uint64
     ELECTRA_FORK_VERSION: Version
     MAX_DEPOSIT_REQUESTS_PER_PAYLOAD: uint64
@@ -105,6 +73,29 @@ class SpecElectra(SpecDeneb):
     MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD: uint64
     MAX_ATTESTATIONS_ELECTRA: uint64
     MAX_ATTESTER_SLASHINGS_ELECTRA: uint64
+
+    @classmethod
+    def from_obj(cls, obj: ObjType) -> Self:
+        if not isinstance(obj, dict):
+            raise ObjParseException(f"obj '{obj}' is not a dict")
+
+        # Create a copy since we manipulate the dict
+        _obj = copy.deepcopy(obj)
+
+        # Remove extra keys/fields
+        fields = cls.fields()
+        for k in list(_obj.keys()):
+            if k not in fields:
+                del _obj[k]
+
+        # Check if all required fields have a value
+        if any(field not in _obj for field in fields):
+            missing = set(fields.keys()) - set(_obj.keys())
+            raise ObjParseException(
+                f"Required field(s) ({missing}) missing from {_obj}"
+            )
+
+        return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
 
 
 def parse_spec(data: dict[str, str]) -> SpecElectra:
