@@ -45,7 +45,7 @@ class BeaconChain:
         self.DENEB_FORK_EPOCH = spec.DENEB_FORK_EPOCH.to_obj()
         self.DENEB_FORK_VERSION = spec.DENEB_FORK_VERSION.to_obj()
         self.ELECTRA_FORK_EPOCH = spec.ELECTRA_FORK_EPOCH.to_obj()
-        self.ELECTRA_FORK_VERSION = spec.DENEB_FORK_VERSION.to_obj()
+        self.ELECTRA_FORK_VERSION = spec.ELECTRA_FORK_VERSION.to_obj()
 
         current_epoch = self.current_slot // self.SLOTS_PER_EPOCH
         if current_epoch >= self.ELECTRA_FORK_EPOCH:
