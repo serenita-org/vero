@@ -4,14 +4,14 @@ Vero regularly undergoes thorough testing against various CL and EL client combi
 
 It is currently compatible with all open-source Ethereum clients:
 
-|                | Compatible | Version        | Notes |
-|----------------|------------|----------------|-------|
-| **Grandine**   | ✅          | 1.0.0+         |       |
-| **Lighthouse** | ✅          | v7.0.0-beta.0+ |       |
-| **Lodestar**   | ✅          | v1.27.0+  |       |
-| **Nimbus**     | ✅          | v25.2.0+       |       |
-| **Prysm**      | ✅          | v5.3.0+        |       |
-| **Teku**       | ✅          | 25.2.0+        |       |
+|                | Compatible | Version | Notes |
+|----------------|------------|---------|-------|
+| **Grandine**   | ✅          | TBD     |       |
+| **Lighthouse** | ✅          | TBD     |       |
+| **Lodestar**   | ✅          | TBD     |       |
+| **Nimbus**     | ✅          | TBD     |       |
+| **Prysm**      | ✅          | TBD     |       |
+| **Teku**       | ✅          | TBD     |       |
 
 #### Legend
 ✅ Everything works perfectly.
