@@ -195,8 +195,8 @@ async def test_get_aggregate_attestation(
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
                 bitlist_length = (
-                    beacon_chain.spec.MAX_VALIDATORS_PER_COMMITTEE
-                    * beacon_chain.spec.MAX_COMMITTEES_PER_SLOT
+                    beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
+                    * beacon_chain.MAX_COMMITTEES_PER_SLOT
                 )
                 agg_bits_to_return = Bitlist[bitlist_length](
                     False for _ in range(bitlist_length)

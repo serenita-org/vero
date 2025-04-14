@@ -77,7 +77,7 @@ class ValidatorStatusTrackerService:
     async def on_new_slot(self, slot: int, _: bool) -> None:
         # Update validator statuses one slot before the next epoch starts
         # (before duties are updated)
-        slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
+        slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
         if slot % slots_per_epoch == slots_per_epoch - 1:
             self.task_manager.submit_task(self.update_validator_statuses())
 

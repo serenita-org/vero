@@ -40,7 +40,7 @@ def response_content_type(request: pytest.FixtureRequest) -> ContentType:
 
 @pytest.fixture
 def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecElectra) -> dict:  # type: ignore[type-arg]
-    return dict(data=beacon_chain.get_fork(beacon_chain.current_slot).to_obj())
+    return dict(data=beacon_chain.get_fork(beacon_chain.current_slot))
 
 
 @pytest.fixture(scope="session")

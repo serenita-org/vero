@@ -53,7 +53,7 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
     def has_duty_for_slot(self, slot: int) -> bool:
-        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
 
         sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
 
@@ -65,7 +65,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # aiming to produce it 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            + self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
             tz=datetime.UTC,
         )
 
@@ -310,7 +310,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Sign and submit aggregated sync committee contributions at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + 2 * int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            + 2 * self.beacon_chain.SECONDS_PER_SLOT / INTERVALS_PER_SLOT,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
@@ -448,10 +448,7 @@ class SyncCommitteeService(ValidatorDutyService):
         for idx in indexes_in_committee:
             subnets.add(
                 idx
-                // int(
-                    self.beacon_chain.spec.SYNC_COMMITTEE_SIZE
-                    // SYNC_COMMITTEE_SUBNET_COUNT
-                ),
+                // self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT,
             )
 
         return subnets
@@ -459,7 +456,7 @@ class SyncCommitteeService(ValidatorDutyService):
     def _is_aggregator(self, selection_proof: bytes) -> bool:
         modulo = max(
             1,
-            self.beacon_chain.spec.SYNC_COMMITTEE_SIZE
+            self.beacon_chain.SYNC_COMMITTEE_SIZE
             // SYNC_COMMITTEE_SUBNET_COUNT
             // TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
@@ -518,7 +515,7 @@ class SyncCommitteeService(ValidatorDutyService):
             # Prepare sync committee subnet subscriptions for aggregation duties
             until_epoch = (
                 sync_period + 1
-            ) * self.beacon_chain.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+            ) * self.beacon_chain.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
             sync_committee_subscriptions_data = [
                 SchemaBeaconAPI.SubscribeToSyncCommitteeSubnetRequestBody(
                     validator_index=duty.validator_index,

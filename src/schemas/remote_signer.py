@@ -24,8 +24,14 @@ class SignableMessage(msgspec.Struct):
     type: SigningRequestType
 
 
+class Fork(msgspec.Struct):
+    previous_version: str
+    current_version: str
+    epoch: str
+
+
 class ForkInfo(msgspec.Struct):
-    fork: dict[str, str]
+    fork: Fork
     genesis_validators_root: str
 
 

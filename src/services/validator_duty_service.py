@@ -65,7 +65,6 @@ class ValidatorDutyService:
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
         self.beacon_chain = kwargs["beacon_chain"]
-        self.spec = self.beacon_chain.spec
         self.remote_signer = kwargs["remote_signer"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"

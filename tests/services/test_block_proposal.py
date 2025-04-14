@@ -76,7 +76,7 @@ async def test_publish_block(
     duty_slot = beacon_chain.current_slot + 1
 
     block_proposal_service.proposer_duties[
-        duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
+        duty_slot // beacon_chain.SLOTS_PER_EPOCH
     ].add(
         SchemaBeaconAPI.ProposerDuty(
             pubkey=random_active_validator.pubkey,
@@ -128,7 +128,7 @@ async def test_block_proposal_beacon_node_urls_proposal(
     duty_slot = beacon_chain.current_slot + 1
 
     block_proposal_service.proposer_duties[
-        duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
+        duty_slot // beacon_chain.SLOTS_PER_EPOCH
     ].add(
         SchemaBeaconAPI.ProposerDuty(
             pubkey=random_active_validator.pubkey,

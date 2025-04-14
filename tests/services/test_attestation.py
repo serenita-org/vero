@@ -39,7 +39,7 @@ async def test_attest_if_not_yet_attested(
 ) -> None:
     # Populate the service with an attester duty
     duty_slot = beacon_chain.current_slot + 1
-    duty_epoch = duty_slot // beacon_chain.spec.SLOTS_PER_EPOCH
+    duty_epoch = duty_slot // beacon_chain.SLOTS_PER_EPOCH
 
     first_active_validator = next(
         v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING

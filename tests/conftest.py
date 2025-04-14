@@ -236,6 +236,4 @@ def genesis(spec: SpecElectra) -> Genesis:
 def beacon_chain(
     spec: SpecElectra, genesis: Genesis, task_manager: TaskManager
 ) -> BeaconChain:
-    bc = BeaconChain(spec=spec, task_manager=task_manager)
-    bc.initialize(genesis=genesis)
-    return bc
+    return BeaconChain(spec=spec, genesis=genesis, task_manager=task_manager)
