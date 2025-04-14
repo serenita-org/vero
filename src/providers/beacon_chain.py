@@ -41,11 +41,18 @@ class BeaconChain:
         self.MAX_COMMITTEES_PER_SLOT = int(spec.MAX_COMMITTEES_PER_SLOT)
         self.SYNC_COMMITTEE_SIZE = int(spec.SYNC_COMMITTEE_SIZE)
 
-        self.CAPELLA_FORK_VERSION = spec.CAPELLA_FORK_VERSION.to_obj()
-        self.DENEB_FORK_EPOCH = spec.DENEB_FORK_EPOCH.to_obj()
-        self.DENEB_FORK_VERSION = spec.DENEB_FORK_VERSION.to_obj()
-        self.ELECTRA_FORK_EPOCH = spec.ELECTRA_FORK_EPOCH.to_obj()
-        self.ELECTRA_FORK_VERSION = spec.ELECTRA_FORK_VERSION.to_obj()
+        self.DENEB_FORK_EPOCH = int(spec.DENEB_FORK_EPOCH)
+        self.DENEB_FORK = SchemaRemoteSigner.Fork(
+            previous_version=spec.CAPELLA_FORK_VERSION.to_obj(),
+            current_version=spec.DENEB_FORK_VERSION.to_obj(),
+            epoch=str(self.DENEB_FORK_EPOCH),
+        )
+        self.ELECTRA_FORK_EPOCH = int(spec.ELECTRA_FORK_EPOCH)
+        self.ELECTRA_FORK = SchemaRemoteSigner.Fork(
+            previous_version=spec.DENEB_FORK_VERSION.to_obj(),
+            current_version=spec.ELECTRA_FORK_VERSION.to_obj(),
+            epoch=str(self.ELECTRA_FORK_EPOCH),
+        )
 
         current_epoch = self.current_slot // self.SLOTS_PER_EPOCH
         if current_epoch >= self.ELECTRA_FORK_EPOCH:
@@ -62,17 +69,9 @@ class BeaconChain:
         slot_epoch = slot // self.SLOTS_PER_EPOCH
 
         if slot_epoch >= self.ELECTRA_FORK_EPOCH:
-            return SchemaRemoteSigner.Fork(
-                previous_version=self.DENEB_FORK_VERSION,
-                current_version=self.ELECTRA_FORK_VERSION,
-                epoch=str(self.ELECTRA_FORK_EPOCH),
-            )
+            return self.ELECTRA_FORK
         if slot_epoch >= self.DENEB_FORK_EPOCH:
-            return SchemaRemoteSigner.Fork(
-                previous_version=self.CAPELLA_FORK_VERSION,
-                current_version=self.DENEB_FORK_VERSION,
-                epoch=str(self.DENEB_FORK_EPOCH),
-            )
+            return self.DENEB_FORK
         raise NotImplementedError(f"Unsupported fork for epoch {self.current_epoch}")
 
     def get_fork_info(self, slot: int) -> SchemaRemoteSigner.ForkInfo:
