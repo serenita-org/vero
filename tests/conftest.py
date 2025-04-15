@@ -52,7 +52,7 @@ def enable_keymanager_api(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def cli_args(
     remote_signer_url: str,
     beacon_node_url: str,
@@ -193,7 +193,7 @@ def shutdown_event() -> asyncio.Event:
     return asyncio.Event()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 async def task_manager(
     shutdown_event: asyncio.Event,
 ) -> AsyncGenerator[TaskManager, None]:
@@ -313,7 +313,7 @@ def genesis(spec: SpecElectra) -> Genesis:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def beacon_chain(
     spec: SpecElectra, genesis: Genesis, task_manager: TaskManager
 ) -> BeaconChain:
