@@ -78,7 +78,7 @@ class BlockProposalService(ValidatorDutyService):
         return next_duty_slot <= self.beacon_chain.current_slot + 3
 
     def has_duty_for_slot(self, slot: int) -> bool:
-        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         return any(int(duty.slot) == slot for duty in self.proposer_duties[epoch])
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
@@ -194,7 +194,7 @@ class BlockProposalService(ValidatorDutyService):
         # Registers a subset of validators every slot
         # based on their index to spread the
         # registrations across the epoch
-        slots_per_epoch = self.beacon_chain.spec.SLOTS_PER_EPOCH
+        slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
         validators_to_register = [
             v
             for v in active_and_pending_validators
@@ -263,7 +263,7 @@ class BlockProposalService(ValidatorDutyService):
             )
             return
 
-        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         slot_proposer_duties = {
             duty for duty in self.proposer_duties[epoch] if int(duty.slot) == slot
         }

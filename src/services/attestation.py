@@ -32,7 +32,7 @@ from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
-from spec.constants import INTERVALS_PER_SLOT, TARGET_AGGREGATORS_PER_COMMITTEE
+from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -71,7 +71,7 @@ class AttestationService(ValidatorDutyService):
         self.attester_duties_dependent_roots: dict[int, str] = dict()
 
     def has_duty_for_slot(self, slot: int) -> bool:
-        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         return any(int(duty.slot) == slot for duty in self.attester_duties[epoch])
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
@@ -80,7 +80,7 @@ class AttestationService(ValidatorDutyService):
         # aiming to attest 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            + self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
 
@@ -140,7 +140,7 @@ class AttestationService(ValidatorDutyService):
             )
             return
 
-        epoch = slot // self.beacon_chain.spec.SLOTS_PER_EPOCH
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         slot_attester_duties = {
             duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
         }
@@ -188,7 +188,7 @@ class AttestationService(ValidatorDutyService):
             # much faster though.
             deadline_timestamp = (
                 self.beacon_chain.get_timestamp_for_slot(slot)
-                + 2 * int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+                + 2 * self.beacon_chain.SECONDS_PER_INTERVAL
             )
 
             consensus_start = asyncio.get_running_loop().time()
@@ -285,7 +285,7 @@ class AttestationService(ValidatorDutyService):
                     if _fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
                         # Attestation object from the CL spec
                         aggregation_bits = Bitlist[
-                            self.spec.MAX_VALIDATORS_PER_COMMITTEE
+                            self.beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
                         ](False for _ in range(int(duty.committee_length)))
                         aggregation_bits[int(duty.validator_committee_index)] = True
 
@@ -370,7 +370,7 @@ class AttestationService(ValidatorDutyService):
         # Schedule aggregated attestation at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + 2 * int(self.beacon_chain.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(

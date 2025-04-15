@@ -121,11 +121,6 @@ async def run_services(
 ) -> None:
     spec = load_spec(cli_args=cli_args)
 
-    beacon_chain = BeaconChain(
-        spec=spec,
-        task_manager=task_manager,
-    )
-
     async with (
         RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
         MultiBeaconNode(
@@ -137,7 +132,11 @@ async def run_services(
             cli_args=cli_args,
         ) as multi_beacon_node,
     ):
-        beacon_chain.initialize(genesis=multi_beacon_node.best_beacon_node.genesis)
+        beacon_chain = BeaconChain(
+            spec=spec,
+            genesis=multi_beacon_node.best_beacon_node.genesis,
+            task_manager=task_manager,
+        )
         await _wait_for_genesis(
             genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
         )

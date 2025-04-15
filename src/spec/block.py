@@ -8,7 +8,7 @@ from spec.attestation import (
     AttestationData,
     SpecAttestation,
 )
-from spec.base import Spec
+from spec.base import SpecElectra
 from spec.common import (
     BLSPubkey,
     BLSSignature,
@@ -152,7 +152,7 @@ class SpecBeaconBlock:
     @classmethod
     def initialize(
         cls,
-        spec: Spec,
+        spec: SpecElectra,
     ) -> None:
         class IndexedAttestationPhase0(Container):
             attesting_indices: List[ValidatorIndex, spec.MAX_VALIDATORS_PER_COMMITTEE]

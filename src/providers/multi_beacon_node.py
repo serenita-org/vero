@@ -103,6 +103,7 @@ class MultiBeaconNode:
         ]
 
         self.spec = spec
+        self.SECONDS_PER_INTERVAL = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
         self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
         self.cli_args = cli_args
@@ -311,13 +312,11 @@ class MultiBeaconNode:
         Most of the logic in here makes sure we don't wait too long for a block to be
         produced by an unresponsive beacon node.
         """
-        spec = next(bn.spec for bn in self.initialized_beacon_nodes)
-
         # Times out at 1/3 of the SECONDS_PER_SLOT spec value into the slot
         # (e.g. 1.33s for Ethereum, 0.55s for Gnosis Chain).
         # If no block has been returned by that point, it waits indefinitely for the
         # first block to be returned by any beacon node.
-        timeout = (1 / 3) * (int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT)
+        timeout = (1 / 3) * self.SECONDS_PER_INTERVAL
 
         beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
