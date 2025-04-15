@@ -7,6 +7,7 @@ when multiple beacon nodes are provided to it. That includes:
 
 import os
 import re
+from copy import deepcopy
 from functools import partial
 
 import pytest
@@ -80,8 +81,9 @@ async def test_initialize(
     of its supplied beacon nodes are available.
     """
     assert len(beacon_node_urls) == len(beacon_node_availabilities)
-    cli_args.attestation_consensus_threshold = _process_attestation_consensus_threshold(
-        None, beacon_node_urls
+    _cli_args_for_test = deepcopy(cli_args)
+    _cli_args_for_test.attestation_consensus_threshold = (
+        _process_attestation_consensus_threshold(None, beacon_node_urls)
     )
 
     mbn = MultiBeaconNode(
@@ -90,7 +92,7 @@ async def test_initialize(
         spec=spec,
         scheduler=scheduler,
         task_manager=task_manager,
-        cli_args=cli_args,
+        cli_args=_cli_args_for_test,
     )
 
     with aioresponses() as m:
