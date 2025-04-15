@@ -93,7 +93,7 @@ class BeaconChain:
 
     @property
     def current_slot(self) -> int:
-        seconds_elapsed = floor(time.time()) - int(self.genesis.genesis_time)
+        seconds_elapsed = floor(time.time()) - self.genesis_time
         seconds_elapsed = max(0, seconds_elapsed)
         return seconds_elapsed // self.SECONDS_PER_SLOT
 

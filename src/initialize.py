@@ -137,7 +137,9 @@ async def run_services(
             genesis=multi_beacon_node.best_beacon_node.genesis,
             task_manager=task_manager,
         )
-        await _wait_for_genesis(genesis_timestamp=beacon_chain.get_timestamp_for_slot(0))
+        await _wait_for_genesis(
+            genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
+        )
         beacon_chain.start_slot_ticker()
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")

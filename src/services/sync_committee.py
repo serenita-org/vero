@@ -447,7 +447,9 @@ class SyncCommitteeService(ValidatorDutyService):
         for idx in indexes_in_committee:
             subnets.add(
                 idx
-                // (self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT),
+                // int(
+                    self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
+                ),
             )
 
         return subnets
