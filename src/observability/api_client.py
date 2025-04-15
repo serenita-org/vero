@@ -30,6 +30,16 @@ _REQUESTS_COUNTER = Counter(
     "Number of requests",
     labelnames=list(get_type_hints(_RequestMetricLabelValues).keys()),
 )
+_TRANSMIT_BYTES = Counter(
+    "transmit_bytes",
+    "Total bytes transmitted",
+    labelnames=["service_type", "host"],
+)
+_RECEIVE_BYTES = Counter(
+    "receive_bytes",
+    "Total bytes received",
+    labelnames=["service_type", "host"],
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -40,6 +50,28 @@ async def _on_request_start(
     _params: aiohttp.TraceRequestStartParams,
 ) -> None:
     trace_config_ctx.start = asyncio.get_running_loop().time()
+
+
+async def _on_request_chunk_sent(
+    _session: aiohttp.ClientSession,
+    trace_config_ctx: SimpleNamespace,
+    params: aiohttp.TraceRequestChunkSentParams,
+) -> None:
+    _TRANSMIT_BYTES.labels(
+        service_type=trace_config_ctx.service_type,
+        host=trace_config_ctx.host,
+    ).inc(len(params.chunk))
+
+
+async def _on_response_chunk_received(
+    _session: aiohttp.ClientSession,
+    trace_config_ctx: SimpleNamespace,
+    params: aiohttp.TraceResponseChunkReceivedParams,
+) -> None:
+    _RECEIVE_BYTES.labels(
+        service_type=trace_config_ctx.service_type,
+        host=trace_config_ctx.host,
+    ).inc(len(params.chunk))
 
 
 async def _on_request_end(
@@ -98,3 +130,5 @@ class RequestLatency(aiohttp.TraceConfig):
 
         self.on_request_start.append(_on_request_start)
         self.on_request_end.append(_on_request_end)
+        self.on_request_chunk_sent.append(_on_request_chunk_sent)
+        self.on_response_chunk_received.append(_on_response_chunk_received)
