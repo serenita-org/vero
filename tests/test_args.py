@@ -376,10 +376,10 @@ from spec.configs import Network
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "--enable-keymanager-api",
             ],
-            None,
             "argument --enable-keymanager-api: not allowed with argument --remote-signer-url",
             {},
-            id="mutually exclusive group - key source",
+            [],
+            id="Mutually exclusive group - key source",
         ),
         pytest.param(
             [
@@ -389,9 +389,17 @@ from spec.configs import Network
                 "--enable-keymanager-api",
             ],
             None,
-            None,
-            {},
-            id="Keymanager API enabled - no remote signer",
+            {
+                "enable_keymanager_api": True,
+                "keymanager_api_token_file_path": Path(
+                    "/vero/data/keymanager-api-token.txt"
+                ),
+            },
+            [
+                "enable_keymanager_api: True",
+                "keymanager_api_token_file_path: /vero/data/keymanager-api-token.txt",
+            ],
+            id="--enable-keymanager-api (no --remote-signer-url)",
         ),
     ],
 )

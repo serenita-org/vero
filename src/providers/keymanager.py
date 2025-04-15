@@ -353,7 +353,7 @@ class Keymanager(SignatureProvider):
         msg, sig, pubkey = await self.sign(
             message=SchemaRemoteSigner.VoluntaryExitSignableMessage(
                 fork_info=self.beacon_chain.get_fork_info(
-                    slot=self.beacon_chain.spec.SLOTS_PER_EPOCH * epoch
+                    slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
                 ),
                 voluntary_exit=SchemaRemoteSigner.VoluntaryExit(
                     epoch=str(epoch), validator_index=str(validator_index)
