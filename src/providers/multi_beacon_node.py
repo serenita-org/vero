@@ -339,7 +339,7 @@ class MultiBeaconNode:
         }
         pending = tasks
 
-        best_block_value = 0
+        best_block_value = -1
         best_block_response = None
         start_time = asyncio.get_running_loop().time()
         remaining_timeout = timeout
