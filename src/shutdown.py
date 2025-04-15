@@ -21,12 +21,14 @@ async def shut_down(
     # Wait until there are no upcoming block proposal duties
     while block_proposal_service.has_upcoming_duty():
         duty_slot = block_proposal_service.next_duty_slot
+        if duty_slot is None:
+            break
 
         _logger.info(
             f"Waiting for upcoming block proposal to complete during slot {duty_slot}"
         )
 
-        while duty_slot != beacon_chain.current_slot:
+        while beacon_chain.current_slot < duty_slot:
             _logger.info(f"Waiting for block proposal duty slot ({duty_slot}) to start")
             await beacon_chain.wait_for_next_slot()
 

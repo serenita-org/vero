@@ -1,13 +1,21 @@
 import asyncio
+import contextlib
 import logging
 import time
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from observability.event_loop import monitor_event_loop
-from providers import BeaconChain, MultiBeaconNode, RemoteSigner
+from providers import (
+    DB,
+    BeaconChain,
+    Keymanager,
+    MultiBeaconNode,
+    RemoteSigner,
+)
 from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
@@ -121,17 +129,21 @@ async def run_services(
 ) -> None:
     spec = load_spec(cli_args=cli_args)
 
-    async with (
-        RemoteSigner(url=cli_args.remote_signer_url) as remote_signer,
-        MultiBeaconNode(
-            beacon_node_urls=cli_args.beacon_node_urls,
-            beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-            spec=spec,
-            scheduler=scheduler,
-            task_manager=task_manager,
-            cli_args=cli_args,
-        ) as multi_beacon_node,
-    ):
+    db = DB(data_dir=cli_args.data_dir)
+    db.run_migrations()
+
+    async with contextlib.AsyncExitStack() as exit_stack:
+        multi_beacon_node = await exit_stack.enter_async_context(
+            MultiBeaconNode(
+                beacon_node_urls=cli_args.beacon_node_urls,
+                beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
+                spec=spec,
+                scheduler=scheduler,
+                task_manager=task_manager,
+                cli_args=cli_args,
+            )
+        )
+
         beacon_chain = BeaconChain(
             spec=spec,
             genesis=multi_beacon_node.best_beacon_node.genesis,
@@ -140,15 +152,38 @@ async def run_services(
         await _wait_for_genesis(
             genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
         )
-        beacon_chain.start_slot_ticker()
+
+        process_pool_executor = ProcessPoolExecutor()
+        keymanager = Keymanager(
+            db=db,
+            beacon_chain=beacon_chain,
+            multi_beacon_node=multi_beacon_node,
+            cli_args=cli_args,
+            process_pool_executor=process_pool_executor,
+        )
+        signature_provider: Keymanager | RemoteSigner
+        if cli_args.enable_keymanager_api:
+            signature_provider = await exit_stack.enter_async_context(keymanager)
+        else:
+            if cli_args.remote_signer_url is None:
+                raise RuntimeError(
+                    "remote_signer_url is None despite disabled Keymanager API"
+                )
+            signature_provider = await exit_stack.enter_async_context(
+                RemoteSigner(
+                    url=cli_args.remote_signer_url,
+                    process_pool_executor=process_pool_executor,
+                )
+            )
 
         _logger.info(f"Current epoch: {beacon_chain.current_epoch}")
         _logger.info(f"Current slot: {beacon_chain.current_slot}")
+        beacon_chain.start_slot_ticker()
 
         validator_status_tracker_service = ValidatorStatusTrackerService(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
-            remote_signer=remote_signer,
+            signature_provider=signature_provider,
             scheduler=scheduler,
             task_manager=task_manager,
         )
@@ -161,7 +196,8 @@ async def run_services(
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
             beacon_chain=beacon_chain,
-            remote_signer=remote_signer,
+            signature_provider=signature_provider,
+            keymanager=keymanager,
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,
             cli_args=cli_args,
@@ -203,3 +239,7 @@ async def run_services(
         await monitor_event_loop(
             beacon_chain=beacon_chain, shutdown_event=shutdown_event
         )
+
+        # Reaching this point means the shutdown_event was set
+        # -> cancel all pending tasks
+        task_manager.cancel_all()
