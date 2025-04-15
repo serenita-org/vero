@@ -32,12 +32,12 @@ from tests.mock_api.remote_signer import *
 from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def beacon_node_urls_proposal(request: pytest.FixtureRequest) -> list[str]:
     return getattr(request, "param", [])
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def cli_args(
     remote_signer_url: str,
     beacon_node_url: str,
@@ -77,7 +77,7 @@ def _init_observability() -> None:
 
 
 @pytest.fixture(scope="session")
-def spec(request: pytest.FixtureRequest) -> SpecElectra:
+def spec() -> SpecElectra:
     return get_network_spec(network=Network._TESTS)
 
 
@@ -178,7 +178,7 @@ async def scheduler(
     _scheduler.shutdown(wait=False)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def task_manager() -> TaskManager:
     return TaskManager(shutdown_event=asyncio.Event())
 
@@ -232,9 +232,9 @@ def genesis(spec: SpecElectra) -> Genesis:
     )
 
 
-@pytest.fixture
-async def beacon_chain(
-    spec: SpecElectra, task_manager: TaskManager, genesis: Genesis
+@pytest.fixture(scope="session")
+def beacon_chain(
+    spec: SpecElectra, genesis: Genesis, task_manager: TaskManager
 ) -> BeaconChain:
     bc = BeaconChain(spec=spec, task_manager=task_manager)
     bc.initialize(genesis=genesis)
