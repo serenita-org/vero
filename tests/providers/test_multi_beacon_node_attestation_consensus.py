@@ -3,8 +3,8 @@ when multiple beacon nodes are provided to it. That includes:
 - coming to consensus on attestation data to sign
 """
 
-import datetime
 import re
+import time
 from collections import Counter
 from functools import partial
 
@@ -218,8 +218,7 @@ async def test_produce_attestation_data(
                 match="Failed to reach consensus on attestation data",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.produce_attestation_data(
-                    deadline=datetime.datetime.now(tz=datetime.UTC)
-                    + datetime.timedelta(seconds=0.1),
+                    deadline_timestamp=time.time() + 0.1,
                     slot=123,
                     committee_index=3,
                     head_event=head_event,
@@ -228,8 +227,7 @@ async def test_produce_attestation_data(
 
         # We expect to reach consensus on attestation data here
         att_data = await multi_beacon_node_three_inited_nodes.produce_attestation_data(
-            deadline=datetime.datetime.now(tz=datetime.UTC)
-            + datetime.timedelta(seconds=1),
+            deadline_timestamp=time.time() + 1,
             slot=123,
             committee_index=3,
             head_event=head_event,
