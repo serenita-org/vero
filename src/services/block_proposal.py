@@ -2,8 +2,11 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from typing import Unpack
+from pathlib import Path
+from types import TracebackType
+from typing import Self, Unpack
 
+import msgspec
 from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
@@ -41,9 +44,44 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-    def start(self) -> None:
-        super().start()
+    async def __aenter__(self) -> Self:
+        try:
+            with Path.open(self._cache_path_duties, "rb") as f:
+                self.proposer_duties = msgspec.json.decode(
+                    f.read(), type=dict[int, set[SchemaBeaconAPI.ProposerDuty]]
+                )
+            with Path.open(self._cache_path_dependent_roots, "rb") as f:
+                self.proposer_duties_dependent_roots = msgspec.json.decode(
+                    f.read(), type=dict[int, str]
+                )
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to load duties from cache: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
+
+        # We still call update_duties - the cached duties may be stale
+        self.task_manager.submit_task(self.update_duties())
         self.task_manager.submit_task(self.prepare_beacon_proposer())
+
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            with Path.open(self._cache_path_duties, "wb") as f:
+                f.write(self.json_encoder.encode(self.proposer_duties))
+            with Path.open(self._cache_path_dependent_roots, "wb") as f:
+                f.write(self.json_encoder.encode(self.proposer_duties_dependent_roots))
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to cache duties: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
 
     @property
     def next_duty_slot(self) -> int | None:
