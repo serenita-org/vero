@@ -11,12 +11,14 @@ from spec.configs import Network
         "list_of_args",
         "expected_error_message",
         "expected_attr_values",
+        "expected_log_messages",
     ),
     argvalues=[
         pytest.param(
             [],
             "the following arguments are required: --network, --remote-signer-url, --beacon-node-urls, --fee-recipient\n",
             {},
+            [],
             id="No arguments provided",
         ),
         pytest.param(
@@ -32,7 +34,12 @@ from spec.configs import Network
                     "http://beacon-node-1:5052",
                     "http://beacon-node-2:5052",
                 ],
+                "attestation_consensus_threshold": 2,
             },
+            [
+                "beacon_node_urls: http://beacon-node-1:5052,http://beacon-node-2:5052",
+                "attestation_consensus_threshold: 2",
+            ],
             id="--beacon-node-urls valid input - multiple values",
         ),
         pytest.param(
@@ -44,6 +51,7 @@ from spec.configs import Network
             ],
             "Not enough beacon node urls provided",
             {},
+            [],
             id="--beacon-node-urls invalid input - empty string",
         ),
         pytest.param(
@@ -55,6 +63,7 @@ from spec.configs import Network
             ],
             "argument --network: invalid choice: 'sepolia'",
             {},
+            [],
             id="--network invalid input - unsupported network",
         ),
         pytest.param(
@@ -66,6 +75,7 @@ from spec.configs import Network
             ],
             "beacon node urls must be unique",
             {},
+            [],
             id="--beacon-node-urls invalid input - duplicate values",
         ),
         pytest.param(
@@ -81,6 +91,10 @@ from spec.configs import Network
                 "beacon_node_urls": ["http://beacon-node:5052"],
                 "beacon_node_urls_proposal": ["http://beacon-node-prop:5052"],
             },
+            [
+                "beacon_node_urls: http://beacon-node:5052",
+                "beacon_node_urls_proposal: http://beacon-node-prop:5052",
+            ],
             id="--beacon-node-urls-proposal",
         ),
         pytest.param(
@@ -93,6 +107,7 @@ from spec.configs import Network
             ],
             "argument --attestation-consensus-threshold: invalid int value",
             {},
+            [],
             id="--attestation-consensus-threshold invalid input - string instead of int",
         ),
         pytest.param(
@@ -105,6 +120,7 @@ from spec.configs import Network
             ],
             "Invalid value for attestation_consensus_threshold (2) with 1 beacon node(s)",
             {},
+            [],
             id="--attestation-consensus-threshold invalid input - threshold impossible to reach",
         ),
         pytest.param(
@@ -117,6 +133,7 @@ from spec.configs import Network
             ],
             "Invalid value for attestation_consensus_threshold: 0",
             {},
+            [],
             id="--attestation-consensus-threshold invalid input - 0",
         ),
         pytest.param(
@@ -128,6 +145,7 @@ from spec.configs import Network
             ],
             "Invalid fee recipient: 0x1c6c",
             {},
+            [],
             id="--fee-recipient invalid input - wrong length",
         ),
         pytest.param(
@@ -139,6 +157,7 @@ from spec.configs import Network
             ],
             "Invalid fee recipient: 1c6c9654",
             {},
+            [],
             id="--fee-recipient invalid input - no 0x prefix",
         ),
         pytest.param(
@@ -150,6 +169,7 @@ from spec.configs import Network
             ],
             "Invalid fee recipient 0xGGGG96549debfc6aaec7631051b84ce9a6e11ad2: ValueError('non-hexadecimal number found",
             {},
+            [],
             id="--fee-recipient invalid input - non-hex character",
         ),
         pytest.param(
@@ -162,6 +182,7 @@ from spec.configs import Network
             ],
             None,
             {"data_dir": "data"},
+            ["data_dir: data"],
             id="--data-dir - relative path",
         ),
         pytest.param(
@@ -174,6 +195,7 @@ from spec.configs import Network
             ],
             None,
             {"data_dir": "/tmp/data"},
+            ["data_dir: /tmp/data"],
             id="--data-dir - absolute path",
         ),
         pytest.param(
@@ -186,6 +208,7 @@ from spec.configs import Network
             ],
             None,
             {"graffiti": b"short".ljust(32, b"\x00")},
+            ["graffiti: short"],
             id="--graffiti valid input",
         ),
         pytest.param(
@@ -198,6 +221,7 @@ from spec.configs import Network
             ],
             None,
             {"graffiti": "🐟 💰 ❓".encode().ljust(32, b"\x00")},
+            ["graffiti: 🐟 💰 ❓"],
             id="--graffiti valid input - emoji",
         ),
         pytest.param(
@@ -210,6 +234,7 @@ from spec.configs import Network
             ],
             "Encoded graffiti exceeds the maximum length of 32 bytes",
             {},
+            [],
             id="--graffiti invalid input - too long",
         ),
         pytest.param(
@@ -222,6 +247,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 1_000_000},
+            ["gas_limit: 1000000"],
             id="--gas-limit valid input",
         ),
         pytest.param(
@@ -233,6 +259,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 36_000_000},
+            [],
             id="--gas-limit default value Ethereum Mainnet",
         ),
         pytest.param(
@@ -244,6 +271,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 17_000_000},
+            [],
             id="--gas-limit default value Gnosis Chain",
         ),
         pytest.param(
@@ -255,6 +283,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 36_000_000},
+            [],
             id="--gas-limit default value Holesky testnet",
         ),
         pytest.param(
@@ -266,6 +295,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 36_000_000},
+            [],
             id="--gas-limit default value Hoodi testnet",
         ),
         pytest.param(
@@ -277,6 +307,7 @@ from spec.configs import Network
             ],
             None,
             {"gas_limit": 17_000_000},
+            [],
             id="--gas-limit default value Chiado testnet",
         ),
         pytest.param(
@@ -289,7 +320,27 @@ from spec.configs import Network
             ],
             "--gas-limit: invalid int value: 'two'",
             {},
+            [],
             id="--gas-limit invalid input - not a number",
+        ),
+        pytest.param(
+            [
+                "--network=custom",
+                "--network-custom-config-path=/path/to/config.yaml",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            None,
+            {
+                "network": Network.CUSTOM,
+                "network_custom_config_path": "/path/to/config.yaml",
+            },
+            [
+                "network: Network.CUSTOM",
+                "network_custom_config_path: /path/to/config.yaml",
+            ],
+            id="--network-custom-config-path",
         ),
     ],
 )
@@ -297,6 +348,8 @@ def test_parse_cli_args(
     list_of_args: list[str],
     expected_error_message: str | None,
     expected_attr_values: dict[str, Any],
+    expected_log_messages: list[str],
+    caplog: pytest.LogCaptureFixture,
     capsys: pytest.CaptureFixture,  # type: ignore[type-arg]
 ) -> None:
     if expected_error_message:
@@ -308,6 +361,9 @@ def test_parse_cli_args(
         parsed_args = parse_cli_args(list_of_args)
         for attr_name, attr_value in expected_attr_values.items():
             assert getattr(parsed_args, attr_name) == attr_value
+
+    for log_message in expected_log_messages:
+        assert log_message in caplog.messages
 
 
 def test_parse_cli_args_full_set() -> None:

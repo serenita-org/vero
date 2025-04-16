@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from args import CLIArgs, parse_cli_args
+from args import CLIArgs, log_cli_arg_values, parse_cli_args
 from initialize import check_data_dir_permissions, run_services
 from observability import get_service_commit, get_service_version, init_observability
 from tasks import TaskManager
@@ -83,4 +83,5 @@ if __name__ == "__main__":
         metrics_multiprocess_mode=cli_args.metrics_multiprocess_mode,
         log_level=cli_args.log_level,
     )
+    log_cli_arg_values(cli_args)
     asyncio.run(main(cli_args=cli_args))
