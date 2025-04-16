@@ -1,8 +1,11 @@
 import asyncio
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, TypedDict, Unpack
+from pathlib import Path
+from types import TracebackType
+from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
+import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from prometheus_client import Histogram
@@ -77,6 +80,7 @@ class ValidatorDutyService:
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
+        self.json_encoder = msgspec.json.Encoder()
 
         # Keeps track of the last slot for which this service started performing its
         # duty.
@@ -96,8 +100,28 @@ class ValidatorDutyService:
         # at the same time
         self._update_duties_lock = asyncio.Lock()
 
-    def start(self) -> None:
-        self.task_manager.submit_task(self.update_duties())
+        # Cache path
+        #  We cache the validator service duties so that we can start
+        #  performing them quicker after a restart
+        #  It also saves us from re-computing selection proofs.
+        data_dir = Path(self.cli_args.data_dir)
+        self._cache_path_duties = (
+            data_dir / f"cache_{self.__class__.__name__}_duties.json"
+        )
+        self._cache_path_dependent_roots = (
+            data_dir / f"cache_{self.__class__.__name__}_dependent_roots.json"
+        )
+
+    async def __aenter__(self) -> Self:
+        raise NotImplementedError
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        raise NotImplementedError
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         raise NotImplementedError
