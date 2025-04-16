@@ -1,4 +1,6 @@
 import argparse
+import logging
+import sys
 from collections.abc import Sequence
 from logging import getLevelNamesMapping
 from urllib.parse import urlparse
@@ -107,6 +109,25 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
     }
 
     return _defaults[network]
+
+
+def log_cli_arg_values(validated_args: CLIArgs) -> None:
+    logger = logging.getLogger(__name__)
+
+    for action in get_parser()._actions:  # noqa: SLF001
+        if action.dest in ("help",):
+            continue
+
+        validated_arg_value = getattr(
+            validated_args, action.dest.removeprefix("DANGER____")
+        )
+        if isinstance(validated_arg_value, list):
+            validated_arg_value = ",".join(validated_arg_value)
+        elif action.dest == "graffiti":
+            validated_arg_value = validated_arg_value.rstrip(b"\x00").decode()
+
+        if action.default != validated_arg_value:
+            logger.info(f"{action.dest}: {validated_arg_value}")
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -225,8 +246,6 @@ def get_parser() -> argparse.ArgumentParser:
 
 def parse_cli_args(args: Sequence[str]) -> CLIArgs:
     if args == ["--version"]:
-        import sys
-
         from observability import get_service_version
 
         print(f"Vero {get_service_version()}")  # noqa: T201
@@ -247,7 +266,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         ]
         network = Network(parsed_args.network)
 
-        return CLIArgs(
+        validated_args = CLIArgs(
             network=network,
             network_custom_config_path=parsed_args.network_custom_config_path,
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
@@ -280,3 +299,9 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         )
     except ValueError as e:
         parser.error(repr(e))
+    else:
+        # For test_parse_cli_args
+        if "pytest" in sys.modules:
+            log_cli_arg_values(validated_args)
+
+        return validated_args
