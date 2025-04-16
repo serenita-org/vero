@@ -213,7 +213,7 @@ async def run_services(
             block_proposal_service,
             sync_committee_service,
         ):
-            service.start()
+            await exit_stack.enter_async_context(service)
             validator_duty_services.append(service)
             beacon_chain.new_slot_handlers.append(service.on_new_slot)
         _logger.info("Started validator duty services")

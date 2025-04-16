@@ -3,9 +3,12 @@ import contextlib
 import datetime
 import logging
 from collections import defaultdict
-from typing import Unpack
+from pathlib import Path
+from types import TracebackType
+from typing import Self, Unpack
 from uuid import uuid4
 
+import msgspec
 from apscheduler.jobstores.base import JobLookupError
 from prometheus_client import Counter
 
@@ -50,6 +53,37 @@ class SyncCommitteeService(ValidatorDutyService):
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
             defaultdict(list)
         )
+
+    async def __aenter__(self) -> Self:
+        try:
+            with Path.open(self._cache_path_duties, "rb") as f:
+                self.sync_duties = msgspec.json.decode(
+                    f.read(), type=dict[int, list[SchemaBeaconAPI.SyncDuty]]
+                )
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to load duties from cache: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
+
+        # We still call update_duties - the cached duties may be stale
+        self.task_manager.submit_task(self.update_duties())
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            with Path.open(self._cache_path_duties, "wb") as f:
+                f.write(self.json_encoder.encode(self.sync_duties))
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to cache duties: {e!r}",
+                exc_info=self.logger.isEnabledFor(logging.DEBUG),
+            )
 
     def has_duty_for_slot(self, slot: int) -> bool:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
