@@ -112,6 +112,11 @@ class AttestationService(ValidatorDutyService):
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.submit_task(super().update_duties())
+
+        if int(event.slot) <= self._last_slot_duty_started_for:
+            self.logger.warning(f"Ignoring late head event for slot {event.slot}")
+            return
+
         await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
 
     async def attest_if_not_yet_attested(
@@ -126,10 +131,9 @@ class AttestationService(ValidatorDutyService):
             raise RuntimeError("Slashing detected, not attesting")
 
         if slot <= self._last_slot_duty_started_for:
-            self.logger.warning(
+            raise RuntimeError(
                 f"Not attesting to slot {slot} - already started attesting to slot {self._last_slot_duty_started_for}"
             )
-            return
 
         if slot != self.beacon_chain.current_slot:
             _ERRORS_METRIC.labels(
