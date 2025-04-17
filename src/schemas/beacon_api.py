@@ -8,8 +8,9 @@ https://ethereum.github.io/beacon-APIs/
 https://docs.nodereal.io/reference/eventstream
 """
 
+from collections.abc import Hashable
 from enum import Enum
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import msgspec
 
@@ -52,15 +53,34 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
+class Checkpoint(msgspec.Struct, frozen=True):
+    epoch: str
+    root: str
+
+
 class ForkVersion(Enum):
     ELECTRA = "electra"
+
+
+class AttestationData(msgspec.Struct, frozen=True):
+    slot: str
+    index: str
+    # LMD GHOST vote
+    beacon_block_root: str
+    # FFG vote
+    source: Checkpoint
+    target: Checkpoint
 
 
 class SingleAttestation(msgspec.Struct):
     committee_index: str
     attester_index: str
-    data: dict  # type: ignore[type-arg]
+    data: AttestationData
     signature: str
+
+
+class ProduceAttestationDataResponse(msgspec.Struct):
+    data: AttestationData
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
@@ -182,8 +202,15 @@ class ElectraBlockContentsSigned(msgspec.Struct):
 
 
 # Events
+class DeduplicableEvent(Protocol):
+    @property
+    def dedup_key(self) -> Hashable: ...
+
+
 class BeaconNodeEvent(msgspec.Struct):
-    pass
+    @property
+    def dedup_key(self) -> Hashable:
+        raise NotImplementedError
 
 
 class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
@@ -192,12 +219,20 @@ class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     previous_duty_dependent_root: str
     current_duty_dependent_root: str
 
+    @property
+    def dedup_key(self) -> Hashable:
+        return self.block
+
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     slot: str
     depth: str
     old_head_block: str
     new_head_block: str
+
+    @property
+    def dedup_key(self) -> Hashable:
+        return self.new_head_block
 
 
 # Slashing events
@@ -211,7 +246,12 @@ class AttesterSlashing(msgspec.Struct):
 
 
 class AttesterSlashingEvent(BeaconNodeEvent, AttesterSlashing):
-    pass
+    @property
+    def dedup_key(self) -> Hashable:
+        return str(
+            set(self.attestation_1.attesting_indices)
+            & set(self.attestation_2.attesting_indices)
+        )
 
 
 class ProposerSlashingEventMessage(msgspec.Struct):
@@ -228,4 +268,6 @@ class ProposerSlashing(msgspec.Struct):
 
 
 class ProposerSlashingEvent(BeaconNodeEvent, ProposerSlashing):
-    pass
+    @property
+    def dedup_key(self) -> Hashable:
+        return self.signed_header_1.message.proposer_index

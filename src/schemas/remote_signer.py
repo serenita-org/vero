@@ -5,7 +5,6 @@ import msgspec
 
 
 class SigningRequestType(Enum):
-    AGGREGATE_AND_PROOF = "AGGREGATE_AND_PROOF"
     AGGREGATE_AND_PROOF_V2 = "AGGREGATE_AND_PROOF_V2"
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
@@ -52,11 +51,6 @@ class Slot(msgspec.Struct):
 class AggregationSlotSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.AGGREGATION_SLOT
     aggregation_slot: Slot
-
-
-class AggregateAndProofSignableMessage(SignableMessageWithForkInfo, kw_only=True):
-    type: SigningRequestType = SigningRequestType.AGGREGATE_AND_PROOF
-    aggregate_and_proof: dict  # type: ignore[type-arg]
 
 
 class AggregateAndProofV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):

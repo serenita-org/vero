@@ -28,10 +28,6 @@ You may also set other OpenTelemetry-supported environment variables like `OTEL_
 
 ### Examples
 
-#### Attestation
-
-![Attestation](images/instrumentation/tracing_attestation.png)
-
 #### Block Proposal
 
 ![Block Proposal](images/instrumentation/tracing_block_proposal.png)

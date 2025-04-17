@@ -1,3 +1,4 @@
+from .attestation_data_provider import AttestationDataProvider
 from .beacon_chain import BeaconChain
 from .beacon_node import BeaconNode
 from .db.db import DB
@@ -9,6 +10,7 @@ from .signature_provider import SignatureProvider
 
 __all__ = [
     "DB",
+    "AttestationDataProvider",
     "BeaconChain",
     "BeaconNode",
     "DutyCache",
