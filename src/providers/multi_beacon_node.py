@@ -159,10 +159,6 @@ class MultiBeaconNode:
         )
 
     @property
-    def primary_beacon_node(self) -> BeaconNode:
-        return self.beacon_nodes[0]
-
-    @property
     def best_beacon_node(self) -> BeaconNode:
         return next(
             bn

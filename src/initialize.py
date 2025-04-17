@@ -221,7 +221,7 @@ async def run_services(
         _logger.info("Started validator duty services")
 
         event_consumer_service = EventConsumerService(
-            multi_beacon_node=multi_beacon_node,
+            beacon_nodes=multi_beacon_node.beacon_nodes,
             beacon_chain=beacon_chain,
             scheduler=scheduler,
             task_manager=task_manager,

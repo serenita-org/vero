@@ -1,34 +1,69 @@
+import asyncio
 import logging
+import math
 from collections import defaultdict
 from collections.abc import Callable, Coroutine
 from typing import Any
 from uuid import uuid4
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconChain, BeaconNode, MultiBeaconNode
+from providers import BeaconChain, BeaconNode
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
-_VC_PROCESSED_BEACON_NODE_EVENTS = Counter(
-    "vc_processed_beacon_node_events",
-    "Successfully processed beacon node events",
-    labelnames=["host", "event_type"],
-)
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
+def _setup_head_event_time_metric(
+    seconds_per_slot: int,
+    seconds_per_interval: float,
+) -> Histogram:
+    """
+    We want to track at which point into the slot a head event was received
+    from each connected beacon node.
+    In the first 1/3rd of the slot it makes sense to track this in a finer
+    way, e.g. in buckets of 250ms second.
+    During the rest of the slot, a coarser approach is sufficient since
+    head events received that late are not that valuable anyway.
+    """
+    step_fine = 0.25  # first part:  250 ms
+    step_coarse = 1.0  # second part: 1,000 ms
+
+    # Fine-grained head event timing buckets
+    ticks_fine = int(seconds_per_interval / step_fine)
+    fine_buckets = [step_fine * k for k in range(ticks_fine)]
+
+    # Coarser tracking for the remainder of the slot
+    first_coarse = math.ceil(seconds_per_interval / step_coarse) * step_coarse
+    ticks_coarse = math.ceil((seconds_per_slot - first_coarse) / step_coarse) + 1
+    coarse_buckets = [first_coarse + step_coarse * k for k in range(ticks_coarse)]
+
+    return Histogram(
+        "head_event_time",
+        "Time into slot at which a head event for the slot was received",
+        labelnames=["host"],
+        buckets=fine_buckets + coarse_buckets,
+    )
+
+
 class EventConsumerService:
+    _processed_events_metric = Counter(
+        "vc_processed_beacon_node_events",
+        "Successfully processed beacon node events",
+        labelnames=["host", "event_type"],
+    )
+
     def __init__(
         self,
-        multi_beacon_node: MultiBeaconNode,
+        beacon_nodes: list[BeaconNode],
         beacon_chain: BeaconChain,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
     ):
-        self.multi_beacon_node = multi_beacon_node
+        self.beacon_nodes = beacon_nodes
         self.beacon_chain: BeaconChain = beacon_chain
         self.scheduler = scheduler
         self.task_manager = task_manager
@@ -40,8 +75,17 @@ class EventConsumerService:
             list[Callable[[Any], Coroutine[Any, Any, None]]],
         ] = defaultdict(list)
 
+        self._head_event_time_metric = _setup_head_event_time_metric(
+            seconds_per_slot=beacon_chain.SECONDS_PER_SLOT,
+            seconds_per_interval=beacon_chain.SECONDS_PER_INTERVAL,
+        )
+
     def start(self) -> None:
-        self.task_manager.submit_task(self.handle_events())
+        for beacon_node in self.beacon_nodes:
+            self.task_manager.submit_task(
+                self.handle_events(beacon_node=beacon_node),
+                name=f"handle_events_{beacon_node.base_url}",
+            )
 
     def add_event_handler(
         self,
@@ -50,10 +94,8 @@ class EventConsumerService:
     ) -> None:
         self.event_handlers[event_type].append(event_handler)
 
-    async def handle_events(self) -> None:
-        beacon_node = self.multi_beacon_node.best_beacon_node
+    async def handle_events(self, beacon_node: BeaconNode) -> None:
         self.logger.info(f"Subscribing to events from {beacon_node.host}")
-        primary_bn = self.multi_beacon_node.primary_beacon_node
 
         topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
 
@@ -70,6 +112,9 @@ class EventConsumerService:
 
                 if isinstance(event, SchemaBeaconAPI.HeadEvent):
                     self.logger.debug(f"New head @ {event.slot} : {event.block}")
+                    self._head_event_time_metric.labels(host=beacon_node.host).observe(
+                        self.beacon_chain.time_since_slot_start(slot=int(event.slot))
+                    )
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
                     self.logger.info(
                         f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
@@ -89,27 +134,13 @@ class EventConsumerService:
                                 name=f"{self.__class__.__name__}.handler-{event_type}-{handler.__name__}-{uuid4().hex}",
                             )
 
-                _VC_PROCESSED_BEACON_NODE_EVENTS.labels(
+                self._processed_events_metric.labels(
                     host=beacon_node.host,
                     event_type=type(event).__name__,
                 ).inc()
 
-                # Switch back to primary beacon node SSE stream whenever possible
-                if (
-                    beacon_node != primary_bn
-                    and primary_bn.score == BeaconNode.MAX_SCORE
-                ):
-                    self.logger.info(
-                        f"Switching SSE subscription from {beacon_node.host} back to primary beacon node {primary_bn.host}"
-                    )
-                    break
-
-            # We may break out of the for loop to switch nodes, or if the SSE ends
-            # naturally. -> In both cases we want to reconnect/resubscribe.
-            self.task_manager.submit_task(
-                self.handle_events(), name=f"{self.__class__.__name__}.handle_events"
-            )
-
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             beacon_node.score -= BeaconNode.SCORE_DELTA_FAILURE
             _ERRORS_METRIC.labels(
@@ -118,4 +149,16 @@ class EventConsumerService:
             self.logger.exception(
                 f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 1 second...",
             )
-            self.task_manager.submit_task(self.handle_events(), delay=1.0)
+            self.task_manager.submit_task(
+                self.handle_events(beacon_node=beacon_node),
+                delay=1.0,
+                name=f"handle_events_{beacon_node.base_url}",
+            )
+        else:
+            # The SSE stream ended without any error.
+            # This is not expected to happen normally.
+            # We want to resubscribe to it right away.
+            self.task_manager.submit_task(
+                self.handle_events(beacon_node=beacon_node),
+                name=f"handle_events_{beacon_node.base_url}",
+            )
