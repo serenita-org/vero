@@ -82,6 +82,18 @@ from spec.configs import Network
             [
                 "--network=hoodi",
                 "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-1:5053",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "Beacon node URLs must have unique hostnames",
+            {},
+            [],
+            id="--beacon-node-urls invalid input - duplicate hostname",
+        ),
+        pytest.param(
+            [
+                "--network=hoodi",
+                "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
@@ -96,6 +108,19 @@ from spec.configs import Network
                 "beacon_node_urls_proposal: http://beacon-node-prop:5052",
             ],
             id="--beacon-node-urls-proposal",
+        ),
+        pytest.param(
+            [
+                "--network=hoodi",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node-1:5052",
+                "--beacon-node-urls-proposal=http://beacon-node-1:5052,http://beacon-node-1:5053",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            "Proposal beacon node URLs must have unique hostnames",
+            {},
+            [],
+            id="--beacon-node-urls-proposal invalid input - duplicate hostname",
         ),
         pytest.param(
             [

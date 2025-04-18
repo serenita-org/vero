@@ -264,6 +264,22 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 min_values_required=1,
             )
         ]
+        if len({urlparse(bn_url).hostname for bn_url in beacon_node_urls}) != len(
+            beacon_node_urls
+        ):
+            parser.error("Beacon node URLs must have unique hostnames.")
+        beacon_node_urls_proposal = [
+            _validate_url(url)
+            for url in _validate_comma_separated_strings(
+                input_string=parsed_args.beacon_node_urls_proposal,
+                entity_name="proposal beacon node url",
+                min_values_required=0,
+            )
+        ]
+        if len(
+            {urlparse(bn_url).hostname for bn_url in beacon_node_urls_proposal}
+        ) != len(beacon_node_urls_proposal):
+            parser.error("Proposal beacon node URLs must have unique hostnames.")
         network = Network(parsed_args.network)
 
         validated_args = CLIArgs(
@@ -271,14 +287,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             network_custom_config_path=parsed_args.network_custom_config_path,
             remote_signer_url=_validate_url(parsed_args.remote_signer_url),
             beacon_node_urls=beacon_node_urls,
-            beacon_node_urls_proposal=[
-                _validate_url(url)
-                for url in _validate_comma_separated_strings(
-                    input_string=parsed_args.beacon_node_urls_proposal,
-                    entity_name="proposal beacon node url",
-                    min_values_required=0,
-                )
-            ],
+            beacon_node_urls_proposal=beacon_node_urls_proposal,
             attestation_consensus_threshold=_process_attestation_consensus_threshold(
                 value=parsed_args.attestation_consensus_threshold,
                 beacon_node_urls=beacon_node_urls,
