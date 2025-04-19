@@ -183,6 +183,9 @@ class AttestationService(ValidatorDutyService):
             ),
             timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
         )
+        self.logger.debug(
+            f"Produced attestation data without expected root using {bn_hosts}"
+        )
         for bn_host in bn_hosts:
             _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
         return att_data
@@ -202,13 +205,13 @@ class AttestationService(ValidatorDutyService):
             return await self._produce_attestation_data_without_expected_root(slot)
 
         # We have an expected block root; try to confirm it
-        bn_host_with_head = next(
+        bn_host_with_initial_head = next(
             iter(self.block_root_to_beacon_node_hosts[expected_block_root])
         )
         bn_with_head = next(
             bn
             for bn in self.multi_beacon_node.beacon_nodes
-            if bn.host == bn_host_with_head
+            if bn.host == bn_host_with_initial_head
         )
 
         attestation_data_task = asyncio.create_task(
@@ -240,12 +243,13 @@ class AttestationService(ValidatorDutyService):
         if len(contributing_bn_hosts) >= self.attestation_consensus_threshold:
             for bn_host in contributing_bn_hosts:
                 _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
-                trace.get_current_span().add_event(
-                    name="HeadEventConfirmation",
-                    attributes={
-                        "host.name": bn_host,
-                    },
-                )
+                if bn_host != bn_host_with_initial_head:
+                    trace.get_current_span().add_event(
+                        name="HeadEventConfirmation",
+                        attributes={
+                            "host.name": bn_host,
+                        },
+                    )
             return await asyncio.wait_for(
                 attestation_data_task,
                 timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)

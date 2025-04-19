@@ -341,7 +341,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=0.3,
+                total=0.5,
             ),
         )
 
