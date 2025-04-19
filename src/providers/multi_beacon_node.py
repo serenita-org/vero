@@ -35,7 +35,6 @@ connected beacon nodes have equal scores, the first beacon node will be used.
 
 import asyncio
 import logging
-import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
@@ -43,8 +42,6 @@ from typing import Any, Self
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
-from opentelemetry.trace import Span
-from prometheus_client import Counter as CounterMetric
 from remerkleable.complex import Container
 
 from args import CLIArgs
@@ -59,11 +56,6 @@ from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 (_ERRORS_METRIC,) = get_shared_metrics()
-_VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = CounterMetric(
-    "vc_attestation_consensus_contributions",
-    "Tracks how many times the attestation data's block root contributed to the attestation consensus by returning the same root as was emitted in the HeadEvent.",
-    labelnames=["host"],
-)
 
 
 class AttestationConsensusFailure(Exception):
@@ -464,72 +456,16 @@ class MultiBeaconNode:
             **kwargs,
         )
 
-    async def _produce_attestation_data_from_head_event(
+    async def produce_attestation_data_without_head_event(
         self,
         slot: int,
         committee_index: int,
-        deadline_timestamp: float,
-        head_event: SchemaBeaconAPI.HeadEvent,
-        tracer_span: Span,
-    ) -> AttestationData:
-        tasks = [
-            asyncio.create_task(
-                bn.wait_for_attestation_data(
-                    expected_head_block_root=head_event.block,
-                    slot=slot,
-                    committee_index=committee_index,
-                ),
-            )
-            for bn in self.initialized_beacon_nodes
-        ]
-        head_match_count = 0
-        for coro in asyncio.as_completed(
-            tasks,
-            timeout=deadline_timestamp - time.time(),
-        ):
-            try:
-                host, att_data = await coro
-                _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=host).inc()
-                tracer_span.add_event(
-                    name="HeadEventConfirmation",
-                    attributes={
-                        "host.name": host,
-                    },
-                )
-                head_match_count += 1
-                if head_match_count >= self._attestation_consensus_threshold:
-                    # Cancel pending tasks
-                    for task in tasks:
-                        task.cancel()
-                    return att_data
-            except TimeoutError:
-                # Deadline reached
-                continue
-            except Exception as e:
-                self.logger.exception(
-                    f"Failed waiting for attestation data: {e!r}",
-                )
-                continue
-
-        # Cancel pending tasks
-        for task in tasks:
-            task.cancel()
-        raise AttestationConsensusFailure(
-            f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes. Expected head block root: {head_event.block}",
-        )
-
-    async def _produce_attestation_data_without_head_event(
-        self,
-        slot: int,
-        committee_index: int,
-        deadline_timestamp: float,
-        tracer_span: Span,
-    ) -> AttestationData:
+    ) -> tuple[AttestationData, list[str]]:
         # Maps beacon node hosts to their last known head block root
         host_to_block_root: dict[str, str] = dict()
         head_block_root_counter: Counter[str] = Counter()
 
-        while time.time() < deadline_timestamp:
+        while True:
             _round_start = asyncio.get_running_loop().time()
 
             tasks = [
@@ -566,7 +502,7 @@ class MultiBeaconNode:
                 if prev_root is not None:
                     head_block_root_counter[prev_root] -= 1
 
-                tracer_span.add_event(
+                trace.get_current_span().add_event(
                     name="HeadBlockRoot",
                     attributes={
                         "host.name": host,
@@ -583,92 +519,17 @@ class MultiBeaconNode:
                     for task in tasks:
                         task.cancel()
 
-                    for contributing_host in (
+                    contributing_hosts = [
                         h for h, r in host_to_block_root.items() if r == block_root
-                    ):
-                        _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(
-                            host=contributing_host
-                        ).inc()
-                    return att_data
+                    ]
+
+                    return att_data, contributing_hosts
 
             # If no consensus has been reached in this round,
             # rate-limit so we don't spam requests too quickly.
             # Example: wait at least 30ms from the start of this round
             await asyncio.sleep(
                 max(0.03 - (asyncio.get_running_loop().time() - _round_start), 0),
-            )
-
-        # If we exit the while loop, we haven't reached consensus by the deadline
-        raise AttestationConsensusFailure(
-            f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes.",
-        )
-
-    async def _produce_attestation_data(
-        self,
-        slot: int,
-        committee_index: int,
-        deadline_timestamp: float,
-        head_event: SchemaBeaconAPI.HeadEvent | None,
-        tracer_span: Span,
-    ) -> AttestationData:
-        # Slightly different algorithms depending on whether
-        # a head event has been emitted.
-        # A) A head event was emitted
-        #    We wait for enough beacon nodes to report the same
-        #    head block root as is present in the head event.
-        # B) No head event was emitted
-        #    We wait for enough beacon nodes to report the same
-        #    head block root.
-        if head_event:
-            return await self._produce_attestation_data_from_head_event(
-                slot=slot,
-                committee_index=committee_index,
-                deadline_timestamp=deadline_timestamp,
-                head_event=head_event,
-                tracer_span=tracer_span,
-            )
-        return await self._produce_attestation_data_without_head_event(
-            slot=slot,
-            committee_index=committee_index,
-            deadline_timestamp=deadline_timestamp,
-            tracer_span=tracer_span,
-        )
-
-    async def produce_attestation_data(
-        self,
-        slot: int,
-        committee_index: int,
-        deadline_timestamp: float,
-        head_event: SchemaBeaconAPI.HeadEvent | None = None,
-    ) -> AttestationData:
-        """Returns attestation data from the connected beacon nodes.
-
-        If a head event is provided, the function will wait until enough beacon nodes
-        has processed the same head block.
-
-        Some example situations that can occur and how they are handled:
-        - 2s into the slot, we receive a head event from one beacon node,
-          but the rest of connected beacon nodes hasn't processed that block yet
-          --> we wait for enough beacon nodes to report the same head block
-              (even if that means submitting the attestation later than 4s into the slot)
-        - 4s into the slot, we haven't received a head event.
-          --> We request all beacon nodes to produce attestation data and wait until enough
-              beacon nodes agrees on a head block. Then we attest to that.
-        """
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.produce_attestation_data",
-            attributes={
-                "head_event.beacon_block_root": head_event.block
-                if head_event
-                else str(None),
-            },
-        ) as tracer_span:
-            return await self._produce_attestation_data(
-                slot=slot,
-                committee_index=committee_index,
-                deadline_timestamp=deadline_timestamp,
-                head_event=head_event,
-                tracer_span=tracer_span,
             )
 
     async def publish_attestations(self, **kwargs: Any) -> None:

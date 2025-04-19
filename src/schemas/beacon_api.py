@@ -8,8 +8,9 @@ https://ethereum.github.io/beacon-APIs/
 https://docs.nodereal.io/reference/eventstream
 """
 
+from collections.abc import Hashable
 from enum import Enum
-from typing import Any, Self
+from typing import Any, Protocol, Self, runtime_checkable
 
 import msgspec
 
@@ -182,6 +183,12 @@ class ElectraBlockContentsSigned(msgspec.Struct):
 
 
 # Events
+@runtime_checkable
+class DeduplicableEvent(Protocol):
+    @property
+    def dedup_key(self) -> Hashable: ...
+
+
 class BeaconNodeEvent(msgspec.Struct):
     pass
 
@@ -192,12 +199,19 @@ class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     previous_duty_dependent_root: str
     current_duty_dependent_root: str
 
+    # Intentionally does not implement the DeduplicableEvent
+    # protocol since we want to process these for each beacon node
+
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     slot: str
     depth: str
     old_head_block: str
     new_head_block: str
+
+    @property
+    def dedup_key(self) -> Hashable:
+        return self.new_head_block
 
 
 # Slashing events
@@ -211,7 +225,9 @@ class AttesterSlashing(msgspec.Struct):
 
 
 class AttesterSlashingEvent(BeaconNodeEvent, AttesterSlashing):
-    pass
+    @property
+    def dedup_key(self) -> Hashable:
+        return hash(self)
 
 
 class ProposerSlashingEventMessage(msgspec.Struct):
@@ -228,4 +244,6 @@ class ProposerSlashing(msgspec.Struct):
 
 
 class ProposerSlashingEvent(BeaconNodeEvent, ProposerSlashing):
-    pass
+    @property
+    def dedup_key(self) -> Hashable:
+        return hash(self)

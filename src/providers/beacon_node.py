@@ -332,66 +332,46 @@ class BeaconNode:
         committee_index: int,
     ) -> tuple[str, AttestationData]:
         """Returns the beacon node host along with the produced attestation data."""
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.produce_attestation_data",
-            kind=SpanKind.CLIENT,
-            attributes={
-                "server.address": self.host,
-            },
-        ) as tracer_span:
-            resp = await self._make_request(
-                method="GET",
-                endpoint="/eth/v1/validator/attestation_data",
-                params=dict(
-                    slot=slot,
-                    committee_index=committee_index,
-                ),
-                timeout=ClientTimeout(
-                    connect=self.client_session.timeout.connect,
-                    total=0.3,
-                ),
-            )
+        resp = await self._make_request(
+            method="GET",
+            endpoint="/eth/v1/validator/attestation_data",
+            params=dict(
+                slot=slot,
+                committee_index=committee_index,
+            ),
+            timeout=ClientTimeout(
+                connect=self.client_session.timeout.connect,
+                total=0.3,
+            ),
+        )
 
-            att_data = AttestationData.from_obj(json.loads(resp)["data"])
-            tracer_span.add_event(
-                "AttestationData",
-                attributes={
-                    "att_data.beacon_block_root": att_data.beacon_block_root.to_obj(),
-                },
-            )
-            return self.host, att_data
+        att_data = AttestationData.from_obj(json.loads(resp)["data"])
+        return self.host, att_data
 
     async def wait_for_attestation_data(
         self,
         expected_head_block_root: str,
         slot: int,
         committee_index: int,
-    ) -> tuple[str, AttestationData]:
-        """Returns the beacon node host along with the produced attestation data."""
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.wait_for_attestation_data",
-            attributes={
-                "server.address": self.host,
-            },
-        ):
-            while True:
-                _request_start_time = asyncio.get_running_loop().time()
+    ) -> AttestationData:
+        while True:
+            _request_start_time = asyncio.get_running_loop().time()
 
-                try:
-                    _, att_data = await self.produce_attestation_data(
-                        slot=slot,
-                        committee_index=committee_index,
-                    )
-                    if att_data.beacon_block_root.to_obj() == expected_head_block_root:
-                        return self.host, att_data
-                except Exception as e:
-                    self.logger.exception(
-                        f"Failed to produce attestation data: {e!r}",
-                    )
+            try:
+                _, att_data = await self.produce_attestation_data(
+                    slot=slot,
+                    committee_index=committee_index,
+                )
+                if att_data.beacon_block_root.to_obj() == expected_head_block_root:
+                    return att_data
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to produce attestation data: {e!r}",
+                )
 
-                # Rate-limiting - wait at least 50ms in between requests
-                elapsed_time = asyncio.get_running_loop().time() - _request_start_time
-                await asyncio.sleep(max(0.05 - elapsed_time, 0))
+            # Rate-limiting - wait at least 50ms in between requests
+            elapsed_time = asyncio.get_running_loop().time() - _request_start_time
+            await asyncio.sleep(max(0.05 - elapsed_time, 0))
 
     async def get_block_root(self, block_id: str) -> str:
         resp_text = await self._make_request(

@@ -83,7 +83,8 @@ class ValidatorStatusTrackerService:
 
     async def handle_slashing_event(
         self,
-        event: SchemaBeaconAPI.BeaconNodeEvent,
+        event: SchemaBeaconAPI.AttesterSlashingEvent
+        | SchemaBeaconAPI.ProposerSlashingEvent,
     ) -> None:
         our_validator_indices = {
             validator.index

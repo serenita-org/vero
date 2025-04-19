@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import datetime
+import time
 from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
@@ -19,7 +20,6 @@ from prometheus_client import Counter as CounterMetric
 from prometheus_client import Histogram
 
 from observability import ErrorType, get_shared_metrics
-from providers.multi_beacon_node import AttestationConsensusFailure
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -48,6 +48,11 @@ _VC_ATTESTATION_CONSENSUS_TIME = Histogram(
     "Time it took to achieve consensus on the attestation beacon block root",
     buckets=[0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 2, 3],
 )
+_VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = CounterMetric(
+    "vc_attestation_consensus_contributions",
+    "Tracks how many times the attestation data's block root contributed to the attestation consensus by returning the same root as was emitted in the HeadEvent.",
+    labelnames=["host"],
+)
 _VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
     "vc_attestation_consensus_failures",
     "Amount of attestation consensus failures",
@@ -55,7 +60,8 @@ _VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
 _VC_ATTESTATION_CONSENSUS_FAILURES.reset()
 (_ERRORS_METRIC,) = get_shared_metrics()
 
-_PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
+_PRODUCE_JOB_ID = "AttestationService.attest-slot-{duty_slot}"
+_PRODUCE_ATTESTATION_DATA_SPAN_ID = "AttestationService.attest"
 
 
 class AttestationService(ValidatorDutyService):
@@ -68,6 +74,13 @@ class AttestationService(ValidatorDutyService):
             set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
+
+        self.attestation_consensus_threshold = (
+            self.cli_args.attestation_consensus_threshold
+        )
+
+        # Block root counter used for reaching consensus on attestation data to sign
+        self.block_root_to_beacon_node_hosts: dict[str, set[str]] = {}
 
     async def __aenter__(self) -> Self:
         try:
@@ -112,7 +125,7 @@ class AttestationService(ValidatorDutyService):
         )
 
         self.scheduler.add_job(
-            func=self.attest_if_not_yet_attested,
+            func=self.attest,
             trigger="date",
             next_run_time=_produce_deadline,
             kwargs=dict(slot=slot),
@@ -124,33 +137,150 @@ class AttestationService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.submit_task(super().update_duties())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
-        if (
-            any(
-                root not in self.attester_duties_dependent_roots.values()
-                for root in (
-                    event.previous_duty_dependent_root,
-                    event.current_duty_dependent_root,
-                )
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
+    ) -> None:
+        if event.block in self._processed_head_block_roots:
+            return
+
+        if any(
+            root not in self.attester_duties_dependent_roots.values()
+            for root in (
+                event.previous_duty_dependent_root,
+                event.current_duty_dependent_root,
             )
-            and len(self.attester_duties_dependent_roots) > 0
         ):
             self.logger.debug(
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.submit_task(super().update_duties())
 
-        if int(event.slot) <= self._last_slot_duty_started_for:
-            self.logger.warning(f"Ignoring late head event for slot {event.slot}")
-            return
+        if event.block in self.block_root_to_beacon_node_hosts:
+            # We've already seen a head event for this block root and started
+            # attesting
+            self.block_root_to_beacon_node_hosts[event.block].add(beacon_node_host)
+            # TODO make debug?
+            self.logger.info(f"HeadEventConfirmation from {beacon_node_host}")
+        else:
+            self.block_root_to_beacon_node_hosts[event.block] = {beacon_node_host}
+            # TODO make debug?
+            self.logger.info(
+                f"Head event for slot {event.slot} received from {beacon_node_host}"
+            )
+            await self.attest(
+                slot=int(event.slot),
+                head_event=event,
+                head_event_beacon_node_host=beacon_node_host,
+            )
 
-        await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
+    async def _produce_attestation_data_without_expected_root(
+        self, slot: int
+    ) -> AttestationData:
+        att_data, bn_hosts = await asyncio.wait_for(
+            self.multi_beacon_node.produce_attestation_data_without_head_event(
+                slot=slot,
+                committee_index=0,
+            ),
+            timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
+        )
+        for bn_host in bn_hosts:
+            _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
+        return att_data
 
-    async def attest_if_not_yet_attested(
+    async def _produce_attestation_data(
+        self, slot: int, expected_block_root: str | None
+    ) -> AttestationData:
+        """
+        Produces attestation data for the given slot.
+
+        If an expected block root is provided, tries to reach consensus on it.
+        If consensus can't be reached on the expected block root or no
+        expected block root is provided, we wait for the required threshold of
+        connected beacon nodes to agree on any head block root.
+        """
+        if expected_block_root is None:
+            return await self._produce_attestation_data_without_expected_root(slot)
+
+        # We have an expected block root; try to confirm it
+        bn_host_with_head = next(
+            iter(self.block_root_to_beacon_node_hosts[expected_block_root])
+        )
+        bn_with_head = next(
+            bn
+            for bn in self.multi_beacon_node.beacon_nodes
+            if bn.host == bn_host_with_head
+        )
+
+        attestation_data_task = asyncio.create_task(
+            bn_with_head.wait_for_attestation_data(
+                expected_head_block_root=expected_block_root,
+                slot=slot,
+                committee_index=0,
+            )
+        )
+
+        confirm_deadline_ts = (
+            self.beacon_chain.get_timestamp_for_slot(slot)
+            + 0.5 * self.beacon_chain.SECONDS_PER_SLOT
+        )
+
+        while (  # noqa: ASYNC110
+            len(self.block_root_to_beacon_node_hosts[expected_block_root])
+            < self.attestation_consensus_threshold
+            and time.time() < confirm_deadline_ts
+        ):
+            await asyncio.sleep(0.005)
+
+        # Clean up
+        contributing_bn_hosts = self.block_root_to_beacon_node_hosts.pop(
+            expected_block_root, set()
+        )
+        self._processed_head_block_roots.append(expected_block_root)
+
+        if len(contributing_bn_hosts) >= self.attestation_consensus_threshold:
+            for bn_host in contributing_bn_hosts:
+                _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
+                trace.get_current_span().add_event(
+                    name="HeadEventConfirmation",
+                    attributes={
+                        "host.name": bn_host,
+                    },
+                )
+            return await asyncio.wait_for(
+                attestation_data_task,
+                timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
+                - time.time(),
+            )
+
+        # Consensus was not reached on expected block root.
+        # Fallback to behavior as if no head event block root was received.
+        self.logger.warning(
+            f"Consensus was not reached for slot {slot} and block root {expected_block_root}"
+        )
+        return await self._produce_attestation_data(slot=slot, expected_block_root=None)
+
+    async def attest(
         self,
         slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
+        head_event_beacon_node_host: str | None = None,
     ) -> None:
+        """
+        We either
+        a) call this function at the attestation deadline without a head_event
+        or b) call this function when we see the first head event for the slot.
+
+        If we see a head event in time, we cancel the scheduled function call
+        at the attestation deadline.
+        """
+        if head_event is not None:
+            # Cancel the scheduled job that would call this function
+            # at 1/3 of the slot time if it has not yet been called
+            with contextlib.suppress(JobLookupError):
+                self.scheduler.remove_job(
+                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+                )
+
         if (
             self.validator_status_tracker_service.slashing_detected
             and not self.cli_args.disable_slashing_detection
@@ -175,14 +305,6 @@ class AttestationService(ValidatorDutyService):
         for duty in slot_attester_duties:
             self.attester_duties[epoch].remove(duty)
 
-        if head_event is not None:
-            # Cancel the scheduled job that would call this function
-            # at 1/3 of the slot time if it has not yet been called
-            with contextlib.suppress(JobLookupError):
-                self.scheduler.remove_job(
-                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
-                )
-
         if len(slot_attester_duties) == 0:
             self.logger.debug(f"No remaining attester duties for slot {slot}")
             return
@@ -196,11 +318,24 @@ class AttestationService(ValidatorDutyService):
             is_remote=False,
             trace_flags=TraceFlags(0x01),
         )
+        span_attrs: dict[str, int | str] = {
+            "beacon_chain.slot": slot,
+        }
+        if head_event:
+            span_attrs["head_event.beacon_block_root"] = head_event.block
         with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.attest_if_not_yet_attested",
+            name=f"{self.__class__.__name__}.attest",
             context=trace.set_span_in_context(NonRecordingSpan(span_ctx)),
-            attributes={"beacon_chain.slot": slot},
-        ):
+            attributes=span_attrs,
+        ) as attest_span:
+            if head_event is not None:
+                attest_span.add_event(
+                    name="HeadEvent",
+                    attributes={
+                        "host.name": head_event_beacon_node_host,
+                    },
+                )
+
             self.logger.debug(
                 f"Attesting to slot {slot}, {len(slot_attester_duties)} duties",
             )
@@ -209,42 +344,31 @@ class AttestationService(ValidatorDutyService):
                 duty=ValidatorDuty.ATTESTATION.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-            # Deadline is set at 2/3 into the slot.
-            # That is quite late into the slot, we do not want to attest that late.
-            # Consensus on the latest head block is normally reached
-            # much faster though.
-            deadline_timestamp = (
-                self.beacon_chain.get_timestamp_for_slot(slot)
-                + 2 * self.beacon_chain.SECONDS_PER_INTERVAL
-            )
-
             consensus_start = asyncio.get_running_loop().time()
-            with self.tracer.start_as_current_span(
-                name=f"{self.__class__.__name__}.produce_attestation_data",
-            ):
-                try:
-                    att_data = await self.multi_beacon_node.produce_attestation_data(
-                        deadline_timestamp=deadline_timestamp,
-                        head_event=head_event,
+            try:
+                with self.tracer.start_as_current_span(
+                    name=f"{self.__class__.__name__}.produce_attestation_data",
+                ):
+                    att_data = await self._produce_attestation_data(
                         slot=slot,
-                        committee_index=0,
+                        expected_block_root=head_event.block if head_event else None,
                     )
-                except AttestationConsensusFailure as e:
-                    self.logger.exception(
-                        f"Failed to produce attestation data: {e!r}",
-                    )
-                    _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
-                    _ERRORS_METRIC.labels(
-                        error_type=ErrorType.ATTESTATION_CONSENSUS.value,
-                    ).inc()
-                    self._last_slot_duty_completed_for = slot
-                    return
-
-            consensus_time = asyncio.get_running_loop().time() - consensus_start
-            self.logger.debug(
-                f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
-            )
-            _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
+            except TimeoutError as e:
+                self.logger.exception(
+                    f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes (head event: {head_event}): {e!r}",
+                )
+                _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
+                _ERRORS_METRIC.labels(
+                    error_type=ErrorType.ATTESTATION_CONSENSUS.value,
+                ).inc()
+                self._last_slot_duty_completed_for = slot
+                return
+            else:
+                consensus_time = asyncio.get_running_loop().time() - consensus_start
+                self.logger.debug(
+                    f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
+                )
+                _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
 
             self.logger.debug(
                 "Attestation data:"

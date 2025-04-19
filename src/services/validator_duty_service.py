@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import deque
 from enum import Enum
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
@@ -97,6 +98,12 @@ class ValidatorDutyService:
         # at signing too.
         self._last_slot_duty_started_for = -1
 
+        # Keeps track of block roots as emitted that were already
+        # by each connected beacon node's SSE stream.
+        self._processed_head_block_roots: deque[str] = deque(
+            maxlen=2 * len(self.multi_beacon_node.beacon_nodes)
+        )
+
         # Keeps track of the last slot for which this
         # service completed performing its duty.
         # Allows us to wait for a duty to be completed
@@ -118,7 +125,9 @@ class ValidatorDutyService:
     ) -> None:
         raise NotImplementedError
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
+    ) -> None:
         raise NotImplementedError
 
     async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:

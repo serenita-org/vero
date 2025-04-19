@@ -1,8 +1,8 @@
 import asyncio
 import logging
 import math
-from collections import defaultdict
-from collections.abc import Callable, Coroutine
+from collections import deque
+from collections.abc import Callable, Coroutine, Hashable
 from typing import Any
 from uuid import uuid4
 
@@ -70,10 +70,23 @@ class EventConsumerService:
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.event_handlers: dict[
-            type[SchemaBeaconAPI.BeaconNodeEvent],
-            list[Callable[[Any], Coroutine[Any, Any, None]]],
-        ] = defaultdict(list)
+        self.head_event_handlers: list[
+            Callable[[SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]]
+        ] = []
+        self.reorg_event_handlers: list[
+            Callable[[SchemaBeaconAPI.ChainReorgEvent], Coroutine[Any, Any, None]]
+        ] = []
+        self.slashing_event_handlers: list[
+            Callable[
+                [
+                    SchemaBeaconAPI.AttesterSlashingEvent
+                    | SchemaBeaconAPI.ProposerSlashingEvent
+                ],
+                Coroutine[Any, Any, None],
+            ]
+        ] = []
+
+        self._recent_event_keys: deque[Hashable] = deque(maxlen=10 * len(beacon_nodes))
 
         self._head_event_time_metric = _setup_head_event_time_metric(
             seconds_per_slot=beacon_chain.SECONDS_PER_SLOT,
@@ -87,12 +100,42 @@ class EventConsumerService:
                 name=f"handle_events_{beacon_node.base_url}",
             )
 
-    def add_event_handler(
+    def add_head_event_handler(
         self,
-        event_handler: Callable[[Any], Coroutine[Any, Any, None]],
-        event_type: type[SchemaBeaconAPI.BeaconNodeEvent],
+        event_handler: Callable[
+            [SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]
+        ],
     ) -> None:
-        self.event_handlers[event_type].append(event_handler)
+        self.head_event_handlers.append(event_handler)
+
+    def add_reorg_event_handler(
+        self,
+        event_handler: Callable[
+            [SchemaBeaconAPI.ChainReorgEvent], Coroutine[Any, Any, None]
+        ],
+    ) -> None:
+        self.reorg_event_handlers.append(event_handler)
+
+    def add_slashing_event_handler(
+        self,
+        event_handler: Callable[
+            [
+                SchemaBeaconAPI.AttesterSlashingEvent
+                | SchemaBeaconAPI.ProposerSlashingEvent
+            ],
+            Coroutine[Any, Any, None],
+        ],
+    ) -> None:
+        self.slashing_event_handlers.append(event_handler)
+
+    def _has_seen_event(self, event: SchemaBeaconAPI.DeduplicableEvent) -> bool:
+        key = event.dedup_key
+
+        if key in self._recent_event_keys:
+            return True
+
+        self._recent_event_keys.append(key)
+        return False
 
     async def handle_events(self, beacon_node: BeaconNode) -> None:
         self.logger.info(f"Subscribing to events from {beacon_node.host}")
@@ -110,34 +153,65 @@ class EventConsumerService:
                     )
                     continue
 
+                event_type = type(event).__name__
+
                 if isinstance(event, SchemaBeaconAPI.HeadEvent):
                     self.logger.debug(f"New head @ {event.slot} : {event.block}")
                     self._head_event_time_metric.labels(host=beacon_node.host).observe(
                         self.beacon_chain.time_since_slot_start(slot=int(event.slot))
                     )
+                    for head_handler in self.head_event_handlers:
+                        self.task_manager.submit_task(
+                            head_handler(event, beacon_node.host),
+                            name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
+                        )
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
                     self.logger.info(
                         f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
                     )
-                elif isinstance(event, SchemaBeaconAPI.AttesterSlashingEvent):
-                    self.logger.debug(f"AttesterSlashingEvent: {event}")
-                elif isinstance(event, SchemaBeaconAPI.ProposerSlashingEvent):
-                    self.logger.debug(f"ProposerSlashingEvent: {event}")
-                else:
-                    raise NotImplementedError(f"Unsupported event type: {type(event)}")  # noqa: TRY301
-
-                for event_type, handlers in self.event_handlers.items():
-                    if isinstance(event, event_type):
-                        for handler in handlers:
+                    for reorg_handler in self.reorg_event_handlers:
+                        if not self._has_seen_event(event):
                             self.task_manager.submit_task(
-                                handler(event),
-                                name=f"{self.__class__.__name__}.handler-{event_type}-{handler.__name__}-{uuid4().hex}",
+                                reorg_handler(event),
+                                name=f"{self.__class__.__name__}.handler-{event_type}-{reorg_handler.__name__}-{uuid4().hex}",
                             )
+                elif isinstance(
+                    event,
+                    (
+                        SchemaBeaconAPI.AttesterSlashingEvent,
+                        SchemaBeaconAPI.ProposerSlashingEvent,
+                    ),
+                ):
+                    self.logger.debug(f"{type(event)}: {event}")
+                    for sl_handler in self.slashing_event_handlers:
+                        if not self._has_seen_event(event):
+                            self.task_manager.submit_task(
+                                sl_handler(event),
+                                name=f"{self.__class__.__name__}.handler-{event_type}-{sl_handler.__name__}-{uuid4().hex}",
+                            )
+                else:
+                    raise NotImplementedError(f"Unsupported event type: {event_type}")  # noqa: TRY301
 
                 self._processed_events_metric.labels(
                     host=beacon_node.host,
-                    event_type=type(event).__name__,
+                    event_type=event_type,
                 ).inc()
+
+                # TODO
+                #  ... think about this case
+                #      3 beacon nodes
+                #      1 of them has a bug, forks off and emits head events
+                #      ... we may fail to attest here since _last_slot_duty_started_for
+                #          has already been set by the faulty node and consensus will never
+                #          be reached on its head block root!
+                #      this can be avoided by setting _last_slot_duty_started_for later on,
+                #      once consensus has been reached (or introducing a new property)
+                #      ... BUT we would not want to attest early to an old head if we have
+                #      already seen a head event for the current slot
+                #      ... feels like there's a tradeoff here and we can't get best of both?
+                #      HMMM perhaps an entire logic change makes sense here - emit the head event
+                #      only once it's been seen by multiple BNs? It would avoid the polling we do
+                #      ...
 
         except asyncio.CancelledError:
             raise

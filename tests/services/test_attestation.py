@@ -45,7 +45,7 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     ],
     indirect=True,
 )
-async def test_attest_if_not_yet_attested(
+async def test_attest(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     validators: list[ValidatorIndexPubkey],
@@ -81,7 +81,7 @@ async def test_attest_if_not_yet_attested(
 
     # Wait for slot to start
     await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
-    await attestation_service.attest_if_not_yet_attested(slot=duty_slot)
+    await attestation_service.attest(slot=duty_slot)
 
     assert any("Published attestations" in m for m in caplog.messages)
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1
@@ -101,7 +101,7 @@ async def test_attest_to_invalid_slot(
 ) -> None:
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
     with pytest.raises(RuntimeError, match="Invalid slot for attestation: "):
-        await attestation_service.attest_if_not_yet_attested(
+        await attestation_service.attest(
             slot=beacon_chain.current_slot + slot_offset
         )
 
