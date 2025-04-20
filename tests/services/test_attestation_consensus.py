@@ -358,10 +358,23 @@ async def test_produce_attestation_data_without_head_event(
 
 
 async def _simulate_head_event(
-    block_root: str, bn_host: str, delay: float, attestation_service: AttestationService
+    slot: int,
+    block_root: str,
+    bn_host: str,
+    delay: float,
+    attestation_service: AttestationService,
 ) -> None:
     await asyncio.sleep(delay)
-    attestation_service.block_root_to_beacon_node_hosts[block_root].add(bn_host)
+    await attestation_service.handle_head_event(
+        SchemaBeaconAPI.HeadEvent(
+            execution_optimistic=False,
+            slot=str(slot),
+            block=block_root,
+            previous_duty_dependent_root="",
+            current_duty_dependent_root="",
+        ),
+        beacon_node_host=bn_host,
+    )
 
 
 @pytest.mark.parametrize(
@@ -504,6 +517,7 @@ async def test_produce_attestation_data_with_head_event(
             _head_event_tasks.add(
                 asyncio.create_task(
                     _simulate_head_event(
+                        slot=beacon_chain.current_slot,
                         block_root=block_root,
                         bn_host=bn_host,
                         delay=delay,
@@ -544,3 +558,7 @@ async def test_produce_attestation_data_with_head_event(
 
     for message in expected_log_messages:
         assert any(message in m for m in caplog.messages)
+
+
+# TODO see if we can test it on a higher level here, calling .attest() and .handle_head_event()
+#  ... we don't have tests yet for late/conflicting head events

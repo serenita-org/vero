@@ -80,7 +80,10 @@ class AttestationService(ValidatorDutyService):
         )
 
         # Block root counter used for reaching consensus on attestation data to sign
-        self.block_root_to_beacon_node_hosts: dict[str, set[str]] = {}
+        self.block_root_to_beacon_node_hosts: dict[str, set[str]] = defaultdict(set)
+        self.block_root_to_consensus_reached_event: dict[str, asyncio.Event] = (
+            defaultdict(asyncio.Event)
+        )
 
     async def __aenter__(self) -> Self:
         try:
@@ -155,23 +158,59 @@ class AttestationService(ValidatorDutyService):
             )
             self.task_manager.submit_task(super().update_duties())
 
-        if event.block in self.block_root_to_beacon_node_hosts:
+        head_event_block_root_seen_before = (
+            event.block in self.block_root_to_beacon_node_hosts
+        )
+        if head_event_block_root_seen_before:
             # We've already seen a head event for this block root and started
             # attesting
-            self.block_root_to_beacon_node_hosts[event.block].add(beacon_node_host)
             # TODO make debug?
             self.logger.info(f"HeadEventConfirmation from {beacon_node_host}")
+            self._update_consensus_on_block_root(
+                bn_host=beacon_node_host,
+                block_root=event.block,
+            )
         else:
-            self.block_root_to_beacon_node_hosts[event.block] = {beacon_node_host}
+            # This is the first time we see the block root
             # TODO make debug?
             self.logger.info(
-                f"Head event for slot {event.slot} received from {beacon_node_host}"
+                f"Initial head event for slot {event.slot} received from {beacon_node_host}"
             )
+
+            # Ignore the head event if we've already started attesting - it's either:
+            # A) too late (entirely possible with a block that was proposed late / did not propagate well)
+            # or B) we have already seen a different block root in a head event and started attesting using
+            #       that (this is unlikely to happen but could happen e.g. in case of a reorg)
+            if int(event.slot) <= self._last_slot_duty_started_for:
+                # TODO make debug?
+                #  on a late block and 5 beacon nodes, it will log 5x...
+                #  ... ideally it would warn once and that's it but that would require
+                #      another internal service variable...
+                self.logger.info(
+                    f"Ignoring late head event for slot {event.slot} from {beacon_node_host}"
+                )
+                return
+
+            self._update_consensus_on_block_root(
+                bn_host=beacon_node_host,
+                block_root=event.block,
+            )
+
+            # Start attesting
             await self.attest(
                 slot=int(event.slot),
                 head_event=event,
                 head_event_beacon_node_host=beacon_node_host,
             )
+
+    def _update_consensus_on_block_root(self, bn_host: str, block_root: str) -> None:
+        self.block_root_to_beacon_node_hosts[block_root].add(bn_host)
+
+        if (
+            len(self.block_root_to_beacon_node_hosts[block_root])
+            >= self.attestation_consensus_threshold
+        ):
+            self.block_root_to_consensus_reached_event[block_root].set()
 
     async def _produce_attestation_data_without_expected_root(
         self, slot: int
@@ -227,41 +266,44 @@ class AttestationService(ValidatorDutyService):
             + 0.5 * self.beacon_chain.SECONDS_PER_SLOT
         )
 
-        while (  # noqa: ASYNC110
-            len(self.block_root_to_beacon_node_hosts[expected_block_root])
-            < self.attestation_consensus_threshold
-            and time.time() < confirm_deadline_ts
-        ):
-            await asyncio.sleep(0.005)
-
-        # Clean up
-        contributing_bn_hosts = self.block_root_to_beacon_node_hosts.pop(
-            expected_block_root, set()
-        )
-        self._processed_head_block_roots.append(expected_block_root)
-
-        if len(contributing_bn_hosts) >= self.attestation_consensus_threshold:
-            for bn_host in contributing_bn_hosts:
-                _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
-                if bn_host != bn_host_with_initial_head:
-                    trace.get_current_span().add_event(
-                        name="HeadEventConfirmation",
-                        attributes={
-                            "host.name": bn_host,
-                        },
-                    )
-            return await asyncio.wait_for(
-                attestation_data_task,
-                timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
-                - time.time(),
+        consensus_reached = self.block_root_to_consensus_reached_event[
+            expected_block_root
+        ]
+        try:
+            await asyncio.wait_for(
+                consensus_reached.wait(), timeout=confirm_deadline_ts - time.time()
             )
+        except TimeoutError:
+            # Consensus was not reached on expected block root.
+            # Fallback to behavior as if no head event block root was received.
+            self.logger.warning(
+                f"Consensus was not reached for slot {slot} and block root {expected_block_root}"
+            )
+            return await self._produce_attestation_data(
+                slot=slot, expected_block_root=None
+            )
+        finally:
+            # Clean up
+            del self.block_root_to_consensus_reached_event[expected_block_root]
+            contributing_bn_hosts = self.block_root_to_beacon_node_hosts.pop(
+                expected_block_root, set()
+            )
+            self._processed_head_block_roots.append(expected_block_root)
 
-        # Consensus was not reached on expected block root.
-        # Fallback to behavior as if no head event block root was received.
-        self.logger.warning(
-            f"Consensus was not reached for slot {slot} and block root {expected_block_root}"
+        # Consensus was reached in time
+        for bn_host in contributing_bn_hosts:
+            _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
+            if bn_host != bn_host_with_initial_head:
+                trace.get_current_span().add_event(
+                    name="HeadEventConfirmation",
+                    attributes={
+                        "host.name": bn_host,
+                    },
+                )
+        return await asyncio.wait_for(
+            attestation_data_task,
+            timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
         )
-        return await self._produce_attestation_data(slot=slot, expected_block_root=None)
 
     async def attest(
         self,
