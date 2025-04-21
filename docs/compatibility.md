@@ -1,20 +1,20 @@
 # Compatibility
 
-Vero regularly undergoes thorough testing against various CL and EL client combinations using [Kurtosis](https://github.com/kurtosis-tech/kurtosis) and the amazing [ethereum-package](https://github.com/ethpandaops/ethereum-package).
+Vero regularly undergoes thorough testing against CL and EL client combinations using the Kurtosis [ethereum-package](https://github.com/ethpandaops/ethereum-package).
 
-It is currently compatible with all open-source Ethereum clients:
+It is currently compatible with all open-source Ethereum consensus layer clients:
 
-|                | Compatible | Version        | Notes |
-|----------------|------------|----------------|-------|
-| **Grandine**   | ✅          | 1.0.0+         |       |
-| **Lighthouse** | ✅          | v7.0.0-beta.0+ |       |
-| **Lodestar**   | ✅          | v1.27.0+  |       |
-| **Nimbus**     | ✅          | v25.2.0+       |       |
-| **Prysm**      | ✅          | v5.3.0+        |       |
-| **Teku**       | ✅          | 25.2.0+        |       |
+|                | Compatible | Version  | Notes |
+|----------------|------------|----------|-------|
+| **Grandine**   | ✅          | TBD      |       |
+| **Lighthouse** | ✅          | v7.0.0+  |       |
+| **Lodestar**   | ✅          | v1.29.0+ |       |
+| **Nimbus**     | ✅          | v25.4.0+ |       |
+| **Prysm**      | ✅          | v6.0.0+  |       |
+| **Teku**       | ✅          | 25.4.1+  |       |
 
 #### Legend
-✅ Everything works perfectly.
+✅ No known issues.
 
 🟡 Minor issues that do not prevent validator duties from working but they may not work ideally.
 
