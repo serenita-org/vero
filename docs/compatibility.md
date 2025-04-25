@@ -6,7 +6,7 @@ It is currently compatible with all open-source Ethereum consensus layer clients
 
 |                | Compatible | Version  | Notes |
 |----------------|------------|----------|-------|
-| **Grandine**   | ✅          | TBD      |       |
+| **Grandine**   | ✅          | 1.1.0+   |       |
 | **Lighthouse** | ✅          | v7.0.0+  |       |
 | **Lodestar**   | ✅          | v1.29.0+ |       |
 | **Nimbus**     | ✅          | v25.4.0+ |       |
