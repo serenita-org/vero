@@ -75,16 +75,12 @@ of SSV tokens.
 
 3. **DVT - Obol's Charon**
 
-The Charon middleware client is not open-source, requiring an additional
-use grant from Obol for production use.
-
-Obol's team also took a different approach and did not implement their
+Obol's team took a different approach and did not implement their
 own validator client, instead choosing to go with a middleware approach,
 standing between existing validator clients and beacon nodes. That
 approach required some Charon-specific changes in beacon nodes.
-Again, any issue with Charon would be non-trivial to recover from.
 
-*TLDR: license, non-standard middleware approach*
+*TLDR: non-standard middleware approach*
 
 ___
 The biggest shared risk for all of the above options was downtime.
@@ -177,7 +173,7 @@ supermajority chain!
 ||Gnosis Chain support|
 |-|-|
 | Traditional VC | ✅ (most of them) |
-| DVT - Charon | ❓ |
+| DVT - Charon | ✅ |
 | DVT - SSV | ❌ |
 | Vouch | ❌ |
 | Vero | ✅ |
@@ -191,7 +187,7 @@ diversity situation.
 ||Open Source|
 |-|-|
 | Traditional VC | ✅ |
-| DVT - Charon | ❌ |
+| DVT - Charon | ✅ |
 | DVT - SSV | ✅ |
 | Vouch | ✅ |
 | Vero | ✅ |
