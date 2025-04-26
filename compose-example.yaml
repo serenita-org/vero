@@ -4,11 +4,15 @@ services:
     image: ghcr.io/serenita-org/vero:v0.9.0
     # It's recommended to set the `stop_grace_period` value
     # (or equivalent, e.g. `terminationGracePeriodSeconds` in k8s)
-    # to at least 30 seconds.
+    # to at least 60 seconds.
     # This is because Vero defers the shutdown process if it detects
     # an upcoming validator duty, opting to complete the duty before
     # shutting down.
-    # This feature can make the shutdown process take several seconds.
+    # This feature can make the shutdown process take a relatively long time.
+    # The maximum delay depends on the network's slot time.
+    # For 12-second slot networks, the worst case would consist of:
+    # - Up to 3 slots (waiting for upcoming block proposals) = 36 seconds
+    # - Up to ~1.5 slots (waiting to perform attester and sync duties) = 18 seconds
     stop_grace_period: 1m
     command:
       - "--network=hoodi"
