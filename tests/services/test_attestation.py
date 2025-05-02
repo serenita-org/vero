@@ -84,11 +84,11 @@ async def test_attest_to_invalid_slot(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
-    await attestation_service.attest_if_not_yet_attested(
-        slot=beacon_chain.current_slot + slot_offset
-    )
+    with pytest.raises(RuntimeError, match="Invalid slot for attestation: "):
+        await attestation_service.attest_if_not_yet_attested(
+            slot=beacon_chain.current_slot + slot_offset
+        )
 
-    assert any("Invalid slot for attestation" in m for m in caplog.messages)
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before
 
 

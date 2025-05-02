@@ -103,13 +103,9 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             return
         if duty_slot != self.beacon_chain.current_slot:
-            _ERRORS_METRIC.labels(
-                error_type=ErrorType.OTHER.value,
-            ).inc()
-            self.logger.error(
+            raise RuntimeError(
                 f"Invalid duty_slot for sync committee message: {duty_slot}. Current slot: {self.beacon_chain.current_slot}"
             )
-            return
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
         sync_period = self.beacon_chain.compute_sync_period_for_slot(duty_slot + 1)
