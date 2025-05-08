@@ -136,13 +136,9 @@ class AttestationService(ValidatorDutyService):
             )
 
         if slot != self.beacon_chain.current_slot:
-            _ERRORS_METRIC.labels(
-                error_type=ErrorType.OTHER.value,
-            ).inc()
-            self.logger.error(
+            raise RuntimeError(
                 f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
             )
-            return
 
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         slot_attester_duties = {
@@ -230,6 +226,17 @@ class AttestationService(ValidatorDutyService):
                 f"\nTarget: {att_data.target}"
                 f"\nHead: {att_data.beacon_block_root} (from head event: {head_event is not None})"
             )
+
+            # Ensure attestation data checkpoints are not in the future
+            current_epoch = self.beacon_chain.current_epoch
+            if any(
+                cp.epoch > current_epoch for cp in (att_data.source, att_data.target)
+            ):
+                raise RuntimeError(
+                    f"Checkpoint in returned attestation data is in the future:"
+                    f"\nCurrent epoch: {current_epoch}"
+                    f"\nAttestation data: {att_data}"
+                )
 
             # Sign the attestation data
             attestations_objects_to_publish: list[
