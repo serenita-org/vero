@@ -143,14 +143,14 @@ of the connected CL or EL clients.*
 
 Defaults to the following values::
 
-| Network  | Gas Limit |
-|:---------|:----------|
-| mainnet  | 36M       |
-| gnosis   | 17M       |
-| holesky  | 36M       |
-| hoodi    | 36M       |
-| chiado   | 17M       |
-| custom   | 100M      |
+| Network  |  Gas Limit |
+|:---------|-----------:|
+| mainnet  |   36000000 |
+| gnosis   |   17000000 |
+| holesky  |   36000000 |
+| hoodi    |   36000000 |
+| chiado   |   17000000 |
+| custom   |  100000000 |
 
 ___
 
