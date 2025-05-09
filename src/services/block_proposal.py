@@ -347,9 +347,9 @@ class BlockProposalService(ValidatorDutyService):
             ):
                 graffiti = self.cli_args.graffiti
                 if self.keymanager.enabled:
-                    kmgr_graffiti_str = self.keymanager.get_graffiti(
-                        duty.pubkey
-                    ).graffiti
+                    kmgr_graffiti_str = self.keymanager.pubkey_to_graffiti_override.get(
+                        duty.pubkey, None
+                    )
                     if kmgr_graffiti_str is not None:
                         self.logger.info(
                             f"Using Keymanager-provided graffiti: {kmgr_graffiti_str}"
