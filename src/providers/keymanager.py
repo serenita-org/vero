@@ -61,8 +61,8 @@ class Keymanager(SignatureProvider):
 
         self.process_pool_executor = process_pool_executor
 
-        # We'll create this in `Keymanager.__aenter__`
-        self._exit_stack: contextlib.AsyncExitStack | None = None
+        # Create an AsyncExitStack for dynamically managed signers
+        self._exit_stack = contextlib.AsyncExitStack()
 
         if self.enabled:
             self.pubkey_to_fee_recipient_override = self._load_fee_recipient_override()
@@ -80,9 +80,6 @@ class Keymanager(SignatureProvider):
             )
 
     async def __aenter__(self) -> Self:
-        # Create an AsyncExitStack for dynamically-managed signers
-        self._exit_stack = contextlib.AsyncExitStack()
-        # Enter the stack so it's ready
         await self._exit_stack.__aenter__()
 
         await self._update_pubkey_to_remote_signer_mapping()
@@ -98,8 +95,7 @@ class Keymanager(SignatureProvider):
             self.api_task.cancel()
 
         # Let the stack close all signers in reverse order
-        if self._exit_stack is not None:
-            await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+        await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
 
     async def _update_pubkey_to_remote_signer_mapping(self) -> None:
         """
@@ -110,9 +106,6 @@ class Keymanager(SignatureProvider):
         - If another pubkey's RemoteSigner (same URL) can be reused, do so.
         - Otherwise, a new RemoteSigner is instantiated.
         """
-        if self._exit_stack is None:
-            raise RuntimeError("Keymanager._exit_stack not set!")
-
         # Fetch all (pubkey, url) pairs from the DB
         rows = self.db.fetch_all("SELECT pubkey, url FROM keymanager_data;")
 

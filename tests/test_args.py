@@ -484,6 +484,8 @@ def test_parse_cli_args_full_set() -> None:
     parsed_args = parse_cli_args(list_of_args)
 
     for action in get_parser()._actions:
+        # Ignoring missing --enable-keymanager-api flag since it's
+        # mutually exclusive with --remote-signer-url
         if action.dest in ("help", "enable_keymanager_api"):
             continue
 

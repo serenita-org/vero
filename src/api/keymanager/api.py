@@ -54,9 +54,7 @@ async def start_server(keymanager: "Keymanager", cli_args: CLIArgs) -> None:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     logger = logging.getLogger("api.keymanager.api")
     try:
-        runner = web.AppRunner(
-            app,
-        )
+        runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(
             runner,
