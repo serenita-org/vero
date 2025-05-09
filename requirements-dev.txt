@@ -40,6 +40,7 @@ aiohttp==3.11.16 \
     --hash=sha256:fd36c119c5d6551bce374fcb5c19269638f8d09862445f85a5a48596fd59f4bb
     # via
     #   aioresponses
+    #   pytest-aiohttp
     #   vero
 aioresponses==0.7.8 \
     --hash=sha256:b73bd4400d978855e55004b23a3a84cb0f018183bcf066a85ad392800b5b9a94 \
@@ -443,11 +444,16 @@ pytest==8.3.5 \
     --hash=sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820 \
     --hash=sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845
     # via
+    #   pytest-aiohttp
     #   pytest-asyncio
     #   pytest-cov
+pytest-aiohttp==1.1.0 \
+    --hash=sha256:147de8cb164f3fc9d7196967f109ab3c0b93ea3463ab50631e56438eab7b5adc \
+    --hash=sha256:f39a11693a0dce08dd6c542d241e199dd8047a6e6596b2bcfa60d373f143456d
 pytest-asyncio==0.26.0 \
     --hash=sha256:7b51ed894f4fbea1340262bdae5135797ebbe21d8638978e35d31c6d19f72fb0 \
     --hash=sha256:c4df2a697648241ff39e7f0e4a73050b03f123f760673956cf0d72a4990e312f
+    # via pytest-aiohttp
 pytest-cov==6.1.1 \
     --hash=sha256:46935f7aaefba760e716c2ebfbe1c216240b9592966e7da99ea8292d4d3e2a0a \
     --hash=sha256:bddf29ed2d0ab6f4df17b4c55b0a657287db8684af9c42ea546b21b1041b3dde

@@ -19,23 +19,11 @@ if TYPE_CHECKING:
 from shutdown import shutdown_handler
 
 
-def prep_datadir(data_dir: Path) -> None:
-    # Write to placeholder file
-    # so datadir is not empty.
-    # The data dir is not necessary at the
-    # moment but will be used soon for
-    # another laying of slashing protection
-    # and caching.
-    with Path.open(data_dir / "vero_placeholder.yml", "w") as f:
-        f.write("placeholder")
-
-
-async def main(cli_args: CLIArgs) -> None:
+async def main(cli_args: CLIArgs, shutdown_event: asyncio.Event) -> None:
     logging.getLogger("vero-init").info(
         f"Starting vero {get_service_version()} (commit {get_service_commit()})",
     )
     check_data_dir_permissions(data_dir=Path(cli_args.data_dir))
-    prep_datadir(data_dir=Path(cli_args.data_dir))
 
     scheduler = AsyncIOScheduler(
         timezone=datetime.UTC,
@@ -49,7 +37,7 @@ async def main(cli_args: CLIArgs) -> None:
 
     validator_duty_services: list[ValidatorDutyService] = []
 
-    shutdown_event = asyncio.Event()
+    shutdown_event = shutdown_event
     task_manager = TaskManager(shutdown_event=shutdown_event)
 
     loop = asyncio.get_running_loop()
@@ -84,4 +72,4 @@ if __name__ == "__main__":
         log_level=cli_args.log_level,
     )
     log_cli_arg_values(cli_args)
-    asyncio.run(main(cli_args=cli_args))
+    asyncio.run(main(cli_args=cli_args, shutdown_event=asyncio.Event()))
