@@ -101,9 +101,7 @@ async def test_attest_to_invalid_slot(
 ) -> None:
     atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
     with pytest.raises(RuntimeError, match="Invalid slot for attestation: "):
-        await attestation_service.attest(
-            slot=beacon_chain.current_slot + slot_offset
-        )
+        await attestation_service.attest(slot=beacon_chain.current_slot + slot_offset)
 
     assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before
 

@@ -37,9 +37,7 @@ _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.reset()
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
-_PRODUCE_JOB_ID = (
-    "SyncCommitteeService.produce_sync_message_if_not_yet_produced-slot-{duty_slot}"
-)
+_PRODUCE_JOB_ID = "SyncCommitteeService.sync-message-slot-{duty_slot}"
 
 
 class SyncCommitteeService(ValidatorDutyService):

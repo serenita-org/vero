@@ -17,7 +17,6 @@ from providers import (
     MultiBeaconNode,
     RemoteSigner,
 )
-from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
     BlockProposalService,

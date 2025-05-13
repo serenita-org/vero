@@ -15,6 +15,7 @@ from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
 (_ERRORS_METRIC,) = get_shared_metrics()
+_HEAD_EVENT_TIME_METRIC = None
 
 
 def _setup_head_event_time_metric(
@@ -29,24 +30,28 @@ def _setup_head_event_time_metric(
     During the rest of the slot, a coarser approach is sufficient since
     head events received that late are not that valuable anyway.
     """
-    step_fine = 0.25  # first part:  250 ms
-    step_coarse = 1.0  # second part: 1,000 ms
+    global _HEAD_EVENT_TIME_METRIC
 
-    # Fine-grained head event timing buckets
-    ticks_fine = int(seconds_per_interval / step_fine)
-    fine_buckets = [step_fine * k for k in range(ticks_fine)]
+    if _HEAD_EVENT_TIME_METRIC is None:
+        step_fine = 0.25  # first part:  250 ms
+        step_coarse = 1.0  # second part: 1,000 ms
 
-    # Coarser tracking for the remainder of the slot
-    first_coarse = math.ceil(seconds_per_interval / step_coarse) * step_coarse
-    ticks_coarse = math.ceil((seconds_per_slot - first_coarse) / step_coarse) + 1
-    coarse_buckets = [first_coarse + step_coarse * k for k in range(ticks_coarse)]
+        # Fine-grained head event timing buckets
+        ticks_fine = int(seconds_per_interval / step_fine)
+        fine_buckets = [step_fine * k for k in range(ticks_fine)]
 
-    return Histogram(
-        "head_event_time",
-        "Time into slot at which a head event for the slot was received",
-        labelnames=["host"],
-        buckets=fine_buckets + coarse_buckets,
-    )
+        # Coarser tracking for the remainder of the slot
+        first_coarse = math.ceil(seconds_per_interval / step_coarse) * step_coarse
+        ticks_coarse = math.ceil((seconds_per_slot - first_coarse) / step_coarse) + 1
+        coarse_buckets = [first_coarse + step_coarse * k for k in range(ticks_coarse)]
+
+        _HEAD_EVENT_TIME_METRIC = Histogram(
+            "head_event_time",
+            "Time into slot at which a head event for the slot was received",
+            labelnames=["host"],
+            buckets=fine_buckets + coarse_buckets,
+        )
+    return _HEAD_EVENT_TIME_METRIC
 
 
 class EventConsumerService:
@@ -205,7 +210,7 @@ class EventConsumerService:
                 #          has already been set by the faulty node and consensus will never
                 #          be reached on its head block root!
                 #      this can be avoided by setting _last_slot_duty_started_for later on,
-                #      once consensus has been reached (or introducing a new property)
+                #      once consensus has been reached (or introducing some new logic that accounts for this case)
                 #      ... BUT we would not want to attest early to an old head if we have
                 #      already seen a head event for the current slot
                 #      ... feels like there's a tradeoff here and we can't get best of both?

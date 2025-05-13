@@ -10,7 +10,7 @@ from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import BeaconChain, MultiBeaconNode
+from providers import BeaconChain, DutyCache, MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService, ValidatorStatusTrackerService
@@ -19,7 +19,7 @@ from spec.base import SpecElectra
 from tasks import TaskManager
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def _cli_args_for_file(cli_args: CLIArgs) -> CLIArgs:
     _cli_args_for_file = deepcopy(cli_args)
     _cli_args_for_file.attestation_consensus_threshold = 2
@@ -87,6 +87,7 @@ async def multi_beacon_node_three_inited_nodes(
 async def attestation_service(
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
     beacon_chain: BeaconChain,
+    duty_cache: DutyCache,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     _cli_args_for_file: CLIArgs,
@@ -94,7 +95,7 @@ async def attestation_service(
     validator_status_tracker_service = ValidatorStatusTrackerService(
         multi_beacon_node=multi_beacon_node_three_inited_nodes,
         beacon_chain=beacon_chain,
-        remote_signer=None,  # type: ignore[arg-type]
+        signature_provider=None,  # type: ignore[arg-type]
         scheduler=scheduler,
         task_manager=task_manager,
     )
@@ -102,7 +103,9 @@ async def attestation_service(
     return AttestationService(
         multi_beacon_node=multi_beacon_node_three_inited_nodes,
         beacon_chain=beacon_chain,
-        remote_signer=None,  # type: ignore[arg-type]
+        signature_provider=None,  # type: ignore[arg-type]
+        keymanager=None,  # type: ignore[arg-type]
+        duty_cache=duty_cache,
         validator_status_tracker_service=validator_status_tracker_service,
         scheduler=scheduler,
         task_manager=task_manager,
