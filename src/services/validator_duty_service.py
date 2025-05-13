@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from enum import Enum
-from pathlib import Path
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
@@ -13,6 +12,7 @@ from prometheus_client import Histogram
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
 from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
+from providers.duty_cache import DutyCacheProvider
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
@@ -35,6 +35,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     beacon_chain: BeaconChain
     signature_provider: SignatureProvider
     keymanager: Keymanager
+    duty_cache_provider: DutyCacheProvider
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
     task_manager: TaskManager
@@ -71,6 +72,7 @@ class ValidatorDutyService:
         self.beacon_chain = kwargs["beacon_chain"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
+        self.duty_cache_provider = kwargs["duty_cache_provider"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]
@@ -99,18 +101,6 @@ class ValidatorDutyService:
         # Avoids us updating validator duties multiple times
         # at the same time
         self._update_duties_lock = asyncio.Lock()
-
-        # Cache path
-        #  We cache the validator service duties so that we can start
-        #  performing them quicker after a restart
-        #  It also saves us from re-computing selection proofs.
-        data_dir = Path(self.cli_args.data_dir)
-        self._cache_path_duties = (
-            data_dir / f"cache_{self.__class__.__name__}_duties.json"
-        )
-        self._cache_path_dependent_roots = (
-            data_dir / f"cache_{self.__class__.__name__}_dependent_roots.json"
-        )
 
     async def __aenter__(self) -> Self:
         raise NotImplementedError

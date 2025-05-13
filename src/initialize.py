@@ -16,6 +16,7 @@ from providers import (
     MultiBeaconNode,
     RemoteSigner,
 )
+from providers.duty_cache import DutyCacheProvider
 from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
@@ -198,6 +199,7 @@ async def run_services(
             beacon_chain=beacon_chain,
             signature_provider=signature_provider,
             keymanager=keymanager,
+            duty_cache_provider=DutyCacheProvider(data_dir=cli_args.data_dir),
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,
             cli_args=cli_args,
