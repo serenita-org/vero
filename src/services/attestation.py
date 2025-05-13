@@ -3,12 +3,10 @@ import contextlib
 import datetime
 import logging
 from collections import defaultdict
-from pathlib import Path
 from types import TracebackType
 from typing import Self, Unpack
 from uuid import uuid4
 
-import msgspec
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -74,23 +72,19 @@ class AttestationService(ValidatorDutyService):
 
     async def __aenter__(self) -> Self:
         try:
-            with Path.open(self._cache_path_duties, "rb") as f:
-                self.attester_duties = msgspec.json.decode(
-                    f.read(),
-                    type=dict[int, set[SchemaBeaconAPI.AttesterDutyWithSelectionProof]],
-                )
-            with Path.open(self._cache_path_dependent_roots, "rb") as f:
-                self.attester_duties_dependent_roots = msgspec.json.decode(
-                    f.read(), type=dict[int, str]
-                )
+            duties, dependent_roots = self.duty_cache_provider.load_attester_duties()
+            self.attester_duties = defaultdict(set, duties)
+            self.attester_duties_dependent_roots = dependent_roots
         except Exception as e:
             self.logger.warning(
                 f"Failed to load duties from cache: {e!r}",
                 exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
+        finally:
+            # The cached duties may be stale - call update_duties even if
+            # we loaded duties from cache
+            self.task_manager.submit_task(self.update_duties())
 
-        # We still call update_duties - the cached duties may be stale
-        self.task_manager.submit_task(self.update_duties())
         return self
 
     async def __aexit__(
@@ -100,10 +94,10 @@ class AttestationService(ValidatorDutyService):
         exc_tb: TracebackType | None,
     ) -> None:
         try:
-            with Path.open(self._cache_path_duties, "wb") as f:
-                f.write(self.json_encoder.encode(self.attester_duties))
-            with Path.open(self._cache_path_dependent_roots, "wb") as f:
-                f.write(self.json_encoder.encode(self.attester_duties_dependent_roots))
+            self.duty_cache_provider.cache_attester_duties(
+                duties=self.attester_duties,
+                dependent_roots=self.attester_duties_dependent_roots,
+            )
         except Exception as e:
             self.logger.warning(
                 f"Failed to cache duties: {e!r}",
