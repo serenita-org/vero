@@ -158,7 +158,7 @@ class SyncCommitteeService(ValidatorDutyService):
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         coroutines = [
-            self.remote_signer.sign(
+            self.signature_provider.sign(
                 message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
                     fork_info=_fork_info,
                     sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
@@ -251,7 +251,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             selection_proofs_coroutines.extend(
                 [
-                    self.remote_signer.sign(
+                    self.signature_provider.sign(
                         SchemaRemoteSigner.SyncCommitteeSelectionProofSignableMessage(
                             fork_info=_fork_info,
                             sync_aggregator_selection_data=SchemaRemoteSigner.SyncAggregatorSelectionData(
@@ -328,7 +328,7 @@ class SyncCommitteeService(ValidatorDutyService):
         identifiers: list[str],
     ) -> None:
         signed_contribution_and_proofs = []
-        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(
+        for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):

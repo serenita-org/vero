@@ -10,27 +10,38 @@ from services.sync_committee import (
     _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS,
     _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
 )
-from services.validator_duty_service import ValidatorDutyServiceOptions
 
 
-@pytest.fixture
-def sync_committee_service(
-    validator_duty_service_options: ValidatorDutyServiceOptions,
-) -> SyncCommitteeService:
-    return SyncCommitteeService(**validator_duty_service_options)
-
-
-async def test_update_duties(sync_committee_service: SyncCommitteeService) -> None:
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
+async def test_update_duties(
+    sync_committee_service: SyncCommitteeService, enable_keymanager_api: bool
+) -> None:
     # This test just checks that no exception is thrown
     assert len(sync_committee_service.sync_duties) == 0
     await sync_committee_service._update_duties()
     assert len(sync_committee_service.sync_duties) > 0
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_produce_sync_message_if_not_yet_produced(
     sync_committee_service: SyncCommitteeService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
+    enable_keymanager_api: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with a sync duty
@@ -63,10 +74,19 @@ async def test_produce_sync_message_if_not_yet_produced(
     assert sync_committee_service._last_slot_duty_completed_for == duty_slot
 
 
+@pytest.mark.parametrize(
+    "enable_keymanager_api",
+    [
+        pytest.param(False, id="signature_provider: RemoteSigner"),
+        pytest.param(True, id="signature_provider: Keymanager"),
+    ],
+    indirect=True,
+)
 async def test_aggregate_sync_messages(
     sync_committee_service: SyncCommitteeService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
+    enable_keymanager_api: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with a sync contribution duty

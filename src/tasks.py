@@ -68,3 +68,7 @@ class TaskManager:
         task: asyncio.Task[None] = asyncio.create_task(_delayed_coro(), name=name)
         task.add_done_callback(partial(self.task_done_callback))
         self._tasks.add(task)
+
+    def cancel_all(self) -> None:
+        for task in self._tasks:
+            task.cancel()

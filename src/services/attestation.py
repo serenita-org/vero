@@ -262,7 +262,7 @@ class AttestationService(ValidatorDutyService):
 
                 for coro in asyncio.as_completed(
                     [
-                        self.remote_signer.sign(
+                        self.signature_provider.sign(
                             message=SchemaRemoteSigner.AttestationSignableMessage(
                                 fork_info=_fork_info,
                                 attestation=att_data_obj
@@ -415,7 +415,7 @@ class AttestationService(ValidatorDutyService):
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         signed_aggregate_and_proofs = []
-        for msg, sig, _identifier in await self.remote_signer.sign_in_batches(  # type: ignore[misc]
+        for msg, sig, _identifier in await self.signature_provider.sign_in_batches(  # type: ignore[misc]
             messages=messages,
             identifiers=identifiers,
         ):
@@ -551,7 +551,7 @@ class AttestationService(ValidatorDutyService):
                 )
                 identifiers.append(duty.pubkey)
 
-            signatures = await self.remote_signer.sign_in_batches(
+            signatures = await self.signature_provider.sign_in_batches(
                 messages=signable_messages,
                 identifiers=identifiers,
             )

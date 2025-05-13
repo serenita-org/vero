@@ -3,17 +3,19 @@ import logging
 import sys
 from collections.abc import Sequence
 from logging import getLevelNamesMapping
+from pathlib import Path
 from urllib.parse import urlparse
 
 import msgspec
 
 from spec.configs import Network
+from spec.utils import encode_graffiti
 
 
 class CLIArgs(msgspec.Struct, kw_only=True):
     network: Network
     network_custom_config_path: str | None
-    remote_signer_url: str
+    remote_signer_url: str | None
     beacon_node_urls: list[str]
     beacon_node_urls_proposal: list[str]
     attestation_consensus_threshold: int
@@ -23,6 +25,10 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     gas_limit: int
     use_external_builder: bool
     builder_boost_factor: int
+    enable_keymanager_api: bool
+    keymanager_api_token_file_path: Path
+    keymanager_api_address: str
+    keymanager_api_port: int
     metrics_address: str
     metrics_port: int
     metrics_multiprocess_mode: bool
@@ -84,17 +90,6 @@ def _process_fee_recipient(input_string: str) -> str:
         return input_string
 
 
-def _process_graffiti(graffiti: str) -> bytes:
-    _graffiti_max_bytes = 32
-
-    encoded = graffiti.encode("utf-8").ljust(_graffiti_max_bytes, b"\x00")
-    if len(encoded) > _graffiti_max_bytes:
-        raise ValueError(
-            f"Encoded graffiti exceeds the maximum length of {_graffiti_max_bytes} bytes"
-        )
-    return encoded
-
-
 def _process_gas_limit(input_value: int | None, network: Network) -> int:
     if input_value is not None:
         return input_value
@@ -133,6 +128,10 @@ def log_cli_arg_values(validated_args: CLIArgs) -> None:
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Vero validator client.")
 
+    mutually_exclusive_group_key_source = parser.add_mutually_exclusive_group(
+        required=True
+    )
+
     _network_choices = [e.value for e in list(Network) if e != Network._TESTS]  # noqa: SLF001
     parser.add_argument(
         "--network",
@@ -148,8 +147,11 @@ def get_parser() -> argparse.ArgumentParser:
         default=None,
         help="Path to a custom network configuration file from which to load the network specs.",
     )
-    parser.add_argument(
-        "--remote-signer-url", type=str, required=True, help="URL of the remote signer."
+    mutually_exclusive_group_key_source.add_argument(
+        "--remote-signer-url",
+        type=str,
+        required=False,
+        help="URL of the remote signer.",
     )
     parser.add_argument(
         "--beacon-node-urls",
@@ -209,6 +211,32 @@ def get_parser() -> argparse.ArgumentParser:
         required=False,
         default=90,
         help="A percentage multiplier applied to externally built blocks when comparing their value to locally built blocks. The externally built block is only chosen if its value, post-multiplication, is higher than the locally built block's value. Defaults to 90.",
+    )
+    mutually_exclusive_group_key_source.add_argument(
+        "--enable-keymanager-api",
+        action="store_true",
+        help="Enables the Keymanager API.",
+    )
+    parser.add_argument(
+        "--keymanager-api-token-file-path",
+        type=str,
+        required=False,
+        default=None,
+        help="Path to a file containing the bearer token used for Keymanager API authentication. If none is provided, a file called 'keymanager-api-token.txt' will be created in Vero's data directory.",
+    )
+    parser.add_argument(
+        "--keymanager-api-address",
+        type=str,
+        required=False,
+        default="localhost",
+        help="The Keymanager API server listen address. Defaults to localhost.",
+    )
+    parser.add_argument(
+        "--keymanager-api-port",
+        type=int,
+        required=False,
+        default=8001,
+        help="The Keymanager API server port number. Defaults to 8001.",
     )
     parser.add_argument(
         "--metrics-address",
@@ -282,10 +310,17 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             parser.error("Proposal beacon node URLs must have unique hostnames.")
         network = Network(parsed_args.network)
 
+        keymanager_api_token_file_path = (
+            parsed_args.keymanager_api_token_file_path
+            or Path(parsed_args.data_dir) / "keymanager-api-token.txt"
+        )
+
         validated_args = CLIArgs(
             network=network,
             network_custom_config_path=parsed_args.network_custom_config_path,
-            remote_signer_url=_validate_url(parsed_args.remote_signer_url),
+            remote_signer_url=_validate_url(parsed_args.remote_signer_url)
+            if parsed_args.remote_signer_url is not None
+            else None,
             beacon_node_urls=beacon_node_urls,
             beacon_node_urls_proposal=beacon_node_urls_proposal,
             attestation_consensus_threshold=_process_attestation_consensus_threshold(
@@ -294,12 +329,16 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             ),
             fee_recipient=_process_fee_recipient(parsed_args.fee_recipient),
             data_dir=parsed_args.data_dir,
-            graffiti=_process_graffiti(parsed_args.graffiti),
+            graffiti=encode_graffiti(parsed_args.graffiti),
             gas_limit=_process_gas_limit(
                 input_value=parsed_args.gas_limit, network=network
             ),
             use_external_builder=parsed_args.use_external_builder,
             builder_boost_factor=parsed_args.builder_boost_factor,
+            enable_keymanager_api=parsed_args.enable_keymanager_api,
+            keymanager_api_token_file_path=Path(keymanager_api_token_file_path),
+            keymanager_api_address=parsed_args.keymanager_api_address,
+            keymanager_api_port=parsed_args.keymanager_api_port,
             metrics_address=parsed_args.metrics_address,
             metrics_port=parsed_args.metrics_port,
             metrics_multiprocess_mode=parsed_args.metrics_multiprocess_mode,
