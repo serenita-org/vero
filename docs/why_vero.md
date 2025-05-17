@@ -123,13 +123,13 @@ validator client implementation you were using before -
 - Only attests if a majority of them agrees on the attestation data.
 - Can tolerate a minority of beacon nodes going offline.
 
-||Attestation consensus|
-|-|-|
-| Traditional VC | ❌ |
-| DVT - Charon | ✅ |
-| DVT - SSV | ✅ |
-| Vouch | ✅ (majority attestation strategy) |
-| Vero | ✅ |
+|                | Attestation consensus             |
+|----------------|-----------------------------------|
+| Traditional VC | ❌                                 |
+| DVT - Charon   | ✅                                 |
+| DVT - SSV      | ✅                                 |
+| Vouch          | ✅ (majority attestation strategy) |
+| Vero           | ✅                                 |
 
 ### Slashing detection
 
@@ -137,13 +137,13 @@ Monitors slashing events on the network and immediately stops
 performing validator duties as soon as any of the locally managed
 validators get slashed.
 
-||Slashing detection|
-|-|-|
-| Traditional VC | ❌ |
-| DVT - Charon | ❌ |
-| DVT - SSV | ❌ |
-| Vouch | ❌ |
-| Vero | ✅ |
+|                | Slashing detection |
+|----------------|--------------------|
+| Traditional VC | 🟠 (only Teku)     |
+| DVT - Charon   | ❌                  |
+| DVT - SSV      | ❌                  |
+| Vouch          | ❌                  |
+| Vero           | ✅                  |
 
 ### Ethereum remote signing API
 
@@ -155,13 +155,13 @@ to switch to without any slashing risk (the slashing protection data
 stays in-place). In case you end up not liking Vero, you can switch
 back just as easily.
 
-||Ethereum remote signing API|
-|-|-|
-| Traditional VC | ✅ |
-| DVT - Charon | ✅ |
-| DVT - SSV | ❌ |
-| Vouch | ❌ |
-| Vero | ✅ |
+|                | Ethereum remote signing API |
+|----------------|-----------------------------|
+| Traditional VC | ✅                           |
+| DVT - Charon   | ✅                           |
+| DVT - SSV      | ❌                           |
+| Vouch          | ❌                           |
+| Vero           | ✅                           |
 
 ### Gnosis Chain support
 
@@ -174,13 +174,13 @@ run Nethermind and Erigon side-by-side and only attest if both of the
 implementations agree. That way you never risk getting stuck on a buggy
 supermajority chain!
 
-||Gnosis Chain support|
-|-|-|
-| Traditional VC | ✅ (most of them) |
-| DVT - Charon | ❓ |
-| DVT - SSV | ❌ |
-| Vouch | ❌ |
-| Vero | ✅ |
+|                | Gnosis Chain support |
+|----------------|----------------------|
+| Traditional VC | ✅ (most of them)     |
+| DVT - Charon   | ❓                    |
+| DVT - SSV      | ❌                    |
+| Vouch          | ❌                    |
+| Vero           | ✅                    |
 
 ### Open Source
 
@@ -188,10 +188,10 @@ Vero is completely open-source without any strings attached. It is released
 as a public good to strengthen the Ethereum network and improve the client
 diversity situation.
 
-||Open Source|
-|-|-|
-| Traditional VC | ✅ |
-| DVT - Charon | ❌ |
-| DVT - SSV | ✅ |
-| Vouch | ✅ |
-| Vero | ✅ |
+|                | Open Source |
+|----------------|-------------|
+| Traditional VC | ✅           |
+| DVT - Charon   | ❌           |
+| DVT - SSV      | ✅           |
+| Vouch          | ✅           |
+| Vero           | ✅           |
