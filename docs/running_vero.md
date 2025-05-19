@@ -71,8 +71,7 @@ If provided, Vero automatically handles duties for all validator keys
 present on the remote signer.
 
 _Note: This flag is mutually exclusive with `--enable-keymanager-api`.
-One of these flags must be provided to server as a source of validator
-keys._
+One of the two must be specified as the validator key source._
 ___
 
 #### `--beacon-node-urls`
@@ -153,6 +152,8 @@ ___
 The gas limit value to pass on to external block builders
 during validator registrations.
 
+Can be set individually for each validator through the Keymanager API.
+
 *Note: this does not affect the gas limit value
 of the connected CL or EL clients.*
 
@@ -166,8 +167,6 @@ Defaults to the following values::
 | hoodi    |   36000000 |
 | chiado   |   17000000 |
 | custom   |  100000000 |
-
-Can be set individually for each validator through the Keymanager API.
 ___
 
 #### `--use-external-builder`
@@ -190,14 +189,13 @@ ___
 Enables the Keymanager API.
 
 _Note: This flag is mutually exclusive with `--remote-signer-url`.
-One of these flags must be provided to server as a source of validator
-keys._
+One of the two must be specified as the validator key source._
 ___
 
 #### `--keymanager-api-token-file-path`
 
 Path to a file containing the bearer token used for Keymanager API
-authentication. If none is provided, a file called
+authentication. If no path is provided, a file called
 `keymanager-api-token.txt` will be created in Vero's data directory.
 
 ___
