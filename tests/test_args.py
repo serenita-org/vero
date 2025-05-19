@@ -320,7 +320,7 @@ from spec.configs import Network
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
             None,
-            {"gas_limit": 36_000_000},
+            {"gas_limit": 60_000_000},
             [],
             id="--gas-limit default value Hoodi testnet",
         ),
