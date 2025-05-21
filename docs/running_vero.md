@@ -159,14 +159,14 @@ of the connected CL or EL clients.*
 
 Defaults to the following values::
 
-| Network  |  Gas Limit |
-|:---------|-----------:|
-| mainnet  |   36000000 |
-| gnosis   |   17000000 |
-| holesky  |   36000000 |
-| hoodi    |   36000000 |
-| chiado   |   17000000 |
-| custom   |  100000000 |
+| Network  | Gas Limit |
+|:---------|----------:|
+| mainnet  |  36000000 |
+| gnosis   |  17000000 |
+| holesky  |  36000000 |
+| hoodi    |  60000000 |
+| chiado   |  17000000 |
+| custom   | 100000000 |
 ___
 
 #### `--use-external-builder`
