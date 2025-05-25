@@ -527,7 +527,7 @@ class AttestationService(ValidatorDutyService):
             f"Published aggregate and proofs for slot {att_data.slot}, count: {aggregate_count}",
         )
 
-    async def _prep_and_schedule_duties(
+    async def _get_duties_with_selection_proofs(
         self, duties: list[SchemaBeaconAPI.AttesterDuty]
     ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
         if len(duties) == 0:
@@ -595,12 +595,11 @@ class AttestationService(ValidatorDutyService):
             for duty in duties_with_proofs
         ]
 
-        if len(beacon_committee_subscriptions_data) > 0:
-            self.task_manager.submit_task(
-                self.multi_beacon_node.prepare_beacon_committee_subscriptions(
-                    data=beacon_committee_subscriptions_data,
-                ),
-            )
+        self.task_manager.submit_task(
+            self.multi_beacon_node.prepare_beacon_committee_subscriptions(
+                data=beacon_committee_subscriptions_data,
+            ),
+        )
 
         return duties_with_proofs
 
@@ -636,6 +635,9 @@ class AttestationService(ValidatorDutyService):
                 epoch=epoch,
                 indices=_validator_indices,
             )
+            self.logger.debug(
+                f"Dependent root for attester duties for epoch {epoch} - {response.dependent_root}",
+            )
 
             if response.dependent_root == self.attester_duties_dependent_roots.get(
                 epoch,
@@ -647,17 +649,12 @@ class AttestationService(ValidatorDutyService):
                 )
                 continue
 
-            self.attester_duties_dependent_roots[epoch] = response.dependent_root
-            self.logger.debug(
-                f"Dependent root for attester duties for epoch {epoch} - {response.dependent_root}",
-            )
             self.attester_duties[epoch] = set()
 
-            # For large amounts of validators, the `_prep_and_schedule_duties`
-            # can take quite a while since aggregation duty selection proofs
-            # are computed in there.
-            # Run `_prep_and_schedule_duties` for the next couple of slots first,
-            # and only worry about the rest of the duties once we are ready to
+            # For large amounts of validators, the `_get_duties_with_selection_proofs`
+            # can take quite a while.
+            # Run `_get_duties_with_selection_proofs` for the next couple of slots
+            # first, and only worry about the rest of the duties once we are ready to
             # perform the duties that are due soon.
             current_slot = self.beacon_chain.current_slot
             duties_due_soon = []
@@ -673,7 +670,7 @@ class AttestationService(ValidatorDutyService):
                     duties_due_later.append(duty)
 
             for list_of_duties in (duties_due_soon, duties_due_later):
-                for duty_with_proof in await self._prep_and_schedule_duties(
+                for duty_with_proof in await self._get_duties_with_selection_proofs(
                     duties=list_of_duties,
                 ):
                     self.attester_duties[epoch].add(duty_with_proof)
@@ -681,5 +678,11 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])} duties",
             )
+
+            # Only set the dependent root value once all duties for the epoch have been
+            # successfully added. That way, if something fails while getting the
+            # selection proofs, another attempt will be made later thanks to the
+            # retry mechanism in `ValidatorDutyService.update_duties`
+            self.attester_duties_dependent_roots[epoch] = response.dependent_root
 
         self._prune_duties()
