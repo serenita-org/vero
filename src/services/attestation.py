@@ -279,18 +279,15 @@ class AttestationService(ValidatorDutyService):
 
                     duty = pubkey_to_duty[pubkey]
 
-                    if _fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-                        # SingleAttestation object from the CL spec
-                        attestations_objects_to_publish.append(
-                            SchemaBeaconAPI.SingleAttestation(
-                                committee_index=duty.committee_index,
-                                attester_index=duty.validator_index,
-                                data=att_data_obj,
-                                signature=signature,
-                            ),
-                        )
-                    else:
-                        raise NotImplementedError
+                    # SingleAttestation object from the CL spec
+                    attestations_objects_to_publish.append(
+                        SchemaBeaconAPI.SingleAttestation(
+                            committee_index=duty.committee_index,
+                            attester_index=duty.validator_index,
+                            data=att_data_obj,
+                            signature=signature,
+                        ),
+                    )
 
             # Add the aggregation duty to the schedule *before*
             # publishing attestations so that any delays in publishing
