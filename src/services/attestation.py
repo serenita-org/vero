@@ -72,7 +72,7 @@ class AttestationService(ValidatorDutyService):
 
     async def __aenter__(self) -> Self:
         try:
-            duties, dependent_roots = self.duty_cache_provider.load_attester_duties()
+            duties, dependent_roots = self.duty_cache.load_attester_duties()
             self.attester_duties = defaultdict(set, duties)
             self.attester_duties_dependent_roots = dependent_roots
         except Exception as e:
@@ -94,7 +94,7 @@ class AttestationService(ValidatorDutyService):
         exc_tb: TracebackType | None,
     ) -> None:
         try:
-            self.duty_cache_provider.cache_attester_duties(
+            self.duty_cache.cache_attester_duties(
                 duties=self.attester_duties,
                 dependent_roots=self.attester_duties_dependent_roots,
             )

@@ -21,8 +21,8 @@ from providers import (
     Keymanager,
     DB,
     SignatureProvider,
+    DutyCache,
 )
-from providers.duty_cache import DutyCacheProvider
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
@@ -239,8 +239,8 @@ async def keymanager(
 
 
 @pytest.fixture
-def duty_cache_provider(cli_args: CLIArgs) -> DutyCacheProvider:
-    return DutyCacheProvider(data_dir=cli_args.data_dir)
+def duty_cache(cli_args: CLIArgs) -> DutyCache:
+    return DutyCache(data_dir=cli_args.data_dir)
 
 
 @pytest.fixture

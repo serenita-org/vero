@@ -11,8 +11,13 @@ from prometheus_client import Histogram
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
-from providers.duty_cache import DutyCacheProvider
+from providers import (
+    BeaconChain,
+    DutyCache,
+    Keymanager,
+    MultiBeaconNode,
+    SignatureProvider,
+)
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
@@ -35,7 +40,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     beacon_chain: BeaconChain
     signature_provider: SignatureProvider
     keymanager: Keymanager
-    duty_cache_provider: DutyCacheProvider
+    duty_cache: DutyCache
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
     task_manager: TaskManager
@@ -72,7 +77,7 @@ class ValidatorDutyService:
         self.beacon_chain = kwargs["beacon_chain"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
-        self.duty_cache_provider = kwargs["duty_cache_provider"]
+        self.duty_cache = kwargs["duty_cache"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]

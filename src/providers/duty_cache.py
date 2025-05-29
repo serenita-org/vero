@@ -20,7 +20,7 @@ def _save_bytes_to_fp(bytes_: bytes, fp: Path) -> None:
         f.write(bytes_)
 
 
-class DutyCacheProvider:
+class DutyCache:
     attester_duties_fname = "cache_attester_duties.json"
     attester_dep_roots_fname = "cache_attester_dependent_roots.json"
     proposer_duties_fname = "cache_proposer_duties.json"
