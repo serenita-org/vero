@@ -33,7 +33,6 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
 @pytest.mark.parametrize(
     "fork_version",
     [
-        pytest.param(ForkVersion.DENEB, id="Deneb"),
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
     ],
     indirect=True,
@@ -112,7 +111,6 @@ async def test_attest_to_invalid_slot(
 @pytest.mark.parametrize(
     "fork_version",
     [
-        pytest.param(ForkVersion.DENEB, id="Deneb"),
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
     ],
     indirect=True,

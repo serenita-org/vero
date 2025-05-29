@@ -262,7 +262,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.DenebBlockContents | SpecBeaconBlock.DenebBlindedBlock | SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
+    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -279,11 +279,6 @@ class MultiBeaconNode:
         )
 
         block_map = {
-            SchemaBeaconAPI.ForkVersion.DENEB: (
-                SpecBeaconBlock.DenebBlindedBlock
-                if response.execution_payload_blinded
-                else SpecBeaconBlock.DenebBlockContents
-            ),
             SchemaBeaconAPI.ForkVersion.ELECTRA: (
                 SpecBeaconBlock.ElectraBlindedBlock
                 if response.execution_payload_blinded
@@ -692,16 +687,11 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_index: int,
-        fork_version: SchemaBeaconAPI.ForkVersion,
-    ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
+    ) -> "SpecAttestation.AttestationElectra":
         _att_data = attestation_data.copy()
-        if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
-            _att_data.index = committee_index
-
-        aggregates: (
-            list[SpecAttestation.AttestationPhase0]
-            | list[SpecAttestation.AttestationElectra]
-        ) = await self._get_all_beacon_node_responses(
+        aggregates: list[
+            SpecAttestation.AttestationElectra
+        ] = await self._get_all_beacon_node_responses(
             func_name="get_aggregate_attestation_v2",
             attestation_data=_att_data,
             committee_index=committee_index,
@@ -728,15 +718,11 @@ class MultiBeaconNode:
         self,
         attestation_data: AttestationData,
         committee_indices: set[int],
-        fork_version: SchemaBeaconAPI.ForkVersion,
-    ) -> AsyncIterator[
-        "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra"
-    ]:
+    ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
         tasks = [
             self.get_aggregate_attestation_v2(
                 attestation_data=attestation_data,
                 committee_index=committee_index,
-                fork_version=fork_version,
             )
             for committee_index in committee_indices
         ]

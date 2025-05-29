@@ -38,7 +38,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -54,7 +54,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -70,7 +70,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(120),
                                 consensus_block_value=str(50),
@@ -92,7 +92,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -108,7 +108,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -140,7 +140,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -218,7 +218,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -234,7 +234,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(200),
                                 consensus_block_value=str(50),
@@ -250,7 +250,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV3Response(
-                                version=SchemaBeaconAPI.ForkVersion.DENEB,
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(1000),
                                 consensus_block_value=str(500),

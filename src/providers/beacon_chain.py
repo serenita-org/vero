@@ -43,12 +43,6 @@ class BeaconChain:
         self.MAX_COMMITTEES_PER_SLOT = int(spec.MAX_COMMITTEES_PER_SLOT)
         self.SYNC_COMMITTEE_SIZE = int(spec.SYNC_COMMITTEE_SIZE)
 
-        self.DENEB_FORK_EPOCH = int(spec.DENEB_FORK_EPOCH)
-        self.DENEB_FORK = SchemaRemoteSigner.Fork(
-            previous_version=spec.CAPELLA_FORK_VERSION.to_obj(),
-            current_version=spec.DENEB_FORK_VERSION.to_obj(),
-            epoch=str(self.DENEB_FORK_EPOCH),
-        )
         self.ELECTRA_FORK_EPOCH = int(spec.ELECTRA_FORK_EPOCH)
         self.ELECTRA_FORK = SchemaRemoteSigner.Fork(
             previous_version=spec.DENEB_FORK_VERSION.to_obj(),
@@ -72,8 +66,6 @@ class BeaconChain:
 
         if slot_epoch >= self.ELECTRA_FORK_EPOCH:
             return self.ELECTRA_FORK
-        if slot_epoch >= self.DENEB_FORK_EPOCH:
-            return self.DENEB_FORK
         raise NotImplementedError(f"Unsupported fork for epoch {self.current_epoch}")
 
     def get_fork_info(self, slot: int) -> SchemaRemoteSigner.ForkInfo:

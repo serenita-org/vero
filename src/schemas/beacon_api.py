@@ -57,12 +57,6 @@ class ForkVersion(Enum):
     ELECTRA = "electra"
 
 
-class AttestationPhase0(msgspec.Struct):
-    aggregation_bits: str
-    data: dict  # type: ignore[type-arg]
-    signature: str
-
-
 class SingleAttestation(msgspec.Struct):
     committee_index: str
     attester_index: str
