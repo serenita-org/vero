@@ -54,7 +54,7 @@ class SyncCommitteeService(ValidatorDutyService):
 
     async def __aenter__(self) -> Self:
         try:
-            duties = self.duty_cache_provider.load_sync_duties()
+            duties = self.duty_cache.load_sync_duties()
             self.sync_duties = defaultdict(list, duties)
         except Exception as e:
             self.logger.warning(
@@ -75,7 +75,7 @@ class SyncCommitteeService(ValidatorDutyService):
         exc_tb: TracebackType | None,
     ) -> None:
         try:
-            self.duty_cache_provider.cache_sync_duties(duties=self.sync_duties)
+            self.duty_cache.cache_sync_duties(duties=self.sync_duties)
         except Exception as e:
             self.logger.warning(
                 f"Failed to cache duties: {e!r}",

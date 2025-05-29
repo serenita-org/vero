@@ -44,7 +44,7 @@ class BlockProposalService(ValidatorDutyService):
 
     async def __aenter__(self) -> Self:
         try:
-            duties, dependent_roots = self.duty_cache_provider.load_proposer_duties()
+            duties, dependent_roots = self.duty_cache.load_proposer_duties()
             self.proposer_duties = defaultdict(set, duties)
             self.proposer_duties_dependent_roots = dependent_roots
         except Exception as e:
@@ -67,7 +67,7 @@ class BlockProposalService(ValidatorDutyService):
         exc_tb: TracebackType | None,
     ) -> None:
         try:
-            self.duty_cache_provider.cache_proposer_duties(
+            self.duty_cache.cache_proposer_duties(
                 duties=self.proposer_duties,
                 dependent_roots=self.proposer_duties_dependent_roots,
             )

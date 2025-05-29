@@ -2,8 +2,13 @@ import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
-from providers.duty_cache import DutyCacheProvider
+from providers import (
+    BeaconChain,
+    DutyCache,
+    Keymanager,
+    MultiBeaconNode,
+    SignatureProvider,
+)
 from services import (
     AttestationService,
     BlockProposalService,
@@ -20,7 +25,7 @@ def validator_duty_service_options(
     beacon_chain: BeaconChain,
     signature_provider: SignatureProvider,
     keymanager: Keymanager,
-    duty_cache_provider: DutyCacheProvider,
+    duty_cache: DutyCache,
     validator_status_tracker: ValidatorStatusTrackerService,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
@@ -31,7 +36,7 @@ def validator_duty_service_options(
         beacon_chain=beacon_chain,
         signature_provider=signature_provider,
         keymanager=keymanager,
-        duty_cache_provider=duty_cache_provider,
+        duty_cache=duty_cache,
         validator_status_tracker_service=validator_status_tracker,
         scheduler=scheduler,
         task_manager=task_manager,
