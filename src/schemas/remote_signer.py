@@ -82,7 +82,6 @@ class BeaconBlockHeader(msgspec.Struct):
 
 
 class BeaconBlockVersion(Enum):
-    DENEB = "DENEB"
     ELECTRA = "ELECTRA"
 
 

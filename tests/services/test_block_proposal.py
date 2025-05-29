@@ -84,7 +84,6 @@ async def test_register_validators(
 @pytest.mark.parametrize(
     "fork_version",
     [
-        pytest.param(ForkVersion.DENEB, id="Deneb"),
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
     ],
     indirect=True,

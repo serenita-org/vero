@@ -137,12 +137,6 @@ class KZGProof(Bytes48):
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecBeaconBlock:
-    DenebBlockSigned: Container
-    DenebBlockContents: Container
-    DenebBlockContentsSigned: Container
-    DenebBlindedBlock: Container
-    DenebBlindedBlockSigned: Container
-
     ElectraBlockSigned: Container
     ElectraBlockContents: Container
     ElectraBlockContentsSigned: Container
@@ -154,15 +148,6 @@ class SpecBeaconBlock:
         cls,
         spec: SpecElectra,
     ) -> None:
-        class IndexedAttestationPhase0(Container):
-            attesting_indices: List[ValidatorIndex, spec.MAX_VALIDATORS_PER_COMMITTEE]
-            data: AttestationData
-            signature: BLSSignature
-
-        class AttesterSlashingPhase0(Container):
-            attestation_1: IndexedAttestationPhase0
-            attestation_2: IndexedAttestationPhase0
-
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
             sync_committee_signature: BLSSignature
@@ -211,63 +196,6 @@ class SpecBeaconBlock:
             withdrawals: List[Withdrawal, spec.MAX_WITHDRAWALS_PER_PAYLOAD]
             blob_gas_used: UInt64SerializedAsString  # [New in Deneb:EIP4844]
             excess_blob_gas: UInt64SerializedAsString  # [New in Deneb:EIP4844]
-
-        class BeaconBlockBodyDeneb(Container):
-            randao_reveal: BLSSignature
-            eth1_data: Eth1Data  # Eth1 data vote
-            graffiti: Bytes32  # Arbitrary data
-            # Operations
-            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[
-                AttesterSlashingPhase0, spec.MAX_ATTESTER_SLASHINGS
-            ]
-            attestations: List[SpecAttestation.AttestationPhase0, spec.MAX_ATTESTATIONS]
-            deposits: List[Deposit, spec.MAX_DEPOSITS]
-            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
-            sync_aggregate: SyncAggregate  # [New in Altair]
-            # Execution
-            execution_payload: (
-                ExecutionPayloadV3  # [New in Bellatrix, Modified in Deneb:EIP4844]
-            )
-            # Capella operations
-            bls_to_execution_changes: List[
-                SignedBLSToExecutionChange,
-                spec.MAX_BLS_TO_EXECUTION_CHANGES,
-            ]  # [New in Capella]
-            # Deneb
-            blob_kzg_commitments: List[
-                KZGCommitment,
-                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
-            ]  # [New in Deneb:EIP4844]
-
-        class BlindedBeaconBlockBodyDeneb(Container):
-            randao_reveal: BLSSignature
-            eth1_data: Eth1Data  # Eth1 data vote
-            graffiti: Bytes32  # Arbitrary data
-            # Operations
-            proposer_slashings: List[ProposerSlashing, spec.MAX_PROPOSER_SLASHINGS]
-            attester_slashings: List[
-                AttesterSlashingPhase0, spec.MAX_ATTESTER_SLASHINGS
-            ]
-            attestations: List[SpecAttestation.AttestationPhase0, spec.MAX_ATTESTATIONS]
-            deposits: List[Deposit, spec.MAX_DEPOSITS]
-            voluntary_exits: List[SignedVoluntaryExit, spec.MAX_VOLUNTARY_EXITS]
-            sync_aggregate: SyncAggregate  # [New in Altair]
-            # Execution
-            execution_payload_header: (
-                ExecutionPayloadV3Header
-                # [New in Bellatrix, Modified in Deneb:EIP4844]
-            )
-            # Capella operations
-            bls_to_execution_changes: List[
-                SignedBLSToExecutionChange,
-                spec.MAX_BLS_TO_EXECUTION_CHANGES,
-            ]  # [New in Capella]
-            # Deneb
-            blob_kzg_commitments: List[
-                KZGCommitment,
-                spec.MAX_BLOB_COMMITMENTS_PER_BLOCK,
-            ]  # [New in Deneb:EIP4844]
 
         class IndexedAttestationElectra(Container):
             attesting_indices: List[
@@ -355,40 +283,8 @@ class SpecBeaconBlock:
             # Electra
             execution_requests: ExecutionRequests  # [New in Electra]
 
-        class BeaconBlockDeneb(Container):
-            slot: Slot
-            proposer_index: ValidatorIndex
-            parent_root: Root
-            state_root: Root
-            body: BeaconBlockBodyDeneb
-
         class Blob(ByteVector[BYTES_PER_FIELD_ELEMENT * spec.FIELD_ELEMENTS_PER_BLOB]):  # type: ignore[misc]
             pass
-
-        class BlockContentsDeneb(Container):
-            block: BeaconBlockDeneb
-            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
-            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
-
-        class SignedBeaconBlockDeneb(Container):
-            message: BeaconBlockDeneb
-            signature: BLSSignature
-
-        class SignedBlockContentsDeneb(Container):
-            signed_block: SignedBeaconBlockDeneb
-            kzg_proofs: List[KZGProof, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
-            blobs: List[Blob, spec.MAX_BLOB_COMMITMENTS_PER_BLOCK]
-
-        class BlindedBeaconBlockDeneb(Container):
-            slot: Slot
-            proposer_index: ValidatorIndex
-            parent_root: Root
-            state_root: Root
-            body: BlindedBeaconBlockBodyDeneb
-
-        class SignedBlindedBeaconBlockDeneb(Container):
-            message: BlindedBeaconBlockDeneb
-            signature: BLSSignature
 
         class BeaconBlockElectra(Container):
             slot: Slot
@@ -421,12 +317,6 @@ class SpecBeaconBlock:
         class SignedBlindedBeaconBlockElectra(Container):
             message: BlindedBeaconBlockElectra
             signature: BLSSignature
-
-        cls.DenebBlockSigned = SignedBeaconBlockDeneb
-        cls.DenebBlockContents = BlockContentsDeneb
-        cls.DenebBlockContentsSigned = SignedBlockContentsDeneb
-        cls.DenebBlindedBlock = BlindedBeaconBlockDeneb
-        cls.DenebBlindedBlockSigned = SignedBlindedBeaconBlockDeneb
 
         cls.ElectraBlockSigned = SignedBeaconBlockElectra
         cls.ElectraBlockContents = BlockContentsElectra
