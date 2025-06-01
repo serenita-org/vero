@@ -69,9 +69,9 @@ def cli_args(
         attestation_consensus_threshold=_process_attestation_consensus_threshold(
             None, [beacon_node_url]
         ),
-        fee_recipient="0x0000000000000000000000000000000000000000",
+        fee_recipient="0xfee0000000000000000000000000000000000000",
         data_dir=str(tmp_path),
-        graffiti=b"pytest",
+        graffiti=b"graffiti-in-pytest",
         gas_limit=30_000_000,
         use_external_builder=False,
         builder_boost_factor=90,

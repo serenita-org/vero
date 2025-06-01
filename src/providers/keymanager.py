@@ -25,6 +25,7 @@ from schemas.keymanager_api import (
     ValidatorGraffiti,
     VoluntaryExit,
 )
+from spec.utils import decode_graffiti
 
 from .beacon_chain import BeaconChain
 from .db.db import DB
@@ -52,6 +53,7 @@ class Keymanager(SignatureProvider):
         self.db = db
         self.beacon_chain = beacon_chain
         self.multi_beacon_node = multi_beacon_node
+        self.cli_args = cli_args
 
         self.enabled = cli_args.enable_keymanager_api
         self.pubkey_to_remote_signer: dict[str, RemoteSigner] = {}
@@ -176,7 +178,10 @@ class Keymanager(SignatureProvider):
         if res is None:
             raise PubkeyNotFound(pubkey)
 
-        return ValidatorFeeRecipient(pubkey=pubkey, ethaddress=res[0])
+        # If the fee recipient value was not overridden, return
+        # the default fee recipient
+        address = res[0] or self.cli_args.fee_recipient
+        return ValidatorFeeRecipient(pubkey=pubkey, ethaddress=address)
 
     def set_fee_recipient(self, pubkey: Pubkey, fee_recipient: EthAddress) -> None:
         _, rowcount = self.db.fetch_one(
@@ -204,7 +209,10 @@ class Keymanager(SignatureProvider):
         if res is None:
             raise PubkeyNotFound(pubkey)
 
-        return ValidatorGasLimit(pubkey=pubkey, gas_limit=res[0])
+        # If the gas limit value was not overridden, return
+        # the default gas limit
+        gas_limit = res[0] or str(self.cli_args.gas_limit)
+        return ValidatorGasLimit(pubkey=pubkey, gas_limit=gas_limit)
 
     def set_gas_limit(self, pubkey: Pubkey, gas_limit: UInt64String) -> None:
         _, rowcount = self.db.fetch_one(
@@ -232,7 +240,8 @@ class Keymanager(SignatureProvider):
         if res is None:
             raise PubkeyNotFound(pubkey)
 
-        return ValidatorGraffiti(pubkey=pubkey, graffiti=res[0])
+        graffiti = res[0] or decode_graffiti(self.cli_args.graffiti)
+        return ValidatorGraffiti(pubkey=pubkey, graffiti=graffiti)
 
     def set_graffiti(self, pubkey: Pubkey, graffiti: str) -> None:
         _, rowcount = self.db.fetch_one(

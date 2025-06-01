@@ -36,7 +36,7 @@ def _get_bearer_token_value(cli_args: CLIArgs) -> str:
 
 
 def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
-    app = web.Application(middlewares=[bearer_authentication, exception_handler])
+    app = web.Application(middlewares=[exception_handler, bearer_authentication])
 
     app["bearer_token"] = _get_bearer_token_value(cli_args=cli_args)
     app["keymanager"] = keymanager

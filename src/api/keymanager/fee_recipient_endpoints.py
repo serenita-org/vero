@@ -35,6 +35,11 @@ async def fee_recipient_post(request: web.Request) -> web.Response:
         type=SchemaKeymanagerAPI.SetFeeRecipientRequest,
     )
 
+    if request_data.ethaddress == "0x0000000000000000000000000000000000000000":
+        raise web.HTTPBadRequest(
+            reason="Cannot specify the 0x00 fee recipient address through the API."
+        )
+
     pubkey = request.match_info["pubkey"]
     keymanager: Keymanager = request.app["keymanager"]
 

@@ -32,7 +32,9 @@ async def test_graffiti_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.GraffitiResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.graffiti is None
+    # We return the default graffiti value provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.graffiti == "graffiti-in-pytest"
     assert keymanager.pubkey_to_graffiti_override.get(pubkey) is None
 
     # Set its graffiti
@@ -68,7 +70,9 @@ async def test_graffiti_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.GraffitiResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.graffiti is None
+    # We return the default graffiti value provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.graffiti == "graffiti-in-pytest"
     assert keymanager.pubkey_to_graffiti_override.get(pubkey) is None
 
 
