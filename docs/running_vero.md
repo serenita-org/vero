@@ -161,7 +161,7 @@ Defaults to the following values::
 
 | Network  | Gas Limit |
 |:---------|----------:|
-| mainnet  |  36000000 |
+| mainnet  |  60000000 |
 | gnosis   |  17000000 |
 | holesky  |  36000000 |
 | hoodi    |  60000000 |
