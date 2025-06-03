@@ -33,7 +33,9 @@ async def test_fee_recipient_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.ListFeeRecipientResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.ethaddress is None
+    # We return the default fee recipient provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.ethaddress == "0xfee0000000000000000000000000000000000000"
     assert keymanager.pubkey_to_fee_recipient_override.get(pubkey) is None
 
     # Set its fee recipient
@@ -71,7 +73,9 @@ async def test_fee_recipient_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.ListFeeRecipientResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.ethaddress is None
+    # We return the default fee recipient provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.ethaddress == "0xfee0000000000000000000000000000000000000"
     assert keymanager.pubkey_to_fee_recipient_override.get(pubkey) is None
 
 
@@ -115,3 +119,24 @@ async def test_bad_request(test_client: TestClient[Any, Application]) -> None:
     assert resp.status == 500
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{invalid_pubkey}')"
+
+
+async def test_zero_address_as_fr(test_client: TestClient[Any, Application]) -> None:
+    pubkey = "0x" + "a" * 96
+    zero_address = "0x" + "0" * 40
+
+    # Attempt to set the fee recipient to the 0x00 address
+    resp = await test_client.post(
+        f"/eth/v1/validator/{pubkey}/feerecipient",
+        data=msgspec.json.encode(
+            SchemaKeymanagerAPI.SetFeeRecipientRequest(
+                ethaddress=zero_address,
+            )
+        ),
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert (
+        data["message"]
+        == "Cannot specify the 0x00 fee recipient address through the API."
+    )

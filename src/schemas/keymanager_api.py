@@ -67,7 +67,7 @@ class DeleteRemoteKeysResponse(msgspec.Struct):
 # Fee recipient endpoints
 class ValidatorFeeRecipient(msgspec.Struct):
     pubkey: Pubkey
-    ethaddress: EthAddress | None
+    ethaddress: EthAddress
 
 
 class ListFeeRecipientResponse(msgspec.Struct):
@@ -81,7 +81,7 @@ class SetFeeRecipientRequest(msgspec.Struct):
 # Gas limit endpoints
 class ValidatorGasLimit(msgspec.Struct):
     pubkey: Pubkey
-    gas_limit: UInt64String | None
+    gas_limit: UInt64String
 
 
 class ListGasLimitResponse(msgspec.Struct):
@@ -95,7 +95,7 @@ class SetGasLimitRequest(msgspec.Struct):
 # Graffiti endpoints
 class ValidatorGraffiti(msgspec.Struct):
     pubkey: Pubkey
-    graffiti: str | None
+    graffiti: str
 
 
 class GraffitiResponse(msgspec.Struct):

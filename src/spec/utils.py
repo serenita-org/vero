@@ -8,3 +8,7 @@ def encode_graffiti(graffiti_string: str) -> bytes:
         )
 
     return encoded
+
+
+def decode_graffiti(graffiti_bytes: bytes) -> str:
+    return graffiti_bytes.rstrip(b"\x00").decode("utf-8")

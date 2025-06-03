@@ -32,7 +32,9 @@ async def test_gas_limit_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.ListGasLimitResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.gas_limit is None
+    # We return the default gas limit value provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.gas_limit == "30000000"
     assert keymanager.pubkey_to_gas_limit_override.get(pubkey) is None
 
     # Set its gas limit value
@@ -68,7 +70,9 @@ async def test_gas_limit_lifecycle(
         await resp.text(), type=SchemaKeymanagerAPI.ListGasLimitResponse
     )
     assert response.data.pubkey == pubkey
-    assert response.data.gas_limit is None
+    # We return the default gas limit value provided via CLI arguments if
+    # it was not overridden via the Keymanager API
+    assert response.data.gas_limit == "30000000"
     assert keymanager.pubkey_to_gas_limit_override.get(pubkey) is None
 
 

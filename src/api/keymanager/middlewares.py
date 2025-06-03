@@ -15,19 +15,11 @@ async def bearer_authentication(
 ) -> web.StreamResponse:
     auth_header_value = request.headers.get(hdrs.AUTHORIZATION)
     if not auth_header_value:
-        return web.json_response(
-            status=401,
-            body=msgspec.json.encode(
-                ErrorResponse(message="No value provided for Authorization header")
-            ),
-        )
+        raise web.HTTPUnauthorized(reason="No value provided for Authorization header")
 
     if auth_header_value != f"Bearer {request.app['bearer_token']}":
-        return web.json_response(
-            status=403,
-            body=msgspec.json.encode(
-                ErrorResponse(message="Invalid value provided for Authorization header")
-            ),
+        raise web.HTTPForbidden(
+            reason="Invalid value provided for Authorization header"
         )
 
     return await handler(request)
@@ -44,8 +36,9 @@ async def exception_handler(
     """
     try:
         return await handler(request)
-    except web.HTTPException:
-        raise
+    except web.HTTPException as e:
+        status_code = e.status_code
+        msg = e.reason
     except msgspec.ValidationError as e:
         status_code = 400
         msg = repr(e)
