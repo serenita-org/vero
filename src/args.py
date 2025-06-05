@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import msgspec
 
 from spec.configs import Network
-from spec.utils import encode_graffiti
+from spec.utils import decode_graffiti, encode_graffiti
 
 
 class CLIArgs(msgspec.Struct, kw_only=True):
@@ -119,7 +119,7 @@ def log_cli_arg_values(validated_args: CLIArgs) -> None:
         if isinstance(validated_arg_value, list):
             validated_arg_value = ",".join(validated_arg_value)
         elif action.dest == "graffiti":
-            validated_arg_value = validated_arg_value.rstrip(b"\x00").decode()
+            validated_arg_value = decode_graffiti(validated_arg_value)
 
         if action.default != validated_arg_value:
             logger.info(f"{action.dest}: {validated_arg_value}")
