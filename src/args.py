@@ -32,7 +32,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     metrics_address: str
     metrics_port: int
     metrics_multiprocess_mode: bool
-    log_level: str
+    log_level: int
     disable_slashing_detection: bool
 
 
@@ -120,6 +120,8 @@ def log_cli_arg_values(validated_args: CLIArgs) -> None:
             validated_arg_value = ",".join(validated_arg_value)
         elif action.dest == "graffiti":
             validated_arg_value = decode_graffiti(validated_arg_value)
+        elif action.dest == "log_level":
+            validated_arg_value = logging.getLevelName(validated_arg_value)
 
         if action.default != validated_arg_value:
             logger.info(f"{action.dest}: {validated_arg_value}")
@@ -342,7 +344,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             metrics_address=parsed_args.metrics_address,
             metrics_port=parsed_args.metrics_port,
             metrics_multiprocess_mode=parsed_args.metrics_multiprocess_mode,
-            log_level=parsed_args.log_level,
+            log_level=logging.getLevelName(parsed_args.log_level),
             disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )
     except ValueError as e:

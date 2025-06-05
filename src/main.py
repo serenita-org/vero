@@ -23,7 +23,6 @@ async def main(cli_args: CLIArgs, shutdown_event: asyncio.Event) -> None:
     logging.getLogger("vero-init").info(
         f"Starting vero {get_service_version()} (commit {get_service_commit()})",
     )
-    check_data_dir_permissions(data_dir=Path(cli_args.data_dir))
 
     scheduler = AsyncIOScheduler(
         timezone=datetime.UTC,
@@ -65,11 +64,13 @@ async def main(cli_args: CLIArgs, shutdown_event: asyncio.Event) -> None:
 
 if __name__ == "__main__":
     cli_args = parse_cli_args(args=sys.argv[1:])
+    check_data_dir_permissions(data_dir=Path(cli_args.data_dir))
     init_observability(
         metrics_address=cli_args.metrics_address,
         metrics_port=cli_args.metrics_port,
         metrics_multiprocess_mode=cli_args.metrics_multiprocess_mode,
         log_level=cli_args.log_level,
+        data_dir=Path(cli_args.data_dir),
     )
     log_cli_arg_values(cli_args)
     asyncio.run(main(cli_args=cli_args, shutdown_event=asyncio.Event()))
