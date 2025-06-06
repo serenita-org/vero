@@ -108,7 +108,7 @@ class AttestationService(ValidatorDutyService):
             )
             and len(self.attester_duties_dependent_roots) > 0
         ):
-            self.logger.info(
+            self.logger.debug(
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.submit_task(super().update_duties())
