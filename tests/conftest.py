@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import random
 import time
 from asyncio import AbstractEventLoop
@@ -82,7 +83,7 @@ def cli_args(
         metrics_address="localhost",
         metrics_port=8000,
         metrics_multiprocess_mode=False,
-        log_level="INFO",
+        log_level=logging.INFO,
         disable_slashing_detection=False,
     )
 
@@ -93,7 +94,8 @@ def _init_observability() -> None:
         metrics_address="localhost",
         metrics_port=8080,
         metrics_multiprocess_mode=False,
-        log_level="DEBUG",
+        log_level=logging.DEBUG,
+        data_dir=Path("/tmp"),
     )
 
 

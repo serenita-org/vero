@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -401,6 +402,23 @@ from spec.configs import Network
             ],
             id="--enable-keymanager-api (no --remote-signer-url)",
         ),
+        pytest.param(
+            [
+                "--network=mainnet",
+                "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node:5052",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+                "--log-level=DEBUG",
+            ],
+            None,
+            {
+                "log_level": logging.DEBUG,
+            },
+            [
+                "log_level: DEBUG",
+            ],
+            id="--log-level override",
+        ),
     ],
 )
 def test_parse_cli_args(
@@ -468,7 +486,7 @@ def test_parse_cli_args_full_set() -> None:
         "metrics_address": "1.2.3.4",
         "metrics_port": 4321,
         "metrics_multiprocess_mode": True,
-        "log_level": "DEBUG",
+        "log_level": logging.DEBUG,
         "disable_slashing_detection": True,
     }
 
@@ -526,7 +544,7 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         metrics_address="localhost",
         metrics_port=8000,
         metrics_multiprocess_mode=False,
-        log_level="INFO",
+        log_level=logging.INFO,
         disable_slashing_detection=False,
     )
 
