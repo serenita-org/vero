@@ -28,7 +28,7 @@ repos:
     -   id: mypy
         additional_dependencies:
           [
-          aiohttp==3.12.4,
+          aiohttp==3.12.11,
           msgspec==0.19.0,
           prometheus-client==0.22.0,
           pytest==8.3.5,
