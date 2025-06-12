@@ -52,6 +52,6 @@ jobs:
           GIT_TAG=${{ github.ref_name }}
           GIT_COMMIT=${{ github.sha }}
         platforms: linux/amd64,linux/arm64
-        push: ${{ github.event_name != 'pull_request' }}
+        push: true
         tags: ${{ steps.docker_metadata.outputs.tags }}
         labels: ${{ steps.docker_metadata.outputs.labels }}

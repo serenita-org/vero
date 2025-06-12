@@ -29,7 +29,7 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.configs import get_network_spec
 from tasks import TaskManager
 
@@ -102,7 +102,7 @@ def check_data_dir_permissions(data_dir: Path) -> None:
         )
 
 
-def load_spec(cli_args: CLIArgs) -> SpecElectra:
+def load_spec(cli_args: CLIArgs) -> SpecFulu:
     spec = get_network_spec(
         network=cli_args.network,
         network_custom_config_path=cli_args.network_custom_config_path,

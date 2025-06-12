@@ -29,7 +29,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecElectra, Fork, Genesis, Version
+from spec.base import SpecFulu, Fork, Genesis, Version
 from spec.common import Epoch
 from spec.configs import Network, get_network_spec
 from tasks import TaskManager
@@ -103,12 +103,12 @@ def _init_observability() -> None:
 
 
 @pytest.fixture(scope="session")
-def spec() -> SpecElectra:
+def spec() -> SpecFulu:
     return get_network_spec(network=Network._TESTS)
 
 
 @pytest.fixture(autouse=True, scope="session")
-def _init_spec(spec: SpecElectra) -> None:
+def _init_spec(spec: SpecFulu) -> None:
     SpecAttestation.initialize(spec=spec)
     SpecBeaconBlock.initialize(spec=spec)
     SpecSyncCommittee.initialize(spec=spec)
@@ -118,7 +118,7 @@ def _init_spec(spec: SpecElectra) -> None:
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
 ) -> Generator[None, None, None]:
-    requested_fork_version = getattr(request, "param", ForkVersion.ELECTRA)
+    requested_fork_version = getattr(request, "param", ForkVersion.FULU)
 
     with mock.patch.object(
         beacon_chain, "current_fork_version", requested_fork_version
@@ -297,7 +297,7 @@ async def validator_status_tracker(
 async def multi_beacon_node(
     cli_args: CLIArgs,
     _mocked_beacon_node_endpoints: None,
-    spec: SpecElectra,
+    spec: SpecFulu,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     beacon_chain: BeaconChain,
@@ -314,7 +314,7 @@ async def multi_beacon_node(
 
 
 @pytest.fixture(scope="session")
-def genesis(spec: SpecElectra) -> Genesis:
+def genesis(spec: SpecFulu) -> Genesis:
     # Fake genesis 1 hour ago
     return Genesis(
         genesis_time=int(time.time() - 3600),
@@ -325,7 +325,7 @@ def genesis(spec: SpecElectra) -> Genesis:
 
 @pytest.fixture
 def beacon_chain(
-    spec: SpecElectra, genesis: Genesis, task_manager: TaskManager
+    spec: SpecFulu, genesis: Genesis, task_manager: TaskManager
 ) -> BeaconChain:
     return BeaconChain(spec=spec, genesis=genesis, task_manager=task_manager)
 

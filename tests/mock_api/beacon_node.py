@@ -5,6 +5,7 @@ from typing import Any
 
 import msgspec
 import pytest
+from aiohttp.hdrs import CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
@@ -16,7 +17,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import Genesis, SpecElectra
+from spec.base import Genesis, SpecFulu
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -39,7 +40,7 @@ def response_content_type(request: pytest.FixtureRequest) -> ContentType:
 
 
 @pytest.fixture
-def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecElectra) -> dict:  # type: ignore[type-arg]
+def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecFulu) -> dict:  # type: ignore[type-arg]
     return dict(data=beacon_chain.get_fork(beacon_chain.current_slot))
 
 
@@ -51,7 +52,7 @@ def mocked_genesis_response(genesis: Genesis) -> dict:  # type: ignore[type-arg]
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecElectra,
+    spec: SpecFulu,
     beacon_chain: BeaconChain,
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
@@ -113,39 +114,53 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
             slot = int(url.raw_path.split("/")[-1])
 
-            if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
-                fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
-                if execution_payload_blinded:
-                    _data = SpecBeaconBlock.ElectraBlindedBlock(
-                        slot=slot,
-                        proposer_index=123,
-                        parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                        state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                        # body=...
+            block_cls_map = {
+                ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlockContents,
+                ForkVersion.FULU: SpecBeaconBlock.ElectraBlockContents,
+            }
+            blinded_block_cls_map = {
+                ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlock,
+                ForkVersion.FULU: SpecBeaconBlock.ElectraBlindedBlock,
+            }
+
+            fork_version = beacon_chain.current_fork_version
+            if execution_payload_blinded:
+                if fork_version not in blinded_block_cls_map:
+                    raise NotImplementedError(
+                        f"Unsupported fork version {fork_version}"
                     )
-                else:
-                    _data = SpecBeaconBlock.ElectraBlockContents.from_obj(
-                        dict(
-                            block=dict(
-                                slot=slot,
-                                proposer_index=123,
-                                parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                                state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                                # body=...
-                            ),
-                            kzg_proofs=[],
-                            blobs=[],
-                        )
-                    )
+
+                _data = blinded_block_cls_map[fork_version](
+                    slot=slot,
+                    proposer_index=123,
+                    parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                    state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                    # body=...
+                )
             else:
-                raise NotImplementedError(
-                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                if fork_version not in block_cls_map:
+                    raise NotImplementedError(
+                        f"Unsupported fork version {fork_version}"
+                    )
+
+                _data = block_cls_map[fork_version].from_obj(
+                    dict(
+                        block=dict(
+                            slot=slot,
+                            proposer_index=123,
+                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+                            # body=...
+                        ),
+                        kzg_proofs=[],
+                        blobs=[],
+                    )
                 )
 
             exec_payload_value = random.randint(0, 10_000_000)
             consensus_block_value = random.randint(0, 10_000_000)
             headers = {
-                "Content-Type": response_content_type.value,
+                CONTENT_TYPE: response_content_type.value,
                 "Eth-Consensus-Version": fork_version.value,
                 "Eth-Execution-Payload-Blinded": str(execution_payload_blinded),
                 "Eth-Execution-Payload-Value": str(exec_payload_value),
@@ -180,41 +195,44 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
-            if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
-                fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
-
-                _committee_bits = Bitvector[spec.MAX_COMMITTEES_PER_SLOT](
-                    False for _ in range(spec.MAX_COMMITTEES_PER_SLOT)
-                )
-                _committee_bits[int(url.query["committee_index"])] = True
-                _agg_bitlist_size = (
-                    spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
-                )
-                # Populating the full bitlist is expensive
-                # -> a smaller agg bits bitlist is fine for testing purposes too
-                _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
-                aggregate_attestation = SpecAttestation.AttestationElectra(
-                    aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),
-                    data=AttestationData(
-                        slot=int(url.query["slot"]),
-                        index=0,
-                        beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
-                        source=Checkpoint(
-                            epoch=5,
-                            root="0xfd87176458a22999a87872fc9cbbba38bdeeb37847091875fb4ff82dd3d05abf",
-                        ),
-                        target=Checkpoint(
-                            epoch=6,
-                            root="0x62e8fb27f17e5fb962503a56f07d14b5bf8710fb6b53bc9ef78f04c82d46a460",
-                        ),
-                    ),
-                    signature="0x4992b42d8d9b7827accbc94523fb1f98f866bd53105155907179238e00dfec8ab4618de8ff0361c818e5703a191ad16beedeff4c4341ac3fe3c935e01ffbc2199b7212d371f0dcf5bd2db993c51d9554609235a4a86d1f0e85074d014f8e494b",
-                    committee_bits=_committee_bits,
-                )
-            else:
+            if beacon_chain.current_fork_version not in (
+                ForkVersion.ELECTRA,
+                ForkVersion.FULU,
+            ):
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
                 )
+
+            fork_version = beacon_chain.current_fork_version
+
+            _committee_bits = Bitvector[spec.MAX_COMMITTEES_PER_SLOT](
+                False for _ in range(spec.MAX_COMMITTEES_PER_SLOT)
+            )
+            _committee_bits[int(url.query["committee_index"])] = True
+            _agg_bitlist_size = (
+                spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
+            )
+            # Populating the full bitlist is expensive
+            # -> a smaller agg bits bitlist is fine for testing purposes too
+            _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
+            aggregate_attestation = SpecAttestation.AttestationElectra(
+                aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),
+                data=AttestationData(
+                    slot=int(url.query["slot"]),
+                    index=0,
+                    beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
+                    source=Checkpoint(
+                        epoch=5,
+                        root="0xfd87176458a22999a87872fc9cbbba38bdeeb37847091875fb4ff82dd3d05abf",
+                    ),
+                    target=Checkpoint(
+                        epoch=6,
+                        root="0x62e8fb27f17e5fb962503a56f07d14b5bf8710fb6b53bc9ef78f04c82d46a460",
+                    ),
+                ),
+                signature="0x4992b42d8d9b7827accbc94523fb1f98f866bd53105155907179238e00dfec8ab4618de8ff0361c818e5703a191ad16beedeff4c4341ac3fe3c935e01ffbc2199b7212d371f0dcf5bd2db993c51d9554609235a4a86d1f0e85074d014f8e494b",
+                committee_bits=_committee_bits,
+            )
 
             return CallbackResult(
                 body=msgspec.json.encode(
@@ -294,15 +312,18 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = SchemaBeaconAPI.ForkVersion[
-                headers["Eth-Consensus-Version"].upper()
-            ]
+            fork_version = ForkVersion[headers["Eth-Consensus-Version"].upper()]
 
-            if fork_version not in (SchemaBeaconAPI.ForkVersion.ELECTRA,):
+            if fork_version not in (
+                ForkVersion.ELECTRA,
+                ForkVersion.FULU,
+            ):
                 raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-            if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-                if headers["Content-Type"] == ContentType.JSON.value:
+            assert fork_version == beacon_chain.current_fork_version
+
+            if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                if headers[CONTENT_TYPE] == ContentType.JSON.value:
                     _ = SpecBeaconBlock.ElectraBlockContentsSigned.from_obj(
                         msgspec.json.decode(kwargs["data"].decode())
                     )
@@ -315,15 +336,18 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = SchemaBeaconAPI.ForkVersion[
-                headers["Eth-Consensus-Version"].upper()
-            ]
+            fork_version = ForkVersion[headers["Eth-Consensus-Version"].upper()]
 
-            if fork_version not in (SchemaBeaconAPI.ForkVersion.ELECTRA,):
+            if fork_version not in (
+                ForkVersion.ELECTRA,
+                ForkVersion.FULU,
+            ):
                 raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-            if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-                if headers["Content-Type"] == ContentType.JSON.value:
+            assert fork_version == beacon_chain.current_fork_version
+
+            if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                if headers[CONTENT_TYPE] == ContentType.JSON.value:
                     _ = SpecBeaconBlock.ElectraBlindedBlockSigned.from_obj(
                         msgspec.json.decode(kwargs["data"].decode())
                     )
@@ -390,7 +414,10 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/pool/attestations", url.raw_path):
-            if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
+            if beacon_chain.current_fork_version in (
+                ForkVersion.ELECTRA,
+                ForkVersion.FULU,
+            ):
                 attestations = msgspec.json.decode(
                     kwargs["data"].decode(),
                     type=list[SchemaBeaconAPI.SingleAttestation],
@@ -416,7 +443,10 @@ def _mocked_beacon_node_endpoints(
             assert data["message"]["aggregator_index"] == "1"
             aggregate = data["message"]["aggregate"]
 
-            if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
+            if beacon_chain.current_fork_version in (
+                ForkVersion.ELECTRA,
+                ForkVersion.FULU,
+            ):
                 assert aggregate["committee_bits"] == "0x0040000000000000"
                 assert aggregate["aggregation_bits"] == "0x7507"
             else:

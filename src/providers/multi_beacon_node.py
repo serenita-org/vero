@@ -48,7 +48,7 @@ from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
@@ -61,7 +61,7 @@ class MultiBeaconNode:
         self,
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
-        spec: SpecElectra,
+        spec: SpecFulu,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
         cli_args: CLIArgs,
@@ -262,6 +262,12 @@ class MultiBeaconNode:
 
         block_map = {
             SchemaBeaconAPI.ForkVersion.ELECTRA: (
+                SpecBeaconBlock.ElectraBlindedBlock
+                if response.execution_payload_blinded
+                else SpecBeaconBlock.ElectraBlockContents
+            ),
+            # Block containers unchanged in Fulu => reusing Electra containers
+            SchemaBeaconAPI.ForkVersion.FULU: (
                 SpecBeaconBlock.ElectraBlindedBlock
                 if response.execution_payload_blinded
                 else SpecBeaconBlock.ElectraBlockContents

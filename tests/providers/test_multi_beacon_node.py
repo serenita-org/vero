@@ -21,7 +21,7 @@ from args import CLIArgs, _process_attestation_consensus_threshold
 from providers import BeaconChain, MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
 from tasks import TaskManager
@@ -73,7 +73,7 @@ async def test_initialize(
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
     beacon_chain: BeaconChain,
-    spec: SpecElectra,
+    spec: SpecFulu,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     cli_args: CLIArgs,
@@ -204,7 +204,7 @@ async def test_get_aggregate_attestation(
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         payload=dict(
-                            version=SchemaBeaconAPI.ForkVersion.ELECTRA.value,
+                            version=SchemaBeaconAPI.ForkVersion.FULU.value,
                             data=SpecAttestation.AttestationElectra(
                                 aggregation_bits=_bits,
                             ).to_obj(),
@@ -288,7 +288,7 @@ async def test_get_sync_committee_contribution(
     numbers_of_root_matching_indices: list[Exception | int],
     best_contribution_score: int,
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    spec: SpecElectra,
+    spec: SpecFulu,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
