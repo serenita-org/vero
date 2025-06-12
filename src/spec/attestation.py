@@ -38,9 +38,6 @@ class AttestationData(Container):
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecAttestation:
-    AttestationPhase0: Container
-    IndexedAttestationPhase0: Container
-    AggregateAndProofPhase0: Container
     AttestationElectra: Container
     IndexedAttestationElectra: Container
     AggregateAndProofElectra: Container
@@ -50,16 +47,6 @@ class SpecAttestation:
         cls,
         spec: "SpecElectra",
     ) -> None:
-        class AttestationPhase0(Container):
-            aggregation_bits: Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE]
-            data: AttestationData
-            signature: BLSSignature
-
-        class AggregateAndProofPhase0(Container):
-            aggregator_index: ValidatorIndex
-            aggregate: AttestationPhase0
-            selection_proof: BLSSignature
-
         class AttestationElectra(Container):
             aggregation_bits: Bitlist[
                 spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
@@ -73,7 +60,5 @@ class SpecAttestation:
             aggregate: AttestationElectra
             selection_proof: BLSSignature
 
-        cls.AttestationPhase0 = AttestationPhase0
-        cls.AggregateAndProofPhase0 = AggregateAndProofPhase0
         cls.AttestationElectra = AttestationElectra
         cls.AggregateAndProofElectra = AggregateAndProofElectra

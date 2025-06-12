@@ -546,7 +546,7 @@ class BeaconNode:
         self,
         attestation_data: AttestationData,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationPhase0 | SpecAttestation.AttestationElectra":
+    ) -> "SpecAttestation.AttestationElectra":
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
@@ -565,9 +565,7 @@ class BeaconNode:
             resp_text, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        if response.version == SchemaBeaconAPI.ForkVersion.DENEB:
-            att = SpecAttestation.AttestationPhase0.from_obj(response.data)
-        elif response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
+        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
             att = SpecAttestation.AttestationElectra.from_obj(response.data)
         else:
             raise NotImplementedError(f"Unsupported fork version {response.version}")
@@ -736,7 +734,7 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_beacon_block_contents: "SpecBeaconBlock.DenebBlockContentsSigned | SpecBeaconBlock.ElectraBlockContentsSigned",
+        signed_beacon_block_contents: "SpecBeaconBlock.ElectraBlockContentsSigned",
     ) -> None:
         if self.logger.isEnabledFor(logging.DEBUG):
             block = signed_beacon_block_contents.signed_block.message
@@ -766,7 +764,7 @@ class BeaconNode:
     async def publish_blinded_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_blinded_beacon_block: "SpecBeaconBlock.DenebBlindedBlockSigned | SpecBeaconBlock.ElectraBlindedBlockSigned",
+        signed_blinded_beacon_block: "SpecBeaconBlock.ElectraBlindedBlockSigned",
     ) -> None:
         if self.logger.isEnabledFor(logging.DEBUG):
             block = signed_blinded_beacon_block.message

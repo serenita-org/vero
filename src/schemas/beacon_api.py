@@ -53,14 +53,7 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
 
 
 class ForkVersion(Enum):
-    DENEB = "deneb"
     ELECTRA = "electra"
-
-
-class AttestationPhase0(msgspec.Struct):
-    aggregation_bits: str
-    data: dict  # type: ignore[type-arg]
-    signature: str
 
 
 class SingleAttestation(msgspec.Struct):

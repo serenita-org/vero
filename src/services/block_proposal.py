@@ -430,10 +430,6 @@ class BlockProposalService(ValidatorDutyService):
                 try:
                     if not full_response.execution_payload_blinded:
                         class_map = {
-                            SchemaBeaconAPI.ForkVersion.DENEB: (
-                                SpecBeaconBlock.DenebBlockSigned,
-                                SpecBeaconBlock.DenebBlockContentsSigned,
-                            ),
                             SchemaBeaconAPI.ForkVersion.ELECTRA: (
                                 SpecBeaconBlock.ElectraBlockSigned,
                                 SpecBeaconBlock.ElectraBlockContentsSigned,
@@ -457,7 +453,6 @@ class BlockProposalService(ValidatorDutyService):
                     else:
                         # Blinded block
                         class_map = {
-                            SchemaBeaconAPI.ForkVersion.DENEB: SpecBeaconBlock.DenebBlindedBlockSigned,
                             SchemaBeaconAPI.ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlockSigned,
                         }
                         block_class = class_map[full_response.version]

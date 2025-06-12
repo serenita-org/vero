@@ -137,32 +137,10 @@ def _mocked_beacon_node_endpoints(
                             blobs=[],
                         )
                     )
-            elif beacon_chain.current_fork_version == ForkVersion.DENEB:
-                fork_version = SchemaBeaconAPI.ForkVersion.DENEB
-                if execution_payload_blinded:
-                    _data = SpecBeaconBlock.DenebBlindedBlock(
-                        slot=slot,
-                        proposer_index=123,
-                        parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                        state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                        # body=...
-                    )
-                else:
-                    _data = SpecBeaconBlock.DenebBlockContents.from_obj(
-                        dict(
-                            block=dict(
-                                slot=slot,
-                                proposer_index=123,
-                                parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                                state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                                # body=...
-                            ),
-                            kzg_proofs=[],
-                            blobs=[],
-                        )
-                    )
             else:
-                raise NotImplementedError(f"Endpoint not implemented for spec {spec}")
+                raise NotImplementedError(
+                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                )
 
             exec_payload_value = random.randint(0, 10_000_000)
             consensus_block_value = random.randint(0, 10_000_000)
@@ -230,35 +208,10 @@ def _mocked_beacon_node_endpoints(
                     signature="0x4992b42d8d9b7827accbc94523fb1f98f866bd53105155907179238e00dfec8ab4618de8ff0361c818e5703a191ad16beedeff4c4341ac3fe3c935e01ffbc2199b7212d371f0dcf5bd2db993c51d9554609235a4a86d1f0e85074d014f8e494b",
                     committee_bits=_committee_bits,
                 )
-            elif beacon_chain.current_fork_version == ForkVersion.DENEB:
-                fork_version = SchemaBeaconAPI.ForkVersion.DENEB
-                # Deterministic return data to make it possible to
-                # check the submitted aggregate in the other endpoint
-                _agg_bitlist_size = spec.MAX_VALIDATORS_PER_COMMITTEE
-                # Populating the full bitlist is expensive
-                # -> a smaller agg bits bitlist is fine for testing purposes too
-                _agg_bits = [0, 1, 1, 0, 0, 1, 1, 0, 1, 1]
-                aggregate_attestation = SpecAttestation.AttestationPhase0(
-                    aggregation_bits=Bitlist[spec.MAX_VALIDATORS_PER_COMMITTEE](
-                        _agg_bits
-                    ),
-                    data=AttestationData(
-                        slot=int(url.query["slot"]),
-                        index=int(url.query["committee_index"]),
-                        beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
-                        source=Checkpoint(
-                            epoch=2,
-                            root="0x6ec25dbfa49e671629fdc437beb2acf02d16763ef05bdeb6351d9ead027b24b4",
-                        ),
-                        target=Checkpoint(
-                            epoch=3,
-                            root="0x3b3ee1a4cf6c952285e8f2114573b0526968766370761bfa6a09705028cbe62a",
-                        ),
-                    ),
-                    signature="0x582e78b397101fa0a611a278296ad4752e46a4d573fc0fe57092ffa2ad5dcd5bdcc3ea94c98958aeba4fb09b4e2ce07ee02f54f50234575e3ca250855f57d088c5b61bd3a99571f522b6997aed5844fcab841e820e428e7cfd5794d6f0efdce1",
-                )
             else:
-                raise ValueError(f"Unsupported spec: {spec}")
+                raise NotImplementedError(
+                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                )
 
             return CallbackResult(
                 body=msgspec.json.encode(
@@ -342,21 +295,9 @@ def _mocked_beacon_node_endpoints(
                 headers["Eth-Consensus-Version"].upper()
             ]
 
-            if fork_version not in (
-                SchemaBeaconAPI.ForkVersion.DENEB,
-                SchemaBeaconAPI.ForkVersion.ELECTRA,
-            ):
-                raise NotImplementedError
+            if fork_version not in (SchemaBeaconAPI.ForkVersion.ELECTRA,):
+                raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-            if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
-                if headers["Content-Type"] == ContentType.JSON.value:
-                    _ = SpecBeaconBlock.DenebBlockContentsSigned.from_obj(
-                        msgspec.json.decode(kwargs["data"].decode())
-                    )
-                else:
-                    _ = SpecBeaconBlock.DenebBlockContentsSigned.decode_bytes(
-                        kwargs["data"]
-                    )
             if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
                 if headers["Content-Type"] == ContentType.JSON.value:
                     _ = SpecBeaconBlock.ElectraBlockContentsSigned.from_obj(
@@ -375,21 +316,9 @@ def _mocked_beacon_node_endpoints(
                 headers["Eth-Consensus-Version"].upper()
             ]
 
-            if fork_version not in (
-                SchemaBeaconAPI.ForkVersion.DENEB,
-                SchemaBeaconAPI.ForkVersion.ELECTRA,
-            ):
-                raise NotImplementedError
+            if fork_version not in (SchemaBeaconAPI.ForkVersion.ELECTRA,):
+                raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-            if fork_version == SchemaBeaconAPI.ForkVersion.DENEB:
-                if headers["Content-Type"] == ContentType.JSON.value:
-                    _ = SpecBeaconBlock.DenebBlindedBlockSigned.from_obj(
-                        msgspec.json.decode(kwargs["data"].decode())
-                    )
-                else:
-                    _ = SpecBeaconBlock.DenebBlindedBlockSigned.decode_bytes(
-                        kwargs["data"]
-                    )
             if fork_version == SchemaBeaconAPI.ForkVersion.ELECTRA:
                 if headers["Content-Type"] == ContentType.JSON.value:
                     _ = SpecBeaconBlock.ElectraBlindedBlockSigned.from_obj(
@@ -464,15 +393,10 @@ def _mocked_beacon_node_endpoints(
                     type=list[SchemaBeaconAPI.SingleAttestation],
                 )
                 attestation = attestations[0]
-            elif beacon_chain.current_fork_version == ForkVersion.DENEB:
-                attestations = msgspec.json.decode(
-                    kwargs["data"].decode(),
-                    type=list[SchemaBeaconAPI.AttestationPhase0],
-                )
-                attestation = attestations[0]
-                assert attestation.aggregation_bits == "0x000201"  # type: ignore[attr-defined]
             else:
-                raise ValueError(f"Unsupported spec: {spec}")
+                raise NotImplementedError(
+                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                )
 
             assert (
                 attestation.data["beacon_block_root"]
@@ -492,11 +416,10 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
                 assert aggregate["committee_bits"] == "0x0040000000000000"
                 assert aggregate["aggregation_bits"] == "0x7507"
-            elif beacon_chain.current_fork_version == ForkVersion.DENEB:
-                assert aggregate["data"]["index"] == "14"
-                assert aggregate["aggregation_bits"] == "0x6607"
             else:
-                raise ValueError(f"Unsupported spec: {spec}")
+                raise NotImplementedError(
+                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                )
             return CallbackResult(status=200)
 
         if re.match(r"/eth/v1/validator/duties/sync/\d+", url.raw_path):
