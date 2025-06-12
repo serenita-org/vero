@@ -54,6 +54,7 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
 
 class ForkVersion(Enum):
     ELECTRA = "electra"
+    FULU = "fulu"
 
 
 class SingleAttestation(msgspec.Struct):

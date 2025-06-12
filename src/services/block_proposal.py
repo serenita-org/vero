@@ -460,6 +460,10 @@ class BlockProposalService(ValidatorDutyService):
                                 SpecBeaconBlock.ElectraBlockSigned,
                                 SpecBeaconBlock.ElectraBlockContentsSigned,
                             ),
+                            SchemaBeaconAPI.ForkVersion.FULU: (
+                                SpecBeaconBlock.FuluBlockSigned,
+                                SpecBeaconBlock.FuluBlockContentsSigned,
+                            ),
                         }
 
                         block_class, block_contents_class = class_map[
@@ -480,6 +484,7 @@ class BlockProposalService(ValidatorDutyService):
                         # Blinded block
                         class_map = {
                             SchemaBeaconAPI.ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlockSigned,
+                            SchemaBeaconAPI.ForkVersion.FULU: SpecBeaconBlock.FuluBlindedBlockSigned,
                         }
                         block_class = class_map[full_response.version]
 

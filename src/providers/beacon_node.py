@@ -31,7 +31,7 @@ from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData
-from spec.base import Genesis, SpecElectra, parse_spec
+from spec.base import Genesis, SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
@@ -106,7 +106,7 @@ class BeaconNode:
     def __init__(
         self,
         base_url: str,
-        spec: SpecElectra,
+        spec: SpecFulu,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
     ) -> None:
@@ -290,7 +290,7 @@ class BeaconNode:
         )
         return Genesis.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
-    async def get_spec(self) -> SpecElectra:
+    async def get_spec(self) -> SpecFulu:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
@@ -565,10 +565,7 @@ class BeaconNode:
             resp_text, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-            att = SpecAttestation.AttestationElectra.from_obj(response.data)
-        else:
-            raise NotImplementedError(f"Unsupported fork version {response.version}")
+        att = SpecAttestation.AttestationElectra.from_obj(response.data)
 
         _BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT.labels(
             host=self.host
@@ -734,7 +731,7 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_beacon_block_contents: "SpecBeaconBlock.ElectraBlockContentsSigned",
+        signed_beacon_block_contents: "SpecBeaconBlock.ElectraBlockContentsSigned | SpecBeaconBlock.FuluBlockContentsSigned",
     ) -> None:
         if self.logger.isEnabledFor(logging.DEBUG):
             block = signed_beacon_block_contents.signed_block.message
@@ -764,7 +761,7 @@ class BeaconNode:
     async def publish_blinded_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_blinded_beacon_block: "SpecBeaconBlock.ElectraBlindedBlockSigned",
+        signed_blinded_beacon_block: "SpecBeaconBlock.ElectraBlindedBlockSigned | SpecBeaconBlock.FuluBlindedBlockSigned",
     ) -> None:
         if self.logger.isEnabledFor(logging.DEBUG):
             block = signed_blinded_beacon_block.message

@@ -7,7 +7,7 @@ from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from providers import BeaconNode
-from spec.base import SpecElectra, Version
+from spec.base import SpecFulu, Version
 from tasks import TaskManager
 
 
@@ -21,7 +21,7 @@ from tasks import TaskManager
 async def test_initialize_spec_mismatch(
     spec_mismatch: bool,
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec: SpecElectra,
+    spec: SpecFulu,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
 ) -> None:
