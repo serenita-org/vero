@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from ._logging import setup_logging
 from ._metrics import setup_metrics
 from ._metrics_shared import ErrorType, get_shared_metrics
@@ -10,9 +12,13 @@ def init_observability(
     metrics_address: str,
     metrics_port: int,
     metrics_multiprocess_mode: bool,
-    log_level: str,
+    log_level: int,
+    data_dir: Path,
 ) -> None:
-    setup_logging(log_level=log_level)
+    setup_logging(
+        log_level=log_level,
+        data_dir=data_dir,
+    )
     setup_metrics(
         addr=metrics_address,
         port=metrics_port,
