@@ -1,15 +1,23 @@
 import asyncio
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, TypedDict, Unpack
+from types import TracebackType
+from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
+import msgspec
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from prometheus_client import Histogram
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconChain, Keymanager, MultiBeaconNode, SignatureProvider
+from providers import (
+    BeaconChain,
+    DutyCache,
+    Keymanager,
+    MultiBeaconNode,
+    SignatureProvider,
+)
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
 
@@ -32,6 +40,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     beacon_chain: BeaconChain
     signature_provider: SignatureProvider
     keymanager: Keymanager
+    duty_cache: DutyCache
     validator_status_tracker_service: "ValidatorStatusTrackerService"
     scheduler: AsyncIOScheduler
     task_manager: TaskManager
@@ -68,6 +77,7 @@ class ValidatorDutyService:
         self.beacon_chain = kwargs["beacon_chain"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
+        self.duty_cache = kwargs["duty_cache"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]
@@ -77,6 +87,7 @@ class ValidatorDutyService:
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
+        self.json_encoder = msgspec.json.Encoder()
 
         # Keeps track of the last slot for which this service started performing its
         # duty.
@@ -96,8 +107,16 @@ class ValidatorDutyService:
         # at the same time
         self._update_duties_lock = asyncio.Lock()
 
-    def start(self) -> None:
-        self.task_manager.submit_task(self.update_duties())
+    async def __aenter__(self) -> Self:
+        raise NotImplementedError
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        raise NotImplementedError
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
         raise NotImplementedError

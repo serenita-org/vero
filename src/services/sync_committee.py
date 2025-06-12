@@ -3,7 +3,8 @@ import contextlib
 import datetime
 import logging
 from collections import defaultdict
-from typing import Unpack
+from types import TracebackType
+from typing import Self, Unpack
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
@@ -50,6 +51,30 @@ class SyncCommitteeService(ValidatorDutyService):
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
             defaultdict(list)
         )
+
+    async def __aenter__(self) -> Self:
+        try:
+            duties = self.duty_cache.load_sync_duties()
+            self.sync_duties = defaultdict(list, duties)
+        except Exception as e:
+            self.logger.debug(f"Failed to load duties from cache: {e}")
+        finally:
+            # The cached duties may be stale - call update_duties even if
+            # we loaded duties from cache
+            self.task_manager.submit_task(self.update_duties())
+
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            self.duty_cache.cache_sync_duties(duties=self.sync_duties)
+        except Exception as e:
+            self.logger.warning(f"Failed to cache duties: {e}")
 
     def has_duty_for_slot(self, slot: int) -> bool:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH

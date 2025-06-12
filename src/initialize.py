@@ -12,6 +12,7 @@ from observability.event_loop import monitor_event_loop
 from providers import (
     DB,
     BeaconChain,
+    DutyCache,
     Keymanager,
     MultiBeaconNode,
     RemoteSigner,
@@ -198,6 +199,7 @@ async def run_services(
             beacon_chain=beacon_chain,
             signature_provider=signature_provider,
             keymanager=keymanager,
+            duty_cache=DutyCache(data_dir=cli_args.data_dir),
             validator_status_tracker_service=validator_status_tracker_service,
             scheduler=scheduler,
             cli_args=cli_args,
@@ -213,7 +215,7 @@ async def run_services(
             block_proposal_service,
             sync_committee_service,
         ):
-            service.start()
+            await exit_stack.enter_async_context(service)
             validator_duty_services.append(service)
             beacon_chain.new_slot_handlers.append(service.on_new_slot)
         _logger.info("Started validator duty services")

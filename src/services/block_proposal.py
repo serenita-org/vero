@@ -2,7 +2,8 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
-from typing import Unpack
+from types import TracebackType
+from typing import Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -41,9 +42,34 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-    def start(self) -> None:
-        super().start()
+    async def __aenter__(self) -> Self:
+        try:
+            duties, dependent_roots = self.duty_cache.load_proposer_duties()
+            self.proposer_duties = defaultdict(set, duties)
+            self.proposer_duties_dependent_roots = dependent_roots
+        except Exception as e:
+            self.logger.debug(f"Failed to load duties from cache: {e}")
+        finally:
+            # The cached duties may be stale - call update_duties even if
+            # we loaded duties from cache
+            self.task_manager.submit_task(self.update_duties())
+
         self.task_manager.submit_task(self.prepare_beacon_proposer())
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        try:
+            self.duty_cache.cache_proposer_duties(
+                duties=self.proposer_duties,
+                dependent_roots=self.proposer_duties_dependent_roots,
+            )
+        except Exception as e:
+            self.logger.warning(f"Failed to cache duties: {e}")
 
     @property
     def next_duty_slot(self) -> int | None:
