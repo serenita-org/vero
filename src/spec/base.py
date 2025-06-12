@@ -24,7 +24,7 @@ class Genesis(Container):
     genesis_fork_version: Version
 
 
-class SpecElectra(Container):
+class SpecFulu(Container):
     # Phase 0
     SECONDS_PER_SLOT: UInt64SerializedAsString
     SLOTS_PER_EPOCH: UInt64SerializedAsString
@@ -73,6 +73,10 @@ class SpecElectra(Container):
     MAX_ATTESTATIONS_ELECTRA: UInt64SerializedAsString
     MAX_ATTESTER_SLASHINGS_ELECTRA: UInt64SerializedAsString
 
+    # Fulu
+    FULU_FORK_EPOCH: UInt64SerializedAsString
+    FULU_FORK_VERSION: Version
+
     @classmethod
     def from_obj(cls, obj: ObjType) -> Self:
         if not isinstance(obj, dict):
@@ -97,5 +101,5 @@ class SpecElectra(Container):
         return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
 
 
-def parse_spec(data: dict[str, str]) -> SpecElectra:
-    return SpecElectra.from_obj(data)
+def parse_spec(data: dict[str, str]) -> SpecFulu:
+    return SpecFulu.from_obj(data)
