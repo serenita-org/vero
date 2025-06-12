@@ -83,6 +83,7 @@ class BeaconBlockHeader(msgspec.Struct):
 
 class BeaconBlockVersion(Enum):
     ELECTRA = "ELECTRA"
+    FULU = "FULU"
 
 
 class BeaconBlock(msgspec.Struct):
