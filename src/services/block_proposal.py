@@ -485,7 +485,7 @@ class BlockProposalService(ValidatorDutyService):
                     else:
                         await self.multi_beacon_node.publish_block_v2(
                             fork_version=full_response.version,
-                            signed_beacon_block_contents=SchemaBeaconAPI.ElectraBlockContentsSigned(
+                            signed_beacon_block_contents=SchemaBeaconAPI.BlockContentsSigned(
                                 signed_block=SchemaBeaconAPI.SignedBeaconBlock(
                                     message=full_response.data["block"],
                                     signature=signature,

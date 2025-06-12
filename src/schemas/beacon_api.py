@@ -60,6 +60,7 @@ class Checkpoint(msgspec.Struct, frozen=True):
 
 class ForkVersion(Enum):
     ELECTRA = "electra"
+    FULU = "fulu"
 
 
 class AttestationData(msgspec.Struct, frozen=True):
@@ -195,7 +196,7 @@ class SignedBeaconBlock(msgspec.Struct):
     signature: str
 
 
-class ElectraBlockContentsSigned(msgspec.Struct):
+class BlockContentsSigned(msgspec.Struct):
     signed_block: SignedBeaconBlock
     kzg_proofs: list[str]
     blobs: list[str]
