@@ -76,10 +76,7 @@ class AttestationService(ValidatorDutyService):
             self.attester_duties = defaultdict(set, duties)
             self.attester_duties_dependent_roots = dependent_roots
         except Exception as e:
-            self.logger.warning(
-                f"Failed to load duties from cache: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
+            self.logger.debug(f"Failed to load duties from cache: {e}")
         finally:
             # The cached duties may be stale - call update_duties even if
             # we loaded duties from cache
@@ -99,10 +96,7 @@ class AttestationService(ValidatorDutyService):
                 dependent_roots=self.attester_duties_dependent_roots,
             )
         except Exception as e:
-            self.logger.warning(
-                f"Failed to cache duties: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
-            )
+            self.logger.warning(f"Failed to cache duties: {e}")
 
     def has_duty_for_slot(self, slot: int) -> bool:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
