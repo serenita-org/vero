@@ -265,6 +265,29 @@ class BeaconNodeResponseSequence(TypedDict):
             250,
             id="2 fast responses and 1 delayed - we do not wait for the delayed one",
         ),
+        pytest.param(
+            [
+                dict(
+                    host="beacon-node-a",
+                    responses=[
+                        BeaconNodeResponse(
+                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                                version=SchemaBeaconAPI.ForkVersion.ELECTRA,
+                                execution_payload_blinded=False,
+                                execution_payload_value="",
+                                consensus_block_value="",
+                                data=dict(),
+                            ),
+                            exception=None,
+                            delay=0,
+                        ),
+                    ],
+                ),
+            ],
+            0,
+            # https://github.com/OffchainLabs/prysm/issues/15174
+            id="No block value provided",
+        ),
     ],
 )
 async def test_produce_block_v3(
