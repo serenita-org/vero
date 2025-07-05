@@ -217,6 +217,10 @@ class EventConsumerService:
                 #      HMMM perhaps an entire logic change makes sense here - emit the head event
                 #      only once it's been seen by multiple BNs? It would avoid the polling we do
                 #      ...
+                #      hmm actually we just fall back to "expected_block_root=None" behavior
+                #      at some point so this seems a non-issue?
+                #      there is another Q though. We're currently coming to consensus on the
+                #      head block root but we should also confirm the FFG part - source+target
 
         except asyncio.CancelledError:
             raise
