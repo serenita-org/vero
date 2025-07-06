@@ -363,10 +363,57 @@ class BeaconNode:
                     committee_index=committee_index,
                 )
                 if att_data.beacon_block_root.to_obj() == expected_head_block_root:
+                    self.logger.info(f"Got att data from {self.host}!")
                     return att_data
             except Exception as e:
                 self.logger.exception(
                     f"Failed to produce attestation data: {e!r}",
+                )
+
+            # Rate-limiting - wait at least 50ms in between requests
+            elapsed_time = asyncio.get_running_loop().time() - _request_start_time
+            await asyncio.sleep(max(0.05 - elapsed_time, 0))
+
+    async def get_finality_checkpoints(
+        self,
+        state_id: str = "head",
+    ) -> SchemaBeaconAPI.GetStateFinalityCheckpointsResponse:
+        """Returns the beacon node host along with the produced attestation data."""
+        resp_text = await self._make_request(
+            method="GET",
+            endpoint="/eth/v1/beacon/states/{state_id}/finality_checkpoints",
+            formatted_endpoint_string_params=dict(state_id=state_id),
+            timeout=ClientTimeout(
+                connect=self.client_session.timeout.connect,
+                total=0.5,
+            ),
+        )
+
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.GetStateFinalityCheckpointsResponse
+        )
+        self._raise_if_optimistic(response)
+
+        return response
+
+    async def confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+        while True:
+            _request_start_time = asyncio.get_running_loop().time()
+
+            try:
+                resp = await self.get_finality_checkpoints()
+                if resp.data.current_justified.root == str(
+                    checkpoint.root
+                ) and resp.data.current_justified.epoch == str(checkpoint.epoch):
+                    # Checkpoint confirmed
+                    # TODO debug? or leave it info since it's just 1x/epoch
+                    # TODO track this as metric too?
+                    self.logger.info(f"Source checkpoint confirmed by {self.host}")
+                    return
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to get finality checkpoints: {e!r}",
+                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
 
             # Rate-limiting - wait at least 50ms in between requests

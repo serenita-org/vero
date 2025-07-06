@@ -49,7 +49,7 @@ from observability import ErrorType, get_shared_metrics
 from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.attestation import AttestationData
+from spec.attestation import AttestationData, Checkpoint
 from spec.base import SpecElectra
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
@@ -531,6 +531,62 @@ class MultiBeaconNode:
             await asyncio.sleep(
                 max(0.03 - (asyncio.get_running_loop().time() - _round_start), 0),
             )
+
+    async def wait_for_attestation_data(
+        self,
+        expected_head_block_root: str,
+        slot: int,
+        committee_index: int,
+    ) -> AttestationData:
+        tasks = [
+            asyncio.create_task(
+                bn.wait_for_attestation_data(
+                    expected_head_block_root=expected_head_block_root,
+                    slot=slot,
+                    committee_index=committee_index,
+                )
+            )
+            for bn in self.initialized_beacon_nodes
+        ]
+
+        try:
+            for coro in asyncio.as_completed(tasks):
+                att_data = await coro
+                for task in tasks:
+                    task.cancel()
+                return att_data
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            raise
+
+        raise RuntimeError(
+            f"Failed waiting for attestation data with block root {expected_head_block_root}"
+        )
+
+    async def confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+        tasks = [
+            asyncio.create_task(bn.confirm_source_checkpoint(checkpoint=checkpoint))
+            for bn in self.initialized_beacon_nodes
+        ]
+
+        try:
+            confirmations = 0
+            for coro in asyncio.as_completed(tasks):
+                await coro
+
+                confirmations += 1  # noqa: SIM113
+                # TODO allow this threshold to be configured differently (usually higher?)
+                #  from the attestation consensus threshold
+                #  (allow to override each using head/source thresholds)
+                if confirmations >= self._attestation_consensus_threshold:
+                    for task in tasks:
+                        task.cancel()
+                    return
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            raise
 
     async def publish_attestations(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(

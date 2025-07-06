@@ -53,6 +53,19 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
+class Checkpoint(msgspec.Struct):
+    epoch: str
+    root: str
+
+
+class GetStateFinalityCheckpointsResponseData(msgspec.Struct):
+    current_justified: Checkpoint
+
+
+class GetStateFinalityCheckpointsResponse(ExecutionOptimisticResponse):
+    data: GetStateFinalityCheckpointsResponseData
+
+
 class ForkVersion(Enum):
     ELECTRA = "electra"
 

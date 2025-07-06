@@ -4,7 +4,7 @@ import datetime
 import time
 from collections import defaultdict
 from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
@@ -26,12 +26,15 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import AttestationData, SpecAttestation
+from spec.attestation import AttestationData, Checkpoint, SpecAttestation
 from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
+
+if TYPE_CHECKING:
+    from remerkleable.settings import Root
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -84,6 +87,8 @@ class AttestationService(ValidatorDutyService):
         self.block_root_to_consensus_reached_event: dict[str, asyncio.Event] = (
             defaultdict(asyncio.Event)
         )
+
+        self.source_checkpoint_confirmation_cache: dict[int, Root] = dict()
 
     async def __aenter__(self) -> Self:
         try:
@@ -212,6 +217,32 @@ class AttestationService(ValidatorDutyService):
         ):
             self.block_root_to_consensus_reached_event[block_root].set()
 
+    async def _confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+        checkpoint_htr = checkpoint.hash_tree_root()
+        if (
+            self.source_checkpoint_confirmation_cache.get(checkpoint.epoch)
+            == checkpoint_htr
+        ):
+            # TODO remove logging/debug?
+            self.logger.info("Source checkpoint confirmed from cache")
+            return
+
+        confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(
+            self.beacon_chain.current_slot + 1
+        )
+        try:
+            await asyncio.wait_for(
+                self.multi_beacon_node.confirm_source_checkpoint(checkpoint=checkpoint),
+                timeout=confirm_deadline_ts - time.time(),
+            )
+            self.source_checkpoint_confirmation_cache[checkpoint.epoch] = checkpoint_htr
+            self.logger.info("Source checkpoint confirmed!")
+        except TimeoutError:
+            self.logger.debug(f"Timed out confirming source checkpoint {checkpoint}")
+            raise TimeoutError(
+                f"Timed out confirming source checkpoint {checkpoint}"
+            ) from None
+
     async def _produce_attestation_data_without_expected_root(
         self, slot: int
     ) -> AttestationData:
@@ -227,6 +258,8 @@ class AttestationService(ValidatorDutyService):
         )
         for bn_host in bn_hosts:
             _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
+
+        await self._confirm_source_checkpoint(checkpoint=att_data.source)
         return att_data
 
     async def _produce_attestation_data(
@@ -247,14 +280,10 @@ class AttestationService(ValidatorDutyService):
         bn_host_with_initial_head = next(
             iter(self.block_root_to_beacon_node_hosts[expected_block_root])
         )
-        bn_with_head = next(
-            bn
-            for bn in self.multi_beacon_node.beacon_nodes
-            if bn.host == bn_host_with_initial_head
-        )
 
+        # Fetch the full AttestationData while waiting for further head confirmations
         attestation_data_task = asyncio.create_task(
-            bn_with_head.wait_for_attestation_data(
+            self.multi_beacon_node.wait_for_attestation_data(
                 expected_head_block_root=expected_block_root,
                 slot=slot,
                 committee_index=0,
@@ -277,7 +306,7 @@ class AttestationService(ValidatorDutyService):
             # Consensus was not reached on expected block root.
             # Fallback to behavior as if no head event block root was received.
             self.logger.warning(
-                f"Consensus was not reached for slot {slot} and block root {expected_block_root}"
+                f"Consensus was not reached for slot {slot} and block root {expected_block_root} - falling back"
             )
             return await self._produce_attestation_data(
                 slot=slot, expected_block_root=None
@@ -300,10 +329,15 @@ class AttestationService(ValidatorDutyService):
                         "host.name": bn_host,
                     },
                 )
-        return await asyncio.wait_for(
+
+        self.logger.info("Head decided, waiting for att data")
+        att_data = await asyncio.wait_for(
             attestation_data_task,
             timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
         )
+        self.logger.info("Got att data")
+        await self._confirm_source_checkpoint(checkpoint=att_data.source)
+        return att_data
 
     async def attest(
         self,

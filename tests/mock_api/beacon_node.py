@@ -173,8 +173,26 @@ def _mocked_beacon_node_endpoints(
                 slot=int(url.query["slot"]),
                 index=int(url.query["committee_index"]),
                 beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
+                source=Checkpoint(
+                    epoch=beacon_chain.current_epoch,
+                ),
             )
             return CallbackResult(payload=dict(data=att_data.to_obj()))
+
+        if re.match("/eth/v1/beacon/states/head/finality_checkpoints", url.raw_path):
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetStateFinalityCheckpointsResponse(
+                        execution_optimistic=False,
+                        data=SchemaBeaconAPI.GetStateFinalityCheckpointsResponseData(
+                            current_justified=SchemaBeaconAPI.Checkpoint(
+                                epoch=str(beacon_chain.current_epoch),
+                                root="0x0000000000000000000000000000000000000000000000000000000000000000",
+                            )
+                        ),
+                    )
+                )
+            )
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
