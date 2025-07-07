@@ -95,9 +95,9 @@ def _process_gas_limit(input_value: int | None, network: Network) -> int:
         return input_value
 
     _defaults = {
-        Network.MAINNET: 60_000_000,
+        Network.MAINNET: 45_000_000,
         Network.GNOSIS: 17_000_000,
-        Network.HOLESKY: 36_000_000,
+        Network.HOLESKY: 60_000_000,
         Network.HOODI: 60_000_000,
         Network.CHIADO: 17_000_000,
         Network.CUSTOM: 100_000_000,
