@@ -217,7 +217,9 @@ class AttestationService(ValidatorDutyService):
         ):
             self.block_root_to_consensus_reached_event[block_root].set()
 
-    async def _confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+    async def _confirm_source_checkpoint(
+        self, checkpoint: Checkpoint, slot: int
+    ) -> None:
         checkpoint_htr = checkpoint.hash_tree_root()
         if (
             self.source_checkpoint_confirmation_cache.get(checkpoint.epoch)
@@ -227,12 +229,12 @@ class AttestationService(ValidatorDutyService):
             self.logger.info("Source checkpoint confirmed from cache")
             return
 
-        confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(
-            self.beacon_chain.current_slot + 1
-        )
+        confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
         try:
             await asyncio.wait_for(
-                self.multi_beacon_node.confirm_source_checkpoint(checkpoint=checkpoint),
+                self.multi_beacon_node.confirm_source_checkpoint(
+                    checkpoint=checkpoint, state_id=str(slot)
+                ),
                 timeout=confirm_deadline_ts - time.time(),
             )
             self.source_checkpoint_confirmation_cache[checkpoint.epoch] = checkpoint_htr
@@ -259,7 +261,7 @@ class AttestationService(ValidatorDutyService):
         for bn_host in bn_hosts:
             _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
 
-        await self._confirm_source_checkpoint(checkpoint=att_data.source)
+        await self._confirm_source_checkpoint(checkpoint=att_data.source, slot=slot)
         return att_data
 
     async def _produce_attestation_data(
@@ -336,7 +338,7 @@ class AttestationService(ValidatorDutyService):
             timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
         )
         self.logger.info("Got att data")
-        await self._confirm_source_checkpoint(checkpoint=att_data.source)
+        await self._confirm_source_checkpoint(checkpoint=att_data.source, slot=slot)
         return att_data
 
     async def attest(

@@ -376,7 +376,7 @@ class BeaconNode:
 
     async def get_finality_checkpoints(
         self,
-        state_id: str = "head",
+        state_id: str,
     ) -> SchemaBeaconAPI.GetStateFinalityCheckpointsResponse:
         """Returns the beacon node host along with the produced attestation data."""
         resp_text = await self._make_request(
@@ -396,12 +396,15 @@ class BeaconNode:
 
         return response
 
-    async def confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+    async def confirm_source_checkpoint(
+        self, checkpoint: Checkpoint, state_id: str
+    ) -> None:
         while True:
             _request_start_time = asyncio.get_running_loop().time()
 
             try:
-                resp = await self.get_finality_checkpoints()
+                resp = await self.get_finality_checkpoints(state_id=state_id)
+
                 if resp.data.current_justified.root == str(
                     checkpoint.root
                 ) and resp.data.current_justified.epoch == str(checkpoint.epoch):
@@ -410,6 +413,10 @@ class BeaconNode:
                     # TODO track this as metric too?
                     self.logger.info(f"Source checkpoint confirmed by {self.host}")
                     return
+                self.logger.warning(f"Source checkpoint mismatch on {self.host}")
+                self.logger.debug(f"Expected: {checkpoint}")
+                self.logger.debug(f"Resp: {resp}")
+
             except Exception as e:
                 self.logger.error(
                     f"Failed to get finality checkpoints: {e!r}",

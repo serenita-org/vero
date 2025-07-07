@@ -564,9 +564,13 @@ class MultiBeaconNode:
             f"Failed waiting for attestation data with block root {expected_head_block_root}"
         )
 
-    async def confirm_source_checkpoint(self, checkpoint: Checkpoint) -> None:
+    async def confirm_source_checkpoint(
+        self, checkpoint: Checkpoint, state_id: str
+    ) -> None:
         tasks = [
-            asyncio.create_task(bn.confirm_source_checkpoint(checkpoint=checkpoint))
+            asyncio.create_task(
+                bn.confirm_source_checkpoint(checkpoint=checkpoint, state_id=state_id)
+            )
             for bn in self.initialized_beacon_nodes
         ]
 

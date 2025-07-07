@@ -396,7 +396,7 @@ async def test_produce_attestation_data_without_head_event(
             for bn in attestation_service.multi_beacon_node.beacon_nodes:
                 m.get(
                     re.compile(
-                        rf"http://{bn.host}:1234/eth/v1/beacon/states/head/finality_checkpoints"
+                        rf"http://{bn.host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
                     ),
                     callback=_create_finality_checkpoints_callback(),
                 )
@@ -650,7 +650,7 @@ async def test_produce_attestation_data_with_head_event(
             if confirm_source:
                 m.get(
                     re.compile(
-                        rf"http://{bn.host}:1234/eth/v1/beacon/states/head/finality_checkpoints"
+                        rf"http://{bn.host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
                     ),
                     callback=_create_finality_checkpoints_callback(),
                 )

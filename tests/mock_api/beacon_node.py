@@ -179,7 +179,7 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
-        if re.match("/eth/v1/beacon/states/head/finality_checkpoints", url.raw_path):
+        if re.match(r"/eth/v1/beacon/states/\w+/finality_checkpoints", url.raw_path):
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetStateFinalityCheckpointsResponse(
