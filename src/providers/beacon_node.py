@@ -705,6 +705,11 @@ class BeaconNode:
                 resp, type=SchemaBeaconAPI.ProduceBlockV3Response
             )
 
+            # Prysm may return an empty string for the block value
+            # https://github.com/OffchainLabs/prysm/issues/15174
+            response.consensus_block_value = response.consensus_block_value or "0"
+            response.execution_payload_value = response.execution_payload_value or "0"
+
             consensus_block_value = int(response.consensus_block_value)
             execution_payload_value = int(response.execution_payload_value)
 
