@@ -76,8 +76,7 @@ async def start_server(keymanager: "Keymanager", cli_args: CLIArgs) -> None:
         await app.cleanup()
 
     except Exception as e:
-        logger.error(
+        logger.exception(
             f"Unexpected error occurred - exiting... {e!r}",
-            exc_info=logger.isEnabledFor(logging.DEBUG),
         )
         sys.exit(1)

@@ -199,9 +199,8 @@ class BeaconNode:
                 f"Initialized beacon node at {self.base_url}",
             )
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to initialize beacon node at {self.base_url}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             # Try to initialize again in 30 seconds
             self.task_manager.submit_task(self.initialize_full(), delay=30.0)
@@ -269,9 +268,8 @@ class BeaconNode:
         except BeaconNodeUnsupportedEndpoint:
             raise
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
@@ -387,9 +385,8 @@ class BeaconNode:
                     if att_data.beacon_block_root.to_obj() == expected_head_block_root:
                         return self.host, att_data
                 except Exception as e:
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to produce attestation data: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
 
                 # Rate-limiting - wait at least 50ms in between requests
@@ -741,14 +738,6 @@ class BeaconNode:
         fork_version: SchemaBeaconAPI.ForkVersion,
         signed_beacon_block_contents: "SpecBeaconBlock.ElectraBlockContentsSigned",
     ) -> None:
-        if self.logger.isEnabledFor(logging.DEBUG):
-            block = signed_beacon_block_contents.signed_block.message
-            self.logger.debug(
-                f"Publishing block for slot {block.slot},"
-                f" block root {block.hash_tree_root().hex()},"
-                f" body root {block.body.hash_tree_root().hex()}",
-            )
-
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_block_v2",
             kind=SpanKind.CLIENT,
@@ -771,14 +760,6 @@ class BeaconNode:
         fork_version: SchemaBeaconAPI.ForkVersion,
         signed_blinded_beacon_block: "SpecBeaconBlock.ElectraBlindedBlockSigned",
     ) -> None:
-        if self.logger.isEnabledFor(logging.DEBUG):
-            block = signed_blinded_beacon_block.message
-            self.logger.debug(
-                f"Publishing blinded block for slot {block.slot},"
-                f" block root {block.hash_tree_root().hex()},"
-                f" body root {block.body.hash_tree_root().hex()}",
-            )
-
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_blinded_block_v2",
             kind=SpanKind.CLIENT,
@@ -843,9 +824,8 @@ class BeaconNode:
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.EVENT_CONSUMER.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to parse event name from {decoded} ({e!r}) -> ignoring event...",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     continue
 

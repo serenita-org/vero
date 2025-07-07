@@ -510,9 +510,8 @@ class MultiBeaconNode:
                 # Deadline reached
                 continue
             except Exception as e:
-                self.logger.error(
+                self.logger.exception(
                     f"Failed waiting for attestation data: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 continue
 
@@ -552,9 +551,8 @@ class MultiBeaconNode:
                     host, att_data = await coro
                 except Exception as e:
                     # We can tolerate some attestation data production failures
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to produce attestation data: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     continue
 
@@ -734,9 +732,8 @@ class MultiBeaconNode:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to produce aggregate attestation for slot {attestation_data.slot}: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
 
     async def publish_aggregate_and_proofs(

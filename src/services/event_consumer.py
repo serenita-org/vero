@@ -115,8 +115,7 @@ class EventConsumerService:
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.EVENT_CONSUMER.value,
             ).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 1 second...",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             self.task_manager.submit_task(self.handle_events(), delay=1.0)

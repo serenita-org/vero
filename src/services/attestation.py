@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import datetime
-import logging
 from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
@@ -231,9 +230,8 @@ class AttestationService(ValidatorDutyService):
                         committee_index=0,
                     )
                 except AttestationConsensusFailure as e:
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to produce attestation data: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
                     _ERRORS_METRIC.labels(
@@ -298,9 +296,8 @@ class AttestationService(ValidatorDutyService):
                         _ERRORS_METRIC.labels(
                             error_type=ErrorType.SIGNATURE.value,
                         ).inc()
-                        self.logger.error(
+                        self.logger.exception(
                             f"Failed to get signature for attestation for slot {slot}: {e!r}",
-                            exc_info=self.logger.isEnabledFor(logging.DEBUG),
                         )
                         sign_span.set_status(Status(StatusCode.ERROR))
                         sign_span.record_exception(e)
@@ -350,9 +347,8 @@ class AttestationService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.ATTESTATION_PUBLISH.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     publish_span.set_status(Status(StatusCode.ERROR))
                     publish_span.record_exception(e)
@@ -432,9 +428,8 @@ class AttestationService(ValidatorDutyService):
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
             ).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to publish aggregate and proofs for slot {slot}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
 
     async def aggregate_attestations(
@@ -534,9 +529,8 @@ class AttestationService(ValidatorDutyService):
             )
         except Exception as e:
             _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to get signatures for aggregation selection proofs: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             raise
 

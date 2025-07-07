@@ -1,7 +1,6 @@
 import asyncio
 import contextlib
 import datetime
-import logging
 from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
@@ -172,9 +171,8 @@ class SyncCommitteeService(ValidatorDutyService):
                     block_id="head",
                 )
             except Exception as e:
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to get beacon block root: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
@@ -202,9 +200,8 @@ class SyncCommitteeService(ValidatorDutyService):
                 msg, sig, pubkey = await coro
             except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 continue
 
@@ -247,9 +244,8 @@ class SyncCommitteeService(ValidatorDutyService):
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
             ).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to publish sync committee messages for slot {duty_slot}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
         else:
             self.logger.info(
@@ -294,9 +290,8 @@ class SyncCommitteeService(ValidatorDutyService):
             selection_proofs = await asyncio.gather(*selection_proofs_coroutines)
         except Exception as e:
             _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to get signatures for sync selection proofs for slot {duty_slot}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             return
 
@@ -374,9 +369,8 @@ class SyncCommitteeService(ValidatorDutyService):
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
             ).inc()
-            self.logger.error(
+            self.logger.exception(
                 f"Failed to publish sync committee contribution and proofs for slot {duty_slot}: {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
 
     async def aggregate_sync_messages(

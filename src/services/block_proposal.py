@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import time
 from collections import defaultdict
 from types import TracebackType
@@ -272,9 +271,8 @@ class BlockProposalService(ValidatorDutyService):
                 )
             except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to get signature for validator registrations: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 continue
 
@@ -361,9 +359,8 @@ class BlockProposalService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to get signature for RANDAO reveal: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     self._last_slot_duty_completed_for = slot
                     raise
@@ -396,9 +393,8 @@ class BlockProposalService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.BLOCK_PRODUCE.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to produce block: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     self._last_slot_duty_completed_for = slot
                     raise
@@ -436,9 +432,8 @@ class BlockProposalService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to get signature for block: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     self._last_slot_duty_completed_for = slot
                     raise
@@ -494,9 +489,8 @@ class BlockProposalService(ValidatorDutyService):
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.BLOCK_PUBLISH.value,
                     ).inc()
-                    self.logger.error(
+                    self.logger.exception(
                         f"Failed to publish block for slot {slot}: {e!r}",
-                        exc_info=self.logger.isEnabledFor(logging.DEBUG),
                     )
                     raise
                 else:

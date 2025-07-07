@@ -189,9 +189,8 @@ class ValidatorDutyService:
                 break
             except Exception as e:
                 _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to update duties: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
 
                 # Wait for the current delay before retrying again
