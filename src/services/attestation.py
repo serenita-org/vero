@@ -229,6 +229,8 @@ class AttestationService(ValidatorDutyService):
             self.logger.info("Source checkpoint confirmed from cache")
             return
 
+        self.logger.info(f"Confirming {checkpoint}")
+
         confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
         try:
             await asyncio.wait_for(
@@ -238,7 +240,7 @@ class AttestationService(ValidatorDutyService):
                 timeout=confirm_deadline_ts - time.time(),
             )
             self.source_checkpoint_confirmation_cache[checkpoint.epoch] = checkpoint_htr
-            self.logger.info("Source checkpoint confirmed!")
+            self.logger.info("Source checkpoint confirmed")
         except TimeoutError:
             self.logger.debug(f"Timed out confirming source checkpoint {checkpoint}")
             raise TimeoutError(
@@ -337,7 +339,7 @@ class AttestationService(ValidatorDutyService):
             attestation_data_task,
             timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
         )
-        self.logger.info("Got att data")
+        self.logger.info("Att data received, confirming source checkpoint")
         await self._confirm_source_checkpoint(checkpoint=att_data.source, slot=slot)
         return att_data
 
@@ -789,6 +791,15 @@ class AttestationService(ValidatorDutyService):
         for epoch in list(self.attester_duties_dependent_roots.keys()):
             if epoch < current_epoch:
                 del self.attester_duties_dependent_roots[epoch]
+
+        # Only keep up to 3 most recent checkpoints in cache
+        self.source_checkpoint_confirmation_cache = dict(
+            sorted(
+                self.source_checkpoint_confirmation_cache.items(),
+                key=lambda item: item[0],
+                reverse=True,
+            )[:3]
+        )
 
     async def _update_duties(self) -> None:
         if not self.validator_status_tracker_service.any_active_or_pending_validators:

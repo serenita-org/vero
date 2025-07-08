@@ -363,7 +363,7 @@ class BeaconNode:
                     committee_index=committee_index,
                 )
                 if att_data.beacon_block_root.to_obj() == expected_head_block_root:
-                    self.logger.info(f"Got att data from {self.host}!")
+                    self.logger.info(f"Got matching att data from {self.host}")
                     return att_data
             except Exception as e:
                 self.logger.exception(
