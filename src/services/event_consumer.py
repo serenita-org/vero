@@ -224,7 +224,7 @@ class EventConsumerService:
 
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as e:
             beacon_node.score -= BeaconNode.SCORE_DELTA_FAILURE
             _ERRORS_METRIC.labels(
                 error_type=ErrorType.EVENT_CONSUMER.value,
