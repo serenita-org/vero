@@ -204,9 +204,8 @@ class ValidatorStatusTrackerService:
                 _ERRORS_METRIC.labels(
                     error_type=ErrorType.VALIDATOR_STATUS_UPDATE.value
                 ).inc()
-                self.logger.error(
+                self.logger.exception(
                     f"Failed to update validator statuses: {e!r}",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
 
                 # Wait for the current delay before retrying again

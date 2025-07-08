@@ -49,9 +49,8 @@ async def exception_handler(
         status_code = 500
         msg = repr(e)
         logger = logging.getLogger("api.keymanager.middlewares.exception_handler")
-        logger.error(
+        logger.exception(
             f"Exception occurred while handling request to {request.url}: {msg}",
-            exc_info=logger.isEnabledFor(logging.DEBUG),
         )
 
     return web.json_response(

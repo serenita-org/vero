@@ -24,9 +24,8 @@ class TaskManager:
             # Re-raise the exception to get a nice traceback
             task.result()
         except Exception as e:
-            self.logger.error(
+            self.logger.exception(
                 f"Task {task} failed with exception {e!r}",
-                exc_info=self.logger.isEnabledFor(logging.DEBUG),
             )
             _ERRORS_METRIC.labels(error_type=ErrorType.OTHER.value).inc()
 
@@ -36,9 +35,8 @@ class TaskManager:
         except asyncio.CancelledError:
             if not self.shutdown_event.is_set():
                 # Log cancellations as errors only if we're not shutting down
-                self.logger.error(
+                self.logger.exception(
                     f"Task {task} was cancelled",
-                    exc_info=self.logger.isEnabledFor(logging.DEBUG),
                 )
                 _ERRORS_METRIC.labels(error_type=ErrorType.OTHER.value).inc()
         else:
