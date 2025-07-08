@@ -83,6 +83,9 @@ class AttestationService(ValidatorDutyService):
         )
 
         # Block root counter used for reaching consensus on attestation data to sign
+        # TODO consider doing something with these in _prune_duties(). The values in here
+        # are cleaned up under normal circumstances but under less-than-normal circumstances
+        # they will not be cleaned...
         self.block_root_to_beacon_node_hosts: dict[str, set[str]] = defaultdict(set)
         self.block_root_to_consensus_reached_event: dict[str, asyncio.Event] = (
             defaultdict(asyncio.Event)
@@ -231,6 +234,9 @@ class AttestationService(ValidatorDutyService):
 
         self.logger.info(f"Confirming {checkpoint}")
 
+        # TODO should we reduce the timeout and return the most-recently-confirmed checkpoint instead?
+        #  that way we'd still be attesting, just with an older source checkpoint.
+        #  That's possibly better for everyone, even the chain?
         confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
         try:
             await asyncio.wait_for(
