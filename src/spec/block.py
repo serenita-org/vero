@@ -1,4 +1,4 @@
-from remerkleable.basic import uint64, uint256
+from remerkleable.basic import uint256
 from remerkleable.bitfields import Bitvector
 from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
@@ -115,7 +115,7 @@ class DepositRequest(Container):
     withdrawal_credentials: Bytes32
     amount: Gwei
     signature: BLSSignature
-    index: uint64
+    index: UInt64SerializedAsString
 
 
 class WithdrawalRequest(Container):
