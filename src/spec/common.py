@@ -1,7 +1,7 @@
 from hashlib import sha256
 from typing import Literal
 
-from remerkleable.basic import uint64
+from remerkleable.basic import uint64, uint256
 from remerkleable.byte_arrays import Bytes32, Bytes48, Bytes96
 from remerkleable.core import ObjType
 
@@ -23,6 +23,11 @@ class BLSSignature(Bytes96):
 
 
 class UInt64SerializedAsString(uint64):
+    def to_obj(self) -> ObjType:
+        return str(self)
+
+
+class UInt256SerializedAsString(uint256):
     def to_obj(self) -> ObjType:
         return str(self)
 

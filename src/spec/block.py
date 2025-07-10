@@ -1,8 +1,6 @@
-from remerkleable.basic import uint256
 from remerkleable.bitfields import Bitvector
 from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
-from remerkleable.core import ObjType
 
 from spec.attestation import (
     AttestationData,
@@ -17,6 +15,7 @@ from spec.common import (
     Root,
     Slot,
     UInt64SerializedAsString,
+    UInt256SerializedAsString,
     ValidatorIndex,
 )
 from spec.constants import BYTES_PER_FIELD_ELEMENT, DEPOSIT_CONTRACT_TREE_DEPTH
@@ -103,11 +102,6 @@ class SignedBLSToExecutionChange(Container):
 
 class KZGCommitment(Bytes48):
     pass
-
-
-class UInt256SerializedAsString(uint256):
-    def to_obj(self) -> ObjType:
-        return str(self)
 
 
 class DepositRequest(Container):

@@ -52,3 +52,10 @@ repos:
       - id: uv-export
         name: export dev dependencies -> requirements-dev.txt
         args: ["--dev", "--output-file=requirements-dev.txt"]
+
+  - repo: local
+    hooks:
+      - id: check-spec-types
+        name: check types used in spec
+        entry: ./src/spec/type_check.sh
+        language: system

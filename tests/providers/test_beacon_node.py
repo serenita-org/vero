@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from providers import BeaconNode
 from spec.base import SpecElectra, Version
+from spec.common import UInt64SerializedAsString
 from tasks import TaskManager
 
 
@@ -32,7 +33,7 @@ async def test_initialize_spec_mismatch(
         spec_to_return = spec
         if spec_mismatch:
             spec_to_return = copy(spec)
-            spec_to_return.SLOTS_PER_EPOCH = 5
+            spec_to_return.SLOTS_PER_EPOCH = UInt64SerializedAsString(5)
             spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
 
         m.get(
