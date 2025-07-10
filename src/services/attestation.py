@@ -8,14 +8,6 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from opentelemetry import trace
-from opentelemetry.trace import (
-    NonRecordingSpan,
-    SpanContext,
-    Status,
-    StatusCode,
-    TraceFlags,
-)
 from prometheus_client import Counter as CounterMetric
 from prometheus_client import Histogram
 
@@ -164,14 +156,12 @@ class AttestationService(ValidatorDutyService):
         await self.attest_if_not_yet_attested(
             slot=int(event.slot),
             head_event=event,
-            head_event_beacon_node_host=beacon_node_host,
         )
 
     async def attest_if_not_yet_attested(
         self,
         slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
-        head_event_beacon_node_host: str | None = None,
     ) -> None:
         """
         We either
@@ -217,190 +207,140 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(f"No remaining attester duties for slot {slot}")
             return
 
-        # We explicitly create a new span context
-        # so this span doesn't get attached to some
-        # previous context
-        # TODO remove tracing for attestations... I don't think it's worth it
-        #  it's a ton of data and you don't learn that much from it for attestations
-        span_ctx = SpanContext(
-            trace_id=slot,
-            span_id=trace.INVALID_SPAN_ID,
-            is_remote=False,
-            trace_flags=TraceFlags(0x01),
+        self.logger.debug(
+            f"Attesting to slot {slot}, {len(slot_attester_duties)} duties",
         )
-        span_attrs: dict[str, int | str] = {
-            "beacon_chain.slot": slot,
-        }
-        if head_event:
-            span_attrs["head_event.beacon_block_root"] = head_event.block
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.attest",
-            context=trace.set_span_in_context(NonRecordingSpan(span_ctx)),
-            attributes=span_attrs,
-        ) as attest_span:
-            if head_event is not None:
-                attest_span.add_event(
-                    name="HeadEvent",
-                    attributes={
-                        "host.name": head_event_beacon_node_host,
-                    },
-                )
+        self._last_slot_duty_started_for = slot
+        self._duty_start_time_metric.labels(
+            duty=ValidatorDuty.ATTESTATION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-            self.logger.debug(
-                f"Attesting to slot {slot}, {len(slot_attester_duties)} duties",
+        consensus_start = asyncio.get_running_loop().time()
+        try:
+            att_data = await self.attestation_data_provider.produce_attestation_data(
+                slot=slot,
+                head_event_block_root=head_event.block if head_event else None,
             )
-            self._last_slot_duty_started_for = slot
-            self._duty_start_time_metric.labels(
-                duty=ValidatorDuty.ATTESTATION.value,
-            ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
+        except TimeoutError as e:
+            self.logger.exception(
+                f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes (head event: {head_event}): {e!r}",
+            )
+            _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.ATTESTATION_CONSENSUS.value,
+            ).inc()
+            self._last_slot_duty_completed_for = slot
+            return
+        else:
+            consensus_time = asyncio.get_running_loop().time() - consensus_start
+            self.logger.debug(
+                f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
+            )
+            _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
 
-            consensus_start = asyncio.get_running_loop().time()
+        self.logger.debug(
+            "Attestation data:"
+            f"\nSource: {att_data.source}"
+            f"\nTarget: {att_data.target}"
+            f"\nHead: {att_data.beacon_block_root} (from head event: {head_event is not None})"
+        )
+
+        # Ensure attestation data checkpoints are not in the future
+        current_epoch = self.beacon_chain.current_epoch
+        if any(
+            int(cp.epoch) > current_epoch for cp in (att_data.source, att_data.target)
+        ):
+            raise RuntimeError(
+                f"Checkpoint in returned attestation data is in the future:"
+                f"\nCurrent epoch: {current_epoch}"
+                f"\nAttestation data: {att_data}"
+            )
+
+        # Sign the attestation data
+        attestations_objects_to_publish: list[SchemaBeaconAPI.SingleAttestation] = []
+
+        _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+        _fork_version = self.beacon_chain.current_fork_version
+
+        pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
+        att_data_obj = msgspec.structs.asdict(att_data)
+
+        for coro in asyncio.as_completed(
+            [
+                self.signature_provider.sign(
+                    message=SchemaRemoteSigner.AttestationSignableMessage(
+                        fork_info=_fork_info,
+                        attestation=att_data_obj,
+                    ),
+                    identifier=duty.pubkey,
+                )
+                for duty in slot_attester_duties
+            ],
+        ):
             try:
-                with self.tracer.start_as_current_span(
-                    name=f"{self.__class__.__name__}.produce_attestation_data",
-                ):
-                    att_data = (
-                        await self.attestation_data_provider.produce_attestation_data(
-                            slot=slot,
-                            head_event_block_root=head_event.block
-                            if head_event
-                            else None,
-                        )
-                    )
-            except TimeoutError as e:
-                self.logger.exception(
-                    f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes (head event: {head_event}): {e!r}",
-                )
-                _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
+                message, signature, pubkey = await coro
+            except Exception as e:
                 _ERRORS_METRIC.labels(
-                    error_type=ErrorType.ATTESTATION_CONSENSUS.value,
+                    error_type=ErrorType.SIGNATURE.value,
                 ).inc()
-                self._last_slot_duty_completed_for = slot
-                return
-            else:
-                consensus_time = asyncio.get_running_loop().time() - consensus_start
-                self.logger.debug(
-                    f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
+                self.logger.exception(
+                    f"Failed to get signature for attestation for slot {slot}: {e!r}",
                 )
-                _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
+                continue
 
-            self.logger.debug(
-                "Attestation data:"
-                f"\nSource: {att_data.source}"
-                f"\nTarget: {att_data.target}"
-                f"\nHead: {att_data.beacon_block_root} (from head event: {head_event is not None})"
+            duty = pubkey_to_duty[pubkey]
+
+            # SingleAttestation object from the CL spec
+            attestations_objects_to_publish.append(
+                SchemaBeaconAPI.SingleAttestation(
+                    committee_index=duty.committee_index,
+                    attester_index=duty.validator_index,
+                    data=att_data_obj,
+                    signature=signature,
+                ),
             )
 
-            # Ensure attestation data checkpoints are not in the future
-            current_epoch = self.beacon_chain.current_epoch
-            if any(
-                int(cp.epoch) > current_epoch
-                for cp in (att_data.source, att_data.target)
-            ):
-                raise RuntimeError(
-                    f"Checkpoint in returned attestation data is in the future:"
-                    f"\nCurrent epoch: {current_epoch}"
-                    f"\nAttestation data: {att_data}"
-                )
+        # Add the aggregation duty to the schedule *before*
+        # publishing attestations so that any delays in publishing
+        # do not affect the aggregation duty start time
+        self.task_manager.submit_task(
+            self.prepare_and_aggregate_attestations(
+                slot=slot,
+                att_data=att_data,
+                aggregator_duties=[d for d in slot_attester_duties if d.is_aggregator],
+            )
+        )
 
-            # Sign the attestation data
-            attestations_objects_to_publish: list[
-                SchemaBeaconAPI.SingleAttestation
-            ] = []
+        self.logger.debug(
+            f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
+        )
 
-            _fork_info = self.beacon_chain.get_fork_info(slot=slot)
-            _fork_version = self.beacon_chain.current_fork_version
+        self._duty_submission_time_metric.labels(
+            duty=ValidatorDuty.ATTESTATION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
-            pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
-            with self.tracer.start_as_current_span(
-                name=f"{self.__class__.__name__}.sign_attestations",
-            ) as sign_span:
-                att_data_obj = msgspec.structs.asdict(att_data)
-
-                for coro in asyncio.as_completed(
-                    [
-                        self.signature_provider.sign(
-                            message=SchemaRemoteSigner.AttestationSignableMessage(
-                                fork_info=_fork_info,
-                                attestation=att_data_obj,
-                            ),
-                            identifier=duty.pubkey,
-                        )
-                        for duty in slot_attester_duties
-                    ],
-                ):
-                    try:
-                        message, signature, pubkey = await coro
-                    except Exception as e:
-                        _ERRORS_METRIC.labels(
-                            error_type=ErrorType.SIGNATURE.value,
-                        ).inc()
-                        self.logger.exception(
-                            f"Failed to get signature for attestation for slot {slot}: {e!r}",
-                        )
-                        sign_span.set_status(Status(StatusCode.ERROR))
-                        sign_span.record_exception(e)
-                        continue
-
-                    duty = pubkey_to_duty[pubkey]
-
-                    # SingleAttestation object from the CL spec
-                    attestations_objects_to_publish.append(
-                        SchemaBeaconAPI.SingleAttestation(
-                            committee_index=duty.committee_index,
-                            attester_index=duty.validator_index,
-                            data=att_data_obj,
-                            signature=signature,
-                        ),
-                    )
-
-            # Add the aggregation duty to the schedule *before*
-            # publishing attestations so that any delays in publishing
-            # do not affect the aggregation duty start time
-            self.task_manager.submit_task(
-                self.prepare_and_aggregate_attestations(
-                    slot=slot,
-                    att_data=att_data,
-                    aggregator_duties=[
-                        d for d in slot_attester_duties if d.is_aggregator
-                    ],
-                )
+        try:
+            await self.multi_beacon_node.publish_attestations(
+                attestations=attestations_objects_to_publish,
+                fork_version=_fork_version,
+            )
+        except Exception as e:
+            _ERRORS_METRIC.labels(
+                error_type=ErrorType.ATTESTATION_PUBLISH.value,
+            ).inc()
+            self.logger.exception(
+                f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
+            )
+        else:
+            self.logger.info(
+                f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
             )
 
-            self.logger.debug(
-                f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
+            _VC_PUBLISHED_ATTESTATIONS.inc(
+                amount=len(attestations_objects_to_publish),
             )
-
-            self._duty_submission_time_metric.labels(
-                duty=ValidatorDuty.ATTESTATION.value,
-            ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
-            with self.tracer.start_as_current_span(
-                name=f"{self.__class__.__name__}.publish_attestations",
-            ) as publish_span:
-                try:
-                    await self.multi_beacon_node.publish_attestations(
-                        attestations=attestations_objects_to_publish,
-                        fork_version=_fork_version,
-                    )
-                except Exception as e:
-                    _ERRORS_METRIC.labels(
-                        error_type=ErrorType.ATTESTATION_PUBLISH.value,
-                    ).inc()
-                    self.logger.exception(
-                        f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
-                    )
-                    publish_span.set_status(Status(StatusCode.ERROR))
-                    publish_span.record_exception(e)
-                else:
-                    self.logger.info(
-                        f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
-                    )
-
-                    _VC_PUBLISHED_ATTESTATIONS.inc(
-                        amount=len(attestations_objects_to_publish),
-                    )
-                finally:
-                    self._last_slot_duty_completed_for = slot
+        finally:
+            self._last_slot_duty_completed_for = slot
 
     async def prepare_and_aggregate_attestations(
         self,

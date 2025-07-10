@@ -499,14 +499,6 @@ class MultiBeaconNode:
                 if prev_root is not None:
                     head_block_root_counter[prev_root] -= 1
 
-                trace.get_current_span().add_event(
-                    name="HeadBlockRoot",
-                    attributes={
-                        "host.name": host,
-                        "block_root": att_data.beacon_block_root,
-                    },
-                )
-
                 # Check if we reached the threshold for consensus
                 if (
                     head_block_root_counter[att_data.beacon_block_root]
