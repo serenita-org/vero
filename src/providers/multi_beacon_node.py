@@ -46,13 +46,14 @@ from remerkleable.complex import Container
 
 from args import CLIArgs
 from observability import ErrorType, get_shared_metrics
-from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.base import SpecElectra
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
+
+from .beacon_node import BeaconNode
 
 (_ERRORS_METRIC,) = get_shared_metrics()
 

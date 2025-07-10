@@ -179,21 +179,6 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
-        if re.match(r"/eth/v1/beacon/states/\w+/finality_checkpoints", url.raw_path):
-            return CallbackResult(
-                body=msgspec.json.encode(
-                    SchemaBeaconAPI.GetStateFinalityCheckpointsResponse(
-                        execution_optimistic=False,
-                        data=SchemaBeaconAPI.GetStateFinalityCheckpointsResponseData(
-                            current_justified=SchemaBeaconAPI.Checkpoint(
-                                epoch=str(beacon_chain.current_epoch),
-                                root="0x0000000000000000000000000000000000000000000000000000000000000000",
-                            )
-                        ),
-                    )
-                )
-            )
-
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
             if beacon_chain.current_fork_version == ForkVersion.ELECTRA:
                 fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA

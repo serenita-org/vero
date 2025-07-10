@@ -369,7 +369,7 @@ class BeaconNode:
                     slot=slot,
                 )
                 if att_data.beacon_block_root == expected_head_block_root:
-                    self.logger.info(f"Got matching att data from {self.host}")
+                    self.logger.debug(f"Got matching att data from {self.host}")
                     return att_data
             except Exception as e:
                 self.logger.warning(
@@ -403,34 +403,12 @@ class BeaconNode:
                     return
             except Exception as e:
                 self.logger.warning(
-                    f"Failed to produce attestation data: {e!r}",
+                    f"Failed to produce attestation data while waiting for checkpoints: {e!r}",
                 )
 
             # Rate-limiting - wait at least 50ms in between requests
             elapsed_time = asyncio.get_running_loop().time() - _request_start_time
             await asyncio.sleep(max(0.05 - elapsed_time, 0))
-
-    async def get_finality_checkpoints(
-        self,
-        state_id: str,
-    ) -> tuple[str, SchemaBeaconAPI.GetStateFinalityCheckpointsResponse]:
-        """Returns the beacon node host along with the produced attestation data."""
-        resp_text = await self._make_request(
-            method="GET",
-            endpoint="/eth/v1/beacon/states/{state_id}/finality_checkpoints",
-            formatted_endpoint_string_params=dict(state_id=state_id),
-            timeout=ClientTimeout(
-                connect=self.client_session.timeout.connect,
-                total=0.5,
-            ),
-        )
-
-        response = msgspec.json.decode(
-            resp_text, type=SchemaBeaconAPI.GetStateFinalityCheckpointsResponse
-        )
-        self._raise_if_optimistic(response)
-
-        return self.host, response
 
     async def get_block_root(self, block_id: str) -> str:
         resp_text = await self._make_request(
