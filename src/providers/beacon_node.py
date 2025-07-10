@@ -397,7 +397,7 @@ class BeaconNode:
                     att_data.source == expected_source_cp
                     and att_data.target == expected_target_cp
                 ):
-                    # TODO debug? or leave it info since it's just 1x/epoch
+                    # TODO debug? or leave it info since it's just 1x/epoch?
                     self.logger.info(f"Checkpoints confirmed by {self.host}")
                     _CHECKPOINT_CONSENSUS_CONTRIBUTIONS.labels(host=self.host).inc()
                     return

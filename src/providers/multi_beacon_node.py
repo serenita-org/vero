@@ -460,7 +460,6 @@ class MultiBeaconNode:
         self,
         slot: int,
     ) -> SchemaBeaconAPI.AttestationData:
-        # TODO rework the without-head-event branch next, we're gonna do the optimistic scenario first
         # Maps beacon node hosts to their last known head block root
         host_to_block_root: dict[str, str] = dict()
         head_block_root_counter: Counter[str] = Counter()

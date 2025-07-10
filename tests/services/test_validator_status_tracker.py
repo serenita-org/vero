@@ -112,7 +112,7 @@ async def test_handle_slashing_event(
 
         # Slashable services should stop performing duties
         with pytest.raises(RuntimeError, match="Slashing detected"):
-            await attestation_service.attest(slot=124)
+            await attestation_service.attest_if_not_yet_attested(slot=124)
 
         with pytest.raises(RuntimeError, match="Slashing detected"):
             await block_proposal_service.propose_block(slot=124)

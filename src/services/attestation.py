@@ -49,11 +49,6 @@ _VC_ATTESTATION_CONSENSUS_TIME = Histogram(
     "Time it took to achieve consensus on the attestation beacon block root",
     buckets=[0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 2, 3],
 )
-_VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS = CounterMetric(
-    "vc_attestation_consensus_contributions",
-    "Tracks how many times the attestation data's block root contributed to the attestation consensus by returning the same root as was emitted in the HeadEvent.",
-    labelnames=["host"],
-)
 _VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
     "vc_attestation_consensus_failures",
     "Amount of attestation consensus failures",
@@ -62,7 +57,6 @@ _VC_ATTESTATION_CONSENSUS_FAILURES.reset()
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 _PRODUCE_JOB_ID = "AttestationService.attest-slot-{duty_slot}"
-_PRODUCE_ATTESTATION_DATA_SPAN_ID = "AttestationService.attest"
 
 
 class AttestationService(ValidatorDutyService):
@@ -125,7 +119,7 @@ class AttestationService(ValidatorDutyService):
         )
 
         self.scheduler.add_job(
-            func=self.attest,
+            func=self.attest_if_not_yet_attested,
             trigger="date",
             next_run_time=_produce_deadline,
             kwargs=dict(slot=slot),
@@ -167,14 +161,13 @@ class AttestationService(ValidatorDutyService):
             )
             return
 
-        # Start attesting
-        await self.attest(
+        await self.attest_if_not_yet_attested(
             slot=int(event.slot),
             head_event=event,
             head_event_beacon_node_host=beacon_node_host,
         )
 
-    async def attest(
+    async def attest_if_not_yet_attested(
         self,
         slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
