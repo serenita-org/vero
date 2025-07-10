@@ -140,10 +140,6 @@ class BlockProposalService(ValidatorDutyService):
             self.task_manager.submit_task(self.prepare_beacon_proposer())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
-        if event.block in self._processed_head_block_roots:
-            return
-        self._processed_head_block_roots.append(event.block)
-
         if (
             event.current_duty_dependent_root
             not in self.proposer_duties_dependent_roots.values()

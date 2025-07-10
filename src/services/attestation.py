@@ -4,9 +4,10 @@ import datetime
 import time
 from collections import defaultdict
 from types import TracebackType
-from typing import TYPE_CHECKING, Self, Unpack
+from typing import Self, Unpack
 from uuid import uuid4
 
+import msgspec
 from apscheduler.jobstores.base import JobLookupError
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -26,15 +27,12 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import AttestationData, Checkpoint, SpecAttestation
+from spec.attestation import SpecAttestation
 from spec.common import (
     bytes_to_uint64,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
-
-if TYPE_CHECKING:
-    from remerkleable.settings import Root
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",
@@ -78,20 +76,12 @@ class AttestationService(ValidatorDutyService):
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
 
-        self.attestation_consensus_threshold = (
-            self.cli_args.attestation_consensus_threshold
-        )
-
-        # Block root counter used for reaching consensus on attestation data to sign
-        # TODO consider doing something with these in _prune_duties(). The values in here
-        # are cleaned up under normal circumstances but under less-than-normal circumstances
-        # they will not be cleaned...
-        self.block_root_to_beacon_node_hosts: dict[str, set[str]] = defaultdict(set)
-        self.block_root_to_consensus_reached_event: dict[str, asyncio.Event] = (
-            defaultdict(asyncio.Event)
-        )
-
-        self.source_checkpoint_confirmation_cache: dict[int, Root] = dict()
+        self.source_checkpoint_confirmation_cache: dict[
+            int, SchemaBeaconAPI.Checkpoint
+        ] = dict()
+        self.target_checkpoint_confirmation_cache: dict[
+            int, SchemaBeaconAPI.Checkpoint
+        ] = dict()
 
     async def __aenter__(self) -> Self:
         try:
@@ -151,9 +141,6 @@ class AttestationService(ValidatorDutyService):
     async def handle_head_event(
         self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
     ) -> None:
-        if event.block in self._processed_head_block_roots:
-            return
-
         if any(
             root not in self.attester_duties_dependent_roots.values()
             for root in (
@@ -166,115 +153,88 @@ class AttestationService(ValidatorDutyService):
             )
             self.task_manager.submit_task(super().update_duties())
 
-        head_event_block_root_seen_before = (
-            event.block in self.block_root_to_beacon_node_hosts
+        # TODO make debug?
+        self.logger.info(
+            f"Initial head event for slot {event.slot} received from {beacon_node_host}"
         )
-        if head_event_block_root_seen_before:
-            # We've already seen a head event for this block root and started
-            # attesting
-            # TODO make debug?
-            self.logger.info(f"HeadEventConfirmation from {beacon_node_host}")
-            self._update_consensus_on_block_root(
-                bn_host=beacon_node_host,
-                block_root=event.block,
+
+        # Ignore the head event if we've already started attesting - it's either:
+        # A) too late (entirely possible with a block that was proposed late / did not propagate well)
+        # or B) we have already seen a different block root in a head event and started attesting using
+        #       that (this is unlikely to happen in practice but possible)
+        if int(event.slot) <= self._last_slot_duty_started_for:
+            self.logger.warning(
+                f"Ignoring late head event for slot {event.slot} from {beacon_node_host}"
             )
-        else:
-            # This is the first time we see the block root
-            # TODO make debug?
-            self.logger.info(
-                f"Initial head event for slot {event.slot} received from {beacon_node_host}"
-            )
-
-            # Ignore the head event if we've already started attesting - it's either:
-            # A) too late (entirely possible with a block that was proposed late / did not propagate well)
-            # or B) we have already seen a different block root in a head event and started attesting using
-            #       that (this is unlikely to happen but could happen e.g. in case of a reorg)
-            if int(event.slot) <= self._last_slot_duty_started_for:
-                # TODO make debug?
-                #  on a late block and 5 beacon nodes, it will log 5x...
-                #  ... ideally it would warn once and that's it but that would require
-                #      another internal service variable...
-                self.logger.info(
-                    f"Ignoring late head event for slot {event.slot} from {beacon_node_host}"
-                )
-                return
-
-            self._update_consensus_on_block_root(
-                bn_host=beacon_node_host,
-                block_root=event.block,
-            )
-
-            # Start attesting
-            await self.attest(
-                slot=int(event.slot),
-                head_event=event,
-                head_event_beacon_node_host=beacon_node_host,
-            )
-
-    def _update_consensus_on_block_root(self, bn_host: str, block_root: str) -> None:
-        self.block_root_to_beacon_node_hosts[block_root].add(bn_host)
-
-        if (
-            len(self.block_root_to_beacon_node_hosts[block_root])
-            >= self.attestation_consensus_threshold
-        ):
-            self.block_root_to_consensus_reached_event[block_root].set()
-
-    async def _confirm_source_checkpoint(
-        self, checkpoint: Checkpoint, slot: int
-    ) -> None:
-        checkpoint_htr = checkpoint.hash_tree_root()
-        if (
-            self.source_checkpoint_confirmation_cache.get(checkpoint.epoch)
-            == checkpoint_htr
-        ):
-            # TODO remove logging/debug?
-            self.logger.info("Source checkpoint confirmed from cache")
             return
 
-        self.logger.info(f"Confirming {checkpoint}")
+        # Start attesting
+        await self.attest(
+            slot=int(event.slot),
+            head_event=event,
+            head_event_beacon_node_host=beacon_node_host,
+        )
 
-        # TODO should we reduce the timeout and return the most-recently-confirmed checkpoint instead?
-        #  that way we'd still be attesting, just with an older source checkpoint.
-        #  That's possibly better for everyone, even the chain?
-        confirm_deadline_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
-        try:
-            await asyncio.wait_for(
-                self.multi_beacon_node.confirm_source_checkpoint(
-                    checkpoint=checkpoint, state_id=str(slot)
-                ),
-                timeout=confirm_deadline_ts - time.time(),
+    async def _confirm_checkpoints(
+        self,
+        expected_source_cp: SchemaBeaconAPI.Checkpoint,
+        expected_target_cp: SchemaBeaconAPI.Checkpoint,
+        slot: int,
+    ) -> None:
+        source_epoch, target_epoch = (
+            int(expected_source_cp.epoch),
+            int(expected_target_cp.epoch),
+        )
+        if expected_source_cp == self.source_checkpoint_confirmation_cache.get(
+            source_epoch
+        ) and expected_target_cp == self.target_checkpoint_confirmation_cache.get(
+            target_epoch
+        ):
+            # TODO remove logging/debug?
+            self.logger.info(
+                f"Checkpoints for epochs {source_epoch}=>{target_epoch} confirmed from cache"
             )
-            self.source_checkpoint_confirmation_cache[checkpoint.epoch] = checkpoint_htr
-            self.logger.info("Source checkpoint confirmed")
-        except TimeoutError:
-            self.logger.debug(f"Timed out confirming source checkpoint {checkpoint}")
-            raise TimeoutError(
-                f"Timed out confirming source checkpoint {checkpoint}"
-            ) from None
+            return
+
+        self.logger.info(
+            f"Confirming checkpoints for epochs {source_epoch}=>{target_epoch}"
+        )
+
+        await self.multi_beacon_node.wait_for_checkpoints(
+            slot=slot,
+            expected_source_cp=expected_source_cp,
+            expected_target_cp=expected_target_cp,
+        )
+        self.source_checkpoint_confirmation_cache[source_epoch] = expected_source_cp
+        self.target_checkpoint_confirmation_cache[target_epoch] = expected_target_cp
+        self.logger.info("Checkpoints confirmed")
 
     async def _produce_attestation_data_without_expected_root(
         self, slot: int
-    ) -> AttestationData:
-        att_data, bn_hosts = await asyncio.wait_for(
+    ) -> SchemaBeaconAPI.AttestationData:
+        # We're going to ask all beacon nodes to produce AttestationData,
+        # requiring a threshold of them to agree on the head of the chain
+        next_slot_start_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
+        att_data = await asyncio.wait_for(
             self.multi_beacon_node.produce_attestation_data_without_head_event(
                 slot=slot,
-                committee_index=0,
             ),
-            timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
+            timeout=next_slot_start_ts - time.time(),
         )
-        self.logger.debug(
-            f"Produced attestation data without expected root using {bn_hosts}"
-        )
-        for bn_host in bn_hosts:
-            _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
 
-        await self._confirm_source_checkpoint(checkpoint=att_data.source, slot=slot)
+        await asyncio.wait_for(
+            self._confirm_checkpoints(
+                expected_source_cp=att_data.source,
+                expected_target_cp=att_data.target,
+                slot=slot,
+            ),
+            timeout=next_slot_start_ts - time.time(),
+        )
         return att_data
 
     async def _produce_attestation_data(
         self, slot: int, expected_block_root: str | None
-    ) -> AttestationData:
+    ) -> SchemaBeaconAPI.AttestationData:
         """
         Produces attestation data for the given slot.
 
@@ -283,71 +243,48 @@ class AttestationService(ValidatorDutyService):
         expected block root is provided, we wait for the required threshold of
         connected beacon nodes to agree on any head block root.
         """
+        # TODO this file is too long, let's try to separate some stuff out...
         if expected_block_root is None:
-            return await self._produce_attestation_data_without_expected_root(slot)
+            return await self._produce_attestation_data_without_expected_root(slot=slot)
 
-        # We have an expected block root; try to confirm it
-        bn_host_with_initial_head = next(
-            iter(self.block_root_to_beacon_node_hosts[expected_block_root])
-        )
-
-        # Fetch the full AttestationData while waiting for further head confirmations
-        attestation_data_task = asyncio.create_task(
-            self.multi_beacon_node.wait_for_attestation_data(
-                expected_head_block_root=expected_block_root,
-                slot=slot,
-                committee_index=0,
-            )
-        )
-
-        confirm_deadline_ts = (
-            self.beacon_chain.get_timestamp_for_slot(slot)
-            + 0.5 * self.beacon_chain.SECONDS_PER_SLOT
-        )
-
-        consensus_reached = self.block_root_to_consensus_reached_event[
-            expected_block_root
-        ]
+        # We have an expected head block root from a HeadEvent.
+        # Fetch the full AttestationData for the given block root
+        # from the fastest beacon node.
         try:
-            await asyncio.wait_for(
-                consensus_reached.wait(), timeout=confirm_deadline_ts - time.time()
+            att_data = await asyncio.wait_for(
+                self.multi_beacon_node.wait_for_attestation_data(
+                    expected_head_block_root=expected_block_root,
+                    slot=slot,
+                ),
+                timeout=0.5,
             )
         except TimeoutError:
-            # Consensus was not reached on expected block root.
-            # Fallback to behavior as if no head event block root was received.
+            # We only have a limited amount of time to attest. If we are unable to retrieve
+            # the corresponding full AttestationData for the expected head block root quickly,
+            # use the fallback behavior of attesting without an expected head block root.
             self.logger.warning(
-                f"Consensus was not reached for slot {slot} and block root {expected_block_root} - falling back"
+                f"Timed out waiting for AttestationData for head block root: {expected_block_root}"
             )
-            return await self._produce_attestation_data(
-                slot=slot, expected_block_root=None
-            )
-        finally:
-            # Clean up
-            del self.block_root_to_consensus_reached_event[expected_block_root]
-            contributing_bn_hosts = self.block_root_to_beacon_node_hosts.pop(
-                expected_block_root, set()
-            )
-            self._processed_head_block_roots.append(expected_block_root)
+            return await self._produce_attestation_data_without_expected_root(slot=slot)
 
-        # Consensus was reached in time
-        for bn_host in contributing_bn_hosts:
-            _VC_ATTESTATION_CONSENSUS_CONTRIBUTIONS.labels(host=bn_host).inc()
-            if bn_host != bn_host_with_initial_head:
-                trace.get_current_span().add_event(
-                    name="HeadEventConfirmation",
-                    attributes={
-                        "host.name": bn_host,
-                    },
-                )
-
-        self.logger.info("Head decided, waiting for att data")
-        att_data = await asyncio.wait_for(
-            attestation_data_task,
-            timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1) - time.time(),
-        )
-        self.logger.info("Att data received, confirming source checkpoint")
-        await self._confirm_source_checkpoint(checkpoint=att_data.source, slot=slot)
-        return att_data
+        # TODO debug/remove?
+        self.logger.info("AttestationData received, confirming checkpoints")
+        try:
+            await asyncio.wait_for(
+                self._confirm_checkpoints(
+                    expected_source_cp=att_data.source,
+                    expected_target_cp=att_data.target,
+                    slot=slot,
+                ),
+                timeout=1,
+            )
+        except TimeoutError:
+            # Failed to confirm the checkpoints for the AttestationData we retrieved.
+            # --> The head event we received may be for a buggy chain. We can still
+            #     attempt to attest without an expected head block root.
+            return await self._produce_attestation_data_without_expected_root(slot)
+        else:
+            return att_data
 
     async def attest(
         self,
@@ -402,6 +339,8 @@ class AttestationService(ValidatorDutyService):
         # We explicitly create a new span context
         # so this span doesn't get attached to some
         # previous context
+        # TODO remove tracing for attestations... I don't think it's worth it
+        #  it's a ton of data and you don't learn that much from it for attestations
         span_ctx = SpanContext(
             trace_id=slot,
             span_id=trace.INVALID_SPAN_ID,
@@ -470,7 +409,8 @@ class AttestationService(ValidatorDutyService):
             # Ensure attestation data checkpoints are not in the future
             current_epoch = self.beacon_chain.current_epoch
             if any(
-                cp.epoch > current_epoch for cp in (att_data.source, att_data.target)
+                int(cp.epoch) > current_epoch
+                for cp in (att_data.source, att_data.target)
             ):
                 raise RuntimeError(
                     f"Checkpoint in returned attestation data is in the future:"
@@ -490,7 +430,7 @@ class AttestationService(ValidatorDutyService):
             with self.tracer.start_as_current_span(
                 name=f"{self.__class__.__name__}.sign_attestations",
             ) as sign_span:
-                att_data_obj = att_data.to_obj()
+                att_data_obj = msgspec.structs.asdict(att_data)
 
                 for coro in asyncio.as_completed(
                     [
@@ -580,7 +520,7 @@ class AttestationService(ValidatorDutyService):
     async def prepare_and_aggregate_attestations(
         self,
         slot: int,
-        att_data: AttestationData,
+        att_data: SchemaBeaconAPI.AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation at 2/3 of the slot
@@ -649,7 +589,7 @@ class AttestationService(ValidatorDutyService):
     async def aggregate_attestations(
         self,
         slot: int,
-        att_data: AttestationData,
+        att_data: SchemaBeaconAPI.AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         if len(aggregator_duties) == 0:
@@ -798,10 +738,17 @@ class AttestationService(ValidatorDutyService):
             if epoch < current_epoch:
                 del self.attester_duties_dependent_roots[epoch]
 
-        # Only keep up to 3 most recent checkpoints in cache
+        # Only keep up to 3 most recent checkpoints in checkpoint confirmation cache
         self.source_checkpoint_confirmation_cache = dict(
             sorted(
                 self.source_checkpoint_confirmation_cache.items(),
+                key=lambda item: item[0],
+                reverse=True,
+            )[:3]
+        )
+        self.target_checkpoint_confirmation_cache = dict(
+            sorted(
+                self.target_checkpoint_confirmation_cache.items(),
                 key=lambda item: item[0],
                 reverse=True,
             )[:3]

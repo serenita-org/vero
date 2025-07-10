@@ -81,6 +81,16 @@ ___
 Vero uses multiple beacon nodes for most tasks like achieving attestation consensus,
 producing blocks and submitting duties.
 
+# TODO update docs
+
+Att consensus v2 makes it much more feasible to run Vero for home stakers
+too (with only 2 nodes). It's still not great for prolonged maintenance but
+if it's just a quick client update, Vero will continue attesting.
+Ideally you'd start the update right after you see "Checkpoints confirmed" in the logs.
+You then have about 6 minutes to get your node back up and running
+without missing any attestations. For a 2/3 node setup you can take one of them offline
+for as long as you wish.
+
 However, there are certain operations where only a single beacon node
 is used. In these cases, Vero will default to the first beacon node
 in your list – unless its score drops (e.g., it goes offline or

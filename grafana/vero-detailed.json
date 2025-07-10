@@ -1419,6 +1419,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
+          //  TODO update dashboard!!!
           "description": "Represents the number of times the produced attestation data's block root ended up matching the head block root of other beacon nodes, before attestation consensus was reached on that block root.",
           "fieldConfig": {
             "defaults": {
@@ -1503,14 +1504,14 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval])) by (host)\n/ ignoring (host) group_left\nsum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval]))",
+              "expr": "sum(rate(checkpoint_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval])) by (host)\n/ ignoring (host) group_left\nsum(rate(checkpoint_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval]))",
               "instant": false,
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Attestation Consensus Contributions",
+          "title": "Checkpoint Consensus Contributions",
           "type": "timeseries"
         },
         {
@@ -1583,7 +1584,7 @@
               "refId": "A"
             }
           ],
-          "title": "Attestation Consensus Contributions",
+          "title": "Checkpoint Consensus Contributions",
           "type": "piechart"
         }
       ],

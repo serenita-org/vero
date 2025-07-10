@@ -77,6 +77,20 @@ class SingleAttestation(msgspec.Struct):
     signature: str
 
 
+class AttestationData(msgspec.Struct):
+    slot: str
+    index: str
+    # LMD GHOST vote
+    beacon_block_root: str
+    # FFG vote
+    source: Checkpoint
+    target: Checkpoint
+
+
+class ProduceAttestationDataResponse(msgspec.Struct):
+    data: AttestationData
+
+
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
     validator_index: str
     committee_index: str
@@ -212,8 +226,9 @@ class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     previous_duty_dependent_root: str
     current_duty_dependent_root: str
 
-    # Intentionally does not implement the DeduplicableEvent
-    # protocol since we want to process these for each beacon node
+    @property
+    def dedup_key(self) -> Hashable:
+        return self.block
 
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from collections import deque
 from enum import Enum
 from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
@@ -97,12 +96,6 @@ class ValidatorDutyService:
         # signer's slashing protection but we can try to prevent the attempt
         # at signing too.
         self._last_slot_duty_started_for = -1
-
-        # Keeps track of block roots as emitted that were already
-        # by each connected beacon node's SSE stream.
-        self._processed_head_block_roots: deque[str] = deque(
-            maxlen=2 * len(self.multi_beacon_node.beacon_nodes)
-        )
 
         # Keeps track of the last slot for which this
         # service completed performing its duty.

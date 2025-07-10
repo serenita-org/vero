@@ -143,7 +143,7 @@ class EventConsumerService:
         return False
 
     async def handle_events(self, beacon_node: BeaconNode) -> None:
-        self.logger.info(f"Subscribing to events from {beacon_node.host}")
+        self.logger.debug(f"Subscribing to events from {beacon_node.host}")
 
         topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
 
@@ -165,17 +165,18 @@ class EventConsumerService:
                     self._head_event_time_metric.labels(host=beacon_node.host).observe(
                         self.beacon_chain.time_since_slot_start(slot=int(event.slot))
                     )
-                    for head_handler in self.head_event_handlers:
-                        self.task_manager.submit_task(
-                            head_handler(event, beacon_node.host),
-                            name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
-                        )
+                    if not self._has_seen_event(event):
+                        for head_handler in self.head_event_handlers:
+                            self.task_manager.submit_task(
+                                head_handler(event, beacon_node.host),
+                                name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
+                            )
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
                     self.logger.info(
                         f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
                     )
-                    for reorg_handler in self.reorg_event_handlers:
-                        if not self._has_seen_event(event):
+                    if not self._has_seen_event(event):
+                        for reorg_handler in self.reorg_event_handlers:
                             self.task_manager.submit_task(
                                 reorg_handler(event),
                                 name=f"{self.__class__.__name__}.handler-{event_type}-{reorg_handler.__name__}-{uuid4().hex}",
@@ -188,8 +189,8 @@ class EventConsumerService:
                     ),
                 ):
                     self.logger.debug(f"{type(event)}: {event}")
-                    for sl_handler in self.slashing_event_handlers:
-                        if not self._has_seen_event(event):
+                    if not self._has_seen_event(event):
+                        for sl_handler in self.slashing_event_handlers:
                             self.task_manager.submit_task(
                                 sl_handler(event),
                                 name=f"{self.__class__.__name__}.handler-{event_type}-{sl_handler.__name__}-{uuid4().hex}",

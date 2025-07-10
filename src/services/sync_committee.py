@@ -104,10 +104,6 @@ class SyncCommitteeService(ValidatorDutyService):
             self.task_manager.submit_task(super().update_duties())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
-        if event.block in self._processed_head_block_roots:
-            return
-        self._processed_head_block_roots.append(event.block)
-
         await self.produce_sync_message_if_not_yet_produced(
             duty_slot=int(event.slot),
             head_event=event,

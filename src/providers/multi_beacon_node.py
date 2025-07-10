@@ -49,7 +49,6 @@ from observability import ErrorType, get_shared_metrics
 from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.attestation import AttestationData, Checkpoint
 from spec.base import SpecElectra
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
@@ -459,8 +458,8 @@ class MultiBeaconNode:
     async def produce_attestation_data_without_head_event(
         self,
         slot: int,
-        committee_index: int,
-    ) -> tuple[AttestationData, list[str]]:
+    ) -> SchemaBeaconAPI.AttestationData:
+        # TODO rework the without-head-event branch next, we're gonna do the optimistic scenario first
         # Maps beacon node hosts to their last known head block root
         host_to_block_root: dict[str, str] = dict()
         head_block_root_counter: Counter[str] = Counter()
@@ -472,7 +471,6 @@ class MultiBeaconNode:
                 asyncio.create_task(
                     bn.produce_attestation_data(
                         slot=slot,
-                        committee_index=committee_index,
                     ),
                 )
                 for bn in self.initialized_beacon_nodes
@@ -483,22 +481,21 @@ class MultiBeaconNode:
                     host, att_data = await coro
                 except Exception as e:
                     # We can tolerate some attestation data production failures
-                    self.logger.exception(
+                    self.logger.warning(
                         f"Failed to produce attestation data: {e!r}",
                     )
                     continue
 
-                block_root = att_data.beacon_block_root.to_obj()
                 prev_root = host_to_block_root.get(host)
 
-                if block_root == prev_root:
+                if att_data.beacon_block_root == prev_root:
                     # This host has already returned the same block root in the past,
                     # no need to process it
                     continue
 
                 # A new block root has arrived for this host
-                host_to_block_root[host] = block_root
-                head_block_root_counter[block_root] += 1
+                host_to_block_root[host] = att_data.beacon_block_root
+                head_block_root_counter[att_data.beacon_block_root] += 1
                 if prev_root is not None:
                     head_block_root_counter[prev_root] -= 1
 
@@ -506,13 +503,13 @@ class MultiBeaconNode:
                     name="HeadBlockRoot",
                     attributes={
                         "host.name": host,
-                        "block_root": block_root,
+                        "block_root": att_data.beacon_block_root,
                     },
                 )
 
                 # Check if we reached the threshold for consensus
                 if (
-                    head_block_root_counter[block_root]
+                    head_block_root_counter[att_data.beacon_block_root]
                     >= self._attestation_consensus_threshold
                 ):
                     # Cancel pending tasks
@@ -520,10 +517,16 @@ class MultiBeaconNode:
                         task.cancel()
 
                     contributing_hosts = [
-                        h for h, r in host_to_block_root.items() if r == block_root
+                        h
+                        for h, r in host_to_block_root.items()
+                        if r == att_data.beacon_block_root
                     ]
 
-                    return att_data, contributing_hosts
+                    self.logger.debug(
+                        f"Produced attestation data without head event using {contributing_hosts}"
+                    )
+
+                    return att_data
 
             # If no consensus has been reached in this round,
             # rate-limit so we don't spam requests too quickly.
@@ -536,14 +539,12 @@ class MultiBeaconNode:
         self,
         expected_head_block_root: str,
         slot: int,
-        committee_index: int,
-    ) -> AttestationData:
+    ) -> SchemaBeaconAPI.AttestationData:
         tasks = [
             asyncio.create_task(
                 bn.wait_for_attestation_data(
                     expected_head_block_root=expected_head_block_root,
                     slot=slot,
-                    committee_index=committee_index,
                 )
             )
             for bn in self.initialized_beacon_nodes
@@ -564,12 +565,19 @@ class MultiBeaconNode:
             f"Failed waiting for attestation data with block root {expected_head_block_root}"
         )
 
-    async def confirm_source_checkpoint(
-        self, checkpoint: Checkpoint, state_id: str
+    async def wait_for_checkpoints(
+        self,
+        slot: int,
+        expected_source_cp: SchemaBeaconAPI.Checkpoint,
+        expected_target_cp: SchemaBeaconAPI.Checkpoint,
     ) -> None:
         tasks = [
             asyncio.create_task(
-                bn.confirm_source_checkpoint(checkpoint=checkpoint, state_id=state_id)
+                bn.wait_for_checkpoints(
+                    slot=slot,
+                    expected_source_cp=expected_source_cp,
+                    expected_target_cp=expected_target_cp,
+                )
             )
             for bn in self.initialized_beacon_nodes
         ]
@@ -600,15 +608,14 @@ class MultiBeaconNode:
 
     async def get_aggregate_attestation_v2(
         self,
-        attestation_data: AttestationData,
+        attestation_data: SchemaBeaconAPI.AttestationData,
         committee_index: int,
     ) -> "SpecAttestation.AttestationElectra":
-        _att_data = attestation_data.copy()
         aggregates: list[
             SpecAttestation.AttestationElectra
         ] = await self._get_all_beacon_node_responses(
             func_name="get_aggregate_attestation_v2",
-            attestation_data=_att_data,
+            attestation_data=attestation_data,
             committee_index=committee_index,
         )
 
@@ -631,7 +638,7 @@ class MultiBeaconNode:
 
     async def get_aggregate_attestations_v2(
         self,
-        attestation_data: AttestationData,
+        attestation_data: SchemaBeaconAPI.AttestationData,
         committee_indices: set[int],
     ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
         tasks = [

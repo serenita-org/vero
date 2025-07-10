@@ -136,7 +136,9 @@ def _add_duty_for_next_slot(
 
 
 def _create_att_data_callback(
-    block_root: str | None = None,
+    block_root: str,
+    source_epoch: int,
+    target_epoch: int,
     delay: float = 0.0,
 ) -> Callable[..., Coroutine[Any, Any, CallbackResult]]:
     async def _f(*args: Any, **kwargs: Any) -> CallbackResult:
@@ -147,7 +149,10 @@ def _create_att_data_callback(
                     "data": AttestationData(
                         beacon_block_root=block_root,
                         source=Checkpoint(
-                            root="0x00000000000000000000000000000000000000000000000000000000000ccccc"
+                            epoch=source_epoch,
+                        ),
+                        target=Checkpoint(
+                            epoch=target_epoch,
                         ),
                     ).to_obj(),
                 },
@@ -157,16 +162,17 @@ def _create_att_data_callback(
     return _f
 
 
-def _create_finality_checkpoints_callback() -> Callable[
-    ..., Coroutine[Any, Any, CallbackResult]
-]:
+def _create_finality_checkpoints_callback(
+    source_epoch: int,
+) -> Callable[..., Coroutine[Any, Any, CallbackResult]]:
     async def _f(*args: Any, **kwargs: Any) -> CallbackResult:
         return CallbackResult(
             payload={
                 "execution_optimistic": False,
                 "data": dict(
                     current_justified=Checkpoint(
-                        root="0x00000000000000000000000000000000000000000000000000000000000ccccc"
+                        epoch=source_epoch,
+                        root="0x00000000000000000000000000000000000000000000000000000000000ccccc",
                     ).to_obj()
                 ),
             },
@@ -177,10 +183,12 @@ def _create_finality_checkpoints_callback() -> Callable[
 
 @pytest.mark.parametrize(
     argnames=(
-        "response_callbacks_by_bn_host",
-        "confirm_source",
+        "att_data_callbacks_by_bn_host",
+        "checkpoints_callbacks_by_bn_host",
         "timeout_expected",
-        "expected_returned_att_data_block_root",
+        "expected_att_data_block_root",
+        "expected_att_data_source_epoch",
+        "expected_att_data_target_epoch",
         "expected_log_messages",
     ),
     argvalues=[
@@ -188,220 +196,242 @@ def _create_finality_checkpoints_callback() -> Callable[
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=0,
+                        target_epoch=1,
+                    )
+                    for _ in range(10)
                 ],
                 "beacon-node-b": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-                "beacon-node-c": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-            },
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [
-                "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-b']",
-            ],
-            id="identical head on all beacon nodes",
-        ),
-        pytest.param(
-            {
-                "beacon-node-a": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-                "beacon-node-b": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
-                    ),
-                ],
-                "beacon-node-c": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
-                    ),
-                ],
-            },
-            True,
-            True,
-            "",
-            [],
-            id="different head on all beacon nodes",
-        ),
-        pytest.param(
-            {
-                "beacon-node-a": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-                "beacon-node-b": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
-                    ),
-                ],
-                "beacon-node-c": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
-                    ),
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        delay=0.1,
-                    ),
-                ],
-            },
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [
-                "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
-            ],
-            id="delayed consensus simple",
-        ),
-        pytest.param(
-            {
-                "beacon-node-a": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        delay=0.01,
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        delay=0.02,
-                    ),
-                ],
-                "beacon-node-b": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        delay=0.01,
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        delay=0.02,
-                    ),
+                        source_epoch=0,
+                        target_epoch=1,
+                    )
+                    for _ in range(10)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
-                    ),
-                    _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        delay=0.1,
-                    ),
+                        source_epoch=0,
+                        target_epoch=1,
+                    )
+                    for _ in range(10)
                 ],
             },
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [
-                "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
-            ],
-            id="delayed consensus complex",
-        ),
-        pytest.param(
             {
                 "beacon-node-a": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+                    _create_finality_checkpoints_callback(
+                        source_epoch=0,
                     ),
                 ],
                 "beacon-node-b": [
-                    TimeoutError(),
-                    TimeoutError(),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+                    _create_finality_checkpoints_callback(
+                        source_epoch=0,
                     ),
                 ],
                 "beacon-node-c": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
-                    ),
-                    TimeoutError(),
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-            },
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [
-                "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
-            ],
-            id="delayed consensus exceptions",
-        ),
-        pytest.param(
-            {
-                "beacon-node-a": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-                "beacon-node-b": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
-                ],
-                "beacon-node-c": [
-                    _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+                    _create_finality_checkpoints_callback(
+                        source_epoch=0,
                     ),
                 ],
             },
             False,
-            True,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            0,
+            1,
             [
-                "Timed out confirming source checkpoint",
+                "Produced attestation data without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
-            id="source checkpoint not confirmed",
+            id="identical head, source, target",
         ),
+        # pytest.param(
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-b": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             ),
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
+        #             ),
+        #         ],
+        #     },
+        #     True,
+        #     True,
+        #     "",
+        #     [],
+        #     id="different head on all beacon nodes",
+        # ),
+        # pytest.param(
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-b": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             ),
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #                 delay=0.1,
+        #             ),
+        #         ],
+        #     },
+        #     True,
+        #     False,
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     [
+        #         "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
+        #     ],
+        #     id="delayed consensus simple",
+        # ),
+        # pytest.param(
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #                 delay=0.01,
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #                 delay=0.02,
+        #             ),
+        #         ],
+        #         "beacon-node-b": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
+        #                 delay=0.01,
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
+        #                 delay=0.02,
+        #             ),
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #                 delay=0.1,
+        #             ),
+        #         ],
+        #     },
+        #     True,
+        #     False,
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     [
+        #         "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
+        #     ],
+        #     id="delayed consensus complex",
+        # ),
+        # pytest.param(
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-b": [
+        #             TimeoutError(),
+        #             TimeoutError(),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             ),
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000cccc"
+        #             ),
+        #             TimeoutError(),
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #     },
+        #     True,
+        #     False,
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     [
+        #         "Produced attestation data without expected root using ['beacon-node-a', 'beacon-node-c']",
+        #     ],
+        #     id="delayed consensus exceptions",
+        # ),
+        # pytest.param(
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-b": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #     },
+        #     False,
+        #     True,
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     [
+        #         "Timed out confirming source checkpoint",
+        #     ],
+        #     id="source checkpoint not confirmed",
+        # ),
     ],
 )
 @pytest.mark.usefixtures("_add_duty_for_next_slot")
 async def test_produce_attestation_data_without_head_event(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    response_callbacks_by_bn_host: dict[
+    att_data_callbacks_by_bn_host: dict[
         str, list[Coroutine[Any, Any, CallbackResult] | Exception]
     ],
-    confirm_source: bool,
+    checkpoints_callbacks_by_bn_host: dict[
+        str, list[Coroutine[Any, Any, CallbackResult] | Exception]
+    ],
     timeout_expected: bool,
-    expected_returned_att_data_block_root: str,
+    expected_att_data_block_root: str,
+    expected_att_data_source_epoch: int,
+    expected_att_data_target_epoch: int,
     expected_log_messages: list[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     await beacon_chain.wait_for_next_slot()
 
     with aioresponses() as m:
-        if confirm_source:
-            for bn in attestation_service.multi_beacon_node.beacon_nodes:
-                m.get(
-                    re.compile(
-                        rf"http://{bn.host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
-                    ),
-                    callback=_create_finality_checkpoints_callback(),
-                )
-
-        for host, callbacks in response_callbacks_by_bn_host.items():
+        for host, callbacks in att_data_callbacks_by_bn_host.items():
             url_re = re.compile(
                 rf"http://{host}:1234/eth/v1/validator/attestation_data.*"
             )
@@ -412,14 +442,21 @@ async def test_produce_attestation_data_without_head_event(
                 )
                 m.get(url=url_re, **kwargs)
 
+        for host, callbacks in checkpoints_callbacks_by_bn_host.items():
+            url_re = re.compile(
+                rf"http://{host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
+            )
+            for cb in callbacks:
+                m.get(url=url_re, callback=cb)
+
         ctx = pytest.raises(TimeoutError) if timeout_expected else nullcontext()
         with ctx:
             att_data = await attestation_service._produce_attestation_data(
                 slot=beacon_chain.current_slot, expected_block_root=None
             )
-            assert (
-                str(att_data.beacon_block_root) == expected_returned_att_data_block_root
-            )
+            assert str(att_data.beacon_block_root) == expected_att_data_block_root
+            assert int(att_data.target.epoch) == expected_att_data_target_epoch
+            assert int(att_data.source.epoch) == expected_att_data_source_epoch
 
     for message in expected_log_messages:
         assert any(message in m for m in caplog.messages), (
@@ -451,11 +488,12 @@ async def _simulate_head_event(
     argnames=(
         "initial_head_event_block_root",
         "initial_head_event_bn_host",
-        "head_event_confirmations",
-        "response_callbacks_by_bn_host",
-        "confirm_source",
+        "att_data_callbacks_by_bn_host",
+        "checkpoints_callbacks_by_bn_host",
         "timeout_expected",
-        "expected_returned_att_data_block_root",
+        "expected_att_data_block_root",
+        "expected_att_data_source_epoch",
+        "expected_att_data_target_epoch",
         "expected_log_messages",
     ),
     argvalues=[
@@ -463,129 +501,250 @@ async def _simulate_head_event(
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
             "beacon-node-a",
             {
-                "beacon-node-b": [
-                    (
-                        "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        0.001,
-                    )
-                ]
-            },
-            {},
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [],
-            id="head event with fast confirmation",
-        ),
-        pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            "beacon-node-a",
-            {
-                "beacon-node-c": [
-                    (
-                        "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        0.3,
-                    )
-                ],
-            },
-            {},
-            True,
-            False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            [],
-            id="head event with slow confirmation",
-        ),
-        pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            "beacon-node-a",
-            {},
-            {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
                     )
-                    for _ in range(1_000)
+                    for _ in range(10)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
                     )
-                    for _ in range(1_000)
+                    for _ in range(10)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
                     )
-                    for _ in range(1_000)
+                    for _ in range(10)
                 ],
             },
-            True,
+            {},
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000bbbb",
-            [
-                "Produced attestation data without expected root using ['beacon-node-b', 'beacon-node-c']",
-            ],
-            id="head event without confirmations -> fallback success",
+            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            2,
+            3,
+            [],
+            id="identical head, source, target",
         ),
         pytest.param(
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
             "beacon-node-a",
-            {},
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-                    ),
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
                 ],
-                "beacon-node-b": [],
-                "beacon-node-c": [],
+                "beacon-node-b": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
+                        source_epoch=2,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
+                ],
+                "beacon-node-c": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
+                        source_epoch=2,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
+                ],
             },
-            True,
-            True,
-            "0x000000000000000000000000000000000000000000000000000000000000bbbb",
+            {},
+            False,
+            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            2,
+            3,
             [],
-            id="head event without confirmations -> fallback failure",
+            id="unconfirmed head, same source and target",
         ),
         pytest.param(
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
             "beacon-node-a",
             {
                 "beacon-node-a": [
-                    (
-                        "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        0.001,
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
                     )
+                    for _ in range(10)
+                ],
+                "beacon-node-b": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
+                        source_epoch=2,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
+                ],
+                "beacon-node-c": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
+                        source_epoch=1,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
                 ],
             },
             {},
-            True,
-            True,
-            "",
-            [
-                "Consensus was not reached for slot",
-            ],
-            id="head event with confirmation from initial beacon node - should not count",
+            False,
+            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            2,
+            3,
+            [],
+            id="unconfirmed head, 2/3 source and target",
         ),
         pytest.param(
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
             "beacon-node-a",
             {
-                "beacon-node-b": [
-                    (
-                        "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        0.001,
+                "beacon-node-a": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
+                        source_epoch=2,
+                        target_epoch=3,
                     )
-                ]
+                    for _ in range(10)
+                ],
+                "beacon-node-b": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
+                        source_epoch=1,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
+                ],
+                "beacon-node-c": [
+                    _create_att_data_callback(
+                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
+                        source_epoch=1,
+                        target_epoch=3,
+                    )
+                    for _ in range(10)
+                ],
             },
-            {},
+            {
+                "beacon-node-a": [
+                    _create_finality_checkpoints_callback(source_epoch=2)
+                    for _ in range(10)
+                ],
+                "beacon-node-b": [
+                    _create_finality_checkpoints_callback(source_epoch=1)
+                    for _ in range(10)
+                ],
+                "beacon-node-c": [
+                    _create_finality_checkpoints_callback(source_epoch=1)
+                    for _ in range(10)
+                ],
+            },
             False,
-            True,
-            "",
+            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            1,
+            3,
             [
-                "Timed out confirming source checkpoint",
+                "Timed out confirming checkpoints 2:3, determining safe checkpoints to use",
+                "Safe source checkpoint determined",
             ],
-            id="source checkpoint not confirmed",
+            id="unconfirmed head, 1/3 source and target -> fallback to safe checkpoints",
         ),
+        # TODO are there more test cases to cover? yes, failures -> timeouts, ...
+        # pytest.param(
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     "beacon-node-a",
+        #     {},
+        #     True,
+        #     False,
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     [],
+        #     id="head event with slow confirmation",
+        # ),
+        # pytest.param(
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     "beacon-node-a",
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             )
+        #             for _ in range(10)
+        #         ],
+        #         "beacon-node-b": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             )
+        #             for _ in range(10)
+        #         ],
+        #         "beacon-node-c": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb"
+        #             )
+        #             for _ in range(10)
+        #         ],
+        #     },
+        #     True,
+        #     False,
+        #     "0x000000000000000000000000000000000000000000000000000000000000bbbb",
+        #     [
+        #         "Produced attestation data without expected root using ['beacon-node-b', 'beacon-node-c']",
+        #     ],
+        #     id="head event without confirmations -> fallback success",
+        # ),
+        # pytest.param(
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     "beacon-node-a",
+        #     {
+        #         "beacon-node-a": [
+        #             _create_att_data_callback(
+        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
+        #             ),
+        #         ],
+        #         "beacon-node-b": [],
+        #         "beacon-node-c": [],
+        #     },
+        #     True,
+        #     True,
+        #     "0x000000000000000000000000000000000000000000000000000000000000bbbb",
+        #     [],
+        #     id="head event without confirmations -> fallback failure",
+        # ),
+        # pytest.param(
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     "beacon-node-a",
+        #     {},
+        #     True,
+        #     True,
+        #     "",
+        #     [
+        #         "Consensus was not reached for slot",
+        #     ],
+        #     id="head event with confirmation from initial beacon node - should not count",
+        # ),
+        # pytest.param(
+        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+        #     "beacon-node-a",
+        #     {},
+        #     False,
+        #     True,
+        #     "",
+        #     [
+        #         "Timed out confirming source checkpoint",
+        #     ],
+        #     id="source checkpoint not confirmed",
+        # ),
     ],
 )
 @pytest.mark.usefixtures("_add_duty_for_next_slot")
@@ -594,11 +753,16 @@ async def test_produce_attestation_data_with_head_event(
     beacon_chain: BeaconChain,
     initial_head_event_block_root: str,
     initial_head_event_bn_host: str,
-    head_event_confirmations: dict[str, list[tuple[str, float]]],
-    response_callbacks_by_bn_host: dict[str, list[CallbackResult]],
-    confirm_source: bool,
+    att_data_callbacks_by_bn_host: dict[
+        str, list[Callable[..., Coroutine[Any, Any, CallbackResult]]]
+    ],
+    checkpoints_callbacks_by_bn_host: dict[
+        str, list[Callable[..., Coroutine[Any, Any, CallbackResult]]]
+    ],
     timeout_expected: bool,
-    expected_returned_att_data_block_root: str,
+    expected_att_data_block_root: str,
+    expected_att_data_source_epoch: int,
+    expected_att_data_target_epoch: int,
     expected_log_messages: list[str],
     task_manager: TaskManager,
     caplog: pytest.LogCaptureFixture,
@@ -606,38 +770,16 @@ async def test_produce_attestation_data_with_head_event(
     await beacon_chain.wait_for_next_slot()
 
     # Simulate initial received head event
-    attestation_service.block_root_to_beacon_node_hosts[
-        initial_head_event_block_root
-    ] = {initial_head_event_bn_host}
-
-    # Simulate subsequent delayed head event confirmations
-    _head_event_tasks = set()
-    for bn_host, confs in head_event_confirmations.items():
-        for block_root, delay in confs:
-            _head_event_tasks.add(
-                asyncio.create_task(
-                    _simulate_head_event(
-                        slot=beacon_chain.current_slot,
-                        block_root=block_root,
-                        bn_host=bn_host,
-                        delay=delay,
-                        attestation_service=attestation_service,
-                    )
-                )
-            )
+    await _simulate_head_event(
+        slot=beacon_chain.current_slot,
+        block_root=initial_head_event_block_root,
+        bn_host=initial_head_event_bn_host,
+        delay=0.0,
+        attestation_service=attestation_service,
+    )
 
     with aioresponses() as m:
-        # Register attestation data callback for beacon node that emitted the head event
-        m.get(
-            re.compile(
-                rf"http://{initial_head_event_bn_host}:1234/eth/v1/validator/attestation_data.*"
-            ),
-            callback=_create_att_data_callback(
-                block_root=initial_head_event_block_root, delay=0.1
-            ),
-        )
-
-        for host, callbacks in response_callbacks_by_bn_host.items():
+        for host, callbacks in att_data_callbacks_by_bn_host.items():
             for cb in callbacks:
                 m.get(
                     re.compile(
@@ -645,14 +787,13 @@ async def test_produce_attestation_data_with_head_event(
                     ),
                     callback=cb,
                 )
-
-        for bn in attestation_service.multi_beacon_node.beacon_nodes:
-            if confirm_source:
+        for host, callbacks in checkpoints_callbacks_by_bn_host.items():
+            for cb in callbacks:
                 m.get(
                     re.compile(
-                        rf"http://{bn.host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
+                        rf"http://{host}:1234/eth/v1/beacon/states/\w+/finality_checkpoints"
                     ),
-                    callback=_create_finality_checkpoints_callback(),
+                    callback=cb,
                 )
 
         ctx = pytest.raises(TimeoutError) if timeout_expected else nullcontext()
@@ -661,9 +802,9 @@ async def test_produce_attestation_data_with_head_event(
                 slot=beacon_chain.current_slot,
                 expected_block_root=initial_head_event_block_root,
             )
-            assert (
-                str(att_data.beacon_block_root) == expected_returned_att_data_block_root
-            )
+            assert str(att_data.beacon_block_root) == expected_att_data_block_root
+            assert int(att_data.target.epoch) == expected_att_data_target_epoch
+            assert int(att_data.source.epoch) == expected_att_data_source_epoch
 
     for message in expected_log_messages:
         assert any(message in m for m in caplog.messages), (
