@@ -138,7 +138,6 @@ class AttestationService(ValidatorDutyService):
             )
             self.task_manager.submit_task(super().update_duties())
 
-        # TODO make debug?
         self.logger.debug(
             f"Initial head event for slot {event.slot} received from {beacon_node_host}"
         )

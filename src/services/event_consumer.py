@@ -161,21 +161,23 @@ class EventConsumerService:
                 event_type = type(event).__name__
 
                 if isinstance(event, SchemaBeaconAPI.HeadEvent):
-                    self.logger.debug(f"New head @ {event.slot} : {event.block}")
                     self._head_event_time_metric.labels(host=beacon_node.host).observe(
                         self.beacon_chain.time_since_slot_start(slot=int(event.slot))
                     )
                     if not self._has_seen_event(event):
+                        self.logger.debug(
+                            f"[{beacon_node.host}] New head @ {event.slot} : {event.block}"
+                        )
                         for head_handler in self.head_event_handlers:
                             self.task_manager.submit_task(
                                 head_handler(event, beacon_node.host),
                                 name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
                             )
                 elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
-                    self.logger.info(
-                        f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
-                    )
                     if not self._has_seen_event(event):
+                        self.logger.info(
+                            f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
+                        )
                         for reorg_handler in self.reorg_event_handlers:
                             self.task_manager.submit_task(
                                 reorg_handler(event),
@@ -188,8 +190,8 @@ class EventConsumerService:
                         SchemaBeaconAPI.ProposerSlashingEvent,
                     ),
                 ):
-                    self.logger.debug(f"{type(event)}: {event}")
                     if not self._has_seen_event(event):
+                        self.logger.debug(f"{type(event)}: {event}")
                         for sl_handler in self.slashing_event_handlers:
                             self.task_manager.submit_task(
                                 sl_handler(event),

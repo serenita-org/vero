@@ -43,32 +43,32 @@ class AttestationDataProvider:
 
     async def _confirm_checkpoints(
         self,
-        source_cp: SchemaBeaconAPI.Checkpoint,
-        target_cp: SchemaBeaconAPI.Checkpoint,
+        source: SchemaBeaconAPI.Checkpoint,
+        target: SchemaBeaconAPI.Checkpoint,
         slot: int,
     ) -> None:
         source_epoch, target_epoch = (
-            int(source_cp.epoch),
-            int(target_cp.epoch),
+            int(source.epoch),
+            int(target.epoch),
         )
-        if source_cp == self.source_checkpoint_confirmation_cache.get(
+        if source == self.source_checkpoint_confirmation_cache.get(
             source_epoch
-        ) and target_cp == self.target_checkpoint_confirmation_cache.get(target_epoch):
+        ) and target == self.target_checkpoint_confirmation_cache.get(target_epoch):
             self.logger.debug(
-                f"Checkpoints for epochs {source_epoch} => {target_epoch} confirmed from cache"
+                f"Checkpoints confirmed from cache ({source=}, {target=})"
             )
             return
 
-        self.logger.info(f"Confirming checkpoints for {source_epoch} => {target_epoch}")
+        self.logger.info(f"Confirming checkpoints {source=} => {target=}")
 
         await self.multi_beacon_node.wait_for_checkpoints(
             slot=slot,
-            expected_source_cp=source_cp,
-            expected_target_cp=target_cp,
+            expected_source_cp=source,
+            expected_target_cp=target,
         )
-        self.source_checkpoint_confirmation_cache[source_epoch] = source_cp
-        self.target_checkpoint_confirmation_cache[target_epoch] = target_cp
-        self.logger.info("Checkpoints confirmed")
+        self.source_checkpoint_confirmation_cache[source_epoch] = source
+        self.target_checkpoint_confirmation_cache[target_epoch] = target
+        self.logger.info("Checkpoint confirmation threshold reached")
 
     async def _produce_attestation_data_without_expected_head_block_root(
         self, slot: int
@@ -85,8 +85,8 @@ class AttestationDataProvider:
 
         await asyncio.wait_for(
             self._confirm_checkpoints(
-                source_cp=att_data.source,
-                target_cp=att_data.target,
+                source=att_data.source,
+                target=att_data.target,
                 slot=slot,
             ),
             timeout=next_slot_start_ts - time.time(),
@@ -130,7 +130,7 @@ class AttestationDataProvider:
             # the corresponding full AttestationData for the expected head block root quickly,
             # use the fallback behavior of attesting without an expected head block root.
             self.logger.warning(
-                f"Timed out waiting for AttestationData for head block root: {head_event_block_root}"
+                f"Timed out waiting for AttestationData matching head block root: {head_event_block_root}"
             )
             return (
                 await self._produce_attestation_data_without_expected_head_block_root(
@@ -147,8 +147,8 @@ class AttestationDataProvider:
         try:
             await asyncio.wait_for(
                 self._confirm_checkpoints(
-                    source_cp=att_data.source,
-                    target_cp=att_data.target,
+                    source=att_data.source,
+                    target=att_data.target,
                     slot=slot,
                 ),
                 timeout=self._timeout_confirm_checkpoints_att_data_for_head_event,
