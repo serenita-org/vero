@@ -692,5 +692,21 @@ async def test_produce_attestation_data_with_head_event(
         )
 
 
-# TODO see if we can test it on a higher level here, calling .attest() and .handle_head_event()
-#  ... we don't have tests yet for late/conflicting head events
+async def test_caching(
+    attestation_data_provider: AttestationDataProvider, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 0
+    assert len(attestation_data_provider.target_checkpoint_confirmation_cache) == 0
+
+    s = SchemaBeaconAPI.Checkpoint(epoch="123", root="0x000123")
+    t = SchemaBeaconAPI.Checkpoint(epoch="124", root="0x000124")
+
+    attestation_data_provider.source_checkpoint_confirmation_cache[123] = s
+    attestation_data_provider.target_checkpoint_confirmation_cache[124] = t
+
+    await attestation_data_provider._confirm_finality_checkpoints(
+        source=s, target=t, slot=3940
+    )
+
+    expected_log_message = "Finality checkpoints confirmed from cache (source=Checkpoint(epoch='123', root='0x000123'), target=Checkpoint(epoch='124', root='0x000124'))"
+    assert expected_log_message in caplog.messages
