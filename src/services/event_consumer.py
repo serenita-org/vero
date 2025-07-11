@@ -26,14 +26,14 @@ def _setup_head_event_time_metric(
     We want to track at which point into the slot a head event was received
     from each connected beacon node.
     In the first 1/3rd of the slot it makes sense to track this in a finer
-    way, e.g. in buckets of 250ms second.
+    way, e.g. in buckets of 250 ms.
     During the rest of the slot, a coarser approach is sufficient since
     head events received that late are not that valuable anyway.
     """
     global _HEAD_EVENT_TIME_METRIC
 
     if _HEAD_EVENT_TIME_METRIC is None:
-        step_fine = 0.25  # first part:  250 ms
+        step_fine = 0.25  # first part: 250 ms
         step_coarse = 1.0  # second part: 1,000 ms
 
         # Fine-grained head event timing buckets

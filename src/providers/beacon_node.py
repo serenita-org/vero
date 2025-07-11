@@ -372,7 +372,7 @@ class BeaconNode:
                     self.logger.debug(f"Got matching AttestationData from {self.host}")
                     return att_data
             except Exception as e:
-                self.logger.warning(
+                self.logger.debug(
                     f"Failed to produce attestation data: {e!r}",
                 )
 
