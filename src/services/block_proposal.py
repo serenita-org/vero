@@ -19,8 +19,6 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec import SpecBeaconBlock
-from spec.block import BeaconBlockHeader
 from spec.utils import encode_graffiti
 
 _VC_PUBLISHED_BLOCKS = Counter(
@@ -40,6 +38,8 @@ class BlockProposalService(ValidatorDutyService):
             defaultdict(set)
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
+
+        self.randao_reveal_cache: dict[int, str] = dict()
 
     async def __aenter__(self) -> Self:
         try:
@@ -103,14 +103,33 @@ class BlockProposalService(ValidatorDutyService):
 
         return next_duty_slot <= self.beacon_chain.current_slot + 3
 
+    def duty_for_slot(self, slot: int) -> SchemaBeaconAPI.ProposerDuty | None:
+        duty_epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+        slot_proposer_duties = [
+            duty for duty in self.proposer_duties[duty_epoch] if int(duty.slot) == slot
+        ]
+        if len(slot_proposer_duties) == 0:
+            return None
+
+        if len(slot_proposer_duties) != 1:
+            raise RuntimeError(
+                f"Unexpected number of proposer duties ({len(slot_proposer_duties)}): {slot_proposer_duties}"
+            )
+
+        return next(d for d in slot_proposer_duties)
+
     def has_duty_for_slot(self, slot: int) -> bool:
-        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
-        return any(int(duty.slot) == slot for duty in self.proposer_duties[epoch])
+        return self.duty_for_slot(slot) is not None
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Wait until any block proposals for this slot finish before
         # doing anything else
         await self.propose_block(slot=slot)
+
+        # Prepare for block proposals due in the next slot
+        duty_for_next_slot = self.duty_for_slot(slot + 1)
+        if duty_for_next_slot:
+            await self._fetch_randao_reveal(duty=duty_for_next_slot)
 
         if self.cli_args.use_external_builder:
             self.task_manager.submit_task(self.register_validators(current_slot=slot))
@@ -286,6 +305,37 @@ class BlockProposalService(ValidatorDutyService):
                 f"Published validator registrations, count: {len(validator_batch)}"
             )
 
+    async def _fetch_randao_reveal(self, duty: SchemaBeaconAPI.ProposerDuty) -> None:
+        self.logger.debug(f"Fetching RANDAO reveal for slot {duty.slot}")
+
+        slot = int(duty.slot)
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+
+        _, randao_reveal, _ = await self.signature_provider.sign(
+            message=SchemaRemoteSigner.RandaoRevealSignableMessage(
+                fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                randao_reveal=SchemaRemoteSigner.RandaoReveal(
+                    epoch=str(epoch),
+                ),
+            ),
+            identifier=duty.pubkey,
+        )
+        self.randao_reveal_cache[slot] = randao_reveal
+
+    async def _get_randao_reveal(self, duty: SchemaBeaconAPI.ProposerDuty) -> str:
+        # Try to get it from the cache - it should be pre-populated
+        # in the slot before a proposal is due
+        slot = int(duty.slot)
+        if slot in self.randao_reveal_cache:
+            return self.randao_reveal_cache.pop(slot)
+
+        self.logger.warning(f"Failed to get RANDAO reveal for slot {slot} from cache")
+
+        # We failed to retrieve the value from the cache, fall back to
+        # fetching it on-demand
+        await self._fetch_randao_reveal(duty=duty)
+        return self.randao_reveal_cache.pop(slot)
+
     async def propose_block(self, slot: int) -> None:
         if (
             self.validator_status_tracker_service.slashing_detected
@@ -303,24 +353,13 @@ class BlockProposalService(ValidatorDutyService):
                 f"Invalid slot for block proposal: {slot}. Current slot: {self.beacon_chain.current_slot}"
             )
 
-        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
-        slot_proposer_duties = {
-            duty for duty in self.proposer_duties[epoch] if int(duty.slot) == slot
-        }
-
-        for duty in slot_proposer_duties:
-            self.proposer_duties[epoch].remove(duty)
-
-        if len(slot_proposer_duties) == 0:
+        duty = self.duty_for_slot(slot=slot)
+        if duty is None:
             self.logger.debug(f"No remaining proposer duties for slot {slot}")
             return
 
-        if len(slot_proposer_duties) != 1:
-            raise ValueError(
-                f"Unexpected number of proposer duties ({len(slot_proposer_duties)}): {slot_proposer_duties}"
-            )
-
-        duty = slot_proposer_duties.pop()
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+        self.proposer_duties[epoch].remove(duty)
 
         # We explicitly create a new span context
         # so this span doesn't get attached to some
@@ -343,24 +382,16 @@ class BlockProposalService(ValidatorDutyService):
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
             with self.tracer.start_as_current_span(
-                name=f"{self.__class__.__name__}.sign_randao",
+                name=f"{self.__class__.__name__}.get_randao_reveal",
             ):
                 try:
-                    _, randao_reveal, _ = await self.signature_provider.sign(
-                        message=SchemaRemoteSigner.RandaoRevealSignableMessage(
-                            fork_info=self.beacon_chain.get_fork_info(slot=slot),
-                            randao_reveal=SchemaRemoteSigner.RandaoReveal(
-                                epoch=int(epoch),
-                            ),
-                        ),
-                        identifier=duty.pubkey,
-                    )
+                    randao_reveal = await self._get_randao_reveal(duty=duty)
                 except Exception as e:
                     _ERRORS_METRIC.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
                     self.logger.exception(
-                        f"Failed to get signature for RANDAO reveal: {e!r}",
+                        f"Failed to get RANDAO reveal: {e!r}",
                     )
                     self._last_slot_duty_completed_for = slot
                     raise
@@ -404,12 +435,12 @@ class BlockProposalService(ValidatorDutyService):
             else:
                 beacon_block = block_contents_or_blinded_block.block
 
-            beacon_block_header = BeaconBlockHeader(
-                slot=beacon_block.slot,
-                proposer_index=beacon_block.proposer_index,
-                parent_root=beacon_block.parent_root,
-                state_root=beacon_block.state_root,
-                body_root=beacon_block.body.hash_tree_root(),
+            beacon_block_header = SchemaRemoteSigner.BeaconBlockHeader(
+                slot=str(beacon_block.slot),
+                proposer_index=str(beacon_block.proposer_index),
+                parent_root=str(beacon_block.parent_root),
+                state_root=str(beacon_block.state_root),
+                body_root="0x" + beacon_block.body.hash_tree_root().hex(),
             )
 
             with self.tracer.start_as_current_span(
@@ -423,7 +454,7 @@ class BlockProposalService(ValidatorDutyService):
                                 version=SchemaRemoteSigner.BeaconBlockVersion[
                                     full_response.version.value.upper()
                                 ],
-                                block_header=beacon_block_header.to_obj(),
+                                block_header=beacon_block_header,
                             ),
                         ),
                         identifier=duty.pubkey,
@@ -438,9 +469,7 @@ class BlockProposalService(ValidatorDutyService):
                     self._last_slot_duty_completed_for = slot
                     raise
 
-            self.logger.info(
-                f"Publishing block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
-            )
+            self.logger.info(f"Publishing block for slot {slot}")
             self._duty_submission_time_metric.labels(
                 duty=ValidatorDuty.BLOCK_PROPOSAL.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
@@ -449,40 +478,25 @@ class BlockProposalService(ValidatorDutyService):
                 name=f"{self.__class__.__name__}.publish_block",
             ):
                 try:
-                    if not full_response.execution_payload_blinded:
-                        class_map = {
-                            SchemaBeaconAPI.ForkVersion.ELECTRA: (
-                                SpecBeaconBlock.ElectraBlockSigned,
-                                SpecBeaconBlock.ElectraBlockContentsSigned,
-                            ),
-                        }
-
-                        block_class, block_contents_class = class_map[
-                            full_response.version
-                        ]
-                        await self.multi_beacon_node.publish_block_v2(
+                    if full_response.execution_payload_blinded:
+                        # Blinded block
+                        await self.multi_beacon_node.publish_blinded_block_v2(
                             fork_version=full_response.version,
-                            signed_beacon_block_contents=block_contents_class(
-                                signed_block=block_class(
-                                    message=block_contents_or_blinded_block.block,
-                                    signature=signature,
-                                ),
-                                kzg_proofs=block_contents_or_blinded_block.kzg_proofs,
-                                blobs=block_contents_or_blinded_block.blobs,
+                            signed_blinded_beacon_block=SchemaBeaconAPI.SignedBeaconBlock(
+                                message=full_response.data,
+                                signature=signature,
                             ),
                         )
                     else:
-                        # Blinded block
-                        class_map = {
-                            SchemaBeaconAPI.ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlockSigned,
-                        }
-                        block_class = class_map[full_response.version]
-
-                        await self.multi_beacon_node.publish_blinded_block_v2(
+                        await self.multi_beacon_node.publish_block_v2(
                             fork_version=full_response.version,
-                            signed_blinded_beacon_block=block_class(
-                                message=block_contents_or_blinded_block,
-                                signature=signature,
+                            signed_beacon_block_contents=SchemaBeaconAPI.ElectraBlockContentsSigned(
+                                signed_block=SchemaBeaconAPI.SignedBeaconBlock(
+                                    message=full_response.data["block"],
+                                    signature=signature,
+                                ),
+                                kzg_proofs=full_response.data["kzg_proofs"],
+                                blobs=full_response.data["blobs"],
                             ),
                         )
                 except Exception as e:

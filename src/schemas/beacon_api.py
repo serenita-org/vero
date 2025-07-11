@@ -9,7 +9,7 @@ https://docs.nodereal.io/reference/eventstream
 """
 
 from enum import Enum
-from typing import Self
+from typing import Any, Self
 
 import msgspec
 
@@ -167,7 +167,18 @@ class ProduceBlockV3Response(msgspec.Struct):
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
-    data: dict  # type: ignore[type-arg]
+    data: dict[str, Any]
+
+
+class SignedBeaconBlock(msgspec.Struct):
+    message: dict[str, Any]
+    signature: str
+
+
+class ElectraBlockContentsSigned(msgspec.Struct):
+    signed_block: SignedBeaconBlock
+    kzg_proofs: list[str]
+    blobs: list[str]
 
 
 # Events
