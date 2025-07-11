@@ -53,7 +53,7 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
-class Checkpoint(msgspec.Struct):
+class Checkpoint(msgspec.Struct, frozen=True):
     epoch: str
     root: str
 
@@ -77,7 +77,7 @@ class SingleAttestation(msgspec.Struct):
     signature: str
 
 
-class AttestationData(msgspec.Struct):
+class AttestationData(msgspec.Struct, frozen=True):
     slot: str
     index: str
     # LMD GHOST vote

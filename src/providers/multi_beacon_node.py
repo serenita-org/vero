@@ -460,9 +460,9 @@ class MultiBeaconNode:
         self,
         slot: int,
     ) -> SchemaBeaconAPI.AttestationData:
-        # Maps beacon node hosts to their last known head block root
-        host_to_block_root: dict[str, str] = dict()
-        head_block_root_counter: Counter[str] = Counter()
+        # Maps beacon node hosts to their last returned AttestationData
+        host_to_att_data: dict[str, SchemaBeaconAPI.AttestationData] = dict()
+        att_data_counter: Counter[SchemaBeaconAPI.AttestationData] = Counter()
 
         while True:
             _round_start = asyncio.get_running_loop().time()
@@ -486,43 +486,38 @@ class MultiBeaconNode:
                     )
                     continue
 
-                prev_root = host_to_block_root.get(host)
+                prev_att_data = host_to_att_data.get(host)
 
-                if att_data.beacon_block_root == prev_root:
-                    # This host has already returned the same block root in the past,
+                if att_data == prev_att_data:
+                    # This host has already returned the same data in the past,
                     # no need to process it
                     continue
 
-                # A new block root has arrived for this host
-                host_to_block_root[host] = att_data.beacon_block_root
-                head_block_root_counter[att_data.beacon_block_root] += 1
-                if prev_root is not None:
-                    head_block_root_counter[prev_root] -= 1
+                # New data has arrived from this host
+                host_to_att_data[host] = att_data
+                att_data_counter[att_data] += 1
+                if prev_att_data is not None:
+                    att_data_counter[prev_att_data] -= 1
 
                 # Check if we reached the threshold for consensus
-                if (
-                    head_block_root_counter[att_data.beacon_block_root]
-                    >= self._attestation_consensus_threshold
-                ):
+                if att_data_counter[att_data] >= self._attestation_consensus_threshold:
                     # Cancel pending tasks
                     for task in tasks:
                         task.cancel()
 
                     contributing_hosts = [
-                        h
-                        for h, r in host_to_block_root.items()
-                        if r == att_data.beacon_block_root
+                        h for h, ad in host_to_att_data.items() if ad == att_data
                     ]
 
                     self.logger.debug(
-                        f"Produced attestation data without head event using {contributing_hosts}"
+                        f"Produced AttestationData without head event using {contributing_hosts}"
                     )
 
                     return att_data
 
             # If no consensus has been reached in this round,
             # rate-limit so we don't spam requests too quickly.
-            # Example: wait at least 30ms from the start of this round
+            # We wait at least 30ms from the start of this round.
             await asyncio.sleep(
                 max(0.03 - (asyncio.get_running_loop().time() - _round_start), 0),
             )

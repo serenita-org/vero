@@ -82,37 +82,15 @@ class AttestationDataProvider:
             ),
             timeout=next_slot_start_ts - time.time(),
         )
-
-        try:
-            await asyncio.wait_for(
-                self._confirm_finality_checkpoints(
-                    source=att_data.source,
-                    target=att_data.target,
-                    slot=slot,
-                ),
-                timeout=self._timeout_confirm_finality_checkpoints,
-            )
-        except TimeoutError:
-            # If we're unable to confirm the checkpoints here, the state of the chain may
-            # have changed between the time the beacon nodes agreed on a head block and
-            # the time the beacon nodes are asked to confirm the checkpoints.
-            # This can happen when a block is proposed late:
-            #
-            # 1) We start attesting without having seen a head event
-            # 2) We reach consensus on AttestationData that points to the previous
-            #    slot's head block root
-            # 3) We try to confirm that AttestationData's checkpoints but fail
-            #    (because the late block has been processed by the connected beacon
-            #    nodes by this point)
-            # Therefore we need to go back to step 2 and restart the whole process.
-            self.logger.debug(
-                f"Failed to confirm finality checkpoints {att_data.source=}, {att_data.target=}"
-            )
-            return (
-                await self._produce_attestation_data_without_expected_head_block_root(
-                    slot=slot
-                )
-            )
+        self.logger.info(
+            f"Confirmed finality checkpoints {att_data.source=} => {att_data.target=}"
+        )
+        self.source_checkpoint_confirmation_cache[int(att_data.source.epoch)] = (
+            att_data.source
+        )
+        self.target_checkpoint_confirmation_cache[int(att_data.target.epoch)] = (
+            att_data.target
+        )
         return att_data
 
     async def produce_attestation_data(

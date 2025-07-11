@@ -8,7 +8,7 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 import aiohttp
@@ -230,7 +230,7 @@ class BeaconNode:
 
     async def _make_request(
         self,
-        method: str,
+        method: Literal["GET", "POST"],
         endpoint: str,
         formatted_endpoint_string_params: dict[str, str | int] | None = None,
         **kwargs: Any,
