@@ -316,7 +316,7 @@ class AttestationService(ValidatorDutyService):
         )
 
         self.logger.debug(
-            f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
+            f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
         )
 
         self._duty_submission_time_metric.labels(
@@ -336,8 +336,8 @@ class AttestationService(ValidatorDutyService):
                 f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
             )
         else:
-            self.logger.info(
-                f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}",
+            self.logger.debug(
+                f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
             )
 
             _VC_PUBLISHED_ATTESTATIONS.inc(
