@@ -159,8 +159,8 @@ class AttestationDataProvider:
             # Failed to confirm the checkpoints for the AttestationData we retrieved.
             # --> The head event we received may be for a buggy chain. We can still
             #     attempt to attest without an expected head block root.
-            self.logger.debug(
-                f"Failed to confirm finality checkpoints {att_data.source=}, {att_data.target=}"
+            self.logger.warning(
+                f"Timed out confirming finality checkpoints {att_data.source=}, {att_data.target=}"
             )
             return (
                 await self._produce_attestation_data_without_expected_head_block_root(

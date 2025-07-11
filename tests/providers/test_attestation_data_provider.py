@@ -539,7 +539,7 @@ async def test_produce_attestation_data_without_head_event(
             SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
             SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
             [
-                "Failed to confirm finality checkpoints",
+                "Timed out confirming finality checkpoints att_data.source=Checkpoint(epoch='2', root='0x0002'), att_data.target=Checkpoint(epoch='3', root='0x0003')",
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
                 "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='2', root='0x0002') => att_data.target=Checkpoint(epoch='3', root='0x0003')",
             ],
