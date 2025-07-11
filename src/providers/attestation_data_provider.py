@@ -35,11 +35,17 @@ class AttestationDataProvider:
         )
 
         self.source_checkpoint_confirmation_cache: dict[
-            int, SchemaBeaconAPI.Checkpoint
+            str, SchemaBeaconAPI.Checkpoint
         ] = dict()
         self.target_checkpoint_confirmation_cache: dict[
-            int, SchemaBeaconAPI.Checkpoint
+            str, SchemaBeaconAPI.Checkpoint
         ] = dict()
+
+    def _cache_checkpoints(
+        self, source: SchemaBeaconAPI.Checkpoint, target: SchemaBeaconAPI.Checkpoint
+    ) -> None:
+        self.source_checkpoint_confirmation_cache[source.epoch] = source
+        self.target_checkpoint_confirmation_cache[target.epoch] = target
 
     async def _confirm_finality_checkpoints(
         self,
@@ -47,13 +53,9 @@ class AttestationDataProvider:
         target: SchemaBeaconAPI.Checkpoint,
         slot: int,
     ) -> None:
-        source_epoch, target_epoch = (
-            int(source.epoch),
-            int(target.epoch),
-        )
         if source == self.source_checkpoint_confirmation_cache.get(
-            source_epoch
-        ) and target == self.target_checkpoint_confirmation_cache.get(target_epoch):
+            source.epoch
+        ) and target == self.target_checkpoint_confirmation_cache.get(target.epoch):
             self.logger.debug(
                 f"Finality checkpoints confirmed from cache ({source=}, {target=})"
             )
@@ -66,9 +68,7 @@ class AttestationDataProvider:
             expected_source_cp=source,
             expected_target_cp=target,
         )
-        self.source_checkpoint_confirmation_cache[source_epoch] = source
-        self.target_checkpoint_confirmation_cache[target_epoch] = target
-        self.logger.info("Finality checkpoint confirmation threshold reached")
+        self._cache_checkpoints(source=source, target=target)
 
     async def _produce_attestation_data_without_expected_head_block_root(
         self, slot: int
@@ -82,15 +82,7 @@ class AttestationDataProvider:
             ),
             timeout=next_slot_start_ts - time.time(),
         )
-        self.logger.info(
-            f"Confirmed finality checkpoints {att_data.source=} => {att_data.target=}"
-        )
-        self.source_checkpoint_confirmation_cache[int(att_data.source.epoch)] = (
-            att_data.source
-        )
-        self.target_checkpoint_confirmation_cache[int(att_data.target.epoch)] = (
-            att_data.target
-        )
+        self._cache_checkpoints(source=att_data.source, target=att_data.target)
         return att_data
 
     async def produce_attestation_data(

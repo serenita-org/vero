@@ -174,7 +174,6 @@ def _create_att_data_callback(
             SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
-                "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='0', root='0x0000') => att_data.target=Checkpoint(epoch='1', root='0x0001')",
             ],
             id="success: identical head, source, target",
         ),
@@ -253,7 +252,6 @@ def _create_att_data_callback(
             SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
-                "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='0', root='0x0000') => att_data.target=Checkpoint(epoch='1', root='0x0001')",
             ],
             id="success: delayed consensus",
         ),
@@ -328,7 +326,6 @@ def _create_att_data_callback(
             SchemaBeaconAPI.Checkpoint(epoch="2", root="0xepoch-1-last-slot"),
             [
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
-                "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='1', root='0x0001') => att_data.target=Checkpoint(epoch='2', root='0xepoch-1-last-slot')",
             ],
             id="success: late block proposal on epoch transition",
         ),
@@ -455,8 +452,8 @@ async def test_produce_attestation_data_without_head_event(
             SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
             SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
             [
+                "Got matching AttestationData from beacon-node-a",
                 "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
-                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: unconfirmed head, same source and target",
         ),
@@ -494,7 +491,6 @@ async def test_produce_attestation_data_without_head_event(
             SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
             [
                 "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
-                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: unconfirmed head, 2/3 source and target",
         ),
@@ -541,7 +537,6 @@ async def test_produce_attestation_data_without_head_event(
             [
                 "Timed out confirming finality checkpoints att_data.source=Checkpoint(epoch='2', root='0x0002'), att_data.target=Checkpoint(epoch='3', root='0x0003')",
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
-                "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='2', root='0x0002') => att_data.target=Checkpoint(epoch='3', root='0x0003')",
             ],
             id="success: delayed consensus - slow head processing",
         ),
@@ -573,7 +568,6 @@ async def test_produce_attestation_data_without_head_event(
             [
                 "Timed out waiting for AttestationData matching head block root: 0x000000000000000000000000000000000000000000000000000000000000aaaa",
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
-                "Confirmed finality checkpoints att_data.source=Checkpoint(epoch='1', root='0x0001') => att_data.target=Checkpoint(epoch='3', root='0x0003')",
             ],
             id="success: head-emitting node stops responding, no further confirmations, fallback succeeds",
         ),
@@ -701,8 +695,7 @@ async def test_caching(
     s = SchemaBeaconAPI.Checkpoint(epoch="123", root="0x000123")
     t = SchemaBeaconAPI.Checkpoint(epoch="124", root="0x000124")
 
-    attestation_data_provider.source_checkpoint_confirmation_cache[123] = s
-    attestation_data_provider.target_checkpoint_confirmation_cache[124] = t
+    attestation_data_provider._cache_checkpoints(source=s, target=t)
 
     await attestation_data_provider._confirm_finality_checkpoints(
         source=s, target=t, slot=3940

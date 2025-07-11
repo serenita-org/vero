@@ -369,7 +369,7 @@ class BeaconNode:
                     slot=slot,
                 )
                 if att_data.beacon_block_root == expected_head_block_root:
-                    self.logger.debug(f"Got matching att data from {self.host}")
+                    self.logger.debug(f"Got matching AttestationData from {self.host}")
                     return att_data
             except Exception as e:
                 self.logger.warning(
