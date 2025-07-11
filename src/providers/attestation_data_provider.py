@@ -24,7 +24,7 @@ class AttestationDataProvider:
         self.beacon_chain = beacon_chain
 
         self._timeout_att_data_for_head_event = 0.5
-        self._timeout_confirm_checkpoints_att_data_for_head_event = 1.0
+        self._timeout_confirm_finality_checkpoints = 1.0
 
         scheduler.add_job(
             self.prune,
@@ -41,7 +41,7 @@ class AttestationDataProvider:
             int, SchemaBeaconAPI.Checkpoint
         ] = dict()
 
-    async def _confirm_checkpoints(
+    async def _confirm_finality_checkpoints(
         self,
         source: SchemaBeaconAPI.Checkpoint,
         target: SchemaBeaconAPI.Checkpoint,
@@ -55,11 +55,11 @@ class AttestationDataProvider:
             source_epoch
         ) and target == self.target_checkpoint_confirmation_cache.get(target_epoch):
             self.logger.debug(
-                f"Checkpoints confirmed from cache ({source=}, {target=})"
+                f"Finality checkpoints confirmed from cache ({source=}, {target=})"
             )
             return
 
-        self.logger.info(f"Confirming checkpoints {source=} => {target=}")
+        self.logger.info(f"Confirming finality checkpoints {source=} => {target=}")
 
         await self.multi_beacon_node.wait_for_checkpoints(
             slot=slot,
@@ -68,7 +68,7 @@ class AttestationDataProvider:
         )
         self.source_checkpoint_confirmation_cache[source_epoch] = source
         self.target_checkpoint_confirmation_cache[target_epoch] = target
-        self.logger.info("Checkpoint confirmation threshold reached")
+        self.logger.info("Finality checkpoint confirmation threshold reached")
 
     async def _produce_attestation_data_without_expected_head_block_root(
         self, slot: int
@@ -83,14 +83,36 @@ class AttestationDataProvider:
             timeout=next_slot_start_ts - time.time(),
         )
 
-        await asyncio.wait_for(
-            self._confirm_checkpoints(
-                source=att_data.source,
-                target=att_data.target,
-                slot=slot,
-            ),
-            timeout=next_slot_start_ts - time.time(),
-        )
+        try:
+            await asyncio.wait_for(
+                self._confirm_finality_checkpoints(
+                    source=att_data.source,
+                    target=att_data.target,
+                    slot=slot,
+                ),
+                timeout=self._timeout_confirm_finality_checkpoints,
+            )
+        except TimeoutError:
+            # If we're unable to confirm the checkpoints here, the state of the chain may
+            # have changed between the time the beacon nodes agreed on a head block and
+            # the time the beacon nodes are asked to confirm the checkpoints.
+            # This can happen when a block is proposed late:
+            #
+            # 1) We start attesting without having seen a head event
+            # 2) We reach consensus on AttestationData that points to the previous
+            #    slot's head block root
+            # 3) We try to confirm that AttestationData's checkpoints but fail
+            #    (because the late block has been processed by the connected beacon
+            #    nodes by this point)
+            # Therefore we need to go back to step 2 and restart the whole process.
+            self.logger.debug(
+                f"Failed to confirm finality checkpoints {att_data.source=}, {att_data.target=}"
+            )
+            return (
+                await self._produce_attestation_data_without_expected_head_block_root(
+                    slot=slot
+                )
+            )
         return att_data
 
     async def produce_attestation_data(
@@ -138,7 +160,9 @@ class AttestationDataProvider:
                 )
             )
         else:
-            self.logger.debug("AttestationData received, confirming checkpoints")
+            self.logger.debug(
+                "AttestationData received, confirming finality checkpoints"
+            )
 
         # We have a full AttestationData object at this point. The only thing left is
         # to confirm the FFG checkpoints. This part also has a timeout to make sure
@@ -146,19 +170,19 @@ class AttestationDataProvider:
         # the checkpoints from the AttestationData. Times out in 1000 ms.
         try:
             await asyncio.wait_for(
-                self._confirm_checkpoints(
+                self._confirm_finality_checkpoints(
                     source=att_data.source,
                     target=att_data.target,
                     slot=slot,
                 ),
-                timeout=self._timeout_confirm_checkpoints_att_data_for_head_event,
+                timeout=self._timeout_confirm_finality_checkpoints,
             )
         except TimeoutError:
             # Failed to confirm the checkpoints for the AttestationData we retrieved.
             # --> The head event we received may be for a buggy chain. We can still
             #     attempt to attest without an expected head block root.
             self.logger.debug(
-                f"Failed to confirm checkpoints {att_data.source=}, {att_data.target=}"
+                f"Failed to confirm finality checkpoints {att_data.source=}, {att_data.target=}"
             )
             return (
                 await self._produce_attestation_data_without_expected_head_block_root(

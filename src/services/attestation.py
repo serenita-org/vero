@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import datetime
+import time
 from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
@@ -215,10 +216,14 @@ class AttestationService(ValidatorDutyService):
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
         consensus_start = asyncio.get_running_loop().time()
+        next_slot_start_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
         try:
-            att_data = await self.attestation_data_provider.produce_attestation_data(
-                slot=slot,
-                head_event_block_root=head_event.block if head_event else None,
+            att_data = await asyncio.wait_for(
+                self.attestation_data_provider.produce_attestation_data(
+                    slot=slot,
+                    head_event_block_root=head_event.block if head_event else None,
+                ),
+                timeout=next_slot_start_ts - time.time(),
             )
         except TimeoutError as e:
             self.logger.exception(

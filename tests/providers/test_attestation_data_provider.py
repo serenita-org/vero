@@ -100,7 +100,7 @@ async def attestation_data_provider(
     # the fallback mechanism.
     # => We lower the timeout here to be able to test what happens
     # when the timeout is reached
-    adp._timeout_confirm_checkpoints_att_data_for_head_event = 0.1
+    adp._timeout_confirm_finality_checkpoints = 0.1
     return adp
 
 
@@ -174,8 +174,8 @@ def _create_att_data_callback(
             1,
             [
                 "Produced attestation data without head event using ['beacon-node-a', 'beacon-node-b']",
-                "Confirming checkpoints source=Checkpoint(epoch='0', root='0x0000') => target=Checkpoint(epoch='1', root='0x0001')",
-                "Checkpoint confirmation threshold reached",
+                "Confirming finality checkpoints source=Checkpoint(epoch='0', root='0x0000') => target=Checkpoint(epoch='1', root='0x0001')",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: identical head, source, target",
         ),
@@ -254,8 +254,8 @@ def _create_att_data_callback(
             1,
             [
                 "Produced attestation data without head event using ['beacon-node-a', 'beacon-node-b']",
-                "Confirming checkpoints source=Checkpoint(epoch='0', root='0x0000') => target=Checkpoint(epoch='1', root='0x0001')",
-                "Checkpoint confirmation threshold reached",
+                "Confirming finality checkpoints source=Checkpoint(epoch='0', root='0x0000') => target=Checkpoint(epoch='1', root='0x0001')",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: delayed consensus",
         ),
@@ -293,9 +293,85 @@ def _create_att_data_callback(
             None,
             [
                 "Produced attestation data without head event using ['beacon-node-b', 'beacon-node-a']",
-                "Confirming checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='2', root='0x0002')",
+                "Confirming finality checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='2', root='0x0002')",
             ],
             id="failure: consensus on head block with failed checkpoint confirmation",
+        ),
+        pytest.param(
+            {
+                "beacon-node-a": [
+                    _create_att_data_callback(
+                        block_root="0xepoch-1-last-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-1-last-slot"
+                        ),
+                    )
+                ]
+                + [
+                    _create_att_data_callback(
+                        block_root="0xepoch-2-first-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-2-first-slot"
+                        ),
+                    )
+                    for _ in range(100)
+                ],
+                "beacon-node-b": [
+                    _create_att_data_callback(
+                        block_root="0xepoch-1-last-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-1-last-slot"
+                        ),
+                    )
+                ]
+                + [
+                    _create_att_data_callback(
+                        block_root="0xepoch-2-first-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-2-first-slot"
+                        ),
+                    )
+                    for _ in range(100)
+                ],
+                "beacon-node-c": [
+                    _create_att_data_callback(
+                        block_root="0xepoch-1-last-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-1-last-slot"
+                        ),
+                    )
+                    for _ in range(10)
+                ]
+                + [
+                    _create_att_data_callback(
+                        block_root="0xepoch-2-first-slot",
+                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        target=SchemaBeaconAPI.Checkpoint(
+                            epoch="2", root="0xepoch-2-first-slot"
+                        ),
+                    )
+                    for _ in range(100)
+                ],
+            },
+            False,
+            "0xepoch-2-first-slot",
+            1,
+            2,
+            [
+                "Produced attestation data without head event using ['beacon-node-a', 'beacon-node-b']",
+                "Confirming finality checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='2', root='0xepoch-1-last-slot')",
+                "Failed to confirm finality checkpoints att_data.source=Checkpoint(epoch='1', root='0x0001'), att_data.target=Checkpoint(epoch='2', root='0xepoch-1-last-slot')",
+                "Confirming finality checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='2', root='0xepoch-2-first-slot')",
+            ],
+            # All beacon nodes agree on the head of the chain during the initial request
+            # for AttestationData. However, right after they process a new block which
+            # causes the finality checkpoint confirmation to fail.
+            id="success: late block proposal on epoch transition causes checkpoint confirmation to fail requiring new consensus round",
         ),
     ],
 )
@@ -420,8 +496,8 @@ async def test_produce_attestation_data_without_head_event(
             2,
             3,
             [
-                "Confirming checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
-                "Checkpoint confirmation threshold reached",
+                "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: unconfirmed head, same source and target",
         ),
@@ -458,8 +534,8 @@ async def test_produce_attestation_data_without_head_event(
             2,
             3,
             [
-                "Confirming checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
-                "Checkpoint confirmation threshold reached",
+                "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: unconfirmed head, 2/3 source and target",
         ),
@@ -504,10 +580,10 @@ async def test_produce_attestation_data_without_head_event(
             2,
             3,
             [
-                "Failed to confirm checkpoints",
+                "Failed to confirm finality checkpoints",
                 "Checkpoints confirmed by beacon-node-a",
                 "Checkpoints confirmed by beacon-node-b",
-                "Checkpoint confirmation threshold reached",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: delayed consensus - slow head processing",
         ),
@@ -539,8 +615,8 @@ async def test_produce_attestation_data_without_head_event(
             [
                 "Timed out waiting for AttestationData matching head block root: 0x000000000000000000000000000000000000000000000000000000000000aaaa",
                 "Produced attestation data without head event using ['beacon-node-b', 'beacon-node-c']",
-                "Confirming checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='3', root='0x0003')",
-                "Checkpoint confirmation threshold reached",
+                "Confirming finality checkpoints source=Checkpoint(epoch='1', root='0x0001') => target=Checkpoint(epoch='3', root='0x0003')",
+                "Finality checkpoint confirmation threshold reached",
             ],
             id="success: head-emitting node stops responding, no further confirmations, fallback succeeds",
         ),
