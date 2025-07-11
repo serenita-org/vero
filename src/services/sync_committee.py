@@ -186,7 +186,7 @@ class SyncCommitteeService(ValidatorDutyService):
                     fork_info=_fork_info,
                     sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
                         beacon_block_root=beacon_block_root,
-                        slot=duty_slot,
+                        slot=str(duty_slot),
                     ),
                 ),
                 identifier=validator.pubkey,
@@ -276,8 +276,8 @@ class SyncCommitteeService(ValidatorDutyService):
                         SchemaRemoteSigner.SyncCommitteeSelectionProofSignableMessage(
                             fork_info=_fork_info,
                             sync_aggregator_selection_data=SchemaRemoteSigner.SyncAggregatorSelectionData(
-                                slot=duty_slot,
-                                subcommittee_index=subcommittee_index,
+                                slot=str(duty_slot),
+                                subcommittee_index=str(subcommittee_index),
                             ),
                         ),
                         identifier=duty.pubkey,
@@ -306,8 +306,10 @@ class SyncCommitteeService(ValidatorDutyService):
 
                 duty_sync_committee_selection_proofs.append(
                     SchemaBeaconAPI.SyncDutySubCommitteeSelectionProof(
-                        slot=sel_proof_msg.sync_aggregator_selection_data.slot,
-                        subcommittee_index=sel_proof_msg.sync_aggregator_selection_data.subcommittee_index,
+                        slot=int(sel_proof_msg.sync_aggregator_selection_data.slot),
+                        subcommittee_index=int(
+                            sel_proof_msg.sync_aggregator_selection_data.subcommittee_index
+                        ),
                         is_aggregator=self._is_aggregator(selection_proof),
                         selection_proof=selection_proof,
                     ),

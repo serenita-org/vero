@@ -518,7 +518,7 @@ class AttestationService(ValidatorDutyService):
                 signable_messages.append(
                     SchemaRemoteSigner.AggregationSlotSignableMessage(
                         fork_info=_fork_info,
-                        aggregation_slot=SchemaRemoteSigner.Slot(slot=int(duty.slot)),
+                        aggregation_slot=SchemaRemoteSigner.Slot(slot=str(duty.slot)),
                     ),
                 )
                 identifiers.append(duty.pubkey)

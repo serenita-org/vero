@@ -46,7 +46,7 @@ class AttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
 
 
 class Slot(msgspec.Struct):
-    slot: int
+    slot: str
 
 
 class AggregationSlotSignableMessage(SignableMessageWithForkInfo, kw_only=True):
@@ -65,7 +65,7 @@ class AggregateAndProofV2SignableMessage(SignableMessageWithForkInfo, kw_only=Tr
 
 
 class RandaoReveal(msgspec.Struct):
-    epoch: int
+    epoch: str
 
 
 class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
@@ -74,8 +74,8 @@ class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
 
 
 class BeaconBlockHeader(msgspec.Struct):
-    slot: int
-    proposer_index: int
+    slot: str
+    proposer_index: str
     parent_root: str
     state_root: str
     body_root: str
@@ -97,7 +97,7 @@ class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
 
 class SyncCommitteeMessage(msgspec.Struct):
     beacon_block_root: str
-    slot: int
+    slot: str
 
 
 class SyncCommitteeMessageSignableMessage(SignableMessageWithForkInfo, kw_only=True):
@@ -106,8 +106,8 @@ class SyncCommitteeMessageSignableMessage(SignableMessageWithForkInfo, kw_only=T
 
 
 class SyncAggregatorSelectionData(msgspec.Struct):
-    slot: int
-    subcommittee_index: int
+    slot: str
+    subcommittee_index: str
 
 
 class SyncCommitteeSelectionProofSignableMessage(

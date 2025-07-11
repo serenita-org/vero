@@ -29,7 +29,7 @@ from observability import (
 )
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
+from spec import SpecAttestation, SpecSyncCommittee
 from spec.attestation import AttestationData
 from spec.base import Genesis, SpecElectra, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
@@ -736,7 +736,7 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_beacon_block_contents: "SpecBeaconBlock.ElectraBlockContentsSigned",
+        signed_beacon_block_contents: SchemaBeaconAPI.ElectraBlockContentsSigned,
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_block_v2",
@@ -748,7 +748,7 @@ class BeaconNode:
             await self._make_request(
                 method="POST",
                 endpoint="/eth/v2/beacon/blocks",
-                data=self.json_encoder.encode(signed_beacon_block_contents.to_obj()),
+                data=self.json_encoder.encode(signed_beacon_block_contents),
                 headers={
                     "Eth-Consensus-Version": fork_version.value,
                     "Content-Type": ContentType.JSON.value,
@@ -758,7 +758,7 @@ class BeaconNode:
     async def publish_blinded_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_blinded_beacon_block: "SpecBeaconBlock.ElectraBlindedBlockSigned",
+        signed_blinded_beacon_block: SchemaBeaconAPI.SignedBeaconBlock,
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_blinded_block_v2",
@@ -770,7 +770,7 @@ class BeaconNode:
             await self._make_request(
                 method="POST",
                 endpoint="/eth/v2/beacon/blinded_blocks",
-                data=self.json_encoder.encode(signed_blinded_beacon_block.to_obj()),
+                data=self.json_encoder.encode(signed_blinded_beacon_block),
                 headers={
                     "Eth-Consensus-Version": fork_version.value,
                     "Content-Type": ContentType.JSON.value,
