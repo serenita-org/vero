@@ -606,46 +606,6 @@ async def test_produce_attestation_data_without_head_event(
             ],
             id="failure: head-emitting node stops responding, no further confirmations, fallback fails",
         ),
-        # TODO are there more test cases to cover? yes, failures -> timeouts, ...
-        # pytest.param(
-        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-        #     {
-        #         "beacon-node-a": [
-        #             _create_att_data_callback(
-        #                 block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa"
-        #             ),
-        #         ],
-        #         "beacon-node-b": [],
-        #         "beacon-node-c": [],
-        #     },
-        #     True,
-        #     True,
-        #     "0x000000000000000000000000000000000000000000000000000000000000bbbb",
-        #     [],
-        #     id="head event without confirmations -> fallback failure",
-        # ),
-        # pytest.param(
-        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-        #     {},
-        #     True,
-        #     True,
-        #     "",
-        #     [
-        #         "Consensus was not reached for slot",
-        #     ],
-        #     id="head event with confirmation from initial beacon node - should not count",
-        # ),
-        # pytest.param(
-        #     "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-        #     {},
-        #     False,
-        #     True,
-        #     "",
-        #     [
-        #         "Timed out confirming source checkpoint",
-        #     ],
-        #     id="source checkpoint not confirmed",
-        # ),
     ],
 )
 async def test_produce_attestation_data_with_head_event(

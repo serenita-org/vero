@@ -44,7 +44,7 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     ],
     indirect=True,
 )
-async def test_attest(
+async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     validators: list[ValidatorIndexPubkey],
