@@ -402,7 +402,7 @@ def _mocked_beacon_node_endpoints(
                 )
 
             assert (
-                attestation.data["beacon_block_root"]
+                attestation.data.beacon_block_root
                 == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
             )
 

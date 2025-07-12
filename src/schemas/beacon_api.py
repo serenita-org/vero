@@ -70,13 +70,6 @@ class ForkVersion(Enum):
     ELECTRA = "electra"
 
 
-class SingleAttestation(msgspec.Struct):
-    committee_index: str
-    attester_index: str
-    data: dict  # type: ignore[type-arg]
-    signature: str
-
-
 class AttestationData(msgspec.Struct, frozen=True):
     slot: str
     index: str
@@ -85,6 +78,13 @@ class AttestationData(msgspec.Struct, frozen=True):
     # FFG vote
     source: Checkpoint
     target: Checkpoint
+
+
+class SingleAttestation(msgspec.Struct):
+    committee_index: str
+    attester_index: str
+    data: AttestationData
+    signature: str
 
 
 class ProduceAttestationDataResponse(msgspec.Struct):

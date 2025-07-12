@@ -263,19 +263,16 @@ class AttestationService(ValidatorDutyService):
         # Sign the attestation data
         attestations_objects_to_publish: list[SchemaBeaconAPI.SingleAttestation] = []
 
-        _fork_info = self.beacon_chain.get_fork_info(slot=slot)
-        _fork_version = self.beacon_chain.current_fork_version
-
         pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
-        att_data_obj = msgspec.structs.asdict(att_data)
+        message = SchemaRemoteSigner.AttestationSignableMessage(
+            fork_info=self.beacon_chain.get_fork_info(slot=slot),
+            attestation=msgspec.to_builtins(att_data),
+        )
 
         for coro in asyncio.as_completed(
             [
                 self.signature_provider.sign(
-                    message=SchemaRemoteSigner.AttestationSignableMessage(
-                        fork_info=_fork_info,
-                        attestation=att_data_obj,
-                    ),
+                    message=message,
                     identifier=duty.pubkey,
                 )
                 for duty in slot_attester_duties
@@ -299,7 +296,7 @@ class AttestationService(ValidatorDutyService):
                 SchemaBeaconAPI.SingleAttestation(
                     committee_index=duty.committee_index,
                     attester_index=duty.validator_index,
-                    data=att_data_obj,
+                    data=att_data,
                     signature=signature,
                 ),
             )
@@ -326,7 +323,7 @@ class AttestationService(ValidatorDutyService):
         try:
             await self.multi_beacon_node.publish_attestations(
                 attestations=attestations_objects_to_publish,
-                fork_version=_fork_version,
+                fork_version=self.beacon_chain.current_fork_version,
             )
         except Exception as e:
             _ERRORS_METRIC.labels(
@@ -336,7 +333,7 @@ class AttestationService(ValidatorDutyService):
                 f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
             )
         else:
-            self.logger.debug(
+            self.logger.info(
                 f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
             )
 
