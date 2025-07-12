@@ -1,5 +1,6 @@
 import asyncio
 import re
+import time
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from contextlib import nullcontext
 from copy import deepcopy
@@ -84,7 +85,6 @@ async def multi_beacon_node_three_inited_nodes(
 @pytest.fixture
 async def attestation_data_provider(
     multi_beacon_node_three_inited_nodes: MultiBeaconNode,
-    beacon_chain: BeaconChain,
     duty_cache: DutyCache,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
@@ -92,7 +92,6 @@ async def attestation_data_provider(
 ) -> AttestationDataProvider:
     adp = AttestationDataProvider(
         multi_beacon_node=multi_beacon_node_three_inited_nodes,
-        beacon_chain=beacon_chain,
         scheduler=scheduler,
     )
     # Default timeout is 1000 ms which doesn't work well for tests
@@ -358,10 +357,16 @@ async def test_produce_attestation_data_without_head_event(
                 )
                 m.get(url=url_re, **kwargs)
 
+        slot = beacon_chain.current_slot
+        next_slot_start_ts = beacon_chain.get_timestamp_for_slot(slot + 1)
+
         ctx = pytest.raises(TimeoutError) if timeout_expected else nullcontext()
         with ctx:
-            att_data = await attestation_data_provider.produce_attestation_data(
-                slot=beacon_chain.current_slot, head_event_block_root=None
+            att_data = await asyncio.wait_for(
+                attestation_data_provider.produce_attestation_data(
+                    slot=slot, head_event_block_root=None
+                ),
+                timeout=next_slot_start_ts - time.time(),
             )
             assert str(att_data.beacon_block_root) == expected_att_data_block_root
             assert att_data.source == expected_att_data_source
@@ -670,11 +675,16 @@ async def test_produce_attestation_data_with_head_event(
                     callback=cb,
                 )
 
+        slot = beacon_chain.current_slot
+        next_slot_start_ts = beacon_chain.get_timestamp_for_slot(slot + 1)
+
         ctx = pytest.raises(TimeoutError) if timeout_expected else nullcontext()
         with ctx:
-            att_data = await attestation_data_provider.produce_attestation_data(
-                slot=beacon_chain.current_slot,
-                head_event_block_root=initial_head_event_block_root,
+            att_data = await asyncio.wait_for(
+                attestation_data_provider.produce_attestation_data(
+                    slot=slot, head_event_block_root=initial_head_event_block_root
+                ),
+                timeout=next_slot_start_ts - time.time(),
             )
             assert str(att_data.beacon_block_root) == expected_att_data_block_root
             assert att_data.source == expected_att_data_source

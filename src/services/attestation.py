@@ -58,7 +58,6 @@ class AttestationService(ValidatorDutyService):
 
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
-            beacon_chain=self.beacon_chain,
             scheduler=self.scheduler,
         )
 

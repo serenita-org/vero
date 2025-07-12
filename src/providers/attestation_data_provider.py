@@ -1,13 +1,11 @@
 import asyncio
 import datetime
 import logging
-import time
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from schemas import SchemaBeaconAPI
 
-from .beacon_chain import BeaconChain
 from .multi_beacon_node import MultiBeaconNode
 
 
@@ -15,13 +13,11 @@ class AttestationDataProvider:
     def __init__(
         self,
         multi_beacon_node: MultiBeaconNode,
-        beacon_chain: BeaconChain,
         scheduler: AsyncIOScheduler,
     ):
         self.logger = logging.getLogger("AttestationData")
 
         self.multi_beacon_node = multi_beacon_node
-        self.beacon_chain = beacon_chain
 
         self._timeout_att_data_for_head_event = 0.5
         self._timeout_confirm_finality_checkpoints = 1.0
@@ -74,13 +70,11 @@ class AttestationDataProvider:
         self, slot: int
     ) -> SchemaBeaconAPI.AttestationData:
         # We ask all beacon nodes to produce AttestationData,
-        # requiring a threshold of them to agree on the head of the chain.
-        next_slot_start_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
-        att_data = await asyncio.wait_for(
-            self.multi_beacon_node.produce_attestation_data_without_head_event(
+        # requiring a threshold of them to agree on it.
+        att_data = (
+            await self.multi_beacon_node.produce_attestation_data_without_head_event(
                 slot=slot,
-            ),
-            timeout=next_slot_start_ts - time.time(),
+            )
         )
         self._cache_checkpoints(source=att_data.source, target=att_data.target)
         return att_data
@@ -108,7 +102,7 @@ class AttestationDataProvider:
 
         # We have an expected head block root from a head event.
         # Fetch the full AttestationData for the given block root
-        # from the fastest beacon node. Times out in 500 ms.
+        # from the fastest beacon node.
         try:
             att_data = await asyncio.wait_for(
                 self.multi_beacon_node.wait_for_attestation_data(
@@ -137,7 +131,7 @@ class AttestationDataProvider:
         # We have a full AttestationData object at this point. The only thing left is
         # to confirm the FFG checkpoints. This part also has a timeout to make sure
         # we still at least have a chance to attest on time if we're unable to confirm
-        # the checkpoints from the AttestationData. Times out in 1000 ms.
+        # the checkpoints from the AttestationData.
         try:
             await asyncio.wait_for(
                 self._confirm_finality_checkpoints(
@@ -163,7 +157,7 @@ class AttestationDataProvider:
             return att_data
 
     def prune(self) -> None:
-        # Only keep up to 3 most recent checkpoints in checkpoint confirmation cache
+        # Only keep up to 3 most recent checkpoints in the checkpoint confirmation cache
         self.source_checkpoint_confirmation_cache = dict(
             sorted(
                 self.source_checkpoint_confirmation_cache.items(),
