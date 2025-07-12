@@ -271,7 +271,8 @@ class BeaconNode:
                     )
 
                 return await resp.text()
-        except (BeaconNodeNotReady, BeaconNodeUnsupportedEndpoint):
+        except BeaconNodeNotReady:
+            self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
             self.logger.exception(
