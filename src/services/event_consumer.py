@@ -205,26 +205,6 @@ class EventConsumerService:
                     event_type=event_type,
                 ).inc()
 
-                # TODO
-                #  ... think about this case
-                #      3 beacon nodes
-                #      1 of them has a bug, forks off and emits head events
-                #      ... we may fail to attest here since _last_slot_duty_started_for
-                #          has already been set by the faulty node and consensus will never
-                #          be reached on its head block root!
-                #      this can be avoided by setting _last_slot_duty_started_for later on,
-                #      once consensus has been reached (or introducing some new logic that accounts for this case)
-                #      ... BUT we would not want to attest early to an old head if we have
-                #      already seen a head event for the current slot
-                #      ... feels like there's a tradeoff here and we can't get best of both?
-                #      HMMM perhaps an entire logic change makes sense here - emit the head event
-                #      only once it's been seen by multiple BNs? It would avoid the polling we do
-                #      ...
-                #      hmm actually we just fall back to "expected_block_root=None" behavior
-                #      at some point so this seems a non-issue?
-                #      there is another Q though. We're currently coming to consensus on the
-                #      head block root but we should also confirm the FFG part - source+target
-
         except asyncio.CancelledError:
             raise
         except Exception as e:

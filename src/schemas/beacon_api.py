@@ -58,14 +58,6 @@ class Checkpoint(msgspec.Struct, frozen=True):
     root: str
 
 
-class GetStateFinalityCheckpointsResponseData(msgspec.Struct):
-    current_justified: Checkpoint
-
-
-class GetStateFinalityCheckpointsResponse(ExecutionOptimisticResponse):
-    data: GetStateFinalityCheckpointsResponseData
-
-
 class ForkVersion(Enum):
     ELECTRA = "electra"
 
