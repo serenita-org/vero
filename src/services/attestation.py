@@ -379,13 +379,12 @@ class AttestationService(ValidatorDutyService):
     async def _sign_and_publish_aggregates(
         self,
         slot: int,
-        messages: list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
-        | list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage],
+        messages: list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage],
         identifiers: list[str],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         signed_aggregate_and_proofs = []
-        for msg, sig, _identifier in await self.signature_provider.sign_in_batches(  # type: ignore[misc]
+        for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
@@ -449,16 +448,13 @@ class AttestationService(ValidatorDutyService):
             slot=slot,
             committee_indices=committee_indices,
         ):
-            messages: (
-                list[SchemaRemoteSigner.AggregateAndProofSignableMessage]
-                | list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage]
-            ) = []
+            messages: list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage] = []
             identifiers = []
             for duty in aggregator_duties:
                 if aggregate.committee_bits[int(duty.committee_index)]:
                     aggregate_count += 1
                     messages.append(
-                        SchemaRemoteSigner.AggregateAndProofV2SignableMessage(  # type: ignore[arg-type]
+                        SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
                             fork_info=_fork_info,
                             aggregate_and_proof=SpecAttestation.AggregateAndProofElectra(
                                 aggregator_index=int(duty.validator_index),
