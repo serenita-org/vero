@@ -595,14 +595,16 @@ class MultiBeaconNode:
 
     async def get_aggregate_attestation_v2(
         self,
-        attestation_data: SchemaBeaconAPI.AttestationData,
+        attestation_data_root: str,
+        slot: int,
         committee_index: int,
     ) -> "SpecAttestation.AttestationElectra":
         aggregates: list[
             SpecAttestation.AttestationElectra
         ] = await self._get_all_beacon_node_responses(
             func_name="get_aggregate_attestation_v2",
-            attestation_data=attestation_data,
+            attestation_data_root=attestation_data_root,
+            slot=slot,
             committee_index=committee_index,
         )
 
@@ -625,12 +627,14 @@ class MultiBeaconNode:
 
     async def get_aggregate_attestations_v2(
         self,
-        attestation_data: SchemaBeaconAPI.AttestationData,
+        attestation_data_root: str,
+        slot: int,
         committee_indices: set[int],
     ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
         tasks = [
             self.get_aggregate_attestation_v2(
-                attestation_data=attestation_data,
+                attestation_data_root=attestation_data_root,
+                slot=slot,
                 committee_index=committee_index,
             )
             for committee_index in committee_indices
@@ -644,7 +648,7 @@ class MultiBeaconNode:
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
                 self.logger.exception(
-                    f"Failed to produce aggregate attestation for slot {attestation_data.slot}: {e!r}",
+                    f"Failed to produce aggregate attestation for root {attestation_data_root}: {e!r}",
                 )
 
     async def publish_aggregate_and_proofs(

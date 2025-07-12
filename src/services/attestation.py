@@ -20,7 +20,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import SpecAttestation
+from spec.attestation import AttestationData, SpecAttestation
 from spec.common import (
     bytes_to_uint64,
     hash_function,
@@ -423,6 +423,12 @@ class AttestationService(ValidatorDutyService):
         self.logger.debug(
             f"Aggregating attestations for slot {slot}, {len(aggregator_duties)} duties",
         )
+        attestation_data_root = (
+            "0x"
+            + AttestationData.from_obj(msgspec.to_builtins(att_data))
+            .hash_tree_root()
+            .hex()
+        )
         self._duty_start_time_metric.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
@@ -431,7 +437,7 @@ class AttestationService(ValidatorDutyService):
 
         aggregate_count = 0
         self.logger.debug(
-            f"Starting aggregate and proof sign-and-publish tasks for slot {att_data.slot}, committee indices: {committee_indices}",
+            f"Starting aggregate and proof sign-and-publish tasks for slot {slot}, committee indices: {committee_indices}",
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
@@ -439,7 +445,8 @@ class AttestationService(ValidatorDutyService):
         _sign_and_publish_tasks = []
 
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
-            attestation_data=att_data,
+            attestation_data_root=attestation_data_root,
+            slot=slot,
             committee_indices=committee_indices,
         ):
             messages: (
@@ -475,7 +482,7 @@ class AttestationService(ValidatorDutyService):
 
         await asyncio.gather(*_sign_and_publish_tasks)
         self.logger.info(
-            f"Published aggregate and proofs for slot {att_data.slot}, count: {aggregate_count}",
+            f"Published aggregate and proofs for slot {slot}, count: {aggregate_count}",
         )
 
     async def _get_duties_with_selection_proofs(

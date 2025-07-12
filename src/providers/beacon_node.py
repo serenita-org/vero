@@ -31,7 +31,6 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
-from spec.attestation import AttestationData
 from spec.base import Genesis, SpecElectra, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
@@ -558,15 +557,16 @@ class BeaconNode:
 
     async def get_aggregate_attestation_v2(
         self,
-        attestation_data: SchemaBeaconAPI.AttestationData,
+        attestation_data_root: str,
+        slot: int,
         committee_index: int,
     ) -> "SpecAttestation.AttestationElectra":
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
             params=dict(
-                attestation_data_root=f"0x{AttestationData.from_obj(msgspec.to_builtins(attestation_data)).hash_tree_root().hex()}",
-                slot=attestation_data.slot,
+                attestation_data_root=attestation_data_root,
+                slot=str(slot),
                 committee_index=str(committee_index),
             ),
             timeout=ClientTimeout(
