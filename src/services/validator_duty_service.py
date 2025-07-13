@@ -47,28 +47,44 @@ class ValidatorDutyServiceOptions(TypedDict):
     cli_args: CLIArgs
 
 
-class ValidatorDutyService:
-    _duty_start_time_metric = Histogram(
-        "duty_start_time",
-        "Time into slot at which a duty starts",
-        labelnames=["duty"],
-        buckets=[
-            item
-            for sublist in [[i, i + 0.25, i + 0.5, i + 0.75] for i in range(12)]
-            for item in sublist
-        ],
-    )
-    _duty_submission_time_metric = Histogram(
-        "duty_submission_time",
-        "Time into slot at which data for a duty is about to be submitted",
-        labelnames=["duty"],
-        buckets=[
-            item
-            for sublist in [[i, i + 0.25, i + 0.5, i + 0.75] for i in range(12)]
-            for item in sublist
-        ],
-    )
+_DUTY_START_TIME_METRIC = None
+_DUTY_SUBMISSION_TIME_METRIC = None
 
+
+def _setup_duty_time_metrics(
+    seconds_per_slot: int,
+) -> tuple[Histogram, Histogram]:
+    global _DUTY_START_TIME_METRIC, _DUTY_SUBMISSION_TIME_METRIC
+
+    buckets = [
+        item
+        for sublist in [
+            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(seconds_per_slot)
+        ]
+        for item in sublist
+    ]
+    buckets.remove(0)
+
+    if _DUTY_START_TIME_METRIC is None:
+        _DUTY_START_TIME_METRIC = Histogram(
+            "duty_start_time",
+            "Time into slot at which a duty starts",
+            labelnames=["duty"],
+            buckets=buckets,
+        )
+
+    if _DUTY_SUBMISSION_TIME_METRIC is None:
+        _DUTY_SUBMISSION_TIME_METRIC = Histogram(
+            "duty_submission_time",
+            "Time into slot at which a duty submission starts",
+            labelnames=["duty"],
+            buckets=buckets,
+        )
+
+    return _DUTY_START_TIME_METRIC, _DUTY_SUBMISSION_TIME_METRIC
+
+
+class ValidatorDutyService:
     def __init__(
         self,
         **kwargs: Unpack[ValidatorDutyServiceOptions],
@@ -106,6 +122,12 @@ class ValidatorDutyService:
         # Avoids us updating validator duties multiple times
         # at the same time
         self._update_duties_lock = asyncio.Lock()
+
+        self._duty_start_time_metric, self._duty_submission_time_metric = (
+            _setup_duty_time_metrics(
+                seconds_per_slot=self.beacon_chain.SECONDS_PER_SLOT
+            )
+        )
 
     async def __aenter__(self) -> Self:
         raise NotImplementedError
