@@ -20,7 +20,6 @@
   "graphTooltip": 1,
   "id": 38,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -51,8 +50,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -83,7 +81,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -117,8 +115,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -149,7 +146,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -185,8 +182,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -217,7 +213,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -251,8 +247,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -283,7 +278,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -318,8 +313,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -350,7 +344,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -384,45 +378,31 @@
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "axisPlacement": "hidden",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
             "lineWidth": 1,
-            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "red"
               }
             ]
-          },
-          "unit": "s"
+          }
         },
         "overrides": []
       },
@@ -433,21 +413,31 @@
         "y": 5
       },
       "id": 34,
-      "interval": "1m",
-      "maxDataPoints": 50,
+      "interval": "10m",
+      "maxDataPoints": 20,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "normal",
         "tooltip": {
-          "mode": "single",
+          "hideZeros": false,
+          "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -456,17 +446,17 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_quantile(0.99, rate(vc_attestation_consensus_time_bucket{instance=\"$instance\"}[$__interval]))",
+          "expr": "round(increase(vc_processed_beacon_node_events_total{event_type=\"HeadEvent\", instance=\"$instance\"}[$__interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
-          "legendFormat": "99% quantile",
+          "legendFormat": "{{ host }}",
           "range": true,
-          "refId": "99% quantile"
+          "refId": "Head Events Processed"
         }
       ],
-      "title": "Attestation Consensus Time [$__interval] - 99% quantile",
-      "type": "timeseries"
+      "title": "Head Events Processed [$__interval]",
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -484,8 +474,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -577,7 +566,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -638,8 +627,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -675,7 +663,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -726,8 +714,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -762,7 +749,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -798,8 +785,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -835,7 +821,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -870,8 +856,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -902,7 +887,7 @@
         "textMode": "name",
         "wideLayout": true
       },
-      "pluginVersion": "11.1.1",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -932,6 +917,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisPlacement": "auto",
             "fillOpacity": 70,
             "hideFrom": {
               "legend": false,
@@ -947,8 +933,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "#EAB839",
@@ -981,12 +966,13 @@
         "rowHeight": 0.9,
         "showValue": "never",
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "10.2.6",
+      "pluginVersion": "11.6.0",
       "targets": [
         {
           "datasource": {
@@ -1006,28 +992,24 @@
       "type": "state-timeline"
     }
   ],
+  "preload": false,
   "refresh": "1m",
-  "schemaVersion": 39,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "default",
           "value": "default"
         },
-        "hide": 0,
         "includeAll": false,
         "label": "Data Source",
-        "multi": false,
         "name": "datasource",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
@@ -1041,10 +1023,8 @@
           "uid": "${datasource}"
         },
         "definition": "label_values(vero_info,instance)",
-        "hide": 0,
         "includeAll": false,
         "label": "Instance",
-        "multi": false,
         "name": "instance",
         "options": [],
         "query": {
@@ -1054,13 +1034,10 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "All",
           "value": "$__all"
         },
@@ -1072,7 +1049,6 @@
         "hide": 2,
         "includeAll": true,
         "label": "Beacon Node",
-        "multi": false,
         "name": "beacon_node_host",
         "options": [],
         "query": {
@@ -1082,8 +1058,6 @@
         },
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]
@@ -1096,6 +1070,5 @@
   "timezone": "",
   "title": "Vero - Simple",
   "uid": "f3868b92-83fd-43a3-8e18-a74f35169590",
-  "version": 2,
-  "weekStart": ""
+  "version": 3
 }

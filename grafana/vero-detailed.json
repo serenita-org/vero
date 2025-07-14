@@ -371,6 +371,7 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "fixedColor": "green",
             "mode": "palette-classic"
           },
           "custom": {
@@ -378,45 +379,31 @@
             "axisCenteredZero": false,
             "axisColorMode": "text",
             "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
+            "axisPlacement": "hidden",
+            "fillOpacity": 80,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
             "lineWidth": 1,
-            "pointSize": 5,
             "scaleDistribution": {
               "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
           "mappings": [],
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "red"
               }
             ]
-          },
-          "unit": "s"
+          }
         },
         "overrides": []
       },
@@ -427,20 +414,29 @@
         "y": 5
       },
       "id": 34,
-      "interval": "1m",
-      "maxDataPoints": 50,
+      "interval": "10m",
+      "maxDataPoints": 20,
       "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
         "legend": {
           "calcs": [],
           "displayMode": "list",
           "placement": "bottom",
           "showLegend": false
         },
+        "orientation": "auto",
+        "showValue": "never",
+        "stacking": "normal",
         "tooltip": {
           "hideZeros": false,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "11.6.0",
       "targets": [
@@ -451,17 +447,17 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_quantile(0.99, rate(vc_attestation_consensus_time_bucket{instance=\"$instance\"}[$__interval]))",
+          "expr": "round(increase(vc_processed_beacon_node_events_total{event_type=\"HeadEvent\", instance=\"$instance\"}[$__interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
-          "legendFormat": "99% quantile",
+          "legendFormat": "{{host}}",
           "range": true,
-          "refId": "99% quantile"
+          "refId": "Head Events Processed"
         }
       ],
-      "title": "Attestation Consensus Time [$__interval] - 99% quantile",
-      "type": "timeseries"
+      "title": "Head Events Processed [$__interval]",
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -1282,7 +1278,7 @@
             "h": 8,
             "w": 24,
             "x": 0,
-            "y": 40
+            "y": 26
           },
           "id": 33,
           "maxDataPoints": 50,
@@ -1356,7 +1352,7 @@
             "h": 14,
             "w": 24,
             "x": 0,
-            "y": 48
+            "y": 34
           },
           "id": 19,
           "maxDataPoints": 50,
@@ -1419,7 +1415,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Represents the number of times the produced attestation data's block root ended up matching the head block root of other beacon nodes, before attestation consensus was reached on that block root.",
+          "description": "Tracks how many times each beacon node confirmed finality checkpoints.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1430,33 +1426,17 @@
                 "axisCenteredZero": false,
                 "axisColorMode": "text",
                 "axisLabel": "",
-                "axisPlacement": "auto",
-                "axisSoftMin": 0,
-                "barAlignment": 0,
-                "barWidthFactor": 0.6,
-                "drawStyle": "line",
-                "fillOpacity": 60,
+                "axisPlacement": "hidden",
+                "fillOpacity": 80,
                 "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
                   "tooltip": false,
                   "viz": false
                 },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineStyle": {
-                  "fill": "solid"
-                },
                 "lineWidth": 1,
-                "pointSize": 5,
                 "scaleDistribution": {
                   "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "normal"
                 },
                 "thresholdsStyle": {
                   "mode": "off"
@@ -1470,8 +1450,7 @@
                     "color": "green"
                   }
                 ]
-              },
-              "unit": "percentunit"
+              }
             },
             "overrides": []
           },
@@ -1479,21 +1458,32 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 62
+            "y": 48
           },
           "id": 273,
+          "interval": "10m",
+          "maxDataPoints": 10,
           "options": {
+            "barRadius": 0,
+            "barWidth": 0.75,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
             "legend": {
               "calcs": [],
               "displayMode": "list",
               "placement": "bottom",
               "showLegend": true
             },
+            "orientation": "auto",
+            "showValue": "never",
+            "stacking": "normal",
             "tooltip": {
               "hideZeros": false,
               "mode": "multi",
               "sort": "none"
-            }
+            },
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
           },
           "pluginVersion": "11.6.0",
           "targets": [
@@ -1503,22 +1493,22 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "sum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval])) by (host)\n/ ignoring (host) group_left\nsum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__rate_interval]))",
+              "expr": "round(increase(checkpoint_confirmations_total{instance=\"$instance\"}[$__rate_interval]))",
               "instant": false,
-              "legendFormat": "__auto",
+              "legendFormat": "{{host}}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Attestation Consensus Contributions",
-          "type": "timeseries"
+          "title": "Finality Checkpoint Confirmations",
+          "type": "barchart"
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "description": "Represents the number of times the produced attestation data's block root ended up matching the head block root of other beacon nodes, before attestation consensus was reached on that block root.",
+          "description": "Tracks how many times each beacon node confirmed finality checkpoints.",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -1540,7 +1530,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 62
+            "y": 48
           },
           "id": 274,
           "options": {
@@ -1576,14 +1566,14 @@
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "sum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__range])) by (host)\n/ ignoring (host) group_left\nsum(rate(vc_attestation_consensus_contributions_total{instance=\"$instance\"}[$__range]))",
+              "expr": "sum(rate(checkpoint_confirmations_total{instance=\"$instance\"}[$__range])) by (host)\n/ ignoring (host) group_left\nsum(rate(checkpoint_confirmations_total{instance=\"$instance\"}[$__range]))",
               "instant": true,
               "legendFormat": "__auto",
               "range": false,
               "refId": "A"
             }
           ],
-          "title": "Attestation Consensus Contributions",
+          "title": "Finality Checkpoint Confirmations",
           "type": "piechart"
         }
       ],
@@ -6668,5 +6658,5 @@
   "timezone": "",
   "title": "Vero - Detailed",
   "uid": "f3868b92-83fd-43a3-8d18-a74f35369590",
-  "version": 10
+  "version": 11
 }
