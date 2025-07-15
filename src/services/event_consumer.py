@@ -216,11 +216,11 @@ class EventConsumerService:
                 error_type=ErrorType.EVENT_CONSUMER.value,
             ).inc()
             self.logger.exception(
-                f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 1 second...",
+                f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 10 seconds...",
             )
             self.task_manager.submit_task(
                 self.handle_events(beacon_node=beacon_node),
-                delay=1.0,
+                delay=10.0,
                 name=f"handle_events_{beacon_node.base_url}",
             )
         else:
