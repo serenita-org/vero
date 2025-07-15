@@ -580,10 +580,15 @@ class MultiBeaconNode:
                 task.cancel()
             raise
 
-    async def publish_attestations(self, **kwargs: Any) -> None:
+    async def publish_attestations(
+        self,
+        attestations: list[SchemaBeaconAPI.SingleAttestation],
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
-            **kwargs,
+            attestations=attestations,
+            fork_version=fork_version,
         )
 
     async def get_aggregate_attestation_v2(

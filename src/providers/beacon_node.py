@@ -99,6 +99,10 @@ class BeaconNodeUnsupportedEndpoint(Exception):
     pass
 
 
+class BeaconNodeReturnedBadRequest(Exception):
+    pass
+
+
 class ContentType(Enum):
     JSON = "application/json"
     OCTET_STREAM = "application/octet-stream"
@@ -223,6 +227,9 @@ class BeaconNode:
             raise BeaconNodeNotReady(resp_text)
         if response.status == 405:
             raise BeaconNodeUnsupportedEndpoint(resp_text)
+        if response.status == 400:
+            raise BeaconNodeReturnedBadRequest(resp_text)
+
         raise ValueError(
             f"Received status code {response.status} for request to {response.request_info.url}"
             f" Full response text: {resp_text}",
@@ -274,7 +281,7 @@ class BeaconNode:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
-            self.logger.exception(
+            self.logger.debug(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -526,7 +533,7 @@ class BeaconNode:
 
     async def publish_attestations(
         self,
-        attestations: list[dict],  # type: ignore[type-arg]
+        attestations: list[SchemaBeaconAPI.SingleAttestation],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
