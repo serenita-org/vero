@@ -1,5 +1,6 @@
 import re
 from collections.abc import AsyncGenerator
+from copy import deepcopy
 
 import pytest
 from aioresponses import CallbackResult, aioresponses
@@ -20,6 +21,8 @@ async def multi_beacon_node_three_inited_nodes(
     task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
+    _cli_args_override = deepcopy(cli_args)
+    _cli_args_override.attestation_consensus_threshold = 2
     mbn = MultiBeaconNode(
         beacon_node_urls=[
             "http://beacon-node-a:1234",
@@ -30,7 +33,7 @@ async def multi_beacon_node_three_inited_nodes(
         spec=spec,
         scheduler=scheduler,
         task_manager=task_manager,
-        cli_args=cli_args,
+        cli_args=_cli_args_override,
     )
     with aioresponses() as m:
         m.get(

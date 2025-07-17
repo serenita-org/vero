@@ -128,6 +128,23 @@ from spec.configs import Network
             [
                 "--network=hoodi",
                 "--remote-signer-url=http://signer:9000",
+                "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052,http://beacon-node-3:5052",
+                "--attestation-consensus-threshold=3",
+                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+            ],
+            None,
+            {
+                "attestation_consensus_threshold": 3,
+            },
+            [
+                "attestation_consensus_threshold: 3",
+            ],
+            id="--attestation-consensus-threshold override",
+        ),
+        pytest.param(
+            [
+                "--network=hoodi",
+                "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
                 "--attestation-consensus-threshold=asd",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",

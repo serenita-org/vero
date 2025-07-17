@@ -8,16 +8,18 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from enum import Enum
-from typing import Any
+from typing import Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
 import msgspec
 from aiohttp import ClientTimeout
+from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
+from prometheus_client import Counter as CounterMetric
 from prometheus_client import Gauge, Histogram
 from yarl import URL
 
@@ -30,7 +32,6 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
-from spec.attestation import AttestationData
 from spec.base import Genesis, SpecElectra, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
@@ -82,6 +83,11 @@ _BEACON_NODE_SYNC_CONTRIBUTION_PARTICIPANT_COUNT = Histogram(
     labelnames=["host"],
     buckets=[8, 16, 32, 64, 128],
 )
+_CHECKPOINT_CONFIRMATIONS = CounterMetric(
+    "checkpoint_confirmations",
+    "Tracks how many times each beacon node confirmed finality checkpoints.",
+    labelnames=["host"],
+)
 (_ERRORS_METRIC,) = get_shared_metrics()
 
 
@@ -90,6 +96,10 @@ class BeaconNodeNotReady(Exception):
 
 
 class BeaconNodeUnsupportedEndpoint(Exception):
+    pass
+
+
+class BeaconNodeReturnedBadRequest(Exception):
     pass
 
 
@@ -128,6 +138,7 @@ class BeaconNode:
         self.initialized = False
         self._score = 0
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
+        _CHECKPOINT_CONFIRMATIONS.labels(host=self.host).reset()
         self.node_version = ""
 
         self._trace_default_request_ctx = dict(
@@ -216,6 +227,9 @@ class BeaconNode:
             raise BeaconNodeNotReady(resp_text)
         if response.status == 405:
             raise BeaconNodeUnsupportedEndpoint(resp_text)
+        if response.status == 400:
+            raise BeaconNodeReturnedBadRequest(resp_text)
+
         raise ValueError(
             f"Received status code {response.status} for request to {response.request_info.url}"
             f" Full response text: {resp_text}",
@@ -223,12 +237,10 @@ class BeaconNode:
 
     async def _make_request(
         self,
-        method: str,
+        method: Literal["GET", "POST"],
         endpoint: str,
         formatted_endpoint_string_params: dict[str, str | int] | None = None,
-        **kwargs: Any,
-        # can't get this more correct type hint to work with mypy
-        # **kwargs: Unpack[_RequestOptions],
+        **kwargs: Unpack[_RequestOptions],
     ) -> str:
         if formatted_endpoint_string_params is not None:
             kwargs["trace_request_ctx"] = dict(path=endpoint)
@@ -265,10 +277,11 @@ class BeaconNode:
                     )
 
                 return await resp.text()
-        except BeaconNodeUnsupportedEndpoint:
+        except BeaconNodeNotReady:
+            self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
-            self.logger.exception(
+            self.logger.debug(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -329,69 +342,78 @@ class BeaconNode:
     async def produce_attestation_data(
         self,
         slot: int,
-        committee_index: int,
-    ) -> tuple[str, AttestationData]:
+    ) -> tuple[str, SchemaBeaconAPI.AttestationData]:
         """Returns the beacon node host along with the produced attestation data."""
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.produce_attestation_data",
-            kind=SpanKind.CLIENT,
-            attributes={
-                "server.address": self.host,
-            },
-        ) as tracer_span:
-            resp = await self._make_request(
-                method="GET",
-                endpoint="/eth/v1/validator/attestation_data",
-                params=dict(
-                    slot=slot,
-                    committee_index=committee_index,
-                ),
-                timeout=ClientTimeout(
-                    connect=self.client_session.timeout.connect,
-                    total=0.3,
-                ),
-            )
+        resp_text = await self._make_request(
+            method="GET",
+            endpoint="/eth/v1/validator/attestation_data",
+            params=dict(
+                slot=slot,
+                committee_index=0,
+            ),
+            timeout=ClientTimeout(
+                connect=self.client_session.timeout.connect,
+                total=0.5,
+            ),
+        )
 
-            att_data = AttestationData.from_obj(json.loads(resp)["data"])
-            tracer_span.add_event(
-                "AttestationData",
-                attributes={
-                    "att_data.beacon_block_root": att_data.beacon_block_root.to_obj(),
-                },
-            )
-            return self.host, att_data
+        response = msgspec.json.decode(
+            resp_text, type=SchemaBeaconAPI.ProduceAttestationDataResponse
+        )
+        return self.host, response.data
 
     async def wait_for_attestation_data(
         self,
         expected_head_block_root: str,
         slot: int,
-        committee_index: int,
-    ) -> tuple[str, AttestationData]:
-        """Returns the beacon node host along with the produced attestation data."""
-        with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.wait_for_attestation_data",
-            attributes={
-                "server.address": self.host,
-            },
-        ):
-            while True:
-                _request_start_time = asyncio.get_running_loop().time()
+    ) -> SchemaBeaconAPI.AttestationData:
+        while True:
+            _request_start_time = asyncio.get_running_loop().time()
 
-                try:
-                    _, att_data = await self.produce_attestation_data(
-                        slot=slot,
-                        committee_index=committee_index,
-                    )
-                    if att_data.beacon_block_root.to_obj() == expected_head_block_root:
-                        return self.host, att_data
-                except Exception as e:
-                    self.logger.exception(
-                        f"Failed to produce attestation data: {e!r}",
-                    )
+            try:
+                _, att_data = await self.produce_attestation_data(
+                    slot=slot,
+                )
+                if att_data.beacon_block_root == expected_head_block_root:
+                    self.logger.debug(f"Got matching AttestationData from {self.host}")
+                    return att_data
+            except Exception as e:
+                self.logger.debug(
+                    f"Failed to produce attestation data: {e!r}",
+                )
 
-                # Rate-limiting - wait at least 50ms in between requests
-                elapsed_time = asyncio.get_running_loop().time() - _request_start_time
-                await asyncio.sleep(max(0.05 - elapsed_time, 0))
+            # Rate-limiting - wait at least 50ms in between requests
+            elapsed_time = asyncio.get_running_loop().time() - _request_start_time
+            await asyncio.sleep(max(0.05 - elapsed_time, 0))
+
+    async def wait_for_checkpoints(
+        self,
+        slot: int,
+        expected_source_cp: SchemaBeaconAPI.Checkpoint,
+        expected_target_cp: SchemaBeaconAPI.Checkpoint,
+    ) -> None:
+        while True:
+            _request_start_time = asyncio.get_running_loop().time()
+
+            try:
+                _, att_data = await self.produce_attestation_data(
+                    slot=slot,
+                )
+                if (
+                    att_data.source == expected_source_cp
+                    and att_data.target == expected_target_cp
+                ):
+                    self.logger.info(f"Finality checkpoints confirmed by {self.host}")
+                    _CHECKPOINT_CONFIRMATIONS.labels(host=self.host).inc()
+                    return
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to produce attestation data while waiting for checkpoints: {e!r}",
+                )
+
+            # Rate-limiting - wait at least 50ms in between requests
+            elapsed_time = asyncio.get_running_loop().time() - _request_start_time
+            await asyncio.sleep(max(0.05 - elapsed_time, 0))
 
     async def get_block_root(self, block_id: str) -> str:
         resp_text = await self._make_request(
@@ -511,7 +533,7 @@ class BeaconNode:
 
     async def publish_attestations(
         self,
-        attestations: list[dict],  # type: ignore[type-arg]
+        attestations: list[SchemaBeaconAPI.SingleAttestation],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
@@ -541,16 +563,17 @@ class BeaconNode:
 
     async def get_aggregate_attestation_v2(
         self,
-        attestation_data: AttestationData,
+        attestation_data_root: str,
+        slot: int,
         committee_index: int,
     ) -> "SpecAttestation.AttestationElectra":
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
             params=dict(
-                attestation_data_root=f"0x{attestation_data.hash_tree_root().hex()}",
-                slot=attestation_data.slot,
-                committee_index=str(committee_index),
+                attestation_data_root=attestation_data_root,
+                slot=slot,
+                committee_index=committee_index,
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,

@@ -8,8 +8,8 @@ retrieve attestation data from all of them and only
 attest to the head of the chain if a majority of
 connected beacon nodes agree on it. This makes
 sure your validator does not attest to a buggy
-version of the chain (unless a majority of connected
-nodes is affected by the same bug).
+version of the chain (unless enough of the connected
+beacon nodes are affected by the same bug).
 
 Importantly, this also allows for a minority of connected
 beacon nodes to be temporarily offline, whether that's
@@ -30,26 +30,18 @@ seen for the current slot (before the attestation deadline).
 
 - **A head event has already been emitted for the current slot**
 
-Vero requests attestation data from all beacon nodes
-and attests to the head block as emitted by the head
-event, once a majority of connected beacon nodes
-report the same head block.
+Vero attempts to submit attestation data that matches the
+head events emitted by the connected beacon nodes. It attests
+as soon as enough beacon nodes have confirmed the data's
+finality checkpoints (based on its configured attestation
+consensus threshold).
 
 ```mermaid
-flowchart LR
-E(Event stream)  -->  |Head event 0xAB| V
-V(Vero)  -->|Get attestation data| CL-A(Lighthouse)
-V(Vero)  -->|Get attestation data| CL-B(Lodestar)
-V(Vero)  -->|Get attestation data| CL-C(Nimbus)
-CL-A  -->  |Head block 0xAB| V
-CL-B  -->  |Head block 0xCD| V
-CL-C  -->  |Head block 0xAB| V
-
-%% Apply green color to links with Head block root 0xAB
-linkStyle 0 stroke:#0066FF
-linkStyle 4 stroke:#00FF00
-linkStyle 5 stroke:#FF0000
-linkStyle 6 stroke:#00FF00
+sequenceDiagram
+    Vero->>Beacon nodes: Produce AttestationData with head block root 0xAB, please
+    Beacon nodes->>Vero: Here you go: AttestationData(head=0xAB)
+    Vero->>Beacon nodes: Do enough of you agree on its finality checkpoints?
+    Beacon nodes->>Vero: We do!
 ```
 
 - **A head event has not been emitted for the
@@ -63,11 +55,9 @@ slowly by the connected primary beacon node.
 
 Vero requests attestation data from all beacon nodes
 and attests to whichever head block is reported by
-a majority of the beacon nodes. In case of a late
-block proposal it's possible the other connected
-beacon nodes processed the block faster than the
-primary beacon node, in which case Vero will attest
-to that block being the head of the chain.
+a majority of the beacon nodes while also confirming
+finality checkpoints (based on its configured
+attestation consensus threshold).
 
 ```mermaid
 flowchart RL
@@ -157,28 +147,25 @@ will only attest if both of those sets of client
 implementations agree on the state of the chain.
 
 A 2-node setup does have a slight downside though
-- taking any of the two CL clients (or connected
+\- taking any of the two CL clients (or its connected
 EL clients) offline will make Vero stop attesting
-since it won't be able to reach a majority when
-requesting attestation data. **To tolerate one
-of the nodes going offline, 3 nodes are needed.**
-The alternative would be to temporarily point Vero
-to only one of the beacon nodes while you perform maintenance.
+at the next epoch transition (it will be unable
+to confirm the next set of finality checkpoints).
+For that reason Vero works best with at least 3
+client combinations, allowing you to perform
+maintenance on one of them at a time.
 
 ```mermaid
 flowchart TD
 
-Home --- Vero
-Home --- Lodestar
-Vero <--> Lodestar
-Vero <--> Nimbus
+V(Vero @ home) <--> Lodestar
+V <--> Nimbus
 Lodestar <--> Nethermind
 Friend's&nbspplace --- Nimbus
 Nimbus <--> Geth
 
 %% Apply colors to nodes based on location
-style Home fill:#ADD8E6,stroke:#000000
-style Vero fill:#ADD8E6,stroke:#000000
+style V fill:#ADD8E6,stroke:#000000
 style Lodestar fill:#ADD8E6,stroke:#000000
 style Nethermind fill:#ADD8E6,stroke:#000000
 style Nimbus fill:#90EE90,stroke:#000000
@@ -220,7 +207,7 @@ risks, like:
 - fallback behavior bugs - in case the Nethermind nodes
   fail or start falling behind because of an invalid block,
   your validator client *may* automatically fall back to using
-  the Geth nodes
+  the Geth nodes that haven't fallen behind
 
 To migrate to a more resilient setup using Vero, you would:
 
@@ -269,5 +256,5 @@ clients that may not be completely battle-tested yet, like
 [Reth](https://github.com/paradigmxyz/reth).
 
 If you're a professional node operator and you're not yet
-running a multi-node setup, do yourself and the network a favor
+running a multi-node setup, do yourself –and the network– a favor
 and start using Vero.

@@ -12,7 +12,6 @@ from services.attestation import (
     _VC_PUBLISHED_AGGREGATE_ATTESTATIONS,
     _VC_PUBLISHED_ATTESTATIONS,
 )
-from spec.attestation import AttestationData
 
 
 @pytest.mark.parametrize(
@@ -152,10 +151,18 @@ async def test_aggregate_attestations(
         ),
     }
 
-    att_data = AttestationData(
-        slot=duty_slot,
-        index=0,
+    att_data = SchemaBeaconAPI.AttestationData(
+        slot=str(duty_slot),
+        index="0",
         beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
+        source=SchemaBeaconAPI.Checkpoint(
+            epoch="0",
+            root="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        ),
+        target=SchemaBeaconAPI.Checkpoint(
+            epoch="1",
+            root="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        ),
     )
 
     aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()

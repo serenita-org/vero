@@ -140,7 +140,9 @@ class ValidatorDutyService:
     ) -> None:
         raise NotImplementedError
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
+    ) -> None:
         raise NotImplementedError
 
     async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:

@@ -139,11 +139,11 @@ class BlockProposalService(ValidatorDutyService):
             self.task_manager.submit_task(super().update_duties())
             self.task_manager.submit_task(self.prepare_beacon_proposer())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
         if (
             event.current_duty_dependent_root
             not in self.proposer_duties_dependent_roots.values()
-        ) and len(self.proposer_duties_dependent_roots) > 0:
+        ):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )

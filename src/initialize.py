@@ -17,7 +17,6 @@ from providers import (
     MultiBeaconNode,
     RemoteSigner,
 )
-from schemas import SchemaBeaconAPI
 from services import (
     AttestationService,
     BlockProposalService,
@@ -58,9 +57,8 @@ def _register_event_handlers(
         block_proposal_service,
         sync_committee_service,
     ):
-        event_consumer_service.add_event_handler(
+        event_consumer_service.add_head_event_handler(
             event_handler=head_handler_service.handle_head_event,
-            event_type=SchemaBeaconAPI.HeadEvent,
         )
 
     for reorg_handler_service in (
@@ -68,19 +66,13 @@ def _register_event_handlers(
         block_proposal_service,
         sync_committee_service,
     ):
-        event_consumer_service.add_event_handler(
+        event_consumer_service.add_reorg_event_handler(
             event_handler=reorg_handler_service.handle_reorg_event,
-            event_type=SchemaBeaconAPI.ChainReorgEvent,
         )
 
-    for event_type in (
-        SchemaBeaconAPI.AttesterSlashingEvent,
-        SchemaBeaconAPI.ProposerSlashingEvent,
-    ):
-        event_consumer_service.add_event_handler(
-            event_handler=validator_status_tracker_service.handle_slashing_event,
-            event_type=event_type,
-        )
+    event_consumer_service.add_slashing_event_handler(
+        event_handler=validator_status_tracker_service.handle_slashing_event,
+    )
 
 
 def check_data_dir_permissions(data_dir: Path) -> None:
@@ -221,7 +213,7 @@ async def run_services(
         _logger.info("Started validator duty services")
 
         event_consumer_service = EventConsumerService(
-            multi_beacon_node=multi_beacon_node,
+            beacon_nodes=multi_beacon_node.beacon_nodes,
             beacon_chain=beacon_chain,
             scheduler=scheduler,
             task_manager=task_manager,

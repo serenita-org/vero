@@ -64,6 +64,7 @@ def _profile_program_run() -> Generator[None, None, None]:
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
 @pytest.mark.usefixtures("_profile_program_run")
+@pytest.mark.usefixtures("_unregister_prometheus_metrics")
 async def test_lifecycle(
     cli_args: CLIArgs,
     shutdown_event: asyncio.Event,

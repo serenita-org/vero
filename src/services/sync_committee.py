@@ -105,7 +105,7 @@ class SyncCommitteeService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.submit_task(super().update_duties())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent) -> None:
+    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
         await self.produce_sync_message_if_not_yet_produced(
             duty_slot=int(event.slot),
             head_event=event,
@@ -126,6 +126,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 f"Not producing message during slot {duty_slot} - already started producing message during slot {self._last_slot_duty_started_for}"
             )
             return
+
         if duty_slot != self.beacon_chain.current_slot:
             raise RuntimeError(
                 f"Invalid duty_slot for sync committee message: {duty_slot}. Current slot: {self.beacon_chain.current_slot}"

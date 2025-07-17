@@ -173,6 +173,9 @@ def _mocked_beacon_node_endpoints(
                 slot=int(url.query["slot"]),
                 index=int(url.query["committee_index"]),
                 beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
+                source=Checkpoint(
+                    epoch=beacon_chain.current_epoch,
+                ),
             )
             return CallbackResult(payload=dict(data=att_data.to_obj()))
 
@@ -399,7 +402,7 @@ def _mocked_beacon_node_endpoints(
                 )
 
             assert (
-                attestation.data["beacon_block_root"]
+                attestation.data.beacon_block_root
                 == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
             )
 

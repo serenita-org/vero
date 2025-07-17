@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import milagro_bls_binding as bls
+import prometheus_client
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -326,3 +327,14 @@ def beacon_chain(
     spec: SpecElectra, genesis: Genesis, task_manager: TaskManager
 ) -> BeaconChain:
     return BeaconChain(spec=spec, genesis=genesis, task_manager=task_manager)
+
+
+@pytest.fixture
+def _unregister_prometheus_metrics() -> Generator[None, None, None]:
+    """
+    Clears the prometheus registry metrics after a test is done running.
+    """
+    yield
+    collectors = tuple(prometheus_client.REGISTRY._collector_to_names.keys())
+    for collector in collectors:
+        prometheus_client.REGISTRY.unregister(collector)

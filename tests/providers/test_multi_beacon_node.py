@@ -234,13 +234,17 @@ async def test_get_aggregate_attestation(
                 match="Failed to get a response from all beacon nodes",
             ):
                 _ = await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
-                    attestation_data=AttestationData(),
+                    attestation_data_root="0x"
+                    + AttestationData().hash_tree_root().hex(),
+                    slot=beacon_chain.current_slot,
                     committee_index=3,
                 )
         else:
             returned_aggregate = (
                 await multi_beacon_node_three_inited_nodes.get_aggregate_attestation_v2(
-                    attestation_data=AttestationData(),
+                    attestation_data_root="0x"
+                    + AttestationData().hash_tree_root().hex(),
+                    slot=beacon_chain.current_slot,
                     committee_index=3,
                 )
             )
