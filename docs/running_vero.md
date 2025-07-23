@@ -184,6 +184,28 @@ Defaults to `90`, meaning the externally built block must be approximately
 11% more valuable to be chosen over a locally built block.
 ___
 
+#### `--enable-doppelganger-detection`
+
+Enables doppelganger detection during start-up.
+
+When enabled, Vero pauses its validator duties for up to three epochs
+while it scans the network for attestations (or any other signs that
+your validator keys are already active elsewhere). If activity is
+detected, Vero aborts start‑up.
+
+> Don’t rely on this as your sole protection against running the same
+keys in two places—it’s a best‑effort safeguard only.
+
+**Notes**
+- You may need to explicitly enable liveness tracking on your primary
+connected beacon node.
+- Keys hot‑loaded via the Keymanager API become active immediately;
+doppelganger detection will only be attempted on Vero’s next start‑up.
+- Operational Tip: Restart Vero in the final slots of an epoch to
+minimise missed attestations.
+
+___
+
 #### `--enable-keymanager-api`
 
 Enables the Keymanager API.

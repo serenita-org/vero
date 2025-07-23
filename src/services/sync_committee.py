@@ -491,20 +491,16 @@ class SyncCommitteeService(ValidatorDutyService):
                 del self.sync_duties[sync_period]
 
     async def _update_duties(self) -> None:
-        if not self.validator_status_tracker_service.any_active_or_pending_validators:
+        _validator_indices = (
+            self.validator_status_tracker_service.active_or_pending_indices
+        )
+        if len(_validator_indices) == 0:
             self.logger.warning(
                 "Not updating sync committee duties - no active or pending validators",
             )
             return
 
         current_epoch = self.beacon_chain.current_epoch
-
-        _validator_indices = [
-            v.index
-            for v in self.validator_status_tracker_service.active_validators
-            + self.validator_status_tracker_service.pending_validators
-        ]
-
         # TODO we current update sync duties way too often.
         #  We only need to update them once in a while
         #  (SUBSCRIPTIONS_LOOKAHEAD_EPOCHS)

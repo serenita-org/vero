@@ -78,6 +78,7 @@ def cli_args(
         gas_limit=30_000_000,
         use_external_builder=False,
         builder_boost_factor=90,
+        enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
         keymanager_api_token_file_path=tmp_path / "keymanager-api-token.txt",
         keymanager_api_address="localhost",

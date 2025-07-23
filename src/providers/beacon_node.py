@@ -800,6 +800,24 @@ class BeaconNode:
                 },
             )
 
+    async def get_liveness(
+        self, epoch: int, validator_indices: list[int]
+    ) -> SchemaBeaconAPI.PostLivenessResponseBody:
+        resp = await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/validator/liveness/{epoch}",
+            formatted_endpoint_string_params=dict(epoch=epoch),
+            timeout=ClientTimeout(
+                connect=self.client_session.timeout.connect,
+            ),
+            data=self.json_encoder.encode([str(i) for i in validator_indices]),
+        )
+
+        return msgspec.json.decode(
+            resp,
+            type=SchemaBeaconAPI.PostLivenessResponseBody,
+        )
+
     async def subscribe_to_events(
         self,
         topics: list[str],

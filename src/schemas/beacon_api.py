@@ -201,6 +201,16 @@ class ElectraBlockContentsSigned(msgspec.Struct):
     blobs: list[str]
 
 
+# Liveness endpoint
+class ValidatorLiveness(msgspec.Struct):
+    index: str
+    is_live: bool
+
+
+class PostLivenessResponseBody(msgspec.Struct):
+    data: list[ValidatorLiveness]
+
+
 # Events
 class DeduplicableEvent(Protocol):
     @property
