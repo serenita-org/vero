@@ -88,16 +88,27 @@ class BeaconChain:
         seconds_elapsed = max(0, seconds_elapsed)
         return seconds_elapsed // self.SECONDS_PER_SLOT
 
-    async def wait_for_next_slot(self) -> None:
+    async def _precise_wait_for_timestamp(self, timestamp: int) -> None:
         # A slightly more accurate version of asyncio.sleep()
-        _next_slot = self.current_slot + 1
-        _delay = self.get_timestamp_for_slot(_next_slot) - time.time()
+        delay = timestamp - time.time()
 
         # asyncio.sleep can be off by up to 16ms (on Windows)
-        await asyncio.sleep(_delay - 0.016)
+        await asyncio.sleep(delay - 0.016)
 
-        while self.current_slot < _next_slot:  # noqa: ASYNC110
+        while time.time() < timestamp:  # noqa: ASYNC110
             await asyncio.sleep(0)
+
+    async def wait_for_next_slot(self) -> None:
+        # A slightly more accurate version of asyncio.sleep()
+        await self._precise_wait_for_timestamp(
+            self.get_timestamp_for_slot(self.current_slot + 1)
+        )
+
+    async def wait_for_epoch(self, epoch: int) -> None:
+        epoch_start_timestamp = self.get_timestamp_for_slot(
+            slot=epoch * self.SLOTS_PER_EPOCH
+        )
+        await self._precise_wait_for_timestamp(epoch_start_timestamp)
 
     async def on_new_slot(self) -> None:
         _current_slot = self.current_slot  # Cache property value

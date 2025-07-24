@@ -62,8 +62,8 @@ class ValidatorStatusTrackerService:
         self.task_manager.submit_task(self.update_validator_statuses())
 
     @property
-    def any_active_or_pending_validators(self) -> bool:
-        return any(self.active_validators) or any(self.pending_validators)
+    def active_or_pending_indices(self) -> list[int]:
+        return [v.index for v in self.active_validators + self.pending_validators]
 
     @property
     def slashing_detected(self) -> bool:

@@ -2,14 +2,26 @@
 
 ## Prevention
 
-At the time of writing, Vero does not maintain its own
-slashing protection database and instead relies on the
-battle-tested slashing protection measures of the
-remote signer, similar to Vouch. Another layer of
-slashing protection may be added to Vero itself
-in the future.
+### Slashing Protection Database
 
-## Detection
+Vero relies on the battle-tested slashing protection
+measures of the attached remote signer, similar to Vouch.
+Another layer of slashing protection may be added directly
+to Vero in the future.
+
+### Doppelganger Detection
+
+Vero supports detecting active doppelganger validators on
+the network during its startup. Doppelgangers are identical
+validators that are running elsewhere. Running identical
+validators in multiple locations can lead to the validators
+getting slashed due to emitting conflicting votes.
+
+If Vero detects active doppelgangers on the network, it will
+not start performing validator duties and will shut down
+instead.
+
+## Slashing Event Detection
 
 Vero closely monitors and attempts to detect validator
 slashing events as quickly as possible

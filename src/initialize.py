@@ -12,11 +12,13 @@ from observability.event_loop import monitor_event_loop
 from providers import (
     DB,
     BeaconChain,
+    DoppelgangerDetector,
     DutyCache,
     Keymanager,
     MultiBeaconNode,
     RemoteSigner,
 )
+from providers.doppelganger_detector import DoppelgangersDetected
 from services import (
     AttestationService,
     BlockProposalService,
@@ -185,6 +187,17 @@ async def run_services(
             validator_status_tracker_service.on_new_slot
         )
         _logger.info("Initialized validator status tracker")
+
+        if cli_args.enable_doppelganger_detection:
+            try:
+                await DoppelgangerDetector(
+                    beacon_chain=beacon_chain,
+                    beacon_node=multi_beacon_node.best_beacon_node,
+                    validator_status_tracker_service=validator_status_tracker_service,
+                ).detect()
+            except DoppelgangersDetected:
+                shutdown_event.set()
+                raise
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,

@@ -25,6 +25,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     gas_limit: int
     use_external_builder: bool
     builder_boost_factor: int
+    enable_doppelganger_detection: bool
     enable_keymanager_api: bool
     keymanager_api_token_file_path: Path
     keymanager_api_address: str
@@ -214,6 +215,11 @@ def get_parser() -> argparse.ArgumentParser:
         default=90,
         help="A percentage multiplier applied to externally built blocks when comparing their value to locally built blocks. The externally built block is only chosen if its value, post-multiplication, is higher than the locally built block's value. Defaults to 90.",
     )
+    parser.add_argument(
+        "--enable-doppelganger-detection",
+        action="store_true",
+        help="Enables doppelganger detection.",
+    )
     mutually_exclusive_group_key_source.add_argument(
         "--enable-keymanager-api",
         action="store_true",
@@ -337,6 +343,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             ),
             use_external_builder=parsed_args.use_external_builder,
             builder_boost_factor=parsed_args.builder_boost_factor,
+            enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,
             keymanager_api_token_file_path=Path(keymanager_api_token_file_path),
             keymanager_api_address=parsed_args.keymanager_api_address,

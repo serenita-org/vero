@@ -550,20 +550,16 @@ class AttestationService(ValidatorDutyService):
                 del self.attester_duties_dependent_roots[epoch]
 
     async def _update_duties(self) -> None:
-        if not self.validator_status_tracker_service.any_active_or_pending_validators:
+        _validator_indices = (
+            self.validator_status_tracker_service.active_or_pending_indices
+        )
+        if len(_validator_indices) == 0:
             self.logger.warning(
                 "Not updating attester duties - no active or pending validators",
             )
             return
 
         current_epoch = self.beacon_chain.current_epoch
-
-        _validator_indices = [
-            v.index
-            for v in self.validator_status_tracker_service.active_validators
-            + self.validator_status_tracker_service.pending_validators
-        ]
-
         for epoch in (current_epoch, current_epoch + 1):
             self.logger.debug(f"Updating attester duties for epoch {epoch}")
 
