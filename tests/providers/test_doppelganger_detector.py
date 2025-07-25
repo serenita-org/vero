@@ -2,7 +2,7 @@ from contextlib import AbstractContextManager
 from contextlib import nullcontext as does_not_raise
 
 import pytest
-from _pytest.python_api import RaisesContext
+from _pytest.raises import RaisesExc
 
 from providers import DoppelgangerDetector
 from providers.doppelganger_detector import DoppelgangersDetected
@@ -44,7 +44,7 @@ from schemas import SchemaBeaconAPI
 def test_process_liveness_data(
     liveness_data: list[SchemaBeaconAPI.ValidatorLiveness],
     expectation: AbstractContextManager[
-        RaisesContext[DoppelgangersDetected] | does_not_raise[None]
+        RaisesExc[DoppelgangersDetected] | does_not_raise[None]
     ],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -58,7 +58,7 @@ def test_process_liveness_data(
         )
 
     log_record = next(iter(caplog.records))
-    if isinstance(expectation, RaisesContext):
+    if isinstance(expectation, RaisesExc):
         assert log_record.levelname == "CRITICAL"
         assert "Doppelgangers detected" in log_record.message
     else:
