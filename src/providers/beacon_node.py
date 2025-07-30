@@ -224,11 +224,11 @@ class BeaconNode:
         resp_text = await response.text()
 
         if response.status == 503:
-            raise BeaconNodeNotReady(resp_text)
+            raise BeaconNodeNotReady(response.request_info.url, resp_text)
         if response.status == 405:
-            raise BeaconNodeUnsupportedEndpoint(resp_text)
+            raise BeaconNodeUnsupportedEndpoint(response.request_info.url, resp_text)
         if response.status == 400:
-            raise BeaconNodeReturnedBadRequest(resp_text)
+            raise BeaconNodeReturnedBadRequest(response.request_info.url, resp_text)
 
         raise ValueError(
             f"Received status code {response.status} for request to {response.request_info.url}"
