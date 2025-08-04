@@ -830,7 +830,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum(increase(errors_total{instance=\"$instance\"}[1h])))",
+          "expr": "round(sum(increase(errors_total{instance=\"$instance\"}[1h]) and on(instance, job) vero_info))",
           "format": "time_series",
           "instant": false,
           "legendFormat": "{{ instance }}",

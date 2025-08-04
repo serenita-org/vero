@@ -831,7 +831,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(sum(increase(errors_total{instance=\"$instance\"}[1h])))",
+          "expr": "round(sum(increase(errors_total{instance=\"$instance\"}[1h]) and on(instance, job) vero_info))",
           "format": "time_series",
           "instant": false,
           "legendFormat": "{{ instance }}",
@@ -5696,7 +5696,7 @@
                 "uid": "${datasource}"
               },
               "editorMode": "code",
-              "expr": "round(increase(errors_total{instance=\"$instance\"}[$__interval]))",
+              "expr": "round(increase(errors_total{instance=\"$instance\"}[$__interval])) and on(instance, job) vero_info",
               "instant": false,
               "legendFormat": "{{ error_type }}",
               "range": true,
