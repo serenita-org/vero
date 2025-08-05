@@ -12,7 +12,7 @@ def get_service_name() -> str:
 
 
 def get_service_version() -> str:
-    return os.getenv("GIT_TAG", "v0.0.0")
+    return os.getenv("GIT_TAG", "v0.0.0-dev")
 
 
 _VERO_INFO = Gauge(

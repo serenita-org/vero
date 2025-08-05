@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import msgspec
 
+from observability import get_service_version
 from spec.configs import Network
 from spec.utils import decode_graffiti, encode_graffiti
 
@@ -193,8 +194,8 @@ def get_parser() -> argparse.ArgumentParser:
         "--graffiti",
         type=str,
         required=False,
-        default="",
-        help="The graffiti string to use during block proposals. Defaults to an empty string.",
+        default=f"Vero {get_service_version()}",
+        help="The graffiti string to use during block proposals. Defaults to 'Vero <version>'.",
     )
     parser.add_argument(
         "--gas-limit",
