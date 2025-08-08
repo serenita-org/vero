@@ -33,6 +33,7 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     "fork_version",
     [
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
+        pytest.param(ForkVersion.FULU, id="Fulu"),
     ],
     indirect=True,
 )
@@ -111,6 +112,7 @@ async def test_attest_to_invalid_slot(
     "fork_version",
     [
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
+        pytest.param(ForkVersion.FULU, id="Fulu"),
     ],
     indirect=True,
 )
