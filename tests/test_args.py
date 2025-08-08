@@ -6,6 +6,7 @@ import pytest
 
 from args import CLIArgs, get_parser, parse_cli_args
 from spec.configs import Network
+from spec.utils import encode_graffiti
 
 
 @pytest.mark.parametrize(
@@ -552,7 +553,7 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         attestation_consensus_threshold=1,
         fee_recipient="0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
         data_dir="/vero/data",
-        graffiti=b"\x00" * 32,
+        graffiti=encode_graffiti("Vero v0.0.0-dev"),
         gas_limit=45_000_000,
         use_external_builder=False,
         builder_boost_factor=90,
