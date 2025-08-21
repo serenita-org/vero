@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec._ascii import ELECTRA as ELECTRA_ASCII_ART
-from spec.base import Genesis, SpecElectra
+from spec.base import Genesis, SpecElectra, Version
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
@@ -44,6 +44,7 @@ class BeaconChain:
         self.SYNC_COMMITTEE_SIZE = int(spec.SYNC_COMMITTEE_SIZE)
 
         self.ELECTRA_FORK_EPOCH = int(spec.ELECTRA_FORK_EPOCH)
+        self.ELECTRA_FORK_VERSION = spec.ELECTRA_FORK_VERSION
         self.ELECTRA_FORK = SchemaRemoteSigner.Fork(
             previous_version=spec.DENEB_FORK_VERSION.to_obj(),
             current_version=spec.ELECTRA_FORK_VERSION.to_obj(),
@@ -65,13 +66,20 @@ class BeaconChain:
 
         if slot_epoch >= self.ELECTRA_FORK_EPOCH:
             return self.ELECTRA_FORK
-        raise NotImplementedError(f"Unsupported fork for epoch {self.current_epoch}")
+        raise NotImplementedError(f"Unsupported fork for epoch {slot_epoch}")
 
     def get_fork_info(self, slot: int) -> SchemaRemoteSigner.ForkInfo:
         return SchemaRemoteSigner.ForkInfo(
             fork=self.get_fork(slot=slot),
             genesis_validators_root=self.genesis_validators_root,
         )
+
+    def get_fork_version(self, slot: int) -> Version:
+        slot_epoch = slot // self.SLOTS_PER_EPOCH
+
+        if slot_epoch >= self.ELECTRA_FORK_EPOCH:
+            return self.ELECTRA_FORK_VERSION
+        raise NotImplementedError(f"Unsupported fork for epoch {slot_epoch}")
 
     def _log_fork_readiness(self) -> None:
         self.logger.info(f"Ready for Electra at epoch {self.ELECTRA_FORK_EPOCH}")
