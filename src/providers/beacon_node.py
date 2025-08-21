@@ -7,7 +7,6 @@ import json
 import logging
 import warnings
 from collections.abc import AsyncIterable
-from enum import Enum
 from typing import Literal, Unpack
 from urllib.parse import urlparse
 
@@ -30,6 +29,7 @@ from observability import (
     get_shared_metrics,
 )
 from observability.api_client import RequestLatency, ServiceType
+from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
 from spec.base import Genesis, SpecElectra, parse_spec
@@ -101,11 +101,6 @@ class BeaconNodeUnsupportedEndpoint(Exception):
 
 class BeaconNodeReturnedBadRequest(Exception):
     pass
-
-
-class ContentType(Enum):
-    JSON = "application/json"
-    OCTET_STREAM = "application/octet-stream"
 
 
 class BeaconNode:
