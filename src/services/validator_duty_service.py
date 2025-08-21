@@ -149,7 +149,7 @@ class ValidatorDutyService:
         self.logger.debug(
             f"Handling reorg event at slot {event.slot}, new head block {event.new_head_block}"
         )
-        self.task_manager.submit_task(self.update_duties())
+        self.task_manager.create_task(self.update_duties())
 
     @property
     def has_ongoing_duty(self) -> bool:

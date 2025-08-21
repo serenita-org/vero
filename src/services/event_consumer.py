@@ -102,7 +102,7 @@ class EventConsumerService:
 
     def start(self) -> None:
         for beacon_node in self.beacon_nodes:
-            self.task_manager.submit_task(
+            self.task_manager.create_task(
                 self.handle_events(beacon_node=beacon_node),
                 name=f"handle_events_{beacon_node.base_url}",
             )
@@ -164,7 +164,7 @@ class EventConsumerService:
                     f"[{beacon_node.host}] New head @ {event.slot} : {event.block}"
                 )
                 for head_handler in self.head_event_handlers:
-                    self.task_manager.submit_task(
+                    self.task_manager.create_task(
                         head_handler(event, beacon_node.host),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
                     )
@@ -174,7 +174,7 @@ class EventConsumerService:
                     f"Chain reorg of depth {event.depth} at slot {event.slot}, old head {event.old_head_block}, new head {event.new_head_block}",
                 )
                 for reorg_handler in self.reorg_event_handlers:
-                    self.task_manager.submit_task(
+                    self.task_manager.create_task(
                         reorg_handler(event),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{reorg_handler.__name__}-{uuid4().hex}",
                     )
@@ -188,7 +188,7 @@ class EventConsumerService:
             if not self._has_seen_event(event):
                 self.logger.debug(f"{event_type}: {event.dedup_key}")
                 for sl_handler in self.slashing_event_handlers:
-                    self.task_manager.submit_task(
+                    self.task_manager.create_task(
                         sl_handler(event),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{sl_handler.__name__}-{uuid4().hex}",
                     )
@@ -218,7 +218,7 @@ class EventConsumerService:
             self.logger.exception(
                 f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 10 seconds...",
             )
-            self.task_manager.submit_task(
+            self.task_manager.create_task(
                 self.handle_events(beacon_node=beacon_node),
                 delay=10.0,
                 name=f"handle_events_{beacon_node.base_url}",
@@ -227,7 +227,7 @@ class EventConsumerService:
             # The SSE stream ended without any error.
             # This is not expected to happen normally.
             # We want to resubscribe to it right away.
-            self.task_manager.submit_task(
+            self.task_manager.create_task(
                 self.handle_events(beacon_node=beacon_node),
                 name=f"handle_events_{beacon_node.base_url}",
             )

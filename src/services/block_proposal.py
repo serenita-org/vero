@@ -51,9 +51,9 @@ class BlockProposalService(ValidatorDutyService):
         finally:
             # The cached duties may be stale - call update_duties even if
             # we loaded duties from cache
-            self.task_manager.submit_task(self.update_duties())
+            self.task_manager.create_task(self.update_duties())
 
-        self.task_manager.submit_task(self.prepare_beacon_proposer())
+        self.task_manager.create_task(self.prepare_beacon_proposer())
         return self
 
     async def __aexit__(
@@ -132,12 +132,12 @@ class BlockProposalService(ValidatorDutyService):
             await self._fetch_randao_reveal(duty=duty_for_next_slot)
 
         if self.cli_args.use_external_builder:
-            self.task_manager.submit_task(self.register_validators(current_slot=slot))
+            self.task_manager.create_task(self.register_validators(current_slot=slot))
 
         # At the start of an epoch, update duties
         if is_new_epoch:
-            self.task_manager.submit_task(super().update_duties())
-            self.task_manager.submit_task(self.prepare_beacon_proposer())
+            self.task_manager.create_task(super().update_duties())
+            self.task_manager.create_task(self.prepare_beacon_proposer())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
         if (
@@ -147,7 +147,7 @@ class BlockProposalService(ValidatorDutyService):
             self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.task_manager.submit_task(super().update_duties())
+            self.task_manager.create_task(super().update_duties())
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch

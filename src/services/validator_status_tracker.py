@@ -59,7 +59,7 @@ class ValidatorStatusTrackerService:
         # to continue initializing the validator client since we don't know
         # which validators to retrieve duties for.
         await self._update_validator_statuses(minimal_update=True)
-        self.task_manager.submit_task(self.update_validator_statuses())
+        self.task_manager.create_task(self.update_validator_statuses())
 
     @property
     def active_or_pending_indices(self) -> list[int]:
@@ -79,7 +79,7 @@ class ValidatorStatusTrackerService:
         # (before duties are updated)
         slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
         if slot % slots_per_epoch == slots_per_epoch - 1:
-            self.task_manager.submit_task(self.update_validator_statuses())
+            self.task_manager.create_task(self.update_validator_statuses())
 
     async def handle_slashing_event(
         self,

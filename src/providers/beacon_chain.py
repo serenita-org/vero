@@ -77,7 +77,7 @@ class BeaconChain:
         self.logger.info(f"Ready for Electra at epoch {self.ELECTRA_FORK_EPOCH}")
 
     def start_slot_ticker(self) -> None:
-        self.task_manager.submit_task(self.on_new_slot())
+        self.task_manager.create_task(self.on_new_slot())
 
     def get_timestamp_for_slot(self, slot: int) -> int:
         return self.genesis_time + slot * self.SECONDS_PER_SLOT
@@ -126,10 +126,10 @@ class BeaconChain:
                 self.logger.info(f"Electra fork epoch reached! {ELECTRA_ASCII_ART}")
 
         for handler in self.new_slot_handlers:
-            self.task_manager.submit_task(handler(_current_slot, _is_new_epoch))
+            self.task_manager.create_task(handler(_current_slot, _is_new_epoch))
 
         await self.wait_for_next_slot()
-        self.task_manager.submit_task(self.on_new_slot())
+        self.task_manager.create_task(self.on_new_slot())
 
     def time_since_slot_start(self, slot: int) -> float:
         return time.time() - self.get_timestamp_for_slot(slot)
