@@ -10,7 +10,7 @@ from opentelemetry import trace
 from prometheus_client import Histogram
 
 from args import CLIArgs
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from providers import (
     BeaconChain,
     DutyCache,
@@ -23,8 +23,6 @@ from tasks import TaskManager
 
 if TYPE_CHECKING:
     from services import ValidatorStatusTrackerService
-
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class ValidatorDuty(Enum):
@@ -212,7 +210,7 @@ class ValidatorDutyService:
                 await self._update_duties()
                 break
             except Exception as e:
-                _ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
+                ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
                 self.logger.exception(
                     f"Failed to update duties: {e!r}",
                 )

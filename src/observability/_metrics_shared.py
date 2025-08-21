@@ -2,9 +2,6 @@ from enum import Enum
 
 from prometheus_client import Counter
 
-_ERRORS_METRIC: Counter | None = None
-_METRICS_INITIALIZED = False
-
 
 class ErrorType(Enum):
     ATTESTATION_CONSENSUS = "attestation-consensus"
@@ -24,21 +21,10 @@ class ErrorType(Enum):
     OTHER = "other"
 
 
-def get_shared_metrics() -> tuple[Counter]:
-    global _ERRORS_METRIC, _METRICS_INITIALIZED
-
-    if not _METRICS_INITIALIZED:
-        _ERRORS_METRIC = Counter(
-            "errors",
-            "Number of errors",
-            labelnames=["error_type"],
-        )
-        for enum_type in ErrorType:
-            _ERRORS_METRIC.labels(enum_type.value).reset()
-
-        _METRICS_INITIALIZED = True
-
-    if _ERRORS_METRIC is None:
-        raise ValueError("_ERRORS_METRIC must be initialized")
-
-    return (_ERRORS_METRIC,)
+ERRORS_METRIC = Counter(
+    "errors",
+    "Number of errors",
+    labelnames=["error_type"],
+)
+for enum_type in ErrorType:
+    ERRORS_METRIC.labels(enum_type.value).reset()

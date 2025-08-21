@@ -9,12 +9,10 @@ from uuid import uuid4
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter, Histogram
 
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from providers import BeaconChain, BeaconNode
 from schemas import SchemaBeaconAPI
 from tasks import TaskManager
-
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 def _setup_head_event_time_metric(
@@ -212,7 +210,7 @@ class EventConsumerService:
             raise
         except Exception as e:
             beacon_node.score -= BeaconNode.SCORE_DELTA_FAILURE
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.EVENT_CONSUMER.value,
             ).inc()
             self.logger.exception(
