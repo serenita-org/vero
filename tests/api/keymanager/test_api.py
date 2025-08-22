@@ -18,6 +18,7 @@ async def test_bearer_auth(
 ) -> None:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     test_client = await aiohttp_client(app)
+    assert len(test_client.app["bearer_token"]) == 64
 
     # Make a request without a value for the Authorization header
     resp = await test_client.get(

@@ -28,7 +28,7 @@ def _get_bearer_token_value(cli_args: CLIArgs) -> str:
             return f.read().strip()
 
     # If it doesn't, generate a value and store it in the file.
-    bearer_token_value = os.urandom(32).hex()[2:]
+    bearer_token_value = os.urandom(32).hex()
     with Path.open(fp, "w") as f:
         f.write(bearer_token_value)
 
