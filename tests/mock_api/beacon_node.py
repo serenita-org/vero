@@ -10,7 +10,7 @@ from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
 
 from providers import BeaconChain
-from providers.beacon_node import ContentType
+from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey

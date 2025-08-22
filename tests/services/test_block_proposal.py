@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from providers import BeaconChain, Keymanager
-from providers.beacon_node import ContentType
+from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
