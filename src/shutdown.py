@@ -55,7 +55,7 @@ def shutdown_handler(
     task_manager: TaskManager,
 ) -> None:
     _logger.info(f"Received shutdown signal {signal.Signals(signo).name}")
-    task_manager.submit_task(
+    task_manager.create_task(
         shut_down(
             validator_duty_services=validator_duty_services,
             shutdown_event=shutdown_event,

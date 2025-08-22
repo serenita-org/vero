@@ -213,7 +213,7 @@ class BeaconNode:
                 f"Failed to initialize beacon node at {self.base_url}: {e!r}",
             )
             # Try to initialize again in 30 seconds
-            self.task_manager.submit_task(self.initialize_full(), delay=30.0)
+            self.task_manager.create_task(self.initialize_full(), delay=30.0)
 
     @staticmethod
     async def _handle_nok_status_code(response: aiohttp.ClientResponse) -> None:

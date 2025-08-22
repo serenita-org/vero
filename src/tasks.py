@@ -44,17 +44,13 @@ class TaskManager:
             # Remove the task from the set once it's done
             self._tasks.discard(task)
 
-    def submit_task(
+    def create_task(
         self,
         coro: Coroutine[Any, Any, None],
         delay: float = 0.0,
         name: str | None = None,
     ) -> None:
         """Create and track a task from the given coroutine."""
-        if self.shutdown_event.is_set():
-            self.logger.debug(f"Cancelling task {name!r}, shutting down...")
-            asyncio.create_task(coro).cancel()
-            return
 
         async def _delayed_coro() -> None:
             if delay > 0:
@@ -62,6 +58,18 @@ class TaskManager:
             await coro
 
         task: asyncio.Task[None] = asyncio.create_task(_delayed_coro(), name=name)
+        self.add_existing_task(task=task)
+
+    def add_existing_task(
+        self,
+        task: asyncio.Task[Any],
+    ) -> None:
+        """Track an existing task, ensuring it is not garbage collected."""
+        if self.shutdown_event.is_set():
+            self.logger.debug(f"Cancelling task {task}, shutting down...")
+            task.cancel()
+            return
+
         task.add_done_callback(partial(self.task_done_callback))
         self._tasks.add(task)
 

@@ -59,7 +59,7 @@ class SyncCommitteeService(ValidatorDutyService):
         finally:
             # The cached duties may be stale - call update_duties even if
             # we loaded duties from cache
-            self.task_manager.submit_task(self.update_duties())
+            self.task_manager.create_task(self.update_duties())
 
         return self
 
@@ -102,7 +102,7 @@ class SyncCommitteeService(ValidatorDutyService):
 
         # At the start of an epoch, update duties
         if is_new_epoch:
-            self.task_manager.submit_task(super().update_duties())
+            self.task_manager.create_task(super().update_duties())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
         await self.produce_sync_message_if_not_yet_produced(
@@ -221,7 +221,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Add the aggregation duty to the schedule *before*
         # publishing sync messages so that any delays in publishing
         # do not affect the aggregation duty start time
-        self.task_manager.submit_task(
+        self.task_manager.create_task(
             self.prepare_and_aggregate_sync_messages(
                 duty_slot=duty_slot,
                 beacon_block_root=beacon_block_root,
@@ -538,7 +538,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 )
                 for duty in self.sync_duties[sync_period]
             ]
-            self.task_manager.submit_task(
+            self.task_manager.create_task(
                 self.multi_beacon_node.prepare_sync_committee_subscriptions(
                     data=sync_committee_subscriptions_data,
                 )

@@ -77,7 +77,7 @@ class AttestationService(ValidatorDutyService):
         finally:
             # The cached duties may be stale - call update_duties even if
             # we loaded duties from cache
-            self.task_manager.submit_task(self.update_duties())
+            self.task_manager.create_task(self.update_duties())
 
         return self
 
@@ -120,7 +120,7 @@ class AttestationService(ValidatorDutyService):
 
         # At the start of an epoch, update duties
         if is_new_epoch:
-            self.task_manager.submit_task(super().update_duties())
+            self.task_manager.create_task(super().update_duties())
 
     async def handle_head_event(
         self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
@@ -135,7 +135,7 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(
                 "Head event duty dependent root mismatch -> updating duties",
             )
-            self.task_manager.submit_task(super().update_duties())
+            self.task_manager.create_task(super().update_duties())
 
         # Ignore the head event if we've already started attesting - it's either:
         # A) too late (entirely possible with a block that was proposed late / did not propagate well)
@@ -245,7 +245,7 @@ class AttestationService(ValidatorDutyService):
             )
 
         # Use the AttestationData later on for aggregation duties
-        self.task_manager.submit_task(
+        self.task_manager.create_task(
             self.prepare_and_aggregate_attestations(
                 slot=slot,
                 att_data=att_data,
@@ -530,7 +530,7 @@ class AttestationService(ValidatorDutyService):
             for duty in duties_with_proofs
         ]
 
-        self.task_manager.submit_task(
+        self.task_manager.create_task(
             self.multi_beacon_node.prepare_beacon_committee_subscriptions(
                 data=beacon_committee_subscriptions_data,
             ),
