@@ -4,7 +4,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Gauge
 
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from providers import BeaconChain, MultiBeaconNode, SignatureProvider
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
@@ -28,7 +28,6 @@ _SLASHING_DETECTED = Gauge(
     multiprocess_mode="max",
 )
 _SLASHING_DETECTED.set(0)
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class ValidatorStatusTrackerService:
@@ -202,7 +201,7 @@ class ValidatorStatusTrackerService:
                 await self._update_validator_statuses()
                 break
             except Exception as e:
-                _ERRORS_METRIC.labels(
+                ERRORS_METRIC.labels(
                     error_type=ErrorType.VALIDATOR_STATUS_UPDATE.value
                 ).inc()
                 self.logger.exception(

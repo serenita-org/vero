@@ -9,7 +9,7 @@ from uuid import uuid4
 from apscheduler.jobstores.base import JobLookupError
 from prometheus_client import Counter
 
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -34,7 +34,6 @@ _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS = Counter(
     "Successfully published sync committee contributions",
 )
 _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.reset()
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 _PRODUCE_JOB_ID = (
@@ -175,7 +174,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 self.logger.exception(
                     f"Failed to get beacon block root: {e!r}",
                 )
-                _ERRORS_METRIC.labels(
+                ERRORS_METRIC.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
                 ).inc()
                 return
@@ -200,7 +199,7 @@ class SyncCommitteeService(ValidatorDutyService):
             try:
                 msg, sig, pubkey = await coro
             except Exception as e:
-                _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+                ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
                 self.logger.exception(
                     f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
                 )
@@ -242,7 +241,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 messages=sync_messages_to_publish,
             )
         except Exception as e:
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -290,7 +289,7 @@ class SyncCommitteeService(ValidatorDutyService):
         try:
             selection_proofs = await asyncio.gather(*selection_proofs_coroutines)
         except Exception as e:
-            _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+            ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for sync selection proofs for slot {duty_slot}: {e!r}",
             )
@@ -369,7 +368,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 amount=len(signed_contribution_and_proofs),
             )
         except Exception as e:
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
             ).inc()
             self.logger.exception(

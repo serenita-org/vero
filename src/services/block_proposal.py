@@ -12,7 +12,7 @@ from opentelemetry.trace import (
 )
 from prometheus_client import Counter
 
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -26,7 +26,6 @@ _VC_PUBLISHED_BLOCKS = Counter(
     "Successfully published blocks",
 )
 _VC_PUBLISHED_BLOCKS.reset()
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -285,7 +284,7 @@ class BlockProposalService(ValidatorDutyService):
                     ],
                 )
             except Exception as e:
-                _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+                ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
                 self.logger.exception(
                     f"Failed to get signature for validator registrations: {e!r}",
                 )
@@ -383,7 +382,7 @@ class BlockProposalService(ValidatorDutyService):
                 try:
                     randao_reveal = await self._get_randao_reveal(duty=duty)
                 except Exception as e:
-                    _ERRORS_METRIC.labels(
+                    ERRORS_METRIC.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
                     self.logger.exception(
@@ -417,7 +416,7 @@ class BlockProposalService(ValidatorDutyService):
                         randao_reveal=randao_reveal,
                     )
                 except Exception as e:
-                    _ERRORS_METRIC.labels(
+                    ERRORS_METRIC.labels(
                         error_type=ErrorType.BLOCK_PRODUCE.value,
                     ).inc()
                     self.logger.exception(
@@ -456,7 +455,7 @@ class BlockProposalService(ValidatorDutyService):
                         identifier=duty.pubkey,
                     )
                 except Exception as e:
-                    _ERRORS_METRIC.labels(
+                    ERRORS_METRIC.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
                     self.logger.exception(
@@ -496,7 +495,7 @@ class BlockProposalService(ValidatorDutyService):
                             ),
                         )
                 except Exception as e:
-                    _ERRORS_METRIC.labels(
+                    ERRORS_METRIC.labels(
                         error_type=ErrorType.BLOCK_PUBLISH.value,
                     ).inc()
                     self.logger.exception(

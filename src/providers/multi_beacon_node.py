@@ -45,7 +45,7 @@ from opentelemetry import trace
 from remerkleable.complex import Container
 
 from args import CLIArgs
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.base import SpecElectra
@@ -54,8 +54,6 @@ from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 from .beacon_node import BeaconNode
-
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 
 class MultiBeaconNode:
@@ -642,7 +640,7 @@ class MultiBeaconNode:
             try:
                 yield await task
             except Exception as e:
-                _ERRORS_METRIC.labels(
+                ERRORS_METRIC.labels(
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
                 self.logger.exception(
@@ -734,7 +732,7 @@ class MultiBeaconNode:
             try:
                 yield await task
             except Exception:
-                _ERRORS_METRIC.labels(
+                ERRORS_METRIC.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PRODUCE.value,
                 ).inc()
 

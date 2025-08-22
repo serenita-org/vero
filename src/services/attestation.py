@@ -12,7 +12,7 @@ from apscheduler.jobstores.base import JobLookupError
 from prometheus_client import Counter as CounterMetric
 from prometheus_client import Histogram
 
-from observability import ErrorType, get_shared_metrics
+from observability import ERRORS_METRIC, ErrorType
 from providers import AttestationDataProvider
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
@@ -47,7 +47,6 @@ _VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
     "Amount of attestation consensus failures",
 )
 _VC_ATTESTATION_CONSENSUS_FAILURES.reset()
-(_ERRORS_METRIC,) = get_shared_metrics()
 
 _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 
@@ -220,7 +219,7 @@ class AttestationService(ValidatorDutyService):
                 f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes ({head_event=}): {e!r}",
             )
             _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.ATTESTATION_CONSENSUS.value,
             ).inc()
             self._last_slot_duty_completed_for = slot
@@ -275,7 +274,7 @@ class AttestationService(ValidatorDutyService):
             try:
                 message, signature, pubkey = await coro
             except Exception as e:
-                _ERRORS_METRIC.labels(
+                ERRORS_METRIC.labels(
                     error_type=ErrorType.SIGNATURE.value,
                 ).inc()
                 self.logger.exception(
@@ -308,7 +307,7 @@ class AttestationService(ValidatorDutyService):
                 fork_version=self.beacon_chain.current_fork_version,
             )
         except Exception as e:
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.ATTESTATION_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -386,7 +385,7 @@ class AttestationService(ValidatorDutyService):
                 amount=len(signed_aggregate_and_proofs),
             )
         except Exception as e:
-            _ERRORS_METRIC.labels(
+            ERRORS_METRIC.labels(
                 error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -493,7 +492,7 @@ class AttestationService(ValidatorDutyService):
                 identifiers=identifiers,
             )
         except Exception as e:
-            _ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+            ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for aggregation selection proofs: {e!r}",
             )
