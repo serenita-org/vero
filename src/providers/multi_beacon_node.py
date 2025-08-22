@@ -48,7 +48,7 @@ from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
@@ -61,7 +61,7 @@ class MultiBeaconNode:
         self,
         beacon_node_urls: list[str],
         beacon_node_urls_proposal: list[str],
-        spec: SpecElectra,
+        spec: SpecFulu,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
         cli_args: CLIArgs,
@@ -244,7 +244,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
+    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock | SpecBeaconBlock.FuluBlockContents | SpecBeaconBlock.FuluBlindedBlock":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -265,6 +265,11 @@ class MultiBeaconNode:
                 SpecBeaconBlock.ElectraBlindedBlock
                 if response.execution_payload_blinded
                 else SpecBeaconBlock.ElectraBlockContents
+            ),
+            SchemaBeaconAPI.ForkVersion.FULU: (
+                SpecBeaconBlock.FuluBlindedBlock
+                if response.execution_payload_blinded
+                else SpecBeaconBlock.FuluBlockContents
             ),
         }
 

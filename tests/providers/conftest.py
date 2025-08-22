@@ -8,7 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from providers import MultiBeaconNode
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from tasks import TaskManager
 
 
@@ -16,7 +16,7 @@ from tasks import TaskManager
 async def multi_beacon_node_three_inited_nodes(
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec: SpecElectra,
+    spec: SpecFulu,
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     cli_args: CLIArgs,

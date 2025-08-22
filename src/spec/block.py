@@ -6,7 +6,7 @@ from spec.attestation import (
     AttestationData,
     SpecAttestation,
 )
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.common import (
     BLSPubkey,
     BLSSignature,
@@ -137,10 +137,16 @@ class SpecBeaconBlock:
     ElectraBlindedBlock: Container
     ElectraBlindedBlockSigned: Container
 
+    FuluBlockSigned: Container
+    FuluBlockContents: Container
+    FuluBlockContentsSigned: Container
+    FuluBlindedBlock: Container
+    FuluBlindedBlockSigned: Container
+
     @classmethod
     def initialize(
         cls,
-        spec: SpecElectra,
+        spec: SpecFulu,
     ) -> None:
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
@@ -317,3 +323,10 @@ class SpecBeaconBlock:
         cls.ElectraBlockContentsSigned = SignedBlockContentsElectra
         cls.ElectraBlindedBlock = BlindedBeaconBlockElectra
         cls.ElectraBlindedBlockSigned = SignedBlindedBeaconBlockElectra
+
+        # The block Containers were not changed in Fulu -> reusing Electra
+        cls.FuluBlockSigned = SignedBeaconBlockElectra
+        cls.FuluBlockContents = BlockContentsElectra
+        cls.FuluBlockContentsSigned = SignedBlockContentsElectra
+        cls.FuluBlindedBlock = BlindedBeaconBlockElectra
+        cls.FuluBlindedBlockSigned = SignedBlindedBeaconBlockElectra
