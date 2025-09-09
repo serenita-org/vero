@@ -32,7 +32,7 @@ from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
-from spec.base import Genesis, SpecElectra, parse_spec
+from spec.base import Genesis, SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
@@ -110,7 +110,7 @@ class BeaconNode:
     def __init__(
         self,
         base_url: str,
-        spec: SpecElectra,
+        spec: SpecFulu,
         scheduler: AsyncIOScheduler,
         task_manager: TaskManager,
     ) -> None:
@@ -295,7 +295,7 @@ class BeaconNode:
         )
         return Genesis.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
-    async def get_spec(self) -> SpecElectra:
+    async def get_spec(self) -> SpecFulu:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
@@ -579,10 +579,7 @@ class BeaconNode:
             resp_text, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        if response.version == SchemaBeaconAPI.ForkVersion.ELECTRA:
-            att = SpecAttestation.AttestationElectra.from_obj(response.data)
-        else:
-            raise NotImplementedError(f"Unsupported fork version {response.version}")
+        att = SpecAttestation.AttestationElectra.from_obj(response.data)
 
         _BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT.labels(
             host=self.host
@@ -753,7 +750,7 @@ class BeaconNode:
     async def publish_block_v2(
         self,
         fork_version: SchemaBeaconAPI.ForkVersion,
-        signed_beacon_block_contents: SchemaBeaconAPI.ElectraBlockContentsSigned,
+        signed_beacon_block_contents: SchemaBeaconAPI.BlockContentsSigned,
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_block_v2",
@@ -768,7 +765,7 @@ class BeaconNode:
                 data=self.json_encoder.encode(signed_beacon_block_contents),
                 headers={
                     "Eth-Consensus-Version": fork_version.value,
-                    "Content-Type": ContentType.JSON.value,
+                    CONTENT_TYPE: ContentType.JSON.value,
                 },
             )
 
@@ -790,7 +787,7 @@ class BeaconNode:
                 data=self.json_encoder.encode(signed_blinded_beacon_block),
                 headers={
                     "Eth-Consensus-Version": fork_version.value,
-                    "Content-Type": ContentType.JSON.value,
+                    CONTENT_TYPE: ContentType.JSON.value,
                 },
             )
 

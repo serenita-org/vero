@@ -6,7 +6,7 @@ from spec.attestation import (
     AttestationData,
     SpecAttestation,
 )
-from spec.base import SpecElectra
+from spec.base import SpecFulu
 from spec.common import (
     BLSPubkey,
     BLSSignature,
@@ -140,7 +140,7 @@ class SpecBeaconBlock:
     @classmethod
     def initialize(
         cls,
-        spec: SpecElectra,
+        spec: SpecFulu,
     ) -> None:
         class SyncAggregate(Container):
             sync_committee_bits: Bitvector[spec.SYNC_COMMITTEE_SIZE]
