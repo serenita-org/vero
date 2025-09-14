@@ -6,6 +6,7 @@ It is currently compatible with all open-source Ethereum consensus layer clients
 
 |                | Compatible | Version  | Notes |
 |----------------|------------|----------|-------|
+| **Caplin**     | ✅          | v3.0.0+  |       |
 | **Grandine**   | ✅          | 1.1.0+   |       |
 | **Lighthouse** | ✅          | v7.0.0+  |       |
 | **Lodestar**   | ✅          | v1.29.0+ |       |
