@@ -132,7 +132,7 @@ ___
 
 **[required]** The fee recipient address to use during block proposals.
 
-Can be set individually for each validator through the Keymanager API.
+Can be set individually for each validator through the [Keymanager API](https://ethereum.github.io/keymanager-APIs/).
 ___
 
 #### `--data-dir`
@@ -144,7 +144,7 @@ ___
 
 The graffiti string to use during block proposals. Defaults to an empty string.
 
-Can be set individually for each validator through the Keymanager API.
+Can be set individually for each validator through the [Keymanager API](https://ethereum.github.io/keymanager-APIs/).
 ___
 
 #### `--gas-limit`
@@ -152,7 +152,7 @@ ___
 The gas limit value to pass on to external block builders
 during validator registrations.
 
-Can be set individually for each validator through the Keymanager API.
+Can be set individually for each validator through the [Keymanager API](https://ethereum.github.io/keymanager-APIs/).
 
 *Note: this does not affect the gas limit value
 of the connected CL or EL clients.*
@@ -208,7 +208,7 @@ ___
 
 #### `--enable-keymanager-api`
 
-Enables the Keymanager API.
+Enables the [Keymanager API](https://ethereum.github.io/keymanager-APIs/).
 
 _Note: This flag is mutually exclusive with `--remote-signer-url`.
 One of the two must be specified as the validator key source._
