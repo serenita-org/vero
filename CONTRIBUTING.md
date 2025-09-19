@@ -9,6 +9,8 @@ preferring simple code over complex code.
 Some of the code style and behavior is enforced using pre-commit
 hooks like `ruff` and `mypy`.
 
+Any changes to Vero should align with its design goals (listed in the [README](./README.md)).
+
 ### Simple changes
 
 Did you find a bug that is simple to fix? Or find a way to make something
