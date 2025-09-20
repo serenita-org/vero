@@ -879,6 +879,7 @@ dependencies = [
     { name = "prometheus-client" },
     { name = "pyroscope-io" },
     { name = "pyroscope-otel" },
+    { name = "pyyaml" },
     { name = "remerkleable" },
 ]
 
@@ -903,6 +904,7 @@ requires-dist = [
     { name = "prometheus-client", specifier = ">=0.21.1" },
     { name = "pyroscope-io", specifier = ">=0.8.8" },
     { name = "pyroscope-otel", specifier = ">=0.4.0" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "remerkleable", specifier = ">=0.1.28" },
 ]
 

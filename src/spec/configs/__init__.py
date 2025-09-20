@@ -1,5 +1,8 @@
 from enum import Enum
 from pathlib import Path
+from typing import Any
+
+from yaml import BaseLoader, load
 
 from spec.base import SpecFulu, parse_spec
 
@@ -20,19 +23,12 @@ class Network(Enum):
     CUSTOM = "custom"
 
 
-def parse_yaml_file(fp: Path) -> dict[str, str]:
-    return_dict: dict[str, str] = {}
+def parse_yaml_file(fp: Path) -> dict[str, Any]:
     with Path.open(fp) as f:
-        for line in f:
-            line = line.strip().split("#", maxsplit=1)[0]
-            if line == "":
-                continue
-
-            name, value = line.split(": ", maxsplit=1)
-            if name in return_dict:
-                raise ValueError(f"{name} already defined as {return_dict[name]}")
-            return_dict[name] = value.strip()
-    return return_dict
+        parsed = load(f, BaseLoader)  # noqa: S506 - trusted input, and BaseLoader is also safe
+        if not isinstance(parsed, dict):
+            raise TypeError(f"Expected a dict, got {type(parsed)}")
+        return parsed
 
 
 def get_network_spec(
