@@ -38,6 +38,10 @@ Vero’s codebase is intentionally kept small and focused.
 Less code means fewer potential bugs, making it easier to audit
 and reason about.
 
+<img alt="Overview" src="docs/images/scatter-loc-dependencies.png" style="width: 30em;">
+
+_Counted using cloc on September 20th 2025, tests excluded_
+
 ### 4. Observable
 
 Understanding validator performance can be challenging.
