@@ -10,7 +10,6 @@ from spec.configs import Network, get_network_spec
 def test_get_network_spec(network: Network) -> None:
     if network in (
         Network.MAINNET,
-        Network.HOLESKY,
         Network.HOODI,
         Network.GNOSIS,
         Network.CHIADO,
