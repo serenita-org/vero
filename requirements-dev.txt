@@ -527,7 +527,9 @@ pyyaml==6.0.2 \
     --hash=sha256:d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e \
     --hash=sha256:ef6107725bd54b262d6dedcc2af448a266975032bc85ef0172c5f059da6325b4 \
     --hash=sha256:efdca5630322a10774e8e98e1af481aad470dd62c3170801852d752aa7a783ba
-    # via pre-commit
+    # via
+    #   pre-commit
+    #   vero
 remerkleable==0.1.28 \
     --hash=sha256:133cb1283f1d6fd2a020f47ee3653e93385acf2aa4ddc30f3d00eb9404751bda \
     --hash=sha256:1e19e9a927961b29c4efa210795bfad5d20a28545a6f78f7552b1e4449c24890
