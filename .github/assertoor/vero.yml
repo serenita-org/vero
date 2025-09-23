@@ -1,13 +1,14 @@
 participants:
   - el_type: nethermind
     cl_type: lodestar
+    supernode: true
     use_separate_vc: true
     vc_type: vero
     vc_image: vero:custom
     use_remote_signer: true
 
 network_params:
-  electra_fork_epoch: 1
+  fulu_fork_epoch: 1
   seconds_per_slot: 3
 
 additional_services:
