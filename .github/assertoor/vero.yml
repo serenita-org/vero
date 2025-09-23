@@ -1,6 +1,7 @@
 participants:
   - el_type: nethermind
     cl_type: lodestar
+    supernode: true
     use_separate_vc: true
     vc_type: vero
     vc_image: vero:custom
