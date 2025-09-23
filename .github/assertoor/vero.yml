@@ -7,7 +7,7 @@ participants:
     use_remote_signer: true
 
 network_params:
-  electra_fork_epoch: 1
+  fulu_fork_epoch: 1
   seconds_per_slot: 3
 
 additional_services:
