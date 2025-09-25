@@ -157,13 +157,13 @@ Can be set individually for each validator through the [Keymanager API](https://
 *Note: this does not affect the gas limit value
 of the connected CL or EL clients.*
 
-Defaults to the following values::
+Defaults to the following values:
 
 | Network  | Gas Limit |
 |:---------|----------:|
-| mainnet  |  60000000 |
+| mainnet  |  45000000 |
 | gnosis   |  17000000 |
-| holesky  |  36000000 |
+| holesky  |  60000000 |
 | hoodi    |  60000000 |
 | chiado   |  17000000 |
 | custom   | 100000000 |
