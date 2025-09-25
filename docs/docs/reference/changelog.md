@@ -5,6 +5,7 @@
 #### Features
 - Wait for beacon nodes to become available while starting up
 - Optimize finality checkpoint confirmation for low validator counts
+- Default gas limit set to 60M for Ethereum mainnet
 
 #### Bugfixes
 - Sync duties not being performed for exited validators

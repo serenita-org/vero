@@ -119,7 +119,7 @@ Can be set individually for each validator through the [Keymanager API](../usage
 
     | Network  | Gas Limit |
     |:---------|----------:|
-    | mainnet  |  45000000 |
+    | mainnet  |  60000000 |
     | gnosis   |  17000000 |
     | holesky  |  60000000 |
     | hoodi    |  60000000 |
