@@ -21,6 +21,7 @@ dependencies = [
 dev = [
     "aioresponses>=0.7.8",
     "milagro-bls-binding>=1.9.0",
+    "mkdocs-material>=9.6.20",
     "pre-commit>=4.1.0",
     "pytest>=8.3.5",
     "pytest-aiohttp>=1.1.0",
