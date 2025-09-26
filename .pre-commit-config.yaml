@@ -9,6 +9,7 @@ repos:
       - id: check-ast
       - id: check-merge-conflict
       - id: check-yaml
+        exclude: "docs/mkdocs.yml"
       - id: end-of-file-fixer
         exclude: "src/spec/configs/\\w+\\.yaml$"
       - id: mixed-line-ending
