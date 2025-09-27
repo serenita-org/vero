@@ -1,9 +1,9 @@
-# Why Vero?
+# Why Vero
 
 There are already several validator client implementations, you
 might be wondering why we need another one.
 
-### Client Diversity
+## Client Diversity
 
 [Much](https://ethereum.org/en/developers/docs/nodes-and-clients/client-diversity/)
 [has](https://clientdiversity.org/)
@@ -27,7 +27,7 @@ clients works, but that does not seem like a good long-term solution
 as it relies on self-reported client usage data which has a hard time
 taking into account multi-node and/or DVT setups.
 
-### Where does Vero come in?
+## Where does Vero come in?
 
 At Serenita we wanted to make sure our validators do not attest
 to a chain that is only considered valid by a single client implementation
@@ -47,44 +47,44 @@ options also comes with some downsides.
 
 1. **Vouch**
 
-Vouch does not support the
-[Ethereum remote signing API](https://github.com/ethereum/remote-signing-api)
-and is therefore not compatible with remote signing software like
-[web3signer](https://github.com/Consensys/web3signer).
-This makes it non-trivial to switch to. **In case of an issue with Vouch,
-it would also be hard to switch back to a different setup.**
+    Vouch does not support the
+    [Ethereum remote signing API](https://github.com/ethereum/remote-signing-api)
+    and is therefore not compatible with remote signing software like
+    [Web3Signer](https://github.com/Consensys/web3signer).
+    This makes it non-trivial to switch to. **In case of an issue with Vouch,
+    it would also be hard to switch back to a different setup.**
 
-Vouch has also in a way become a victim of its own success - it is already
-being used by a lot of large node operators. And while there has never
-been an issue with it, if an issue were to occur, it could affect a large
-portion of the network.
+    Furthermore, Vouch has in a way become a victim of its own success - it
+    is already being used by a lot of large node operators. And while there
+    has never been an issue with it, if an issue were to occur, it would
+    affect a large portion of the network.
 
-*TLDR: not trivial to switch to, already used by a lot of large NOs*
+    *TLDR: not trivial to switch to, already used by a lot of large NOs*
 
 2. **DVT - SSV**
 
-Registering validators with the ssv.network is expensive, as encrypted
-partial validator keys need to be published in transactions on Ethereum
-mainnet.
+    Registering validators with the ssv.network is expensive, as encrypted
+    partial validator keys need to be published in transactions on Ethereum
+    mainnet.
 
-In order to run validators on the ssv.network, the cluster also needs
-to pay a network fee. This requires managing and monitoring a balance
-of SSV tokens.
+    To run validators on the ssv.network, the SSV cluster needs
+    to pay a network fee. This requires managing and monitoring a balance
+    of SSV tokens.
 
-*TLDR: expensive validator registrations, SSV token requirement*
+    *TLDR: expensive validator registrations, SSV token requirement*
 
 3. **DVT - Obol's Charon**
 
-The Charon middleware client is not open-source, requiring an additional
-use grant from Obol for production use.
+    The Charon middleware client is not open-source, requiring an additional
+    use grant from Obol for production use.
 
-Obol's team also took a different approach and did not implement their
-own validator client, instead choosing to go with a middleware approach,
-standing between existing validator clients and beacon nodes. That
-approach required some Charon-specific changes in beacon nodes.
-Again, any issue with Charon would be non-trivial to recover from.
+    Obol's team also took a different approach and did not implement their
+    own validator client, instead choosing to go with a middleware approach,
+    standing between existing validator clients and beacon nodes. That
+    approach required some Charon-specific changes in beacon nodes.
+    Again, any issue with Charon would be non-trivial to recover from.
 
-*TLDR: license, non-standard middleware approach*
+    *TLDR: license, non-standard middleware approach*
 
 ___
 The biggest shared risk for all of the above options was downtime.
@@ -102,20 +102,22 @@ the client diversity landscape on Ethereum.
 worry about exact client usage data.** It is easy to switch to, and
 switch back from in case you don't like it or an issue were to occur.
 
-### Sounds good, but what if there's a bug in Vero?
+!!! question "What if there's a bug in Vero?"
 
-We have tried to minimize the risk of a bug in Vero in the following ways:
+    Vero is a lot less complex piece of software when compared to
+    Ethereum clients. And while we can't guarantee Vero being bug-free,
+    we are taking every possible measure we can to minimize the chances
+    of serious bugs within Vero:
 
-- a small codebase - the more lines of code, the higher the chance of a bug
-- high test coverage
-- regular cross-client integration testing in local devnets
-using [ethereum-package](https://github.com/ethpandaops/ethereum-package)
+    - a small codebase - the more lines of code, the higher the chance of a bug
+    - high test coverage
+    - regular cross-client integration testing in local devnets
+      using [ethereum-package](https://github.com/ethpandaops/ethereum-package)
 
-Still, if you encounter an issue with Vero, you can switch back to the
-validator client implementation you were using before -
-*easily, quickly and without slashing risk*.
+    Still, if you encounter an issue with Vero, you can switch to any
+    other validator client – *easily, quickly and without slashing risk*.
 
-# Feature comparison
+## Feature comparison
 
 ### Attestation consensus
 
@@ -185,8 +187,8 @@ supermajority chain!
 ### Open Source
 
 Vero is completely open-source without any strings attached. It is released
-as a public good to strengthen the Ethereum network and improve the client
-diversity situation.
+as a public good to strengthen the Ethereum network, make running multi-node
+setups more accessible and thereby improve the client diversity situation.
 
 |                | Open Source |
 |----------------|-------------|

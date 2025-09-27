@@ -1,0 +1,76 @@
+nav:
+  - Introduction:
+    - introduction/index.md
+    - introduction/why_vero.md
+    - introduction/risks.md
+  - Quick Start:
+    - quick-start/index.md
+  - Usage:
+    - Running Vero:
+      - usage/running_vero/index.md
+      - usage/running_vero/docker.md
+      - usage/running_vero/native.md
+    - Setup recommendations:
+      - usage/setup_recommendations/latency.md
+      - usage/setup_recommendations/home_stakers.md
+      - usage/setup_recommendations/professionals.md
+    - usage/mev.md
+    - usage/keymanager_api.md
+    - usage/compatibility.md
+  - Reference:
+    - reference/using_multiple_beacon_nodes.md
+    - reference/slashing_protection.md
+    - reference/instrumentation.md
+    - reference/cli_reference.md
+
+theme:
+  name: material
+  favicon: assets/icon_512x512.png
+  logo: assets/symbol_white_transparent.svg
+  font:
+    text: Inter
+  palette:
+    - scheme: slate
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tracking
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - privacy
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# Project information
+site_name: Vero
+site_url: https://docs.serenita.io/vero
+site_description: >-
+  Vero is a multi-node validator client designed to protect validators from client bugs.
+  It does this by cross-checking the blockchain state across multiple client
+  implementations before submitting attestations.
+
+# Repository
+repo_name: serenita-org/vero
+repo_url: https://github.com/serenita-org/vero
+edit_uri: edit/master/docs/

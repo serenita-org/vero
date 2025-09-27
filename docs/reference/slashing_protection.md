@@ -1,11 +1,11 @@
-# Slashing protection
+# Slashing Protection
 
-## Prevention
+## Proactive Measures
 
 ### Slashing Protection Database
 
 Vero relies on the battle-tested slashing protection
-measures of the attached remote signer, similar to Vouch.
+measures of the attached remote signer.
 Another layer of slashing protection may be added directly
 to Vero in the future.
 
@@ -21,17 +21,19 @@ If Vero detects active doppelgangers on the network, it will
 not start performing validator duties and will shut down
 instead.
 
-## Slashing Event Detection
+## Reactive Measures
 
-Vero closely monitors and attempts to detect validator
-slashing events as quickly as possible
-and **stops performing all duties for all of its
-validators whenever it detects any of them have
-been slashed**. This may sound excessive but we
+### Slashing Event Detection
+
+Vero closely monitors validator slashing events
+happening on the network and **stops performing
+validator duties for all of its validators
+whenever it detects any of them have been
+slashed**. This may seem excessive, but we
 believe any slashing event should be thoroughly
 investigated before resuming duties. A slashing
 event should never occur in a well-setup environment,
-therefore if such an event does occur, it indicates
+therefore, if such an event does occur, it indicates
 a larger issue.
 
 Vero detects slashing events in 2 ways:
@@ -51,4 +53,4 @@ A metric - `slashing_detected` - exposes the status of
 the slashing detection mechanism and is also displayed
 in the overview section of the Grafana dashboard:
 
-![Metrics - overview](images/instrumentation/metrics_overview.png)
+![Metrics - overview](assets/instrumentation/metrics_overview.png)
