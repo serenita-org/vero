@@ -1,6 +1,6 @@
 # Compatibility
 
-Vero regularly undergoes thorough testing against CL and EL client combinations using the Kurtosis [ethereum-package](https://github.com/ethpandaops/ethereum-package).
+Vero regularly undergoes thorough testing against CL and EL client combinations using the Kurtosis [ethereum-package](https://github.com/ethpandaops/ethereum-package){:target="_blank"}.
 
 It is currently compatible with all open-source Ethereum consensus layer clients:
 
@@ -14,11 +14,12 @@ It is currently compatible with all open-source Ethereum consensus layer clients
 | **Prysm**      | ✅          | v6.0.0+  |       |
 | **Teku**       | ✅          | 25.4.1+  |       |
 
-#### Legend
-✅ No known issues.
+!!! info "Legend"
 
-🟡 Minor issues that do not prevent validator duties from working but they may not work ideally.
+    ✅ No known issues.
 
-🟠 Issues that may impact some validator duties occasionally.
+    🟡 Minor issues that do not prevent validator duties from working, but they may not work ideally.
 
-🔴 Major issues that prevent validator duties from being performed.
+    🟠 Issues that may impact some validator duties occasionally.
+
+    🔴 Major issues that prevent validator duties from being performed.

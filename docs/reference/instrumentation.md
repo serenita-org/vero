@@ -5,7 +5,7 @@
 Vero exposes Prometheus metrics by default on the `/metrics` endpoint.
 
 Vero's GitHub repository contains
-[pre-buílt Grafana dashboards](https://github.com/serenita-org/vero/tree/master/grafana).
+[pre-buílt Grafana dashboards](https://github.com/serenita-org/vero/tree/master/grafana){:target="_blank"}.
 These dashboards provide an overview of performed duties, validator status,
 errors and connected beacon node scores.
 
@@ -31,7 +31,7 @@ and tracing data will automatically be pushed to the specified endpoint.
 You may also set other OpenTelemetry-supported environment variables like
 `OTEL_TRACES_SAMPLER` or `OTEL_RESOURCE_ATTRIBUTES` . For a full list of
 supported variables refer to the
-[OpenTelemetry docs](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/).
+[OpenTelemetry docs](https://opentelemetry.io/docs/specs/otel/configuration/sdk-environment-variables/){:target="_blank"}.
 
 !!! note "Block Proposal Trace Example"
 

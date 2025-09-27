@@ -1,6 +1,4 @@
-# Latency
-
-## A note on latency
+# A note on latency
 
 Vero has been successfully tested with
 beacon nodes spanning a single continent. It has

@@ -28,7 +28,7 @@ The setup described above is already much better than running only
 supermajority clients, but still exposes your validators to various
 risks, like:
 
-- [33% consensus client bugs](https://x.com/potuz_eth/status/1768418899111113125)
+- [33% consensus client bugs](https://x.com/potuz_eth/status/1768418899111113125){:target="_blank"}
 - fallback behavior bugs—in case the Nethermind nodes
   fail or start falling behind because of an invalid block,
   your validator client *may* automatically fall back to using
@@ -86,8 +86,8 @@ style Vero fill:#11497E,stroke:#000000
 Besides being as resilient as can be against single-client bugs,
 this kind of setup also allows you to gradually introduce new
 clients that may not be completely battle-tested yet, like
-[Grandine](https://github.com/grandinetech/grandine) or
-[Reth](https://github.com/paradigmxyz/reth).
+[Grandine](https://github.com/grandinetech/grandine){:target="_blank"} or
+[Reth](https://github.com/paradigmxyz/reth){:target="_blank"}.
 
 If you're a professional node operator and you're not yet
 running a multi-node setup, do yourself –and the network– a favor

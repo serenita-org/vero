@@ -13,7 +13,7 @@ all CL and EL clients.
 1. ### Multi-node
 
     Vero is designed to take full advantage of client diversity by
-    seamlessly [combining data from multiple clients](../reference/using_multiple_beacon_nodes.md)
+    seamlessly [combining data from multiple clients](reference/using_multiple_beacon_nodes.md)
     at the same time.
 
     !!! question "What's the difference between a multi-node approach and a fallback setup?"
@@ -58,8 +58,8 @@ all CL and EL clients.
     In support of this goal, Vero provides node operators with:
 
     - Clear, human-readable logs
-    - Detailed [metrics](../reference/instrumentation.md#metrics) and pre-built dashboards
-    - Rich [tracing data](../reference/instrumentation.md#tracing)
+    - Detailed [metrics](reference/instrumentation.md#metrics) and pre-built dashboards
+    - Rich [tracing data](reference/instrumentation.md#tracing)
 
     Together, these help node operators better understand and improve
     their setups.
@@ -72,7 +72,7 @@ all CL and EL clients.
 
     In addition the above, Vero also supports industry standards like:
 
-    - [Ethereum Remote Signing API](https://github.com/ethereum/remote-signing-api)
+    - [Ethereum Remote Signing API](https://github.com/ethereum/remote-signing-api){:target="_blank"}
       (used by Web3Signer)
-    - [Ethereum Keymanager API](https://github.com/ethereum/keymanager-APIs)
+    - [Ethereum Keymanager API](https://github.com/ethereum/keymanager-APIs){:target="_blank"}
       (used by tools like Eth Docker and Dappnode)

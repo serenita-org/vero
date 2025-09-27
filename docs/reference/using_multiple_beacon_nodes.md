@@ -3,7 +3,7 @@
 While Vero works perfectly well when connected to
 a single beacon node, its advantages truly come to
 light when connected to a diverse set of clients.
-Vero can, similar to [Vouch](https://github.com/attestantio/vouch),
+Vero can, similar to [Vouch](https://github.com/attestantio/vouch){:target="_blank"},
 retrieve attestation data from all of them and only
 attest to the head of the chain if a majority of
 connected beacon nodes agree on it. This makes

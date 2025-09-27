@@ -45,11 +45,11 @@ There are many different ways to deploy the Ethereum
 validator duties.
 Some of the well known options include:
 
-- [Dappnode](https://dappnode.com/)
-- [eth-docker](https://ethdocker.com/)
-- [EthPillar](https://docs.coincashew.com/ethpillar)
-- [Eth Wizard](https://github.com/stake-house/eth-wizard)
-- [Sedge](https://docs.sedge.nethermind.io/)
+- [Dappnode](https://dappnode.com/){:target="_blank"}
+- [eth-docker](https://ethdocker.com/){:target="_blank"}
+- [EthPillar](https://docs.coincashew.com/ethpillar){:target="_blank"}
+- [Eth Wizard](https://github.com/stake-house/eth-wizard){:target="_blank"}
+- [Sedge](https://docs.sedge.nethermind.io/){:target="_blank"}
 
 You can use any of the above options to set up your
 Ethereum CL and EL client combination(s).
@@ -66,7 +66,7 @@ Ethereum CL and EL client combination(s).
 
 For security reasons, Vero never interacts directly with
 validator keys. Key management is instead handled by a
-remote signer, e.g. [Web3Signer](https://docs.web3signer.consensys.io/):
+remote signer, e.g. [Web3Signer](https://docs.web3signer.consensys.io/){:target="_blank"}:
 
 ```mermaid
 flowchart LR
@@ -78,7 +78,7 @@ While this makes things more secure, it also makes initially
 setting things up a bit more complicated.
 
 For this quick-start guide, we'll be making
-our life easier and use [eth-docker](https://ethdocker.com/)
+our life easier and use [eth-docker](https://ethdocker.com/){:target="_blank"}
 to set up both the remote signer and Vero.
 Perform the following steps on the machine you intend to run
 Vero on:
@@ -139,9 +139,9 @@ WARNING: No active or pending validators detected
 Place your validator keystores in the `vero/.eth/validator_keys`
 directory.
 
-Next, run the `./ethd keys import` command. Once your keys are
-imported, restart Vero using `./ethd restart validator` and Vero
-will start performing duties for your validators!
+Next, run the `./ethd keys import` command and follow the instructions.
+Once your keys are imported, restart Vero using `./ethd restart validator`
+and Vero will start performing duties for your validators!
 
 Vero's logs should contain lines like this when it starts successfully:
 

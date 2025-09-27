@@ -1,8 +1,9 @@
 nav:
   - Introduction:
-    - introduction/index.md
+    - index.md
     - introduction/why_vero.md
     - introduction/risks.md
+    - introduction/faqs.md
   - Quick Start:
     - quick-start/index.md
   - Usage:
@@ -48,6 +49,11 @@ plugins:
   - privacy
   - search
 
+# Necessary for nested pages using mermaid diagrams in combination with the privacy plugin
+# https://github.com/squidfunk/mkdocs-material/issues/3742
+extra_javascript:
+  - https://unpkg.com/mermaid@11/dist/mermaid.min.js
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -61,10 +67,12 @@ markdown_extensions:
         - name: mermaid
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
 
 # Project information
 site_name: Vero
-site_url: https://docs.serenita.io/vero
+site_url: https://vero.docs.serenita.io
 site_description: >-
   Vero is a multi-node validator client designed to protect validators from client bugs.
   It does this by cross-checking the blockchain state across multiple client
