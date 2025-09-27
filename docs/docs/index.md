@@ -1,6 +1,6 @@
-# Vero
+# Introduction
 
-Vero is a multi-node validator client designed to protect validators
+**Vero** is a multi-node validator client designed to protect validators
 from client bugs. It does this by cross-checking the blockchain
 state across multiple client implementations before submitting
 attestations.

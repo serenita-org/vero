@@ -1,14 +1,29 @@
 # FAQs
 
-??? question "Where is the security audit?"
+??? question "Will my validators go offline if one of the connected beacon nodes goes offline?"
 
-    TODO?
+    Most of the time Vero can keep going even if only a single connected beacon node is online
+    and synced. This means you can perform short maintenance on your nodes like applying
+    client updates.
 
-??? question "I noticed Vero is written in Python. Should I be worried about performance?"
+    Most of the time is not all the time though. Vero uses a threshold of beacon nodes
+    at the start of every epoch to confirm finality checkpoints, in order not to
+    follow an incorrect chain. This threshold defaults to a majority of beacon nodes (>50%)
+    and can be overridden through a CLI argument.
+
+??? question "Is Vero compatible with Dirk remote signers?"
+
+    No. Dirk doesn't implement the
+    [Ethereum Remote Signing API](https://github.com/ethereum/remote-signing-api){:target="_blank"}
+    but uses a different API. Adding compatibility for Dirk remote signers
+    is being considered. Let us know if this is something that would be interesting
+    to you.
+
+??? question "I notice Vero is written in Python. Should I be worried about performance?"
 
     The workload of a validator client is not particularly processing-heavy,
-    therefore the choice of language does not play a great role when it
-    comes to performance.
+    therefore the choice of programming language does not play a great role
+    when it comes to performance.
 
     Most of a validator client's work consists of asking other software for data:
 
@@ -40,23 +55,3 @@
     At [Serenita](https://serenita.io){:target="_blank"}, we run thousands
     of Vero-powered validators and we frequently rank among the very
     [top performers](https://explorer.rated.network/leaderboard?network=mainnet&timeWindow=30d){:target="_blank"}.
-
-??? question "Will my validator go offline if one of the connected beacon nodes goes offline?"
-
-    Most of the time Vero can keep going even if only a single connected beacon node is online
-    and synced. This means you can perform short maintenance on your nodes like applying
-    client updates.
-
-    Most of the time is not all the time though. Vero uses a threshold of beacon nodes
-    at the start of every epoch to confirm finality checkpoints, in order not to
-    follow an incorrect chain. This threshold defaults to a majority of beacon nodes (>50%)
-    and can be overridden through a CLI argument.
-
-
-??? question "Is Vero compatible with Dirk remote signers?"
-
-    No. Dirk doesn't implement the
-    [Ethereum Remote Signing API](https://github.com/ethereum/remote-signing-api){:target="_blank"}
-    but uses a different API. Adding compatibility for Dirk remote signers
-    is being considered. Let us know if this is something that would be interesting
-    to you.

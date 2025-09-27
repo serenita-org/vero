@@ -16,6 +16,8 @@ are not exposed to single-client bugs and also make it
 possible to perform maintenance on up to 2 connected
 servers.
 
+___
+
 ## Step-by-step Migration Example
 
 Let's assume you're a professional node operator, running validator
