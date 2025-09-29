@@ -1,0 +1,16 @@
+:root > * {
+  --md-primary-fg-color:               #11497E;
+  --md-primary-fg-color--light:        #11497E;
+  --md-primary-fg-color--dark:         #11497E;
+  --md-primary-bg-color:               hsla(0, 0%, 100%, 1);
+  --md-primary-bg-color--light:        hsla(0, 0%, 100%, 0.7);
+
+  --md-accent-fg-color:                #098686;
+  --md-accent-fg-color--transparent:   #098686;
+  --md-accent-bg-color:                hsla(0, 0%, 100%, 1);
+  --md-accent-bg-color--light:         hsla(0, 0%, 100%, 0.7);
+}
+
+.mermaid {
+  text-align: center;
+}
