@@ -35,6 +35,7 @@ connected beacon nodes have equal scores, the first beacon node will be used.
 
 import asyncio
 import logging
+import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
@@ -91,19 +92,39 @@ class MultiBeaconNode:
         self.spec = spec
         self.SECONDS_PER_INTERVAL = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
-        self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
         self.cli_args = cli_args
 
-    async def initialize(self) -> None:
-        # Attempt to fully initialize the connected beacon nodes
-        await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
+        self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
+        # On startup, try to initialize beacon nodes for 5 minutes
+        # before raising an Exception.
+        self._init_timeout = 300
+        self._init_retry_interval: int | float = 5
 
-        successful_init_count = len(self.initialized_beacon_nodes)
-        if successful_init_count < self._attestation_consensus_threshold:
-            raise RuntimeError(
-                f"Failed to fully initialize a sufficient amount of beacon nodes -"
-                f" {successful_init_count}/{len(self.beacon_nodes)} initialized",
+    async def initialize(self) -> None:
+        deadline = time.monotonic() + self._init_timeout
+
+        def _init_error_message(_ok_init_count: int) -> str:
+            return (
+                "Failed to fully initialize a sufficient amount of beacon nodes - "
+                f"{_ok_init_count}/{len(self.beacon_nodes)} initialized "
+                f"(required: {self._attestation_consensus_threshold})"
             )
+
+        while True:
+            self.logger.info("Initializing beacon nodes")
+            # Attempt to fully initialize the connected beacon nodes
+            await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
+
+            successful_init_count = len(self.initialized_beacon_nodes)
+            if successful_init_count >= self._attestation_consensus_threshold:
+                break
+
+            if time.monotonic() >= deadline:
+                raise RuntimeError(_init_error_message(successful_init_count))
+
+            self.logger.warning(_init_error_message(successful_init_count))
+            self.logger.info(f"Retrying in {self._init_retry_interval} seconds")
+            await asyncio.sleep(self._init_retry_interval)
 
         # Check the connected beacon nodes genesis, spec
         if not len({bn.genesis for bn in self.initialized_beacon_nodes}) == 1:

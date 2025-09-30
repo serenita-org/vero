@@ -139,6 +139,9 @@ async def test_initialize(
             task_manager=task_manager,
             cli_args=_cli_args_for_test,
         )
+        mbn_base._init_timeout = 1
+        mbn_base._init_retry_interval = 0.1
+
         if expected_initialization_success:
             await exit_stack.enter_async_context(mbn_base)
         else:
