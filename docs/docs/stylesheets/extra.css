@@ -9,8 +9,49 @@
   --md-accent-fg-color--transparent:   #098686;
   --md-accent-bg-color:                hsla(0, 0%, 100%, 1);
   --md-accent-bg-color--light:         hsla(0, 0%, 100%, 0.7);
+
+  --md-typeset-a-color:                #0CBABA;
 }
 
 .mermaid {
   text-align: center;
+}
+
+/*
+Some of the admonitions' default colors clashed with Serenita colors
+so those are replaced here.
+*/
+.md-typeset .admonition.note,.md-typeset details.note {
+    border-color: #4B9CE7
+}
+
+.md-typeset .admonition.note:focus-within,.md-typeset details.note:focus-within {
+    box-shadow: 0 0 0 .2rem #4B9CE71a
+}
+
+.md-typeset .note>.admonition-title,.md-typeset .note>summary {
+    background-color: #4B9CE71a
+}
+
+.md-typeset .note>.admonition-title:before,.md-typeset .note>summary:before {
+    background-color: #4B9CE7;
+}
+
+.md-typeset .note>.admonition-title:after,.md-typeset .note>summary:after {
+    color: #4B9CE7
+}
+
+.md-typeset .admonition.question,.md-typeset details.question {
+    border-color: #4B9CE7
+}
+
+.md-typeset .question>.admonition-title,.md-typeset .question>summary {
+    background-color: #4B9CE71a;
+}
+
+.md-typeset .question>.admonition-title:before,.md-typeset .question>summary:before {
+    background-color: #4B9CE7;
+}
+.md-typeset .question>.admonition-title:after,.md-typeset .question>summary:after {
+    color: #4B9CE7
 }

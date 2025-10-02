@@ -11,5 +11,7 @@ RUN mkdocs build -d mkdocs_dist
 FROM caddy:2-alpine
 COPY --from=build /tmp/mkdocs_dist /usr/share/caddy
 
+COPY Caddyfile /etc/caddy/Caddyfile
+
 # Caddy listens on HTTP 80 by default
 EXPOSE 80
