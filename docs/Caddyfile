@@ -1,0 +1,14 @@
+(static) {
+	@static {
+		file
+		path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.svg *.woff *.woff2
+	}
+	# 30 days
+	header @static Cache-Control max-age=2592000
+}
+
+:80 {
+    import static
+	root * /usr/share/caddy
+	file_server
+}

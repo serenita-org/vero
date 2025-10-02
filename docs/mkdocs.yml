@@ -35,6 +35,7 @@ theme:
     text: Inter
   palette:
     - scheme: slate
+      primary: custom
   features:
     - content.action.edit
     - content.code.copy
