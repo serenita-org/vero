@@ -490,14 +490,27 @@ class SyncCommitteeService(ValidatorDutyService):
                 del self.sync_duties[sync_period]
 
     async def _update_duties(self) -> None:
+        # We check for duties for exited validators here too since
+        # it is possible for an exited validator to be scheduled for
+        # sync commitee duties (when scheduled shortly before the
+        # validator exits).
+        # See https://ethresear.ch/t/sync-committees-exited-validators-participating-in-sync-committee/15634
+        exited_indices = [
+            v.index for v in self.validator_status_tracker_service.exited_validators
+        ]
         _validator_indices = (
             self.validator_status_tracker_service.active_or_pending_indices
+            + exited_indices
         )
+
         if len(_validator_indices) == 0:
             self.logger.warning(
-                "Not updating sync committee duties - no active or pending validators",
+                "Not updating sync committee duties - no active, pending, or exited validators",
             )
             return
+        self.logger.debug(
+            f"Updating sync commitee duties for {len(_validator_indices)} validators"
+        )
 
         current_epoch = self.beacon_chain.current_epoch
         # TODO we current update sync duties way too often.

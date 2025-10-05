@@ -51,6 +51,8 @@ class ValidatorStatusTrackerService:
 
         self.active_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
         self.pending_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
+        self.exited_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
+        self.withdrawal_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
 
     async def initialize(self) -> None:
         # Call the internal _update function explicitly at initialization time.
