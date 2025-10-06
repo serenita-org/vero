@@ -2,6 +2,9 @@
 
 ## Upcoming release
 
+#### Features
+- Remove the Holešky testnet from the set of supported networks
+
 #### Bugfixes
 - Fix beacon node initialization retry logic ([#246](https://github.com/serenita-org/vero/pull/246))
 

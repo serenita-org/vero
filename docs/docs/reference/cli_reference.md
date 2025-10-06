@@ -2,7 +2,7 @@
 
 #### `--network`
 
-**[required]** The network to use, one of `mainnet, gnosis, holesky, hoodi, chiado, custom`.
+**[required]** The network to use, one of `mainnet, gnosis, hoodi, chiado, custom`.
 
 `custom` is a special case where Vero loads the network spec from the file specified using `--network-custom-config-path`
 
@@ -121,7 +121,6 @@ Can be set individually for each validator through the [Keymanager API](../usage
     |:---------|----------:|
     | mainnet  |  60000000 |
     | gnosis   |  17000000 |
-    | holesky  |  60000000 |
     | hoodi    |  60000000 |
     | chiado   |  17000000 |
     | custom   | 100000000 |
