@@ -194,6 +194,17 @@ class AttestationService(ValidatorDutyService):
 
         if len(slot_attester_duties) == 0:
             self.logger.debug(f"No remaining attester duties for slot {slot}")
+            # Produce attestation data even if no attester duty is scheduled.
+            # This ensures finality checkpoints are confirmed and cached early into
+            # the epoch, even when managing a low number of validators.
+            _ = await asyncio.wait_for(
+                self.attestation_data_provider.produce_attestation_data(
+                    slot=slot,
+                    head_event_block_root=head_event.block if head_event else None,
+                ),
+                timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
+                - time.time(),
+            )
             return
 
         self.logger.debug(
