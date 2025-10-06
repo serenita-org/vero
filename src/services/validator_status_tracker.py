@@ -67,6 +67,10 @@ class ValidatorStatusTrackerService:
         return [v.index for v in self.active_validators + self.pending_validators]
 
     @property
+    def exited_or_withdrawal_indices(self) -> list[int]:
+        return [v.index for v in self.exited_validators + self.withdrawal_validators]
+
+    @property
     def slashing_detected(self) -> bool:
         return self._slashing_detected
 

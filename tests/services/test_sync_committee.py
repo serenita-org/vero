@@ -3,7 +3,7 @@ import os
 import pytest
 
 from providers import BeaconChain
-from schemas import SchemaBeaconAPI, SchemaValidator
+from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import SyncCommitteeService
 from services.sync_committee import (
@@ -141,22 +141,7 @@ async def test_update_duties_exited_validators(
     class MockValidatorStatusTrackerService:
         def __init__(self) -> None:
             self.active_or_pending_indices = [1, 2, 3]
-            self.exited_validators = [
-                SchemaValidator.ValidatorIndexPubkey(
-                    index=4,
-                    pubkey="0x-exited-pubkey",
-                    status=SchemaBeaconAPI.ValidatorStatus.EXITED_UNSLASHED,
-                )
-            ]
-            # Yes, even a validator with a withdrawal_done status
-            # can still be scheduled for sync committee duties!
-            self.withdrawal_validators = [
-                SchemaValidator.ValidatorIndexPubkey(
-                    index=5,
-                    pubkey="0x-withdrawal-pubkey",
-                    status=SchemaBeaconAPI.ValidatorStatus.WITHDRAWAL_DONE,
-                )
-            ]
+            self.exited_or_withdrawal_indices = [4, 5]
 
     service = SyncCommitteeService(
         multi_beacon_node=None,  # type: ignore[arg-type]
@@ -175,6 +160,7 @@ async def test_update_duties_exited_validators(
     ):
         await service._update_duties()
 
+    # We should be requesting duties for the exited validators too
     assert any(
         "Updating sync commitee duties for 5 validators" in m for m in caplog.messages
     )

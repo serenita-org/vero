@@ -494,14 +494,12 @@ class SyncCommitteeService(ValidatorDutyService):
         # it is possible for an exited validator to be scheduled for
         # sync commitee duties (when scheduled shortly before the
         # validator exits).
+        # Even a validator in `withdrawal_done` status
+        # can still be scheduled for sync committee duties!
         # See https://ethresear.ch/t/sync-committees-exited-validators-participating-in-sync-committee/15634
-        val_tracker = self.validator_status_tracker_service
-        exited_or_withdrawal_indices = [
-            v.index
-            for v in (val_tracker.exited_validators + val_tracker.withdrawal_validators)
-        ]
         _validator_indices = (
-            val_tracker.active_or_pending_indices + exited_or_withdrawal_indices
+            self.validator_status_tracker_service.active_or_pending_indices
+            + self.validator_status_tracker_service.exited_or_withdrawal_indices
         )
 
         if len(_validator_indices) == 0:
