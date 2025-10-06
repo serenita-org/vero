@@ -321,18 +321,6 @@ from spec.utils import encode_graffiti
         ),
         pytest.param(
             [
-                "--network=holesky",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
-            None,
-            {"gas_limit": 60_000_000},
-            [],
-            id="--gas-limit default value Holesky testnet",
-        ),
-        pytest.param(
-            [
                 "--network=hoodi",
                 "--remote-signer-url=http://signer:9000",
                 "--beacon-node-urls=http://beacon-node:5052",
