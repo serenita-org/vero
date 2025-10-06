@@ -125,3 +125,42 @@ async def test_aggregate_sync_messages(
         _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS._value.get()
         > contributions_produced_before
     )
+
+
+async def test_update_duties_exited_validators(
+    beacon_chain: BeaconChain, caplog: pytest.LogCaptureFixture
+) -> None:
+    """
+    # Tests that we update sync duties for exited validators too since
+    # it is possible for an exited validator to be scheduled for
+    # sync commitee duties (when scheduled shortly before the
+    # validator exits).
+    # See https://ethresear.ch/t/sync-committees-exited-validators-participating-in-sync-committee/15634
+    """
+
+    class MockValidatorStatusTrackerService:
+        def __init__(self) -> None:
+            self.active_or_pending_indices = [1, 2, 3]
+            self.exited_or_withdrawal_indices = [4, 5]
+
+    service = SyncCommitteeService(
+        multi_beacon_node=None,  # type: ignore[arg-type]
+        beacon_chain=beacon_chain,
+        signature_provider=None,  # type: ignore[arg-type]
+        keymanager=None,  # type: ignore[arg-type]
+        duty_cache=None,  # type: ignore[arg-type]
+        validator_status_tracker_service=MockValidatorStatusTrackerService(),  # type: ignore[arg-type]
+        scheduler=None,
+        task_manager=None,  # type: ignore[arg-type]
+        cli_args=None,  # type: ignore[arg-type]
+    )
+
+    with pytest.raises(
+        AttributeError, match="'NoneType' object has no attribute 'get_sync_duties'"
+    ):
+        await service._update_duties()
+
+    # We should be requesting duties for the exited validators too
+    assert any(
+        "Updating sync commitee duties for 5 validators" in m for m in caplog.messages
+    )

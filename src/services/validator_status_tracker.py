@@ -51,6 +51,8 @@ class ValidatorStatusTrackerService:
 
         self.active_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
         self.pending_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
+        self.exited_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
+        self.withdrawal_validators: list[SchemaValidator.ValidatorIndexPubkey] = []
 
     async def initialize(self) -> None:
         # Call the internal _update function explicitly at initialization time.
@@ -63,6 +65,10 @@ class ValidatorStatusTrackerService:
     @property
     def active_or_pending_indices(self) -> list[int]:
         return [v.index for v in self.active_validators + self.pending_validators]
+
+    @property
+    def exited_or_withdrawal_indices(self) -> list[int]:
+        return [v.index for v in self.exited_validators + self.withdrawal_validators]
 
     @property
     def slashing_detected(self) -> bool:
