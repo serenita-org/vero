@@ -12,12 +12,12 @@ RS(Remote Signer) <--> V(Vero)
 style V fill:#11497E,stroke:#000000
 ```
 
-This improves security, but it makes the initial setup
+This improves security but it makes the initial setup
 a little more complicated.
 
-For this quick-start guide, we'll be making
-our life easier and use [eth-docker](https://ethdocker.com/){:target="_blank"}
-to set up both the remote signer and Vero.
+For the purposes of this quick-start guide, we'll be taking
+advantage of [eth-docker](https://ethdocker.com/){:target="_blank"}'s built-in
+support for web3signer (a remote signer) and Vero.
 Perform the following steps on the machine you intend to run
 Vero on:
 
@@ -44,17 +44,21 @@ Vero on:
     nano .env
     ```
 
-    then edit the following lines as needed:
+    adjusting the following lines as needed:
 
     ```
     COMPOSE_FILE=vero-vc-only.yml:web3signer.yml
+
     FEE_RECIPIENT=0xYourEthereumAddress # Replace with your own fee recipient
+
     NETWORK=the network to use, hoodi or mainnet
+
     WEB3SIGNER=true
+
     CL_NODE=http://beacon-node:5052
     ```
 
-    Adjust the `CL_NODE` URL as needed – replace `beacon-node:5052` with
+    Adjust the `CL_NODE` URL as needed, replacing `beacon-node:5052` with
     the IP address or hostname and API port of the CL client you set up
     earlier.
 
@@ -62,7 +66,7 @@ ___
 
 !!! tip "Let's check everything is set up correctly"
 
-We still haven't imported our validator keys. However, we can check
+We still haven't imported any validator keys. However, we can check
 if everything is set up correctly so far.
 
 Run `./ethd up` to start Vero and the remote signer.

@@ -79,12 +79,11 @@ one of them can be used at a time.
         -d '{"remote_keys":[{"pubkey": "0x94907e04363dfa47348ca42225f221f0c57396181d1124013587271c6b681ebc8584fd3e6e8d4ec69b8358969976b260", "url": "http://web3signer:9000"}]}'
         ```
 
-    !!! note ""
+    !!! info "You only need to do this once"
 
-        You only need to do this once – there's no need to
-        resend the request each time Vero restarts.
+        There's no need to resend the request each time Vero restarts.
 
-        Vero persists the submitted data into its own local database.
+        Vero persists the submitted data in its database.
 
 Once you have your keys loaded via the Keymanager API, you can then use
 the rest of the Keymanager API endpoints to e.g. override the fee recipient

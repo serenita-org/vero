@@ -19,7 +19,7 @@ all Consensus Layer (CL) and Execution Layer (EL) clients.
     !!! question "What's the difference between a multi-node setup and a fallback setup?"
 
         In a fallback setup, secondary nodes are only
-        used when the primary client goes offline.
+        used when the primary node goes offline.
 
         In a multi-node setup, all nodes are used simultaneously.
 

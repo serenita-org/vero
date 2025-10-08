@@ -40,6 +40,6 @@ if something were to go wrong with those.
 
 By contrast, switching to —and back from—
 Vero is much easier.
-If you're already using a remote signer (Web3Signer),
+If you're already using a remote signer (e.g. Web3Signer),
 you can switch between your current validator client and Vero
 in just minutes.
