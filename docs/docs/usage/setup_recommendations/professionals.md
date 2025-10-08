@@ -17,37 +17,48 @@ at a time.
 
 ___
 
+!!! tip "Become a Vero Sponsor"
+
+    Professional node operators – consider
+    becoming an official Vero Sponsor.
+    Sponsors get access to priority support
+    and exclusive features that aim to make your job
+    as a node operator easier!
+
+___
+
 ## Step-by-step Migration Example
 
 Let's assume you're a professional node operator, running validator
 clients developed by CL client teams, connected to a 50% mix of
 Geth-Prysm (5 servers) and Nethermind-Lighthouse (5 servers).
-You already have a remote signer set up with an enabled slashing
-protection database.
+Let's also assume you already have a remote signer set up
+with an enabled slashing protection database.
 
-This setup is already much safer than running only
-supermajority clients, but it still exposes your
+This setup is safer than only running a single client
+implementation but it still exposes your
 validators to risks such as:
 
 - [33% consensus client bugs](https://x.com/potuz_eth/status/1768418899111113125){:target="_blank"}
-- fallback behavior bugs – for example, if the Nethermind nodes
-  fail or fall behind because of an invalid block,
-  your validator client *may* automatically fall back to using
-  the Geth nodes that haven't fallen behind
+- fallback behavior bugs – for example, if your Nethermind nodes
+  reject an invalid block, your validator client *may* automatically
+  fall back to using your Geth nodes which could consider that block
+  valid due to a bug
 
 To migrate to a more resilient setup using Vero, you would:
 
-1. **Start using Vero as your validator client.**
+1. **Switch to using Vero as your validator client.**
 
-    This step should be very easy to perform if you're already using
-    a remote signer.
-    If you end up not liking Vero, switching back to your previous
-    validator client is very easy.
+    This step should be easy to perform if you're already using
+    a remote signer. You only switch a single component
+    within your setup, the validator client, _without any slashing risk_.
+    In case of need, switching back to the validator client you used
+    previously is equally easy.
 
 2. **Start introducing more clients onto your servers gradually**.
 
-    Switch to a Lodestar CL client on one of them. Then switch to the
-    Besu EL client on another. Continue switching clients one by one until
+    Switch to the Lodestar client on one of them. Then switch to the
+    Besu client on another. Continue switching clients one by one until
     you reach your desired end state while keeping an eye on Vero metrics,
     especially the attestation consensus time and duty submission time.
     With five servers, you could easily be running five different CL clients
@@ -55,12 +66,17 @@ To migrate to a more resilient setup using Vero, you would:
 
 3. **Enjoy the peace of mind a diverse set of clients gives you.**
 
-    When a single client has a bug, you don't need to step in
+    Whenever any single client has a bug, you don't need to step in
     immediately since Vero will simply keep going using the other
-    clients in the mix.
+    clients in the mix. Even if two clients share an identical bug,
+    the three other clients will keep things going without any
+    action required on your part!
 
-    Even if two clients share a bug, the 3 other clients will
-    keep things going!
+    If you want to be extra conservative around network upgrades,
+    when client bugs are more likely to surface, you can temporarily
+    increase Vero's attestation consensus threshold. You could require four,
+    or even all five of the connected clients to agree on the state of
+    the chain before your validators vote for it.
 
 *The ultimate setup for professional node operators?*
 
@@ -92,4 +108,4 @@ clients that may not be completely battle-tested yet, like
 
 If you're a professional node operator not yet running
 a multi-node setup, do yourself —and the network— a favor
-and start to use Vero.
+and start using Vero.

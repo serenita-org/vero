@@ -1,8 +1,8 @@
 # MEV Configuration
 
-For MEV, Vero behaves like a traditional validator client.
-Vero does not communicate directly with MEV relays.
-Instead, connected beacon nodes handle that role through
+When it comes to MEV, Vero behaves like a traditional validator client – it
+does not communicate directly with MEV relays.
+Instead, connected beacon nodes should handle that role through
 sidecars like
 [mev-boost](https://github.com/flashbots/mev-boost){:target="_blank"} or [Commit-Boost](https://www.commit-boost.org/){:target="_blank"}.
 
@@ -33,12 +33,10 @@ to submit its validator registrations
 Therefore, ensure that the first connected beacon node is
 connected to all the MEV relays you wish to use.
 
-Having said that, there are multiple choices you can make
+There are multiple choices you can make
 when it comes to setting this up in a multi-client environment.
 
-___
-
-Option 1: Point all beacon nodes to a single mev-boost instance:
+#### Option 1: Point all beacon nodes to a single mev-boost instance:
 
 ```mermaid
 flowchart RL
@@ -56,7 +54,7 @@ mev-boost <--> Teku
 style Vero fill:#11497E,stroke:#000000
 ```
 
-Option 2: Deploy a separate mev-boost instance for each client pair:
+#### Option 2: Deploy a separate mev-boost instance for each client pair:
 
 ```mermaid
 flowchart RL

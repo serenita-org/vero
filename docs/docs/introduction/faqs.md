@@ -27,7 +27,7 @@
       - beacon nodes - e.g. keeping track of validator duties
       - remote signer - signing validator duties
 
-    Python has many strengths that make it the perfect choice for Vero:
+    Python was chosen because of the many strengths that make it the perfect choice for Vero:
 
     - Simplicity
 
