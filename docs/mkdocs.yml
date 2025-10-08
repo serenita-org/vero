@@ -26,6 +26,7 @@ nav:
     - reference/slashing_protection.md
     - reference/instrumentation.md
     - reference/cli_reference.md
+    - reference/changelog.md
 
 theme:
   name: material
