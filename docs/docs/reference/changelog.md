@@ -5,6 +5,7 @@
 #### Features
 - Wait for beacon nodes to become available while starting up
 - Optimize finality checkpoint confirmation for low validator counts
+- Remove the Holešky testnet from the set of supported networks
 
 #### Bugfixes
 - Sync duties not being performed for exited validators
