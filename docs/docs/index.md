@@ -23,6 +23,10 @@ all Consensus Layer (CL) and Execution Layer (EL) clients.
 
         In a multi-node setup, all nodes are used simultaneously.
 
+    !!! question "How is a Vero-powered setup different from DVT (Distributed Validator Technology)?"
+
+        See the [FAQs](introduction/faqs.md).
+
 2. ### Security
 
     Validator clients form a critical part of staking infrastructure
