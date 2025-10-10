@@ -129,11 +129,18 @@ class BlockProposalService(ValidatorDutyService):
         duty_for_next_slot = self.duty_for_slot(slot + 1)
         if duty_for_next_slot:
             await self._fetch_randao_reveal(duty=duty_for_next_slot)
+            # Call the `prepare_beacon_proposer` endpoint one more time
+            # just before a block proposal is scheduled to decrease
+            # the chances of the fee recipient being set incorrectly,
+            # e.g., due to a beacon node restarting.
+            await self.prepare_beacon_proposer()
 
         if self.cli_args.use_external_builder:
             self.task_manager.create_task(self.register_validators(current_slot=slot))
 
-        # At the start of an epoch, update duties
+        # At the start of every epoch, update duties
+        # and prepare the connected beacon nodes for
+        # block proposals.
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
