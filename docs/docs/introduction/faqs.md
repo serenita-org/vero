@@ -1,5 +1,30 @@
 # FAQs
 
+??? question "What's the difference between a multi-node setup and a fallback setup?"
+
+    In a fallback setup, secondary nodes are only
+    used when the primary node goes offline.
+
+    In a multi-node setup, all nodes are used simultaneously.
+
+??? question "How is a Vero-powered setup different from DVT (Distributed Validator Technology)?"
+
+    Vero provides many of the same benefits as DVT,
+    but with far less operational complexity.
+
+    The key difference lies in where decisions are made.
+    In a Vero-powered setup, a single active validator
+    process gathers input from multiple Ethereum clients
+    and makes decisions in one place. In DVT,
+    validator responsibilities are distributed across a cluster
+    of nodes that coordinate to decide and perform each action.
+
+    Both approaches support high-availability deployments.
+
+    We believe multi-node validator clients are the better
+    choice when a single operator is responsible for running
+    validator infrastructure.
+
 ??? question "Will my validators go offline if one of the connected beacon nodes goes offline?"
 
     Vero can keep running for some amount of time even if only a single connected beacon node
@@ -53,7 +78,7 @@
 
         Wait, what? That's right. In areas where raw speed matters,
         we use libraries written in highly efficient languages like C or Rust.
-        This approach lets us combine Python’s simplicity with the speed of
+        This approach lets us combine Python's simplicity with the speed of
         lower-level languages, giving us the best of both worlds.
 
     At [Serenita](https://serenita.io){:target="_blank"}, we operate thousands
