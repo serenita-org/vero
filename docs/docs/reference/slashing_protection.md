@@ -28,10 +28,9 @@ Vero closely monitors validator slashing events
 happening on the network and **stops performing
 validator duties for all of its validators
 whenever it detects any of them have been
-slashed**. This may seem strict, but any slashing event
-should be thoroughly investigated before duties
-are resumed. A slashing
-event should never occur in a properly configured
+slashed**. While strict, this helps ensure that slashing
+events get properly reviewed before duties are resumed.
+A slashing event should never occur in a properly configured
 environment, therefore, if such an event does occur,
 it indicates a larger issue.
 

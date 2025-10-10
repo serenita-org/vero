@@ -19,11 +19,11 @@ ___
 
 !!! tip "Become a Vero Sponsor"
 
-    Professional node operators – consider
-    becoming an official Vero Sponsor.
-    Sponsors get access to priority support
-    and exclusive features that aim to make your job
-    as a node operator easier!
+    Consider supporting Vero's development by becoming an official **Vero Sponsor**.
+
+    Sponsors get access to exclusive features designed to make
+    validator operations even more reliable, including
+    **high availability** and access to **priority support**.
 
 ___
 
