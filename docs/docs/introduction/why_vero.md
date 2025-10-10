@@ -135,7 +135,7 @@ switch back from— in case any issue were to occur.
       using [ethereum-package](https://github.com/ethpandaops/ethereum-package){:target="_blank"}
 
     If you do encounter an issue with Vero, you can switch to another validator
-    client – *easily, quickly and without slashing risk*.
+    client – ***easily, quickly and without slashing risk***.
 
 ## Feature comparison
 

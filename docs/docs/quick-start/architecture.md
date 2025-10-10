@@ -38,6 +38,4 @@ Nethermind <--> Teku
 style Vero fill:#11497E,stroke:#000000
 ```
 
-These client combinations do not need to run on a single machine.
-In fact, we recommend running each client pair on a separate
-machine for better resilience.
+For resilience, run each client pair on a separate machine.
