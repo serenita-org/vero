@@ -19,3 +19,4 @@
     - https://github.com/jcrist/msgspec/issues/744
   - tip: when checking if no-GIL works, remove the uv .venv, then change the Python version to 3.14t
     in .python-version and then run uv sync. That currently fails to build msgspec.
+  - TODO ensure we're using the free-threading build of Python everywhere (!) (e.g. Dockerfile but also in tests, CI workflows, hooks, ...)
