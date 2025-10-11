@@ -1,6 +1,7 @@
 """Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api)."""
 
 import asyncio
+import functools
 import logging
 from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
@@ -221,8 +222,10 @@ class RemoteSigner(SignatureProvider):
         self.logger.debug(f"Signing {len(messages)} messages in a separate thread")
         return await loop.run_in_executor(
             self.thread_pool_executor,
-            self._sign_in_thread,
-            messages,
-            identifiers,
-            batch_size,
+            functools.partial(
+                self._sign_in_thread,
+                messages=messages,
+                identifiers=identifiers,
+                batch_size=batch_size,
+            ),
         )
