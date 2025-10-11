@@ -74,7 +74,7 @@ class DB:
 
     def batch_host_parameters(
         self, host_parameter_values: list[str]
-    ) -> Generator[list[str], None, None]:
+    ) -> Generator[list[str]]:
         """
         SQLite has a limit on the number of host parameters it can process
         in a single query set to 32,766 as of SQLite 3.32.0.

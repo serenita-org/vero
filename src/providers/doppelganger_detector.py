@@ -19,7 +19,7 @@ class DoppelgangerDetector:
         self,
         beacon_chain: BeaconChain,
         beacon_node: BeaconNode,
-        validator_status_tracker_service: "ValidatorStatusTrackerService",
+        validator_status_tracker_service: ValidatorStatusTrackerService,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 

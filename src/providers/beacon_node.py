@@ -560,7 +560,7 @@ class BeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
+    ) -> SpecAttestation.AttestationElectra:
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
@@ -608,7 +608,7 @@ class BeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SpecSyncCommittee.Contribution:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/sync_committee_contribution",

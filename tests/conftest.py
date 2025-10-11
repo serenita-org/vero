@@ -117,7 +117,7 @@ def _init_spec(spec: SpecFulu) -> None:
 @pytest.fixture
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     requested_fork_version = getattr(request, "param", ForkVersion.FULU)
 
     with mock.patch.object(
@@ -186,7 +186,7 @@ def random_active_validator(
 
 
 @pytest.fixture
-async def scheduler() -> AsyncGenerator[AsyncIOScheduler, None]:
+async def scheduler() -> AsyncGenerator[AsyncIOScheduler]:
     _scheduler = AsyncIOScheduler(event_loop=asyncio.get_running_loop())
     _scheduler.start()
     yield _scheduler
@@ -201,7 +201,7 @@ def shutdown_event() -> asyncio.Event:
 @pytest.fixture
 async def task_manager(
     shutdown_event: asyncio.Event,
-) -> AsyncGenerator[TaskManager, None]:
+) -> AsyncGenerator[TaskManager]:
     t = TaskManager(shutdown_event=shutdown_event)
     yield t
     t.cancel_all()
@@ -229,7 +229,7 @@ async def keymanager(
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
-) -> AsyncGenerator[Keymanager, None]:
+) -> AsyncGenerator[Keymanager]:
     async with Keymanager(
         db=empty_db,
         beacon_chain=beacon_chain,
@@ -253,7 +253,7 @@ async def signature_provider(
     remote_signer_url: str,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
-) -> AsyncGenerator[SignatureProvider, None]:
+) -> AsyncGenerator[SignatureProvider]:
     if enable_keymanager_api:
         # import the default fixture validators into the Keymanager provider
         await keymanager.import_remote_keys(
@@ -301,7 +301,7 @@ async def multi_beacon_node(
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     beacon_chain: BeaconChain,
-) -> AsyncGenerator[MultiBeaconNode, None]:
+) -> AsyncGenerator[MultiBeaconNode]:
     async with MultiBeaconNode(
         beacon_node_urls=cli_args.beacon_node_urls,
         beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
@@ -331,7 +331,7 @@ def beacon_chain(
 
 
 @pytest.fixture
-def _unregister_prometheus_metrics() -> Generator[None, None, None]:
+def _unregister_prometheus_metrics() -> Generator[None]:
     """
     Clears the prometheus registry metrics after a test is done running.
     """
