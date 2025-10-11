@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import logging
 import signal
 import sys
 from pathlib import Path
@@ -12,6 +13,11 @@ from shutdown import shutdown_handler
 
 
 async def main(vero: Vero) -> None:
+    # TODO change to warning?
+    if sys._is_gil_enabled():  # noqa: SLF001
+        logging.getLogger("vero-init").critical("GIL ENABLED :-(")
+        raise RuntimeError("GIL enabled")
+
     loop = asyncio.get_running_loop()
     signals = (signal.SIGINT, signal.SIGTERM)
     for s in signals:

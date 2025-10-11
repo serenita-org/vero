@@ -2,7 +2,7 @@
 
 !!! info "Prerequisites"
 
-    Make sure you're using Python 3.14.
+    Make sure you're using the free-threading build of Python 3.14.
 
 Install Vero's dependencies with your preferred package manager:
 
