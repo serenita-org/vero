@@ -1,12 +1,15 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec.json
 import pytest
-from aiohttp.test_utils import TestClient
-from aiohttp.web_app import Application
 
 from schemas import SchemaKeymanagerAPI
-from schemas.validator import ValidatorIndexPubkey
+
+if TYPE_CHECKING:
+    from aiohttp.test_utils import TestClient
+    from aiohttp.web_app import Application
+
+    from schemas.validator import ValidatorIndexPubkey
 
 
 @pytest.mark.parametrize(

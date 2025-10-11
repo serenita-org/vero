@@ -1,11 +1,13 @@
 import logging
 import sqlite3
-from collections.abc import Generator
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Self
 from types import TracebackType
-from typing import Any, Self
 
 from providers.db.migrations import MIGRATIONS, DbMigration
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class DB:

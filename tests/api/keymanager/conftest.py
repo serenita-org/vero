@@ -1,13 +1,17 @@
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from aiohttp.test_utils import TestClient
-from aiohttp.web_app import Application
 
 from api.keymanager.api import _create_app
-from args import CLIArgs
-from providers import Keymanager
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from aiohttp.test_utils import TestClient
+    from aiohttp.web_app import Application
+
+    from args import CLIArgs
+    from providers import Keymanager
 
 
 @pytest.fixture

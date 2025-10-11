@@ -3,8 +3,7 @@ import contextlib
 import datetime
 import time
 from collections import defaultdict
-from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 from uuid import uuid4
 
 import msgspec
@@ -26,6 +25,9 @@ from spec.common import (
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 _VC_PUBLISHED_ATTESTATIONS = CounterMetric(
     "vc_published_attestations",

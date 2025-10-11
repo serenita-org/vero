@@ -3,9 +3,7 @@
 import asyncio
 import functools
 import logging
-from concurrent.futures import ProcessPoolExecutor
-from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
 
 import aiohttp
@@ -17,6 +15,10 @@ from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaRemoteSigner
 
 from .signature_provider import SignatureProvider
+
+if TYPE_CHECKING:
+    from concurrent.futures import ProcessPoolExecutor
+    from types import TracebackType
 
 _SIGNED_MESSAGES = Counter(
     "signed_messages",

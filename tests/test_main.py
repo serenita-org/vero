@@ -5,13 +5,17 @@ import os
 import pstats
 import signal
 import time
-from _lsprof import profiler_entry
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
-from args import CLIArgs
 from main import main
+
+if TYPE_CHECKING:
+    from _lsprof import profiler_entry
+    from collections.abc import Generator
+
+    from args import CLIArgs
 
 
 @pytest.fixture

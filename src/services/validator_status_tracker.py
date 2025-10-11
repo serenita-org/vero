@@ -1,11 +1,10 @@
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Gauge
 
 from observability import ERRORS_METRIC, ErrorType
-from providers import BeaconChain, MultiBeaconNode, SignatureProvider
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
@@ -14,7 +13,12 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from providers import BeaconChain, MultiBeaconNode, SignatureProvider
+    from tasks import TaskManager
 
 _VALIDATORS_COUNT = Gauge(
     "validator_status",

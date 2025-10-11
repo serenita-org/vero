@@ -3,12 +3,9 @@ import contextlib
 import logging
 import sys
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor
 from sqlite3 import IntegrityError
-from types import TracebackType
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
-from args import CLIArgs
 from schemas import SchemaRemoteSigner
 from schemas.keymanager_api import (
     DeleteStatus,
@@ -27,11 +24,18 @@ from schemas.keymanager_api import (
 )
 from spec.utils import decode_graffiti
 
-from .beacon_chain import BeaconChain
-from .db.db import DB
-from .multi_beacon_node import MultiBeaconNode
 from .remote_signer import RemoteSigner
 from .signature_provider import SignatureProvider
+
+if TYPE_CHECKING:
+    from concurrent.futures import ProcessPoolExecutor
+    from types import TracebackType
+
+    from args import CLIArgs
+
+    from .beacon_chain import BeaconChain
+    from .db.db import DB
+    from .multi_beacon_node import MultiBeaconNode
 
 
 class PubkeyNotFound(Exception):

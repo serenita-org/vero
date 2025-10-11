@@ -1,11 +1,14 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec.json
-from aiohttp.test_utils import TestClient
-from aiohttp.web_app import Application
 
-from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
+
+if TYPE_CHECKING:
+    from aiohttp.test_utils import TestClient
+    from aiohttp.web_app import Application
+
+    from providers import Keymanager
 
 
 async def test_fee_recipient_lifecycle(

@@ -1,27 +1,30 @@
 import os
 import random
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec
 import pytest
 from aiohttp.hdrs import CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist, Bitvector
-from yarl import URL
 
-from providers import BeaconChain
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
-from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import Genesis, SpecFulu
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
+
+if TYPE_CHECKING:
+    from yarl import URL
+
+    from providers import BeaconChain
+    from schemas.validator import ValidatorIndexPubkey
+    from spec.base import Genesis, SpecFulu
 
 
 @pytest.fixture(scope="session")

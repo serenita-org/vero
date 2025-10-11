@@ -1,9 +1,12 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from providers import DB
 from providers.db.migrations import MIGRATIONS
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_db_run_migrations_empty_db(tmp_path: Path) -> None:

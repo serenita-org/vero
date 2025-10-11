@@ -37,24 +37,28 @@ import asyncio
 import logging
 import time
 from collections import Counter
-from collections.abc import AsyncIterator
-from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
-from remerkleable.complex import Container
 
-from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
 
 from .beacon_node import BeaconNode
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from types import TracebackType
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from remerkleable.complex import Container
+
+    from args import CLIArgs
+    from spec.base import SpecFulu
+    from tasks import TaskManager
 
 
 class MultiBeaconNode:

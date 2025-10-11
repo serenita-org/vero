@@ -1,8 +1,7 @@
 import asyncio
 import time
 from collections import defaultdict
-from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -20,6 +19,9 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec.utils import encode_graffiti
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 _VC_PUBLISHED_BLOCKS = Counter(
     "vc_published_blocks",

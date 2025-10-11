@@ -6,16 +6,13 @@ import datetime
 import json
 import logging
 import warnings
-from collections.abc import AsyncIterable
-from typing import Literal, Unpack
+from typing import TYPE_CHECKING, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
 import msgspec
 from aiohttp import ClientTimeout
-from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from prometheus_client import Counter as CounterMetric
@@ -34,7 +31,14 @@ from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
 from spec.base import Genesis, SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable
+
+    from aiohttp.client import _RequestOptions
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from tasks import TaskManager
 
 _TIMEOUT_DEFAULT_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10

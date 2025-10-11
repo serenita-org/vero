@@ -3,10 +3,9 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from providers import BeaconChain, BeaconNode
-from schemas import SchemaBeaconAPI
-
 if TYPE_CHECKING:
+    from providers import BeaconChain, BeaconNode
+    from schemas import SchemaBeaconAPI
     from services import ValidatorStatusTrackerService
 
 

@@ -3,7 +3,6 @@ import logging
 import random
 import time
 from asyncio import AbstractEventLoop
-from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from unittest import mock
@@ -42,6 +41,10 @@ from tests.mock_api.beacon_node import (
 )
 from tests.mock_api.remote_signer import *
 from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
 
 
 @pytest.fixture(scope="session")
