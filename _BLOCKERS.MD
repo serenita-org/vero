@@ -10,3 +10,12 @@
     - accesses __annotations__ of classes internally
     - works as is, as long as we don't change the annotations (move them under TYPE_CHECKING)
     - => exception added to ruff
+
+- Free-threading
+  - aiohttp > 3.13.0 ✅
+  - msgspec
+    - not supported yet, someone ( kumaraditya303 ) is working on it
+      - see https://github.com/kumaraditya303/msgspec/tree/thread-safe
+    - https://github.com/jcrist/msgspec/issues/744
+  - tip: when checking if no-GIL works, remove the uv .venv, then change the Python version to 3.14t
+    in .python-version and then run uv sync. That currently fails to build msgspec.
