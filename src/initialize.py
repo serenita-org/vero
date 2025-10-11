@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 import logging
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.thread import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -151,13 +151,13 @@ async def run_services(
             genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
         )
 
-        process_pool_executor = ProcessPoolExecutor()
+        thread_pool_executor = ThreadPoolExecutor()
         keymanager = Keymanager(
             db=db,
             beacon_chain=beacon_chain,
             multi_beacon_node=multi_beacon_node,
             cli_args=cli_args,
-            process_pool_executor=process_pool_executor,
+            thread_pool_executor=thread_pool_executor,
         )
         signature_provider: Keymanager | RemoteSigner
         if cli_args.enable_keymanager_api:
@@ -170,7 +170,7 @@ async def run_services(
             signature_provider = await exit_stack.enter_async_context(
                 RemoteSigner(
                     url=cli_args.remote_signer_url,
-                    process_pool_executor=process_pool_executor,
+                    thread_pool_executor=thread_pool_executor,
                 )
             )
 

@@ -481,7 +481,6 @@ def test_parse_cli_args_full_set() -> None:
         "--keymanager-api-port=3333",
         "--metrics-address=1.2.3.4",
         "--metrics-port=4321",
-        "--metrics-multiprocess-mode",
         "--log-level=DEBUG",
         "----DANGER----disable-slashing-detection",
     ]
@@ -505,7 +504,6 @@ def test_parse_cli_args_full_set() -> None:
         "keymanager_api_port": 3333,
         "metrics_address": "1.2.3.4",
         "metrics_port": 4321,
-        "metrics_multiprocess_mode": True,
         "log_level": logging.DEBUG,
         "disable_slashing_detection": True,
     }
@@ -564,7 +562,6 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         keymanager_api_port=8001,
         metrics_address="localhost",
         metrics_port=8000,
-        metrics_multiprocess_mode=False,
         log_level=logging.INFO,
         disable_slashing_detection=False,
     )

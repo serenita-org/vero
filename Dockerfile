@@ -28,10 +28,6 @@ RUN groupadd -g 1000 vero && \
     chown -R vero:vero /vero
 COPY --from=build --chown=vero:vero /vero/.venv /vero/.venv
 
-# Create directory for prometheus in multiprocess mode
-RUN mkdir /tmp/multiprocessing && chown -R vero:vero /tmp/multiprocessing
-ENV PROMETHEUS_MULTIPROC_DIR=/tmp/multiprocessing
-
 COPY --chown=vero:vero src .
 
 EXPOSE 8000 8001
