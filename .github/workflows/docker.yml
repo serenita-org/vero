@@ -18,6 +18,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # The permissions below are needed
+      # only for generating attestations
       id-token: write
       attestations: write
 
@@ -68,4 +70,18 @@ jobs:
       with:
         subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         subject-digest: ${{ steps.build_and_push.outputs.digest }}
+        push-to-registry: true
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        output-file: 'sbom.json'
+
+    - name: Generate SBOM attestation
+      uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3.0.0
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        subject-digest: ${{ steps.build_and_push.outputs.digest }}
+        sbom-path: 'sbom.json'
         push-to-registry: true
