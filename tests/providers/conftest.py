@@ -1,15 +1,20 @@
 import re
-from collections.abc import AsyncGenerator
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from args import CLIArgs
 from providers import MultiBeaconNode
-from spec.base import SpecFulu
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from args import CLIArgs
+    from spec.base import SpecFulu
+    from tasks import TaskManager
 
 
 @pytest.fixture

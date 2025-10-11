@@ -1,12 +1,14 @@
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import milagro_bls_binding as bls
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from yarl import URL
 
-from schemas.validator import ValidatorIndexPubkey
+if TYPE_CHECKING:
+    from yarl import URL
+
+    from schemas.validator import ValidatorIndexPubkey
 
 
 @pytest.fixture(scope="session")

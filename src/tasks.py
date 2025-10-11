@@ -1,10 +1,12 @@
 import asyncio
 import logging
-from collections.abc import Coroutine
 from functools import partial
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from observability import ERRORS_METRIC, ErrorType
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 
 class TaskManager:

@@ -1,4 +1,4 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ._logging import setup_logging
 from ._metrics import setup_metrics
@@ -6,6 +6,9 @@ from ._metrics_shared import ERRORS_METRIC, ErrorType
 from ._profiling import setup_profiling
 from ._tracing import setup_tracing
 from ._vero_info import get_service_commit, get_service_name, get_service_version
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def init_observability(

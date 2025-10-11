@@ -1,8 +1,11 @@
 import os
 import tracemalloc
+from typing import TYPE_CHECKING
 
-from providers import Keymanager
 from schemas.keymanager_api import RemoteKey
+
+if TYPE_CHECKING:
+    from providers import Keymanager
 
 
 async def test_keymanager_memory_usage(

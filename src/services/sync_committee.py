@@ -2,8 +2,7 @@ import asyncio
 import contextlib
 import datetime
 from collections import defaultdict
-from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
@@ -22,6 +21,9 @@ from spec.constants import (
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
 from spec.sync_committee import SpecSyncCommittee
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES = Counter(
     "vc_published_sync_committee_messages",

@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import signal
+from typing import TYPE_CHECKING
 
 from services import BlockProposalService, ValidatorDutyService
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from tasks import TaskManager
 
 _logger = logging.getLogger("vero-shutdown")
 

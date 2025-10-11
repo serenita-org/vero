@@ -2,17 +2,21 @@ import asyncio
 import logging
 import math
 from collections import deque
-from collections.abc import Callable, Coroutine, Hashable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter, Histogram
 
 from observability import ERRORS_METRIC, ErrorType
 from providers import BeaconChain, BeaconNode
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Hashable
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from tasks import TaskManager
 
 
 def _setup_head_event_time_metric(

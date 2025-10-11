@@ -1,10 +1,12 @@
 import logging
 import sqlite3
-from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from providers.db.migrations import MIGRATIONS, DbMigration
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 
 class DB:

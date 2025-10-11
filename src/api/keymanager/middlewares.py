@@ -1,11 +1,14 @@
 import logging
-from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING
 
 import msgspec
 from aiohttp import hdrs, web
 
 from providers.keymanager import PubkeyNotFound
 from schemas.keymanager_api import ErrorResponse
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 
 @web.middleware

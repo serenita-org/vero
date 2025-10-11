@@ -10,21 +10,25 @@ import os
 import re
 from copy import deepcopy
 from functools import partial
+from typing import TYPE_CHECKING
 
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from providers import BeaconChain, MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
-from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from spec.base import SpecFulu
+    from tasks import TaskManager
 
 
 @pytest.mark.parametrize(

@@ -8,12 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec._ascii import FULU as FULU_ASCII_ART
-from spec.base import Genesis, SpecFulu, Version
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
+
+    from spec.base import Genesis, SpecFulu, Version
+    from tasks import TaskManager
 
 
 class BeaconChain:

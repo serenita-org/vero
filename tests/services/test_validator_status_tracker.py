@@ -1,12 +1,16 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
 from schemas import SchemaBeaconAPI
-from services import (
-    AttestationService,
-    BlockProposalService,
-    ValidatorStatusTrackerService,
-)
 from services.validator_status_tracker import _SLASHING_DETECTED
+
+if TYPE_CHECKING:
+    from services import (
+        AttestationService,
+        BlockProposalService,
+        ValidatorStatusTrackerService,
+    )
 
 
 @pytest.fixture

@@ -1,14 +1,7 @@
-import pytest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from typing import TYPE_CHECKING
 
-from args import CLIArgs
-from providers import (
-    BeaconChain,
-    DutyCache,
-    Keymanager,
-    MultiBeaconNode,
-    SignatureProvider,
-)
+import pytest
+
 from services import (
     AttestationService,
     BlockProposalService,
@@ -16,7 +9,19 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from args import CLIArgs
+    from providers import (
+        BeaconChain,
+        DutyCache,
+        Keymanager,
+        MultiBeaconNode,
+        SignatureProvider,
+    )
+    from tasks import TaskManager
 
 
 @pytest.fixture

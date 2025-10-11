@@ -1,28 +1,30 @@
 import asyncio
 import logging
 from enum import Enum
-from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
 import msgspec
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from prometheus_client import Histogram
 
-from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
-from providers import (
-    BeaconChain,
-    DutyCache,
-    Keymanager,
-    MultiBeaconNode,
-    SignatureProvider,
-)
-from schemas import SchemaBeaconAPI
-from tasks import TaskManager
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from args import CLIArgs
+    from providers import (
+        BeaconChain,
+        DutyCache,
+        Keymanager,
+        MultiBeaconNode,
+        SignatureProvider,
+    )
+    from schemas import SchemaBeaconAPI
     from services import ValidatorStatusTrackerService
+    from tasks import TaskManager
 
 
 class ValidatorDuty(Enum):

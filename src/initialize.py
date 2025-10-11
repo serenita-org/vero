@@ -4,10 +4,8 @@ import logging
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-from args import CLIArgs
 from observability.event_loop import monitor_event_loop
 from providers import (
     DB,
@@ -29,9 +27,14 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu
 from spec.configs import get_network_spec
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from args import CLIArgs
+    from spec.base import SpecFulu
+    from tasks import TaskManager
 
 _logger = logging.getLogger("vero-init")
 

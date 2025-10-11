@@ -1,15 +1,19 @@
 import contextlib
 import re
 from copy import copy
+from typing import TYPE_CHECKING
 
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from providers import BeaconNode
 from spec.base import SpecFulu, Version
 from spec.common import UInt64SerializedAsString
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from tasks import TaskManager
 
 
 @pytest.mark.parametrize(

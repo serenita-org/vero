@@ -1,18 +1,22 @@
 import asyncio
 import re
 import time
-from collections.abc import Callable, Coroutine
 from contextlib import nullcontext
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec.json
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from tasks import TaskManager
 
 
 @pytest.fixture

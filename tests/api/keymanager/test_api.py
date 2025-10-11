@@ -1,14 +1,18 @@
-from collections.abc import Awaitable, Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec
-from aiohttp.test_utils import TestClient
-from aiohttp.web_app import Application
 
 from api.keymanager.api import _create_app
-from args import CLIArgs
-from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from aiohttp.test_utils import TestClient
+    from aiohttp.web_app import Application
+
+    from args import CLIArgs
+    from providers import Keymanager
 
 
 async def test_bearer_auth(

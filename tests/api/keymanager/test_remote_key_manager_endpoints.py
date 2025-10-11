@@ -1,11 +1,13 @@
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec.json
-from aiohttp.test_utils import TestClient
-from aiohttp.web_app import Application
 
 from schemas import SchemaKeymanagerAPI
+
+if TYPE_CHECKING:
+    from aiohttp.test_utils import TestClient
+    from aiohttp.web_app import Application
 
 
 async def test_remote_keymanager_lifecycle(

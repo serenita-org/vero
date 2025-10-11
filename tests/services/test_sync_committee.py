@@ -1,15 +1,18 @@
 import os
+from typing import TYPE_CHECKING
 
 import pytest
 
-from providers import BeaconChain
 from schemas import SchemaBeaconAPI
-from schemas.validator import ValidatorIndexPubkey
 from services import SyncCommitteeService
 from services.sync_committee import (
     _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS,
     _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES,
 )
+
+if TYPE_CHECKING:
+    from providers import BeaconChain
+    from schemas.validator import ValidatorIndexPubkey
 
 
 @pytest.mark.parametrize(

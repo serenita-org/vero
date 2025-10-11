@@ -1,11 +1,16 @@
+from typing import TYPE_CHECKING
+
 import pytest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from providers import BeaconChain, BeaconNode, MultiBeaconNode
 from schemas import SchemaBeaconAPI
 from services import EventConsumerService
-from spec.base import SpecFulu
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+    from spec.base import SpecFulu
+    from tasks import TaskManager
 
 
 @pytest.fixture

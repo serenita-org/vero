@@ -1,8 +1,11 @@
 import logging
 from logging.handlers import QueueHandler, QueueListener
-from pathlib import Path
 from queue import Queue
 from types import TracebackType
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None]
