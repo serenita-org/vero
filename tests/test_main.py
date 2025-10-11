@@ -15,7 +15,7 @@ from main import main
 
 
 @pytest.fixture
-def _profile_program_run() -> Generator[None, None, None]:
+def _profile_program_run() -> Generator[None]:
     # CI environments report artificially high CPU usage due to virtualization
     # -> skipping the check of CPU usage there
     if os.getenv("CI") == "true":

@@ -20,7 +20,7 @@ async def multi_beacon_node_three_inited_nodes(
     scheduler: AsyncIOScheduler,
     task_manager: TaskManager,
     cli_args: CLIArgs,
-) -> AsyncGenerator[MultiBeaconNode, None]:
+) -> AsyncGenerator[MultiBeaconNode]:
     _cli_args_override = deepcopy(cli_args)
     _cli_args_override.attestation_consensus_threshold = 2
     mbn = MultiBeaconNode(

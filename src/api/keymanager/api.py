@@ -35,7 +35,7 @@ def _get_bearer_token_value(cli_args: CLIArgs) -> str:
     return bearer_token_value
 
 
-def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
+def _create_app(keymanager: Keymanager, cli_args: CLIArgs) -> web.Application:
     app = web.Application(middlewares=[exception_handler, bearer_authentication])
 
     app["bearer_token"] = _get_bearer_token_value(cli_args=cli_args)
@@ -50,7 +50,7 @@ def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
     return app
 
 
-async def start_server(keymanager: "Keymanager", cli_args: CLIArgs) -> None:
+async def start_server(keymanager: Keymanager, cli_args: CLIArgs) -> None:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     logger = logging.getLogger("api.keymanager.api")
     try:

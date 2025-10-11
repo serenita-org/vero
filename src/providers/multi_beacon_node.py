@@ -265,7 +265,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
+    ) -> SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock:
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -621,7 +621,7 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
+    ) -> SpecAttestation.AttestationElectra:
         aggregates: list[
             SpecAttestation.AttestationElectra
         ] = await self._get_all_beacon_node_responses(
@@ -653,7 +653,7 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_indices: set[int],
-    ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
+    ) -> AsyncIterator[SpecAttestation.AttestationElectra]:
         tasks = [
             self.get_aggregate_attestation_v2(
                 attestation_data_root=attestation_data_root,
@@ -711,7 +711,7 @@ class MultiBeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SpecSyncCommittee.Contribution:
         contributions: list[
             SpecSyncCommittee.Contribution
         ] = await self._get_all_beacon_node_responses(

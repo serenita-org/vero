@@ -39,7 +39,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     signature_provider: SignatureProvider
     keymanager: Keymanager
     duty_cache: DutyCache
-    validator_status_tracker_service: "ValidatorStatusTrackerService"
+    validator_status_tracker_service: ValidatorStatusTrackerService
     scheduler: AsyncIOScheduler
     task_manager: TaskManager
     cli_args: CLIArgs
