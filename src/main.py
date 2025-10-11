@@ -20,6 +20,11 @@ from shutdown import shutdown_handler
 
 
 async def main(cli_args: CLIArgs, shutdown_event: asyncio.Event) -> None:
+    # TODO change to warning?
+    if sys._is_gil_enabled():  # noqa: SLF001
+        logging.getLogger("vero-init").critical("GIL ENABLED :-(")
+        raise RuntimeError("GIL enabled")
+
     logging.getLogger("vero-init").info(
         f"Starting vero {get_service_version()} (commit {get_service_commit()})",
     )
