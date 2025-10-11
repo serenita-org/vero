@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 def init_observability(
     metrics_address: str,
     metrics_port: int,
-    metrics_multiprocess_mode: bool,
     log_level: int,
     data_dir: Path,
 ) -> None:
@@ -25,7 +24,6 @@ def init_observability(
     setup_metrics(
         addr=metrics_address,
         port=metrics_port,
-        multiprocess_mode=metrics_multiprocess_mode,
     )
     setup_tracing()
     setup_profiling()

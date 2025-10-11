@@ -2,8 +2,7 @@ import asyncio
 import logging
 import random
 import time
-from asyncio import AbstractEventLoop
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -88,7 +87,6 @@ def cli_args(
         keymanager_api_port=8001,
         metrics_address="localhost",
         metrics_port=8000,
-        metrics_multiprocess_mode=False,
         log_level=logging.INFO,
         disable_slashing_detection=False,
     )
@@ -99,7 +97,6 @@ def _init_observability() -> None:
     init_observability(
         metrics_address="localhost",
         metrics_port=8080,
-        metrics_multiprocess_mode=False,
         log_level=logging.DEBUG,
         data_dir=Path("/tmp"),
     )
@@ -218,8 +215,8 @@ def empty_db(tmp_path: Path) -> Generator[DB, None]:
 
 
 @pytest.fixture(scope="session")
-def process_pool_executor() -> ProcessPoolExecutor:
-    return ProcessPoolExecutor()
+def thread_pool_executor() -> ThreadPoolExecutor:
+    return ThreadPoolExecutor()
 
 
 @pytest.fixture
@@ -229,7 +226,7 @@ async def keymanager(
     cli_args: CLIArgs,
     multi_beacon_node: MultiBeaconNode,
     remote_signer_url: str,
-    process_pool_executor: ProcessPoolExecutor,
+    thread_pool_executor: ThreadPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[Keymanager]:
@@ -238,7 +235,7 @@ async def keymanager(
         beacon_chain=beacon_chain,
         multi_beacon_node=multi_beacon_node,
         cli_args=cli_args,
-        process_pool_executor=process_pool_executor,
+        thread_pool_executor=thread_pool_executor,
     ) as keymanager:
         yield keymanager
 
@@ -254,7 +251,7 @@ async def signature_provider(
     cli_args: CLIArgs,
     keymanager: Keymanager,
     remote_signer_url: str,
-    process_pool_executor: ProcessPoolExecutor,
+    thread_pool_executor: ThreadPoolExecutor,
     validators: list[ValidatorIndexPubkey],
 ) -> AsyncGenerator[SignatureProvider]:
     if enable_keymanager_api:
@@ -272,7 +269,7 @@ async def signature_provider(
                 "remote_signer_url is None despite disabled Keymanager API"
             )
         async with RemoteSigner(
-            url=cli_args.remote_signer_url, process_pool_executor=process_pool_executor
+            url=cli_args.remote_signer_url, thread_pool_executor=thread_pool_executor
         ) as remote_signer:
             yield remote_signer
 

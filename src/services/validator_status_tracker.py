@@ -24,12 +24,10 @@ _VALIDATORS_COUNT = Gauge(
     "validator_status",
     "Amount of validators per status",
     labelnames=["status"],
-    multiprocess_mode="max",
 )
 _SLASHING_DETECTED = Gauge(
     "slashing_detected",
     "1 if any of the connected validators have been slashed, 0 otherwise",
-    multiprocess_mode="max",
 )
 _SLASHING_DETECTED.set(0)
 

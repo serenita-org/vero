@@ -19,7 +19,6 @@ _VERO_INFO = Gauge(
     "vero_info",
     "Information about the Vero build.",
     labelnames=["commit", "version"],
-    multiprocess_mode="max",
 )
 _VERO_INFO.labels(
     commit=get_service_commit(),

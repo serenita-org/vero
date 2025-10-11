@@ -28,7 +28,7 @@ from .remote_signer import RemoteSigner
 from .signature_provider import SignatureProvider
 
 if TYPE_CHECKING:
-    from concurrent.futures import ProcessPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor
     from types import TracebackType
 
     from args import CLIArgs
@@ -50,7 +50,7 @@ class Keymanager(SignatureProvider):
         beacon_chain: BeaconChain,
         multi_beacon_node: MultiBeaconNode,
         cli_args: CLIArgs,
-        process_pool_executor: ProcessPoolExecutor,
+        thread_pool_executor: ThreadPoolExecutor,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -65,7 +65,7 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
         self.pubkey_to_graffiti_override: dict[str, str] = {}
 
-        self.process_pool_executor = process_pool_executor
+        self.thread_pool_executor = thread_pool_executor
 
         # Create an AsyncExitStack for dynamically managed signers
         self._exit_stack = contextlib.AsyncExitStack()
@@ -139,7 +139,7 @@ class Keymanager(SignatureProvider):
 
             # If we still don't have a signer, create a new one
             signer = await self._exit_stack.enter_async_context(
-                RemoteSigner(url, process_pool_executor=self.process_pool_executor)
+                RemoteSigner(url, thread_pool_executor=self.thread_pool_executor)
             )
             signers_by_url[url] = signer
             new_mapping[pubkey] = signer

@@ -37,7 +37,6 @@ def setup_logging(
     """
     logging.logProcesses = False
     logging.logThreads = False
-    logging.logMultiprocessing = False
     if hasattr(logging, "logAsyncioTasks"):
         logging.logAsyncioTasks = False
 

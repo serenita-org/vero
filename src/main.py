@@ -68,7 +68,6 @@ if __name__ == "__main__":
     init_observability(
         metrics_address=cli_args.metrics_address,
         metrics_port=cli_args.metrics_port,
-        metrics_multiprocess_mode=cli_args.metrics_multiprocess_mode,
         log_level=cli_args.log_level,
         data_dir=Path(cli_args.data_dir),
     )
