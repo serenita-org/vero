@@ -8,6 +8,8 @@ https://ethereum.github.io/beacon-APIs/
 https://docs.nodereal.io/reference/eventstream
 """
 
+from __future__ import annotations
+
 from collections.abc import Hashable
 from enum import Enum
 from typing import Any, Protocol, Self
