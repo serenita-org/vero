@@ -5,6 +5,8 @@
 #### Features
 - Wait for beacon nodes to become available while starting up
 - Optimize finality checkpoint confirmation for low validator counts
+- Improve block proposal fee recipient handling
+- Generate build provenance and SBOM attestations for Vero container images
 
 #### Bugfixes
 - Sync duties not being performed for exited validators
