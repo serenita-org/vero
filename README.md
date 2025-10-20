@@ -27,6 +27,9 @@ A selection of talks, articles, and community resources for learning more about 
   - [EthCC 2025: Improving client diversity with Vero](https://www.youtube.com/watch?v=eKE9-XpTuBo)
   - [Lido Node Operator Community Call #22: Improving Client Diversity with Vero](https://youtu.be/JswJdjUCNgs?list=PLhvXP1-8VKZQnuhrHrBBe5asNIoBSJkDv&t=2525)
   - [EthStaker's Community Call #56: Vero](https://www.youtube.com/watch?v=h2GlNXka6og)
+- Questions
+  - [Telegram](https://t.me/+2Sr84lqsuOU0NjQ0)
+  - Discord (invite-only)
 - Workshops
   - [Dappcon 2025: Protecting Validators From Client Bugs Using Vero](https://www.youtube.com/watch?v=afxfNc6Gf7Y)
 

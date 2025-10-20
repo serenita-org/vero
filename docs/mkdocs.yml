@@ -4,6 +4,7 @@ nav:
     - introduction/why_vero.md
     - introduction/risks.md
     - introduction/faqs.md
+    - introduction/more_resources.md
   - Quick Start:
     - quick-start/architecture.md
     - quick-start/setting_up_ethereum_clients.md
@@ -32,6 +33,7 @@ theme:
   name: material
   favicon: assets/icon_512x512.png
   logo: assets/symbol_white_transparent.svg
+  custom_dir: overrides
   font:
     text: Inter
   palette:
