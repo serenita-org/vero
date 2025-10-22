@@ -207,7 +207,7 @@ class AttestationService(ValidatorDutyService):
                     timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
                     - time.time(),
                 )
-                return
+            return
 
         self.logger.debug(
             f"Attesting for {slot=}, {head_event=}, {len(slot_attester_duties)} duties",
