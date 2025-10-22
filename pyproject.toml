@@ -62,3 +62,6 @@ required-version = "~=0.9.2"
 
 [tool.uv.pip]
 generate-hashes = true
+
+[tool.uv.sources]
+msgspec = { git = "https://github.com/jcrist/msgspec", rev = "7acceff82601a18f0bd5284da27eaf8279f753c8" }

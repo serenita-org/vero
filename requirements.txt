@@ -141,8 +141,7 @@ importlib-metadata==8.7.0 \
     --hash=sha256:d13b81ad223b890aa16c5471f2ac3056cf76c5f10f82d6f9292f0b415f389000 \
     --hash=sha256:e5dd1551894c77868a30651cef00984d50e1002d06942a7101d34870c5f02afd
     # via opentelemetry-api
-msgspec==0.19.0 \
-    --hash=sha256:604037e7cd475345848116e89c553aa9a233259733ab51986ac924ab1b976f8e
+msgspec @ git+https://github.com/jcrist/msgspec@7acceff82601a18f0bd5284da27eaf8279f753c8
     # via vero
 multidict==6.7.0 \
     --hash=sha256:05047ada7a2fde2631a0ed706f1fd68b169a681dfe5e4cf0f8e4cb6618bbc2cd \

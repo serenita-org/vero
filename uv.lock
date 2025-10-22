@@ -532,9 +532,8 @@ wheels = [
 
 [[package]]
 name = "msgspec"
-version = "0.19.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/cf/9b/95d8ce458462b8b71b8a70fa94563b2498b89933689f3a7b8911edfae3d7/msgspec-0.19.0.tar.gz", hash = "sha256:604037e7cd475345848116e89c553aa9a233259733ab51986ac924ab1b976f8e", size = 216934, upload-time = "2024-12-27T17:40:28.597Z" }
+version = "0.19.0+9.g7acceff"
+source = { git = "https://github.com/jcrist/msgspec?rev=7acceff82601a18f0bd5284da27eaf8279f753c8#7acceff82601a18f0bd5284da27eaf8279f753c8" }
 
 [[package]]
 name = "multidict"
@@ -1064,7 +1063,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.13" },
     { name = "apscheduler", specifier = ">=3.11.0" },
-    { name = "msgspec", specifier = ">=0.19.0" },
+    { name = "msgspec", git = "https://github.com/jcrist/msgspec?rev=7acceff82601a18f0bd5284da27eaf8279f753c8" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.31.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.31.0" },
     { name = "prometheus-client", specifier = ">=0.21.1" },
