@@ -208,10 +208,10 @@ async def task_manager(
 
 
 @pytest.fixture
-def empty_db(tmp_path: Path) -> DB:
-    db = DB(data_dir=str(tmp_path))
-    db.run_migrations()
-    return db
+def empty_db(tmp_path: Path) -> Generator[DB, None]:
+    with DB(data_dir=str(tmp_path)) as db:
+        db.run_migrations()
+        yield db
 
 
 @pytest.fixture(scope="session")
