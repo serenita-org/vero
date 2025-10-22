@@ -16,10 +16,7 @@ through its proactive
 
 ## Key Security
 
-Vero never has direct access to validator private keys.
-It can only request the remote signer to sign data
-using those keys, which the remote signer will refuse
-if the data to be signed would result in a slashable offense.
+Vero, by design, **never** has direct access to validator private keys.
 
 ## Bugs
 
