@@ -4,7 +4,8 @@ from ._logging import setup_logging
 from ._metrics import setup_metrics
 from ._metrics_shared import ERRORS_METRIC, ErrorType
 from ._profiling import setup_profiling
-from ._tracing import setup_tracing
+
+# from ._tracing import setup_tracing
 from ._vero_info import get_service_commit, get_service_name, get_service_version
 
 if TYPE_CHECKING:
@@ -25,7 +26,8 @@ def init_observability(
         addr=metrics_address,
         port=metrics_port,
     )
-    setup_tracing()
+    # TODO re-enable once grpc adds support for free-threading
+    #    setup_tracing()
     setup_profiling()
 
 

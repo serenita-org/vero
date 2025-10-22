@@ -15,8 +15,9 @@
   - aiohttp ✅ (3.13.0 release)
   - grpc
     - https://github.com/grpc/grpc/issues/38762
-    - blocked by protobuf downstream
+    - blocked by protobuf upstream
       - https://github.com/protocolbuffers/protobuf/issues/23158
+    - only needed for tracing at the moment
   - milagro_bls_binding ✅ (removed)
     - segmentation fault on free-threaded build :-(
     - -> removed it, it was not used in any kind of important way anyway
