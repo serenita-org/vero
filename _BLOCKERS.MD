@@ -12,8 +12,15 @@
     - => exception added to ruff
 
 - Free-threading
-  - aiohttp > 3.13.0 ✅
-  - msgspec
+  - aiohttp ✅ (3.13.0 release)
+  - grpc
+    - https://github.com/grpc/grpc/issues/38762
+    - blocked by protobuf downstream
+      - https://github.com/protocolbuffers/protobuf/issues/23158
+  - milagro_bls_binding ✅ (removed)
+    - segmentation fault on free-threaded build :-(
+    - -> removed it, it was not used in any kind of important way anyway
+  - msgspec 🟠 (using master branch for now)
     - not supported yet, someone ( kumaraditya303 ) is working on it
       - see https://github.com/kumaraditya303/msgspec/tree/thread-safe
     - https://github.com/jcrist/msgspec/issues/744
