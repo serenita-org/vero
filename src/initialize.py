@@ -124,10 +124,10 @@ async def run_services(
 ) -> None:
     spec = load_spec(cli_args=cli_args)
 
-    db = DB(data_dir=cli_args.data_dir)
-    db.run_migrations()
-
     async with contextlib.AsyncExitStack() as exit_stack:
+        db = exit_stack.enter_context(DB(data_dir=cli_args.data_dir))
+        db.run_migrations()
+
         multi_beacon_node = await exit_stack.enter_async_context(
             MultiBeaconNode(
                 beacon_node_urls=cli_args.beacon_node_urls,

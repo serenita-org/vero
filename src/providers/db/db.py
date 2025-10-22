@@ -2,7 +2,8 @@ import logging
 import sqlite3
 from collections.abc import Generator
 from pathlib import Path
-from typing import Any
+from types import TracebackType
+from typing import Any, Self
 
 from providers.db.migrations import MIGRATIONS, DbMigration
 
@@ -30,6 +31,17 @@ class DB:
                 # DB does not exist yet
                 return -1
             raise
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.connection.close()
 
     def run_migration_statements(self, migration: DbMigration) -> None:
         self.logger.info(f"Migrating to version {migration.version}")
