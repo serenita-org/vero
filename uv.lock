@@ -462,21 +462,6 @@ wheels = [
 ]
 
 [[package]]
-name = "milagro-bls-binding"
-version = "1.9.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/8d/62/50284a3ebf16c63de11afc33eac15facc8a384f3d9f95174b776886822ef/milagro_bls_binding-1.9.0.tar.gz", hash = "sha256:43fb41b335b2a40ee21f2698c6ae27ed83921f5f6109443705f793c77d4b6d6e", size = 7026, upload-time = "2022-05-14T00:16:24.965Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/8f/00be421467be0c346c6d56b455511722c2f164cd2242f0bbfbf99e9269d2/milagro_bls_binding-1.9.0-cp37-abi3-macosx_10_7_x86_64.whl", hash = "sha256:b2362f0d14318a3f44a3d1e186e2069eb25859cc4b9cae3e473505a28954803e", size = 445302, upload-time = "2022-05-14T00:16:11.918Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/25/c5eb45d2e1e4f230b2d5e66301b67d108166601fba741011b50f84d200be/milagro_bls_binding-1.9.0-cp37-abi3-macosx_10_9_x86_64.macosx_11_0_arm64.macosx_10_9_universal2.whl", hash = "sha256:8800b9a8c61c20d1fdb5593b8e1940cbf6e521b454cc6f764fc22f026337651f", size = 818945, upload-time = "2022-05-14T00:16:14.071Z" },
-    { url = "https://files.pythonhosted.org/packages/df/f5/9bb967028fe6b9e83bd814504ded0eabb11fc49eb1ea7b26942922e5cf4f/milagro_bls_binding-1.9.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2c47c5e45b30d0df02b65c2da4f9e10a49cc1a773f47796294663fc564ca56ee", size = 1160022, upload-time = "2022-05-14T00:16:15.997Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/d3/7c459c5276d893ad542c4c8ee4f23c1e04e3b12622dd00c4a344a8d3d45a/milagro_bls_binding-1.9.0-cp37-abi3-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:a28cbae598a01f76c5204a29b2d060c9aee8c66898e37c37b708aecc16d1b482", size = 1217504, upload-time = "2022-05-14T00:16:17.907Z" },
-    { url = "https://files.pythonhosted.org/packages/60/7a/42b86c783bffc7fe36bf5c415d37f3a93c09a03230869449d7379106273b/milagro_bls_binding-1.9.0-cp37-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:5646113ffa12a43acda419341817cf3b1b327b9e81dfd2c2a98c6aa1b38422c0", size = 1150042, upload-time = "2022-05-14T00:16:19.869Z" },
-    { url = "https://files.pythonhosted.org/packages/13/c2/892e789a5418d2cd33a088c6d7637987ab14ccbd01bc18ae60caab0048cf/milagro_bls_binding-1.9.0-cp37-abi3-win32.whl", hash = "sha256:4d91da896d8de735c828dc1815d7dcaeeed9363c25a5d4f725ec3916672cbc79", size = 310512, upload-time = "2022-05-14T00:16:21.63Z" },
-    { url = "https://files.pythonhosted.org/packages/5d/d4/87ed4b9d1ec21723ac8161d8afba5695c7a39567593e0b509c7f59239ade/milagro_bls_binding-1.9.0-cp37-abi3-win_amd64.whl", hash = "sha256:d723eac25c1c5d8ebc9937a4eebcea40be1b2fff742dcf181d83e4ee59d2b12d", size = 294383, upload-time = "2022-05-14T00:16:23.732Z" },
-]
-
-[[package]]
 name = "mkdocs"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1067,7 +1052,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "aioresponses" },
-    { name = "milagro-bls-binding" },
     { name = "mkdocs-material" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -1093,7 +1077,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "aioresponses", specifier = ">=0.7.8" },
-    { name = "milagro-bls-binding", specifier = ">=1.9.0" },
     { name = "mkdocs-material", specifier = ">=9.6.20" },
     { name = "pre-commit", specifier = ">=4.1.0" },
     { name = "pytest", specifier = ">=8.3.5" },
