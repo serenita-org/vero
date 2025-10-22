@@ -3,7 +3,8 @@ from pathlib import Path
 from ._logging import setup_logging
 from ._metrics import ErrorType, Metrics
 from ._profiling import setup_profiling
-from ._tracing import setup_tracing
+
+# from ._tracing import setup_tracing
 from ._vero_info import get_service_commit, get_service_name, get_service_version
 
 
@@ -15,7 +16,8 @@ def init_observability(
         log_level=log_level,
         data_dir=data_dir,
     )
-    setup_tracing()
+    # TODO re-enable once grpc adds support for free-threading
+    #    setup_tracing()
     setup_profiling()
 
 
