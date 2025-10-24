@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import msgspec
 
@@ -139,3 +139,9 @@ class VoluntaryExit(msgspec.Struct):
 class VoluntaryExitSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.VOLUNTARY_EXIT
     voluntary_exit: VoluntaryExit
+
+
+class HealthCheckResponse(msgspec.Struct):
+    status: str
+    outcome: str
+    checks: list[dict[str, Any]] | None = None

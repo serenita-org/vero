@@ -10,11 +10,13 @@ from urllib.parse import urlparse
 
 import aiohttp
 import msgspec.json
-from prometheus_client import Counter
+from aiohttp import ClientTimeout
+from prometheus_client import Counter, Gauge
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaRemoteSigner
+from tasks import TaskManager
 
 from .signature_provider import SignatureProvider
 
@@ -22,6 +24,11 @@ _SIGNED_MESSAGES = Counter(
     "signed_messages",
     "Number of signed messages",
     labelnames=["signable_message_type"],
+)
+_REMOTE_SIGNER_SCORE = Gauge(
+    "remote_signer_score",
+    "Remote signer score",
+    labelnames=["host"],
 )
 
 
@@ -36,7 +43,7 @@ def _sign_messages_in_separate_process(
     ]:
         results = []
         async with RemoteSigner(
-            url=remote_signer_url, process_pool_executor=None
+            url=remote_signer_url, task_manager=None, process_pool_executor=None
         ) as signer:
             for i in range(0, len(messages), batch_size):
                 messages_batch = messages[i : i + batch_size]
@@ -56,13 +63,27 @@ def _sign_messages_in_separate_process(
 
 
 class RemoteSigner(SignatureProvider):
-    def __init__(self, url: str, process_pool_executor: ProcessPoolExecutor | None):
+    MAX_SCORE = 100
+    SCORE_DELTA_SUCCESS = 1
+    SCORE_DELTA_FAILURE = 20
+
+    def __init__(
+        self,
+        url: str,
+        task_manager: TaskManager | None,
+        process_pool_executor: ProcessPoolExecutor | None,
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.url = url
         self.host = urlparse(url).hostname or ""
         if not self.host:
             raise ValueError(f"Failed to parse hostname from {self.url}")
+
+        self._score = RemoteSigner.MAX_SCORE
+        # Regularly poll the health status of the remote signer
+        if task_manager:
+            task_manager.create_task(self.poll_health_periodically())
 
         self.process_pool_executor = process_pool_executor
 
@@ -128,6 +149,15 @@ class RemoteSigner(SignatureProvider):
                 await session.close()
         if self.process_pool_executor is not None:
             self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
+
+    @property
+    def score(self) -> int:
+        return self._score
+
+    @score.setter
+    def score(self, value: int) -> None:
+        self._score = max(0, min(value, RemoteSigner.MAX_SCORE))
+        _REMOTE_SIGNER_SCORE.labels(host=self.host).set(self._score)
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -232,3 +262,38 @@ class RemoteSigner(SignatureProvider):
                 batch_size=batch_size,
             ),
         )
+
+    async def get_healthcheck_status(self) -> None:
+        _endpoint = "/healthcheck"
+
+        async with self.low_priority_client_session.get(
+            _endpoint,
+            timeout=ClientTimeout(total=1.0),
+            raise_for_status=True,
+            trace_request_ctx=dict(
+                path=_endpoint,
+            ),
+        ) as resp:
+            decoded_response = msgspec.json.decode(
+                await resp.read(), type=SchemaRemoteSigner.HealthCheckResponse
+            )
+            if decoded_response.status == "UP" and decoded_response.outcome == "UP":
+                self.score += RemoteSigner.SCORE_DELTA_SUCCESS
+            else:
+                self.score -= RemoteSigner.SCORE_DELTA_FAILURE
+
+    async def poll_health_periodically(self) -> None:
+        interval = 1.0
+
+        loop = asyncio.get_running_loop()
+        next_run = loop.time()
+
+        while True:
+            try:
+                await self.get_healthcheck_status()
+            except Exception as e:
+                self.score -= RemoteSigner.SCORE_DELTA_FAILURE
+                self.logger.error(f"Failed to get health check response: {e!r}")
+
+            next_run += interval
+            await asyncio.sleep(max(0.0, next_run - loop.time()))

@@ -22,7 +22,8 @@ async def test_keymanager_memory_usage(
         remote_keys=[
             RemoteKey(
                 pubkey=pk,
-                url=f"http://signer-{idx}",
+                # Limit the number of unique signers to 100
+                url=f"http://signer-{idx % 100}",
             )
             for idx, pk in enumerate(pubkeys)
         ]

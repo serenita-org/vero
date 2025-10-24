@@ -26,6 +26,7 @@ from schemas.keymanager_api import (
     VoluntaryExit,
 )
 from spec.utils import decode_graffiti
+from tasks import TaskManager
 
 from .beacon_chain import BeaconChain
 from .db.db import DB
@@ -45,6 +46,7 @@ class Keymanager(SignatureProvider):
         db: DB,
         beacon_chain: BeaconChain,
         multi_beacon_node: MultiBeaconNode,
+        task_manager: TaskManager,
         cli_args: CLIArgs,
         process_pool_executor: ProcessPoolExecutor,
     ):
@@ -53,6 +55,7 @@ class Keymanager(SignatureProvider):
         self.db = db
         self.beacon_chain = beacon_chain
         self.multi_beacon_node = multi_beacon_node
+        self.task_manager = task_manager
         self.cli_args = cli_args
 
         self.enabled = cli_args.enable_keymanager_api
@@ -135,7 +138,11 @@ class Keymanager(SignatureProvider):
 
             # If we still don't have a signer, create a new one
             signer = await self._exit_stack.enter_async_context(
-                RemoteSigner(url, process_pool_executor=self.process_pool_executor)
+                RemoteSigner(
+                    url,
+                    task_manager=self.task_manager,
+                    process_pool_executor=self.process_pool_executor,
+                )
             )
             signers_by_url[url] = signer
             new_mapping[pubkey] = signer
