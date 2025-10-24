@@ -2,10 +2,12 @@ import re
 from typing import Any
 
 import milagro_bls_binding as bls
+import msgspec.json
 import pytest
 from aioresponses import CallbackResult, aioresponses
 from yarl import URL
 
+from schemas.remote_signer import HealthCheckResponse
 from schemas.validator import ValidatorIndexPubkey
 
 
@@ -22,6 +24,11 @@ def _mocked_remote_signer_endpoints(
 ) -> None:
     def _mocked_pubkeys_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
         return CallbackResult(payload=[v.pubkey for v in validators])
+
+    def _mocked_healthcheck_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
+        return CallbackResult(
+            body=msgspec.json.encode(HealthCheckResponse(status="UP", outcome="UP"))
+        )
 
     def _mocked_sign_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
         url_pubkey = str(url).split("/")[-1]
@@ -40,6 +47,19 @@ def _mocked_remote_signer_endpoints(
     mocked_responses.get(
         url=re.compile("http://remote-signer:1234/api/v1/eth2/publicKeys"),
         callback=_mocked_pubkeys_endpoint,
+        repeat=True,
+    )
+
+    mocked_responses.get(
+        url=re.compile("http://remote-signer:1234/healthcheck"),
+        callback=_mocked_healthcheck_endpoint,
+        repeat=True,
+    )
+
+    # for test_keymanager_memory_usage
+    mocked_responses.get(
+        url=re.compile(r"http://signer-\d+/healthcheck"),
+        callback=_mocked_healthcheck_endpoint,
         repeat=True,
     )
 

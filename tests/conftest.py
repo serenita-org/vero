@@ -225,6 +225,7 @@ async def keymanager(
     beacon_chain: BeaconChain,
     cli_args: CLIArgs,
     multi_beacon_node: MultiBeaconNode,
+    task_manager: TaskManager,
     remote_signer_url: str,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
@@ -234,6 +235,7 @@ async def keymanager(
         db=empty_db,
         beacon_chain=beacon_chain,
         multi_beacon_node=multi_beacon_node,
+        task_manager=task_manager,
         cli_args=cli_args,
         process_pool_executor=process_pool_executor,
     ) as keymanager:
@@ -250,6 +252,7 @@ async def signature_provider(
     enable_keymanager_api: bool,
     cli_args: CLIArgs,
     keymanager: Keymanager,
+    task_manager: TaskManager,
     remote_signer_url: str,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
@@ -269,7 +272,9 @@ async def signature_provider(
                 "remote_signer_url is None despite disabled Keymanager API"
             )
         async with RemoteSigner(
-            url=cli_args.remote_signer_url, process_pool_executor=process_pool_executor
+            url=cli_args.remote_signer_url,
+            task_manager=task_manager,
+            process_pool_executor=process_pool_executor,
         ) as remote_signer:
             yield remote_signer
 

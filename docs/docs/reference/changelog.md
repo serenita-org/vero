@@ -7,6 +7,7 @@
 - Optimize finality checkpoint confirmation for low validator counts
 - Improve block proposal fee recipient handling
 - Generate build provenance and SBOM attestations for Vero container images
+- Track health of connected remote signers (`remote_signer_score` metric, similar to `beacon_node_score`)
 
 #### Bugfixes
 - Sync duties not being performed for exited validators
