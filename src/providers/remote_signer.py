@@ -280,6 +280,9 @@ class RemoteSigner(SignatureProvider):
             if decoded_response.status == "UP" and decoded_response.outcome == "UP":
                 self.score += RemoteSigner.SCORE_DELTA_SUCCESS
             else:
+                self.logger.warning(
+                    f"Remote signer ({self.host}) unhealthy: {decoded_response}"
+                )
                 self.score -= RemoteSigner.SCORE_DELTA_FAILURE
 
     async def poll_health_periodically(self) -> None:
@@ -293,7 +296,7 @@ class RemoteSigner(SignatureProvider):
                 await self.get_healthcheck_status()
             except Exception as e:
                 self.score -= RemoteSigner.SCORE_DELTA_FAILURE
-                self.logger.error(f"Failed to get health check response: {e!r}")
+                self.logger.exception(f"Failed to get health check response: {e!r}")
 
             next_run += interval
             await asyncio.sleep(max(0.0, next_run - loop.time()))
