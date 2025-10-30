@@ -3,6 +3,7 @@
 ## Upcoming release
 
 #### Features
+- Schedule Fusaka on Ethereum mainnet
 - Wait for beacon nodes to become available while starting up
 - Optimize finality checkpoint confirmation for low validator counts
 - Improve block proposal fee recipient handling
