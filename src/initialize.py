@@ -124,10 +124,10 @@ async def run_services(
 ) -> None:
     spec = load_spec(cli_args=cli_args)
 
-    db = DB(data_dir=cli_args.data_dir)
-    db.run_migrations()
-
     async with contextlib.AsyncExitStack() as exit_stack:
+        db = exit_stack.enter_context(DB(data_dir=cli_args.data_dir))
+        db.run_migrations()
+
         multi_beacon_node = await exit_stack.enter_async_context(
             MultiBeaconNode(
                 beacon_node_urls=cli_args.beacon_node_urls,
@@ -153,6 +153,7 @@ async def run_services(
             db=db,
             beacon_chain=beacon_chain,
             multi_beacon_node=multi_beacon_node,
+            task_manager=task_manager,
             cli_args=cli_args,
             process_pool_executor=process_pool_executor,
         )
@@ -167,6 +168,7 @@ async def run_services(
             signature_provider = await exit_stack.enter_async_context(
                 RemoteSigner(
                     url=cli_args.remote_signer_url,
+                    task_manager=task_manager,
                     process_pool_executor=process_pool_executor,
                 )
             )

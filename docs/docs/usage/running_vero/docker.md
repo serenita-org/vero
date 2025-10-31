@@ -25,6 +25,6 @@ You can also run Vero through the popular [eth-docker](https://ethdocker.com/){:
 A multi-client Vero-powered setup is described
 [in the eth-docker docs](https://ethdocker.com/Usage/Advanced/Vero){:target="_blank"}.
 
-eth-docker handles many setup tasks for you, including configuring
-the remote signer Vero needs. It also makes importing your keys
+eth-docker handles many setup tasks for you, including the configuration
+of the remote signer that Vero needs. It also makes importing your keys
 into the remote signer easy.

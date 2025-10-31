@@ -2,7 +2,6 @@ name: Docker - build & push
 
 permissions:
   contents: read
-  packages: write
 
 on:
   push:
@@ -19,6 +18,18 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+      # The permissions below are needed
+      # only for generating attestations
+      id-token: write
+      attestations: write
+
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
     steps:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
@@ -30,7 +41,7 @@ jobs:
       id: docker_metadata
       uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
       with:
-        images: ghcr.io/${{ github.repository }}
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
         tags: |
           # reflects the last commit on the `master` branch
           type=ref,event=branch
@@ -41,11 +52,12 @@ jobs:
     - name: Log in to GitHub Container Registry
       uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
       with:
-        registry: ghcr.io
+        registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push
+      id: build_and_push
       uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
       with:
         build-args: |
@@ -55,3 +67,24 @@ jobs:
         push: true
         tags: ${{ steps.docker_metadata.outputs.tags }}
         labels: ${{ steps.docker_metadata.outputs.labels }}
+
+    - name: Generate build provenance attestation
+      uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        subject-digest: ${{ steps.build_and_push.outputs.digest }}
+        push-to-registry: true
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        output-file: 'sbom.json'
+
+    - name: Generate SBOM attestation
+      uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3.0.0
+      with:
+        subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        subject-digest: ${{ steps.build_and_push.outputs.digest }}
+        sbom-path: 'sbom.json'
+        push-to-registry: true

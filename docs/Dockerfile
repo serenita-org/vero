@@ -4,6 +4,7 @@ WORKDIR /tmp
 
 COPY ./mkdocs.yml .
 COPY ./docs/ docs/
+COPY ./overrides/ overrides/
 
 RUN mkdocs build -d mkdocs_dist
 

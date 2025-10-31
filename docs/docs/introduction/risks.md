@@ -16,10 +16,7 @@ through its proactive
 
 ## Key Security
 
-Vero never has direct access to validator private keys.
-It can only request the remote signer to sign data
-using those keys, which the remote signer will refuse
-if the data to be signed would result in a slashable offense.
+Vero, by design, **never** has direct access to validator private keys.
 
 ## Bugs
 
@@ -40,6 +37,6 @@ if something were to go wrong with those.
 
 By contrast, switching to —and back from—
 Vero is much easier.
-If you're already using a remote signer (Web3Signer),
+If you're already using a remote signer (e.g. Web3Signer),
 you can switch between your current validator client and Vero
 in just minutes.

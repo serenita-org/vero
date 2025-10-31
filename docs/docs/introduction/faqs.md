@@ -1,5 +1,30 @@
 # FAQs
 
+??? question "What's the difference between a multi-node setup and a fallback setup?"
+
+    In a fallback setup, secondary nodes are only
+    used when the primary node goes offline.
+
+    In a multi-node setup, all nodes are used simultaneously.
+
+??? question "How is a Vero-powered setup different from DVT (Distributed Validator Technology)?"
+
+    Vero provides many of the same benefits as DVT,
+    but with far less operational complexity.
+
+    The key difference lies in where decisions are made.
+    In a Vero-powered setup, a single active validator
+    process gathers input from multiple Ethereum clients
+    and makes decisions in one place. In DVT,
+    validator responsibilities are distributed across a cluster
+    of nodes that coordinate to decide and perform each action.
+
+    Both approaches support high-availability deployments.
+
+    We believe multi-node validator clients are the better
+    choice when a single operator is responsible for running
+    validator infrastructure.
+
 ??? question "Will my validators go offline if one of the connected beacon nodes goes offline?"
 
     Vero can keep running for some amount of time even if only a single connected beacon node
@@ -18,41 +43,45 @@
 
 ??? question "I notice Vero is written in Python. Should I be worried about performance?"
 
-    A validator client's workload is not particularly processing-heavy, so the
+    A validator client's workload is not computationally intensive, so the
     choice of programming language has little impact on performance.
 
-    Most of a validator client's work consists of asking other software
-    for data:
+    Most of what a validator client does is simply requesting data
+    from other software components:
 
-      - beacon nodes - e.g. keeping track of validator duties
-      - remote signer - signing validator duties
+      - beacon nodes - e.g. tracking validator duties
+      - remote signer - signing those duties
 
-    Python has many strengths that make it the perfect choice for Vero:
+    Python was chosen because it has many strengths that make it an excellent fit for Vero:
 
-    - Simplicity
+    - **Simplicity**
 
-        Being simple is one of Vero's [design goals](../index.md#design-goals).
+        Simplicity is one of Vero's [design goals](../index.md#design-goals).
         Python's readability and extensive standard library greatly contribute
-        to keeping things simple.
+        to keeping things simple and bug-free.
 
-    - Testability
+    - **Testability**
 
         [pytest](https://pytest.org/){:target="_blank"}
-        is a powerful and popular Python testing framework
-        that we use to test Vero. It makes testing various
-        aspects of software much easier than testing
-        frameworks for other languages.
+        is a powerful and widely used testing framework
+        that we use to test Vero.
 
-        This same framework
-        is used by Ethereum teams to test the
+        The same framework is also used by Ethereum teams to test the
         [consensus](https://github.com/ethereum/consensus-specs){:target="_blank"}
         and [execution](https://github.com/ethereum/execution-spec-tests){:target="_blank"}
         specs.
 
-        A robust and extensive test suite plays an important part
-        in protecting against bugs in Vero itself.
+        A comprehensive test suite plays an important part
+        in preventing bugs in Vero itself.
 
-    At [Serenita](https://serenita.io){:target="_blank"}, we run thousands
-    of Vero-powered validators and we frequently rank among the
+    - **Performance**
+
+        Wait, what? That's right. In areas where raw speed matters,
+        we use libraries written in highly efficient languages like C or Rust.
+        This approach lets us combine Python's simplicity with the speed of
+        lower-level languages, giving us the best of both worlds.
+
+    At [Serenita](https://serenita.io){:target="_blank"}, we operate thousands
+    of Vero-powered, bug-resistant validators, and we frequently rank among the
     [best‑performing](https://explorer.rated.network/leaderboard?network=mainnet&timeWindow=30d){:target="_blank"}
     staking node operators.
