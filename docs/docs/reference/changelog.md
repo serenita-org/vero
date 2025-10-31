@@ -5,6 +5,7 @@
 #### Features
 - Wait for beacon nodes to become available while starting up
 - Optimize finality checkpoint confirmation for low validator counts
+- Default gas limit set to 60M for Ethereum mainnet
 - Improve block proposal fee recipient handling
 - Generate build provenance and SBOM attestations for Vero container images
 - Track health of connected remote signers (`remote_signer_score` metric, similar to `beacon_node_score`)
