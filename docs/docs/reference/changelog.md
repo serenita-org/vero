@@ -1,6 +1,8 @@
 # Changelog
 
-## Upcoming release
+## v1.3.0 { id="v1.3.0" }
+
+<small>November 5, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.3.0){:target="_blank"}
 
 #### Features
 - Schedule Fusaka on Ethereum mainnet
@@ -10,9 +12,14 @@
 - Improve block proposal fee recipient handling
 - Generate build provenance and SBOM attestations for Vero container images
 - Track health of connected remote signers (`remote_signer_score` metric, similar to `beacon_node_score`)
+- _Vero Sponsor feature:_ Add support for Devo, a distributed slashing protection database
+- Add support for the Fulu fork on the Holešky and Hoodi testnets
 
 #### Bugfixes
-- Sync duties not being performed for exited validators
+- Sync committee duties not being performed for exited validators ([#215](https://github.com/serenita-org/vero/pull/215))
+- Incorrect Keymanager API token length ([#189](https://github.com/serenita-org/vero/pull/189))
+
+___
 
 ## v1.3.0-rc.0 { id="v1.3.0-rc.0" }
 
@@ -23,6 +30,8 @@
 
 #### Bugfixes
 - Incorrect Keymanager API token length
+
+___
 
 ## v1.2.0 { id="v1.2.0" }
 
@@ -36,6 +45,8 @@
 - Default gas limit set to 60M for the Holešky and Hoodi testnets
 - Set default for graffiti value to `Vero <version>`
 
+___
+
 ## v1.2.0-rc.0 { id="v1.2.0-rc.0" }
 
 <small>August 1, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.2.0-rc.0){:target="_blank"}
@@ -47,6 +58,8 @@
 - Default gas limit set to 45M for Ethereum mainnet
 - Default gas limit set to 60M for the Holešky and Hoodi testnets
 
+___
+
 ## v1.1.3 { id="v1.1.3" }
 
 <small>July 9, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.1.3){:target="_blank"}
@@ -55,12 +68,16 @@
 - Incorrect serialization of a block attribute leads to the block
   being refused by Nimbus and Prysm beacon nodes
 
+___
+
 ## v1.1.2 { id="v1.1.2" }
 
 <small>June 16, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.1.2){:target="_blank"}
 
 #### Features
 - Remove some spurious and unnecessary log messages
+
+___
 
 ## v1.1.1 { id="v1.1.1" }
 
@@ -72,6 +89,8 @@
 #### Bugfixes
 - Incorrect attester duty updating retry logic while remote signer is unavailable
 
+___
+
 ## v1.1.0 { id="v1.1.0" }
 
 <small>May 19, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.1.0){:target="_blank"}
@@ -80,6 +99,8 @@
 - Introduce support for the Keymanager API, enabling per-validator overrides for
   fee recipient, graffiti and gas limit values
 
+___
+
 ## v1.1.0-rc.0 { id="v1.1.0-rc.0" }
 
 <small>May 13, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.1.0-rc.0){:target="_blank"}
@@ -87,6 +108,8 @@
 #### Features
 - Introduce support for the Keymanager API, enabling per-validator overrides for
   fee recipient, graffiti and gas limit values
+
+___
 
 ## v1.0.0 { id="v1.0.0" }
 
@@ -99,6 +122,8 @@
 - Default gas limit set to 36M for Ethereum mainnet
 - Add a warning message for late head events
 
+___
+
 ## v1.0.0-rc.2 { id="v1.0.0-rc.2" }
 
 <small>March 16, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.0.0-rc.2){:target="_blank"}
@@ -107,12 +132,16 @@
 - Add support for the Electra fork on the Hoodi and Chiado testnets
 - Add `----DANGER----disable-slashing-detection` CLI flag
 
+___
+
 ## v1.0.0-rc.1 { id="v1.0.0-rc.1" }
 
 <small>February 14, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.0.0-rc.1){:target="_blank"}
 
 #### Bugfixes
 - Incorrect pre-Electra aggregate requests
+
+___
 
 ## v1.0.0-rc.0 { id="v1.0.0-rc.0" }
 
@@ -121,6 +150,8 @@
 #### Features
 - Add support for the Electra fork on the Holešky testnet
 
+___
+
 ## v0.9.1 { id="v0.9.1" }
 
 <small>February 1, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v0.9.1){:target="_blank"}
@@ -128,6 +159,8 @@
 #### Features
 - Add `--network-custom-config-path` CLI argument
 - Default gas limit set to 36M for Ethereum mainnet
+
+___
 
 ## v0.9.0 { id="v0.9.0" }
 
@@ -147,6 +180,8 @@ Metrics            |  Trace Data
 :-------------------------:|:-------------------------:
 <img width="748" alt="image" src="https://github.com/user-attachments/assets/1d5b0fa0-63fd-4de8-88e2-70ccec307950" />  |  <img width="773" alt="image" src="https://github.com/user-attachments/assets/78c8ed32-70f9-448e-ae2e-90973fcb5559" />
 
+___
+
 ## v0.8.3 { id="v0.8.3" }
 
 <small>October 16, 2024</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v0.8.3){:target="_blank"}
@@ -154,12 +189,16 @@ Metrics            |  Trace Data
 #### Bugfixes
 - Incorrect value of the `vc_attestation_consensus_failures` metric
 
+___
+
 ## v0.8.2 { id="v0.8.2" }
 
 <small>September 24, 2024</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v0.8.2){:target="_blank"}
 
 #### Features
 - Various performance optimizations in attestation and aggregation duties
+
+___
 
 ## v0.8.1 { id="v0.8.1" }
 
@@ -170,6 +209,8 @@ Metrics            |  Trace Data
 
 #### Bugfixes
 - Incorrect beacon node in use when one of them goes offline
+
+___
 
 ## v0.8.0 { id="v0.8.0" }
 
