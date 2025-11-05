@@ -17,6 +17,6 @@ jobs:
         run: docker build -t vero:custom .
 
       - name: Kurtosis Assertoor GitHub Action
-        uses: ethpandaops/kurtosis-assertoor-github-action@5932604b244dbd2ddb811516b516a9094f4d2c2f # v1
+        uses: ethpandaops/kurtosis-assertoor-github-action@c78bc0981cb4f7c4ac609046a971a8d448dfa7be # v1 + pinned hashes
         with:
           ethereum_package_args: .github/assertoor/vero.yml
