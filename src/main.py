@@ -35,8 +35,6 @@ async def main(cli_args: CLIArgs, shutdown_event: asyncio.Event) -> None:
     scheduler.start()
 
     validator_duty_services: list[ValidatorDutyService] = []
-
-    shutdown_event = shutdown_event
     task_manager = TaskManager(shutdown_event=shutdown_event)
 
     loop = asyncio.get_running_loop()
