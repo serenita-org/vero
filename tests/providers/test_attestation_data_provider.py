@@ -10,18 +10,18 @@ import pytest
 from aioresponses import CallbackResult, aioresponses
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from args import CLIArgs
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
 
 
 @pytest.fixture
 async def attestation_data_provider(
-    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    multi_beacon_node: MultiBeaconNode,
     scheduler: AsyncIOScheduler,
 ) -> AttestationDataProvider:
     adp = AttestationDataProvider(
-        multi_beacon_node=multi_beacon_node_three_inited_nodes,
+        multi_beacon_node=multi_beacon_node,
         scheduler=scheduler,
     )
     # Default timeout is 1000 ms which doesn't work well for tests
@@ -257,6 +257,22 @@ def _create_att_data_callback(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    argnames="cli_args",
+    argvalues=[
+        pytest.param(
+            {
+                "beacon_node_urls": [
+                    "http://beacon-node-a:1234",
+                    "http://beacon-node-b:1234",
+                    "http://beacon-node-c:1234",
+                ],
+            },
+            id="3 beacon nodes",
+        )
+    ],
+    indirect=True,
+)
 async def test_produce_attestation_data_without_head_event(
     attestation_data_provider: AttestationDataProvider,
     beacon_chain: BeaconChain,
@@ -268,6 +284,7 @@ async def test_produce_attestation_data_without_head_event(
     expected_att_data_source: SchemaBeaconAPI.Checkpoint,
     expected_att_data_target: SchemaBeaconAPI.Checkpoint,
     expected_log_messages: list[str],
+    cli_args: CLIArgs,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     await beacon_chain.wait_for_next_slot()
@@ -535,6 +552,22 @@ async def test_produce_attestation_data_without_head_event(
         ),
     ],
 )
+@pytest.mark.parametrize(
+    argnames="cli_args",
+    argvalues=[
+        pytest.param(
+            {
+                "beacon_node_urls": [
+                    "http://beacon-node-a:1234",
+                    "http://beacon-node-b:1234",
+                    "http://beacon-node-c:1234",
+                ],
+            },
+            id="3 beacon nodes",
+        )
+    ],
+    indirect=True,
+)
 async def test_produce_attestation_data_with_head_event(
     attestation_data_provider: AttestationDataProvider,
     beacon_chain: BeaconChain,
@@ -547,7 +580,6 @@ async def test_produce_attestation_data_with_head_event(
     expected_att_data_source: SchemaBeaconAPI.Checkpoint,
     expected_att_data_target: SchemaBeaconAPI.Checkpoint,
     expected_log_messages: list[str],
-    task_manager: TaskManager,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     await beacon_chain.wait_for_next_slot()

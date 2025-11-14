@@ -1,11 +1,8 @@
 import asyncio
 import logging
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from prometheus_client import Gauge
-
-from observability import ERRORS_METRIC, ErrorType
-from providers import BeaconChain, MultiBeaconNode, SignatureProvider
+from observability import ErrorType
+from providers import MultiBeaconNode, SignatureProvider, Vero
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
@@ -14,38 +11,23 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
-from tasks import TaskManager
-
-_VALIDATORS_COUNT = Gauge(
-    "validator_status",
-    "Amount of validators per status",
-    labelnames=["status"],
-    multiprocess_mode="max",
-)
-_SLASHING_DETECTED = Gauge(
-    "slashing_detected",
-    "1 if any of the connected validators have been slashed, 0 otherwise",
-    multiprocess_mode="max",
-)
-_SLASHING_DETECTED.set(0)
 
 
 class ValidatorStatusTrackerService:
     def __init__(
         self,
         multi_beacon_node: MultiBeaconNode,
-        beacon_chain: BeaconChain,
         signature_provider: SignatureProvider,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
+        vero: Vero,
     ):
         self.multi_beacon_node = multi_beacon_node
-        self.beacon_chain = beacon_chain
+        self.beacon_chain = vero.beacon_chain
         self.signature_provider = signature_provider
-        self.scheduler = scheduler
-        self.task_manager = task_manager
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
 
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.metrics = vero.metrics
 
         self._slashing_detected = False
 
@@ -77,7 +59,7 @@ class ValidatorStatusTrackerService:
     @slashing_detected.setter
     def slashing_detected(self, value: bool) -> None:
         self._slashing_detected = value
-        _SLASHING_DETECTED.set(int(value))
+        self.metrics.slashing_detected_g.set(int(value))
 
     async def on_new_slot(self, slot: int, _: bool) -> None:
         # Update validator statuses one slot before the next epoch starts
@@ -188,11 +170,17 @@ class ValidatorStatusTrackerService:
             f" {len(withdrawal_pubkeys)} withdrawal,"
             f" {len(unknown_pubkeys)} unknown.",
         )
-        _VALIDATORS_COUNT.labels(status="unknown").set(len(unknown_pubkeys))
-        _VALIDATORS_COUNT.labels(status="pending").set(len(pending_pubkeys))
-        _VALIDATORS_COUNT.labels(status="active").set(len(active_pubkeys))
-        _VALIDATORS_COUNT.labels(status="exited").set(len(exited_pubkeys))
-        _VALIDATORS_COUNT.labels(status="withdrawal").set(len(withdrawal_pubkeys))
+        self.metrics.validator_status_g.labels(status="unknown").set(
+            len(unknown_pubkeys)
+        )
+        self.metrics.validator_status_g.labels(status="pending").set(
+            len(pending_pubkeys)
+        )
+        self.metrics.validator_status_g.labels(status="active").set(len(active_pubkeys))
+        self.metrics.validator_status_g.labels(status="exited").set(len(exited_pubkeys))
+        self.metrics.validator_status_g.labels(status="withdrawal").set(
+            len(withdrawal_pubkeys)
+        )
 
     async def update_validator_statuses(self) -> None:
         # Calls self._update_validator_statuses, retrying until it succeeds, with backoff
@@ -207,7 +195,7 @@ class ValidatorStatusTrackerService:
                 await self._update_validator_statuses()
                 break
             except Exception as e:
-                ERRORS_METRIC.labels(
+                self.metrics.errors_c.labels(
                     error_type=ErrorType.VALIDATOR_STATUS_UPDATE.value
                 ).inc()
                 self.logger.exception(

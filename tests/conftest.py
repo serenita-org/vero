@@ -23,6 +23,7 @@ from providers import (
     DB,
     SignatureProvider,
     DutyCache,
+    Vero,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
@@ -31,7 +32,7 @@ from services import ValidatorStatusTrackerService
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.base import SpecFulu, Fork, Genesis, Version
 from spec.common import Epoch
-from spec.configs import Network, get_network_spec
+from spec.configs import Network, get_network_spec, get_genesis_for_network
 from tasks import TaskManager
 
 # A few more global fixtures defined separately
@@ -62,15 +63,23 @@ def cli_args(
     beacon_node_urls_proposal: list[str],
     enable_keymanager_api: bool,
     tmp_path: Path,
+    request: pytest.FixtureRequest,
 ) -> CLIArgs:
+    # CLI args can be overridden through indirect parametrization
+    indirect_params = getattr(request, "param", {})
+    beacon_node_urls = indirect_params.get("beacon_node_urls", [beacon_node_url])
+    attestation_consensus_threshold = indirect_params.get(
+        "attestation_consensus_threshold", None
+    )
+
     return CLIArgs(
         network=Network._TESTS,
         network_custom_config_path=None,
         remote_signer_url=None if enable_keymanager_api else remote_signer_url,
-        beacon_node_urls=[beacon_node_url],
+        beacon_node_urls=beacon_node_urls,
         beacon_node_urls_proposal=beacon_node_urls_proposal,
         attestation_consensus_threshold=_process_attestation_consensus_threshold(
-            None, [beacon_node_url]
+            attestation_consensus_threshold, beacon_node_urls
         ),
         fee_recipient="0xfee0000000000000000000000000000000000000",
         data_dir=str(tmp_path),
@@ -94,9 +103,6 @@ def cli_args(
 @pytest.fixture(autouse=True, scope="session")
 def _init_observability() -> None:
     init_observability(
-        metrics_address="localhost",
-        metrics_port=8080,
-        metrics_multiprocess_mode=False,
         log_level=logging.DEBUG,
         data_dir=Path("/tmp"),
     )
@@ -194,20 +200,6 @@ async def scheduler() -> AsyncGenerator[AsyncIOScheduler, None]:
 
 
 @pytest.fixture
-def shutdown_event() -> asyncio.Event:
-    return asyncio.Event()
-
-
-@pytest.fixture
-async def task_manager(
-    shutdown_event: asyncio.Event,
-) -> AsyncGenerator[TaskManager, None]:
-    t = TaskManager(shutdown_event=shutdown_event)
-    yield t
-    t.cancel_all()
-
-
-@pytest.fixture
 def empty_db(tmp_path: Path) -> Generator[DB, None]:
     with DB(data_dir=str(tmp_path)) as db:
         db.run_migrations()
@@ -222,21 +214,17 @@ def process_pool_executor() -> ProcessPoolExecutor:
 @pytest.fixture
 async def keymanager(
     empty_db: DB,
-    beacon_chain: BeaconChain,
-    cli_args: CLIArgs,
-    multi_beacon_node: MultiBeaconNode,
-    task_manager: TaskManager,
+    multi_beacon_node_with_mocked_endpoints: MultiBeaconNode,
     remote_signer_url: str,
+    vero: Vero,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[Keymanager, None]:
     async with Keymanager(
         db=empty_db,
-        beacon_chain=beacon_chain,
-        multi_beacon_node=multi_beacon_node,
-        task_manager=task_manager,
-        cli_args=cli_args,
+        multi_beacon_node=multi_beacon_node_with_mocked_endpoints,
+        vero=vero,
         process_pool_executor=process_pool_executor,
     ) as keymanager:
         yield keymanager
@@ -252,7 +240,7 @@ async def signature_provider(
     enable_keymanager_api: bool,
     cli_args: CLIArgs,
     keymanager: Keymanager,
-    task_manager: TaskManager,
+    vero: Vero,
     remote_signer_url: str,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
@@ -273,7 +261,7 @@ async def signature_provider(
             )
         async with RemoteSigner(
             url=cli_args.remote_signer_url,
-            task_manager=task_manager,
+            task_manager=vero.task_manager,
             process_pool_executor=process_pool_executor,
         ) as remote_signer:
             yield remote_signer
@@ -282,57 +270,47 @@ async def signature_provider(
 @pytest.fixture
 async def validator_status_tracker(
     multi_beacon_node: MultiBeaconNode,
-    beacon_chain: BeaconChain,
     signature_provider: SignatureProvider,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
 ) -> ValidatorStatusTrackerService:
     validator_status_tracker = ValidatorStatusTrackerService(
         multi_beacon_node=multi_beacon_node,
-        beacon_chain=beacon_chain,
         signature_provider=signature_provider,
-        scheduler=scheduler,
-        task_manager=task_manager,
+        vero=vero,
     )
     await validator_status_tracker.initialize()
     return validator_status_tracker
 
 
 @pytest.fixture
-async def multi_beacon_node(
-    cli_args: CLIArgs,
-    _mocked_beacon_node_endpoints: None,
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
-    beacon_chain: BeaconChain,
-) -> AsyncGenerator[MultiBeaconNode, None]:
-    async with MultiBeaconNode(
-        beacon_node_urls=cli_args.beacon_node_urls,
-        beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-        spec=spec,
-        scheduler=scheduler,
-        task_manager=task_manager,
-        cli_args=cli_args,
-    ) as mbn:
-        yield mbn
-
-
-@pytest.fixture(scope="session")
-def genesis(spec: SpecFulu) -> Genesis:
-    # Fake genesis 1 hour ago
-    return Genesis(
-        genesis_time=int(time.time() - 3600),
-        genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
-        genesis_fork_version=spec.GENESIS_FORK_VERSION,
-    )
+def vero(cli_args: CLIArgs, _unregister_prometheus_metrics: None) -> Vero:
+    return Vero(cli_args=cli_args)
 
 
 @pytest.fixture
-def beacon_chain(
-    spec: SpecFulu, genesis: Genesis, task_manager: TaskManager
-) -> BeaconChain:
-    return BeaconChain(spec=spec, genesis=genesis, task_manager=task_manager)
+async def multi_beacon_node(
+    vero: Vero,
+    request: pytest.FixtureRequest,
+) -> AsyncGenerator[MultiBeaconNode, None]:
+    # Skip initializing beacon nodes by default in tests
+    skip_init = getattr(request, "param", True)
+
+    async with MultiBeaconNode(vero=vero, skip_init=skip_init) as mbn:
+        yield mbn
+
+
+@pytest.fixture
+async def multi_beacon_node_with_mocked_endpoints(
+    _mocked_beacon_node_endpoints: None,
+    multi_beacon_node: MultiBeaconNode,
+) -> MultiBeaconNode:
+    return multi_beacon_node
+
+
+@pytest.fixture
+def beacon_chain(spec: SpecFulu, vero: Vero) -> BeaconChain:
+    # Just a convenience fixture
+    return vero.beacon_chain
 
 
 @pytest.fixture

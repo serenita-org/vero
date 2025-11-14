@@ -3,15 +3,11 @@ import os
 
 import pytest
 
-from providers import BeaconChain
+from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion, ValidatorStatus
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
-from services.attestation import (
-    _VC_PUBLISHED_AGGREGATE_ATTESTATIONS,
-    _VC_PUBLISHED_ATTESTATIONS,
-)
 
 
 @pytest.mark.parametrize(
@@ -51,6 +47,7 @@ async def test_attest_if_not_yet_attested(
     validators: list[ValidatorIndexPubkey],
     fork_version: ForkVersion,
     enable_keymanager_api: bool,
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Populate the service with an attester duty
@@ -77,14 +74,17 @@ async def test_attest_if_not_yet_attested(
     attestation_service._last_slot_duty_started_for = 0
     attestation_service._last_slot_duty_completed_for = 0
 
-    atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
+    atts_published_before = vero.metrics.vc_published_attestations_c._value.get()
 
     # Wait for slot to start
     await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
     await attestation_service.attest_if_not_yet_attested(slot=duty_slot)
 
     assert any("Published attestations" in m for m in caplog.messages)
-    assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before + 1
+    assert (
+        vero.metrics.vc_published_attestations_c._value.get()
+        == atts_published_before + 1
+    )
     assert attestation_service._last_slot_duty_started_for == duty_slot
     assert attestation_service._last_slot_duty_completed_for == duty_slot
 
@@ -97,15 +97,18 @@ async def test_attest_to_invalid_slot(
     slot_offset: int,
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    atts_published_before = _VC_PUBLISHED_ATTESTATIONS._value.get()
+    atts_published_before = vero.metrics.vc_published_attestations_c._value.get()
     with pytest.raises(RuntimeError, match="Invalid slot for attestation: "):
         await attestation_service.attest_if_not_yet_attested(
             slot=beacon_chain.current_slot + slot_offset
         )
 
-    assert _VC_PUBLISHED_ATTESTATIONS._value.get() == atts_published_before
+    assert (
+        vero.metrics.vc_published_attestations_c._value.get() == atts_published_before
+    )
 
 
 @pytest.mark.parametrize(
@@ -130,6 +133,7 @@ async def test_aggregate_attestations(
     fork_version: ForkVersion,
     enable_keymanager_api: bool,
     validators: list[ValidatorIndexPubkey],
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     # Create an attester aggregation duty
@@ -167,7 +171,9 @@ async def test_aggregate_attestations(
         ),
     )
 
-    aggregates_produced_before = _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
+    aggregates_produced_before = (
+        vero.metrics.vc_published_aggregate_attestations_c._value.get()
+    )
     await attestation_service.aggregate_attestations(
         slot=duty_slot,
         att_data=att_data,
@@ -176,6 +182,6 @@ async def test_aggregate_attestations(
 
     assert any("Published aggregate and proofs" in m for m in caplog.messages)
     assert (
-        _VC_PUBLISHED_AGGREGATE_ATTESTATIONS._value.get()
+        vero.metrics.vc_published_aggregate_attestations_c._value.get()
         == aggregates_produced_before + 1
     )

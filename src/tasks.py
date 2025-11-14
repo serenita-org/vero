@@ -4,12 +4,13 @@ from collections.abc import Coroutine
 from functools import partial
 from typing import Any
 
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType, Metrics
 
 
 class TaskManager:
-    def __init__(self, shutdown_event: asyncio.Event) -> None:
+    def __init__(self, shutdown_event: asyncio.Event, metrics: Metrics) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.metrics = metrics
 
         self.shutdown_event = shutdown_event
 
@@ -25,7 +26,7 @@ class TaskManager:
             self.logger.exception(
                 f"Task {task} failed with exception {e!r}",
             )
-            ERRORS_METRIC.labels(error_type=ErrorType.OTHER.value).inc()
+            self.metrics.errors_c.labels(error_type=ErrorType.OTHER.value).inc()
 
     def task_done_callback(self, task: asyncio.Task[Any]) -> None:
         try:
@@ -36,7 +37,7 @@ class TaskManager:
                 self.logger.exception(
                     f"Task {task} was cancelled",
                 )
-                ERRORS_METRIC.labels(error_type=ErrorType.OTHER.value).inc()
+                self.metrics.errors_c.labels(error_type=ErrorType.OTHER.value).inc()
         else:
             if exc is not None:
                 self._log_task_exception(task)

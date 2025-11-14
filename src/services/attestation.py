@@ -9,10 +9,8 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from prometheus_client import Counter as CounterMetric
-from prometheus_client import Histogram
 
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType
 from providers import AttestationDataProvider
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
@@ -26,27 +24,6 @@ from spec.common import (
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
-
-_VC_PUBLISHED_ATTESTATIONS = CounterMetric(
-    "vc_published_attestations",
-    "Successfully published attestations",
-)
-_VC_PUBLISHED_ATTESTATIONS.reset()
-_VC_PUBLISHED_AGGREGATE_ATTESTATIONS = CounterMetric(
-    "vc_published_aggregate_attestations",
-    "Successfully published aggregate attestations",
-)
-_VC_PUBLISHED_AGGREGATE_ATTESTATIONS.reset()
-_VC_ATTESTATION_CONSENSUS_TIME = Histogram(
-    "vc_attestation_consensus_time",
-    "Time it took to achieve consensus on the attestation beacon block root",
-    buckets=[0.025, 0.05, 0.075, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1, 2, 3],
-)
-_VC_ATTESTATION_CONSENSUS_FAILURES = CounterMetric(
-    "vc_attestation_consensus_failures",
-    "Amount of attestation consensus failures",
-)
-_VC_ATTESTATION_CONSENSUS_FAILURES.reset()
 
 _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 
@@ -213,7 +190,7 @@ class AttestationService(ValidatorDutyService):
             f"Attesting for {slot=}, {head_event=}, {len(slot_attester_duties)} duties",
         )
         self._last_slot_duty_started_for = slot
-        self._duty_start_time_metric.labels(
+        self.metrics.duty_start_time_h.labels(
             duty=ValidatorDuty.ATTESTATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -231,8 +208,8 @@ class AttestationService(ValidatorDutyService):
             self.logger.exception(
                 f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes ({head_event=}): {e!r}",
             )
-            _VC_ATTESTATION_CONSENSUS_FAILURES.inc()
-            ERRORS_METRIC.labels(
+            self.metrics.vc_attestation_consensus_failures_c.inc()
+            self.metrics.errors_c.labels(
                 error_type=ErrorType.ATTESTATION_CONSENSUS.value,
             ).inc()
             self._last_slot_duty_completed_for = slot
@@ -242,7 +219,7 @@ class AttestationService(ValidatorDutyService):
             self.logger.debug(
                 f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
             )
-            _VC_ATTESTATION_CONSENSUS_TIME.observe(consensus_time)
+            self.metrics.vc_attestation_consensus_time_h.observe(consensus_time)
 
         self.logger.debug(f"{att_data=}, {head_event=}")
 
@@ -287,7 +264,7 @@ class AttestationService(ValidatorDutyService):
             try:
                 message, signature, pubkey = await coro
             except Exception as e:
-                ERRORS_METRIC.labels(
+                self.metrics.errors_c.labels(
                     error_type=ErrorType.SIGNATURE.value,
                 ).inc()
                 self.logger.exception(
@@ -310,7 +287,7 @@ class AttestationService(ValidatorDutyService):
         self.logger.debug(
             f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
         )
-        self._duty_submission_time_metric.labels(
+        self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.ATTESTATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -320,7 +297,7 @@ class AttestationService(ValidatorDutyService):
                 fork_version=self.beacon_chain.current_fork_version,
             )
         except Exception as e:
-            ERRORS_METRIC.labels(
+            self.metrics.errors_c.labels(
                 error_type=ErrorType.ATTESTATION_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -330,8 +307,7 @@ class AttestationService(ValidatorDutyService):
             self.logger.info(
                 f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
             )
-
-            _VC_PUBLISHED_ATTESTATIONS.inc(
+            self.metrics.vc_published_attestations_c.inc(
                 amount=len(attestations_objects_to_publish),
             )
         finally:
@@ -385,7 +361,7 @@ class AttestationService(ValidatorDutyService):
         ):
             signed_aggregate_and_proofs.append((msg.aggregate_and_proof, sig))
 
-        self._duty_submission_time_metric.labels(
+        self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -394,11 +370,11 @@ class AttestationService(ValidatorDutyService):
                 signed_aggregate_and_proofs=signed_aggregate_and_proofs,
                 fork_version=fork_version,
             )
-            _VC_PUBLISHED_AGGREGATE_ATTESTATIONS.inc(
+            self.metrics.vc_published_aggregate_attestations_c.inc(
                 amount=len(signed_aggregate_and_proofs),
             )
         except Exception as e:
-            ERRORS_METRIC.labels(
+            self.metrics.errors_c.labels(
                 error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -423,7 +399,7 @@ class AttestationService(ValidatorDutyService):
             .hash_tree_root()
             .hex()
         )
-        self._duty_start_time_metric.labels(
+        self.metrics.duty_start_time_h.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -505,7 +481,7 @@ class AttestationService(ValidatorDutyService):
                 identifiers=identifiers,
             )
         except Exception as e:
-            ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+            self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for aggregation selection proofs: {e!r}",
             )

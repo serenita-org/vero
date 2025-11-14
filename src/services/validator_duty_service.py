@@ -5,21 +5,17 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
 import msgspec
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
-from prometheus_client import Histogram
 
-from args import CLIArgs
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType
 from providers import (
-    BeaconChain,
     DutyCache,
     Keymanager,
     MultiBeaconNode,
     SignatureProvider,
+    Vero,
 )
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
 
 if TYPE_CHECKING:
     from services import ValidatorStatusTrackerService
@@ -35,51 +31,11 @@ class ValidatorDuty(Enum):
 
 class ValidatorDutyServiceOptions(TypedDict):
     multi_beacon_node: MultiBeaconNode
-    beacon_chain: BeaconChain
     signature_provider: SignatureProvider
     keymanager: Keymanager
     duty_cache: DutyCache
     validator_status_tracker_service: "ValidatorStatusTrackerService"
-    scheduler: AsyncIOScheduler
-    task_manager: TaskManager
-    cli_args: CLIArgs
-
-
-_DUTY_START_TIME_METRIC = None
-_DUTY_SUBMISSION_TIME_METRIC = None
-
-
-def _setup_duty_time_metrics(
-    seconds_per_slot: int,
-) -> tuple[Histogram, Histogram]:
-    global _DUTY_START_TIME_METRIC, _DUTY_SUBMISSION_TIME_METRIC
-
-    buckets = [
-        item
-        for sublist in [
-            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(seconds_per_slot)
-        ]
-        for item in sublist
-    ]
-    buckets.remove(0)
-
-    if _DUTY_START_TIME_METRIC is None:
-        _DUTY_START_TIME_METRIC = Histogram(
-            "duty_start_time",
-            "Time into slot at which a duty starts",
-            labelnames=["duty"],
-            buckets=buckets,
-        )
-
-    if _DUTY_SUBMISSION_TIME_METRIC is None:
-        _DUTY_SUBMISSION_TIME_METRIC = Histogram(
-            "duty_submission_time",
-            "Time into slot at which a duty submission starts",
-            labelnames=["duty"],
-            buckets=buckets,
-        )
-
-    return _DUTY_START_TIME_METRIC, _DUTY_SUBMISSION_TIME_METRIC
+    vero: Vero
 
 
 class ValidatorDutyService:
@@ -88,16 +44,18 @@ class ValidatorDutyService:
         **kwargs: Unpack[ValidatorDutyServiceOptions],
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
-        self.beacon_chain = kwargs["beacon_chain"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
         self.duty_cache = kwargs["duty_cache"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]
-        self.scheduler = kwargs["scheduler"]
-        self.task_manager = kwargs["task_manager"]
-        self.cli_args = kwargs["cli_args"]
+        vero = kwargs["vero"]
+        self.beacon_chain = vero.beacon_chain
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
+        self.metrics = vero.metrics
+        self.cli_args = vero.cli_args
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
@@ -120,12 +78,6 @@ class ValidatorDutyService:
         # Avoids us updating validator duties multiple times
         # at the same time
         self._update_duties_lock = asyncio.Lock()
-
-        self._duty_start_time_metric, self._duty_submission_time_metric = (
-            _setup_duty_time_metrics(
-                seconds_per_slot=self.beacon_chain.SECONDS_PER_SLOT
-            )
-        )
 
     async def __aenter__(self) -> Self:
         raise NotImplementedError
@@ -210,7 +162,9 @@ class ValidatorDutyService:
                 await self._update_duties()
                 break
             except Exception as e:
-                ERRORS_METRIC.labels(error_type=ErrorType.DUTIES_UPDATE.value).inc()
+                self.metrics.errors_c.labels(
+                    error_type=ErrorType.DUTIES_UPDATE.value
+                ).inc()
                 self.logger.exception(
                     f"Failed to update duties: {e!r}",
                 )

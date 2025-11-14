@@ -10,8 +10,8 @@ from collections.abc import Generator
 
 import pytest
 
-from args import CLIArgs
 from main import main
+from providers import Vero
 
 
 @pytest.fixture
@@ -66,20 +66,14 @@ def _profile_program_run() -> Generator[None, None, None]:
 @pytest.mark.usefixtures("_profile_program_run")
 @pytest.mark.usefixtures("_unregister_prometheus_metrics")
 async def test_lifecycle(
-    cli_args: CLIArgs,
-    shutdown_event: asyncio.Event,
+    vero: Vero,
     enable_keymanager_api: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
     Sanity check that Vero can start running, perform its duties and shut down cleanly.
     """
-    run_services_task = asyncio.create_task(
-        main(
-            cli_args=cli_args,
-            shutdown_event=shutdown_event,
-        )
-    )
+    run_services_task = asyncio.create_task(main(vero=vero))
 
     # Wait for expected log lines to appear
     required_log_lines = [
@@ -139,7 +133,7 @@ async def test_lifecycle(
     # Send SIGTERM signal to process to initiate a clean shutdown
     os.kill(os.getpid(), signal.SIGTERM)
 
-    await shutdown_event.wait()
+    await vero.shutdown_event.wait()
     await run_services_task
 
     assert any("Received shutdown signal SIGTERM" in m for m in caplog.messages)

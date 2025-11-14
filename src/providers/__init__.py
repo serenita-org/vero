@@ -8,6 +8,7 @@ from .keymanager import Keymanager
 from .multi_beacon_node import MultiBeaconNode
 from .remote_signer import RemoteSigner
 from .signature_provider import SignatureProvider
+from .vero import Vero
 
 __all__ = [
     "DB",
@@ -20,4 +21,5 @@ __all__ = [
     "MultiBeaconNode",
     "RemoteSigner",
     "SignatureProvider",
+    "Vero",
 ]

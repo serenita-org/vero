@@ -10,9 +10,8 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
-from prometheus_client import Counter
 
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -20,12 +19,6 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec.utils import encode_graffiti
-
-_VC_PUBLISHED_BLOCKS = Counter(
-    "vc_published_blocks",
-    "Successfully published blocks",
-)
-_VC_PUBLISHED_BLOCKS.reset()
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -291,7 +284,7 @@ class BlockProposalService(ValidatorDutyService):
                     ],
                 )
             except Exception as e:
-                ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+                self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
                 self.logger.exception(
                     f"Failed to get signature for validator registrations: {e!r}",
                 )
@@ -379,7 +372,7 @@ class BlockProposalService(ValidatorDutyService):
         ):
             self.logger.info(f"Producing block for slot {slot}")
             self._last_slot_duty_started_for = slot
-            self._duty_start_time_metric.labels(
+            self.metrics.duty_start_time_h.labels(
                 duty=ValidatorDuty.BLOCK_PROPOSAL.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -389,7 +382,7 @@ class BlockProposalService(ValidatorDutyService):
                 try:
                     randao_reveal = await self._get_randao_reveal(duty=duty)
                 except Exception as e:
-                    ERRORS_METRIC.labels(
+                    self.metrics.errors_c.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
                     self.logger.exception(
@@ -423,7 +416,7 @@ class BlockProposalService(ValidatorDutyService):
                         randao_reveal=randao_reveal,
                     )
                 except Exception as e:
-                    ERRORS_METRIC.labels(
+                    self.metrics.errors_c.labels(
                         error_type=ErrorType.BLOCK_PRODUCE.value,
                     ).inc()
                     self.logger.exception(
@@ -462,7 +455,7 @@ class BlockProposalService(ValidatorDutyService):
                         identifier=duty.pubkey,
                     )
                 except Exception as e:
-                    ERRORS_METRIC.labels(
+                    self.metrics.errors_c.labels(
                         error_type=ErrorType.SIGNATURE.value,
                     ).inc()
                     self.logger.exception(
@@ -472,7 +465,7 @@ class BlockProposalService(ValidatorDutyService):
                     raise
 
             self.logger.info(f"Publishing block for slot {slot}")
-            self._duty_submission_time_metric.labels(
+            self.metrics.duty_submission_time_h.labels(
                 duty=ValidatorDuty.BLOCK_PROPOSAL.value,
             ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
 
@@ -502,7 +495,7 @@ class BlockProposalService(ValidatorDutyService):
                             ),
                         )
                 except Exception as e:
-                    ERRORS_METRIC.labels(
+                    self.metrics.errors_c.labels(
                         error_type=ErrorType.BLOCK_PUBLISH.value,
                     ).inc()
                     self.logger.exception(
@@ -513,7 +506,6 @@ class BlockProposalService(ValidatorDutyService):
                     self.logger.info(
                         f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
                     )
-
-                    _VC_PUBLISHED_BLOCKS.inc()
+                    self.metrics.vc_published_blocks_c.inc()
                 finally:
                     self._last_slot_duty_completed_for = slot
