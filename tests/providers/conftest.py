@@ -10,7 +10,7 @@ from providers import MultiBeaconNode, Vero
 
 
 @pytest.fixture
-async def vero_three_nodes(cli_args: CLIArgs) -> Vero:
+def vero_three_nodes(cli_args: CLIArgs) -> Vero:
     _cli_args_override = deepcopy(cli_args)
     _cli_args_override.beacon_node_urls = [
         "http://beacon-node-a:1234",
@@ -24,7 +24,6 @@ async def vero_three_nodes(cli_args: CLIArgs) -> Vero:
 @pytest.fixture
 async def multi_beacon_node_three_inited_nodes(
     mocked_fork_response: dict,  # type: ignore[type-arg]
-    mocked_genesis_response: dict,  # type: ignore[type-arg]
     vero_three_nodes: Vero,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     mbn = MultiBeaconNode(vero=vero_three_nodes)
@@ -33,13 +32,6 @@ async def multi_beacon_node_three_inited_nodes(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"),
             callback=lambda *args, **kwargs: CallbackResult(
                 payload=mocked_fork_response,
-            ),
-            repeat=True,
-        )
-        m.get(
-            re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
-            callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_genesis_response,
             ),
             repeat=True,
         )

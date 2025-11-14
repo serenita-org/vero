@@ -118,12 +118,7 @@ class MultiBeaconNode:
             self.logger.info(f"Retrying in {self._init_retry_interval} seconds")
             await asyncio.sleep(self._init_retry_interval)
 
-        # Check the connected beacon nodes genesis, spec
-        if not len({bn.genesis for bn in self.initialized_beacon_nodes}) == 1:
-            raise RuntimeError(
-                f"Beacon nodes provided different genesis:"
-                f" {[bn.genesis for bn in self.initialized_beacon_nodes]}",
-            )
+        # Check the connected beacon nodes spec
         if not len({bn.spec for bn in self.initialized_beacon_nodes}) == 1:
             raise RuntimeError(
                 f"Beacon nodes provided different specs:"

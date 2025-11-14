@@ -7,9 +7,10 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
 from observability import get_service_commit, get_service_version
+from providers import BeaconChain, BeaconNode
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu
-from spec.configs import get_network_spec
+from spec.base import Genesis, SpecFulu
+from spec.configs import Network, get_genesis_for_network, get_network_spec
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -34,15 +35,8 @@ class Vero:
         logging.getLogger("vero-init").info(
             f"Starting vero {get_service_version()} (commit {get_service_commit()})",
         )
-
-        self.cli_args = cli_args
-        self.spec = load_spec(cli_args=cli_args)
-
         self.shutdown_event = asyncio.Event()
-
-        self.validator_duty_services: list[ValidatorDutyService] = []
         self.task_manager = TaskManager(shutdown_event=self.shutdown_event)
-
         self.scheduler = AsyncIOScheduler(
             timezone=datetime.UTC,
             job_defaults=dict(
@@ -51,4 +45,25 @@ class Vero:
                 misfire_grace_time=None,  # default is 1 second
             ),
         )
-        self.scheduler.start()
+
+        self.cli_args = cli_args
+        self.spec = load_spec(cli_args=cli_args)
+        if cli_args.network == Network.CUSTOM:
+            # get genesis from beacon node on-demand
+            genesis = asyncio.run(self._get_genesis_for_custom_network())
+        else:
+            genesis = get_genesis_for_network(network=self.cli_args.network)
+
+        self.beacon_chain = BeaconChain(
+            spec=self.spec,
+            genesis=genesis,
+            task_manager=self.task_manager,
+        )
+
+        self.validator_duty_services: list[ValidatorDutyService] = []
+
+    async def _get_genesis_for_custom_network(self) -> Genesis:
+        bn = BeaconNode(base_url=self.cli_args.beacon_node_urls[0], vero=self)
+        genesis = await bn.get_genesis()
+        await bn.client_session.close()
+        return genesis

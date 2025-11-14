@@ -17,7 +17,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import Genesis, SpecFulu
+from spec.base import SpecFulu
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -44,18 +44,12 @@ def mocked_fork_response(beacon_chain: BeaconChain, spec: SpecFulu) -> dict:  # 
     return dict(data=beacon_chain.get_fork(beacon_chain.current_slot))
 
 
-@pytest.fixture(scope="session")
-def mocked_genesis_response(genesis: Genesis) -> dict:  # type: ignore[type-arg]
-    return dict(data=genesis.to_obj())
-
-
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
     spec: SpecFulu,
     beacon_chain: BeaconChain,
     mocked_fork_response: dict,  # type: ignore[type-arg]
-    mocked_genesis_response: dict,  # type: ignore[type-arg]
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
     response_content_type: ContentType,
@@ -63,9 +57,6 @@ def _mocked_beacon_node_endpoints(
     def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match(r"/eth/v1/beacon/states/\w+/fork", url.raw_path):
             return CallbackResult(payload=mocked_fork_response)
-
-        if re.match("/eth/v1/beacon/genesis", url.raw_path):
-            return CallbackResult(payload=mocked_genesis_response)
 
         if re.match("/eth/v1/config/spec", url.raw_path):
             return CallbackResult(payload=dict(data=spec.to_obj()))

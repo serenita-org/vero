@@ -19,7 +19,6 @@ from spec.common import UInt64SerializedAsString
 )
 async def test_initialize_spec_mismatch(
     spec_mismatch: bool,
-    mocked_genesis_response: dict,  # type: ignore[type-arg]
     vero: Vero,
 ) -> None:
     """The BeaconNode should fail to initialize on a spec mismatch."""
@@ -32,12 +31,6 @@ async def test_initialize_spec_mismatch(
             spec_to_return.SLOTS_PER_EPOCH = UInt64SerializedAsString(5)
             spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
 
-        m.get(
-            url=re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
-            callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_genesis_response,
-            ),
-        )
         m.get(
             url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
             callback=lambda *args, **kwargs: CallbackResult(

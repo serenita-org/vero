@@ -1,24 +1,18 @@
 import pytest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from providers import BeaconChain, BeaconNode, MultiBeaconNode, Vero
+from providers import BeaconNode, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from services import EventConsumerService
-from tasks import TaskManager
 
 
 @pytest.fixture
 def event_consumer(
     multi_beacon_node: MultiBeaconNode,
-    beacon_chain: BeaconChain,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
 ) -> EventConsumerService:
     return EventConsumerService(
         beacon_nodes=multi_beacon_node.beacon_nodes,
-        beacon_chain=beacon_chain,
-        scheduler=scheduler,
-        task_manager=task_manager,
+        vero=vero,
     )
 
 

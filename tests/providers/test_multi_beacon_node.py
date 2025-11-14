@@ -69,7 +69,6 @@ async def test_initialize(
     beacon_node_availabilities: list[bool],
     expected_initialization_success: bool,
     mocked_fork_response: dict,  # type: ignore[type-arg]
-    mocked_genesis_response: dict,  # type: ignore[type-arg]
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon node is able to initialize if enough
@@ -99,12 +98,6 @@ async def test_initialize(
                     ),
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=mocked_fork_response,
-                    ),
-                )
-                m.get(
-                    url=re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
-                    callback=lambda *args, **kwargs: CallbackResult(
-                        payload=mocked_genesis_response,
                     ),
                 )
                 m.get(

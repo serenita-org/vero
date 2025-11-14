@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from providers import BeaconChain
+from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
 from schemas.validator import ValidatorIndexPubkey
 from services import SyncCommitteeService
@@ -128,7 +128,7 @@ async def test_aggregate_sync_messages(
 
 
 async def test_update_duties_exited_validators(
-    beacon_chain: BeaconChain, caplog: pytest.LogCaptureFixture
+    vero: Vero, caplog: pytest.LogCaptureFixture
 ) -> None:
     """
     # Tests that we update sync duties for exited validators too since
@@ -145,14 +145,11 @@ async def test_update_duties_exited_validators(
 
     service = SyncCommitteeService(
         multi_beacon_node=None,  # type: ignore[arg-type]
-        beacon_chain=beacon_chain,
         signature_provider=None,  # type: ignore[arg-type]
         keymanager=None,  # type: ignore[arg-type]
         duty_cache=None,  # type: ignore[arg-type]
         validator_status_tracker_service=MockValidatorStatusTrackerService(),  # type: ignore[arg-type]
-        scheduler=None,
-        task_manager=None,  # type: ignore[arg-type]
-        cli_args=None,  # type: ignore[arg-type]
+        vero=vero,
     )
 
     with pytest.raises(

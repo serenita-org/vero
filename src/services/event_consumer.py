@@ -6,13 +6,11 @@ from collections.abc import Callable, Coroutine, Hashable
 from typing import Any
 from uuid import uuid4
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Counter, Histogram
 
 from observability import ERRORS_METRIC, ErrorType
-from providers import BeaconChain, BeaconNode
+from providers import BeaconNode, Vero
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
 
 
 def _setup_head_event_time_metric(
@@ -64,14 +62,12 @@ class EventConsumerService:
     def __init__(
         self,
         beacon_nodes: list[BeaconNode],
-        beacon_chain: BeaconChain,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
+        vero: Vero,
     ):
         self.beacon_nodes = beacon_nodes
-        self.beacon_chain: BeaconChain = beacon_chain
-        self.scheduler = scheduler
-        self.task_manager = task_manager
+        self.beacon_chain = vero.beacon_chain
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -94,8 +90,8 @@ class EventConsumerService:
         self._recent_event_keys: deque[Hashable] = deque(maxlen=10 * len(beacon_nodes))
 
         self._head_event_time_metric = _setup_head_event_time_metric(
-            seconds_per_slot=beacon_chain.SECONDS_PER_SLOT,
-            attestation_deadline=beacon_chain.SECONDS_PER_INTERVAL,
+            seconds_per_slot=vero.beacon_chain.SECONDS_PER_SLOT,
+            attestation_deadline=vero.beacon_chain.SECONDS_PER_INTERVAL,
         )
 
     def start(self) -> None:

@@ -8,7 +8,6 @@ from pathlib import Path
 from observability.event_loop import monitor_event_loop
 from providers import (
     DB,
-    BeaconChain,
     DoppelgangerDetector,
     DutyCache,
     Keymanager,
@@ -96,6 +95,8 @@ def check_data_dir_permissions(data_dir: Path) -> None:
 
 
 async def run_services(vero: Vero) -> None:
+    vero.scheduler.start()
+
     async with contextlib.AsyncExitStack() as exit_stack:
         db = exit_stack.enter_context(DB(data_dir=vero.cli_args.data_dir))
         db.run_migrations()
@@ -104,11 +105,7 @@ async def run_services(vero: Vero) -> None:
             MultiBeaconNode(vero=vero)
         )
 
-        beacon_chain = BeaconChain(
-            spec=vero.spec,
-            genesis=multi_beacon_node.best_beacon_node.genesis,
-            task_manager=vero.task_manager,
-        )
+        beacon_chain = vero.beacon_chain
         await _wait_for_genesis(
             genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
         )
@@ -116,10 +113,8 @@ async def run_services(vero: Vero) -> None:
         process_pool_executor = ProcessPoolExecutor()
         keymanager = Keymanager(
             db=db,
-            beacon_chain=beacon_chain,
             multi_beacon_node=multi_beacon_node,
-            task_manager=vero.task_manager,
-            cli_args=vero.cli_args,
+            vero=vero,
             process_pool_executor=process_pool_executor,
         )
         signature_provider: Keymanager | RemoteSigner
@@ -144,10 +139,8 @@ async def run_services(vero: Vero) -> None:
 
         validator_status_tracker_service = ValidatorStatusTrackerService(
             multi_beacon_node=multi_beacon_node,
-            beacon_chain=beacon_chain,
             signature_provider=signature_provider,
-            scheduler=vero.scheduler,
-            task_manager=vero.task_manager,
+            vero=vero,
         )
         await validator_status_tracker_service.initialize()
         beacon_chain.new_slot_handlers.append(
@@ -168,14 +161,11 @@ async def run_services(vero: Vero) -> None:
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
-            beacon_chain=beacon_chain,
             signature_provider=signature_provider,
             keymanager=keymanager,
             duty_cache=DutyCache(data_dir=vero.cli_args.data_dir),
             validator_status_tracker_service=validator_status_tracker_service,
-            scheduler=vero.scheduler,
-            cli_args=vero.cli_args,
-            task_manager=vero.task_manager,
+            vero=vero,
         )
 
         attestation_service = AttestationService(**validator_service_args)
@@ -194,9 +184,7 @@ async def run_services(vero: Vero) -> None:
 
         event_consumer_service = EventConsumerService(
             beacon_nodes=multi_beacon_node.beacon_nodes,
-            beacon_chain=beacon_chain,
-            scheduler=vero.scheduler,
-            task_manager=vero.task_manager,
+            vero=vero,
         )
 
         _register_event_handlers(

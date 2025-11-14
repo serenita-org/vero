@@ -169,8 +169,6 @@ class BeaconNode:
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
 
     async def _initialize_full(self) -> None:
-        self.genesis = await self.get_genesis()
-
         # Raise if the spec returned by the beacon node differs
         bn_spec = await self.get_spec()
         if self.spec != bn_spec:

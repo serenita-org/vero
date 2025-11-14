@@ -223,21 +223,17 @@ def process_pool_executor() -> ProcessPoolExecutor:
 @pytest.fixture
 async def keymanager(
     empty_db: DB,
-    beacon_chain: BeaconChain,
-    cli_args: CLIArgs,
     multi_beacon_node: MultiBeaconNode,
-    task_manager: TaskManager,
     remote_signer_url: str,
+    vero: Vero,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[Keymanager, None]:
     async with Keymanager(
         db=empty_db,
-        beacon_chain=beacon_chain,
         multi_beacon_node=multi_beacon_node,
-        task_manager=task_manager,
-        cli_args=cli_args,
+        vero=vero,
         process_pool_executor=process_pool_executor,
     ) as keymanager:
         yield keymanager
@@ -283,24 +279,20 @@ async def signature_provider(
 @pytest.fixture
 async def validator_status_tracker(
     multi_beacon_node: MultiBeaconNode,
-    beacon_chain: BeaconChain,
     signature_provider: SignatureProvider,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
 ) -> ValidatorStatusTrackerService:
     validator_status_tracker = ValidatorStatusTrackerService(
         multi_beacon_node=multi_beacon_node,
-        beacon_chain=beacon_chain,
         signature_provider=signature_provider,
-        scheduler=scheduler,
-        task_manager=task_manager,
+        vero=vero,
     )
     await validator_status_tracker.initialize()
     return validator_status_tracker
 
 
 @pytest.fixture
-async def vero(cli_args: CLIArgs) -> Vero:
+def vero(cli_args: CLIArgs) -> Vero:
     return Vero(cli_args=cli_args)
 
 
@@ -315,21 +307,11 @@ async def multi_beacon_node(
         yield mbn
 
 
-@pytest.fixture(scope="session")
-def genesis(spec: SpecFulu) -> Genesis:
-    # Fake genesis 1 hour ago
-    return Genesis(
-        genesis_time=int(time.time() - 3600),
-        genesis_validators_root="0x9143aa7c615a7f7115e2b6aac319c03529df8242ae705fba9df39b79c59fa8b1",
-        genesis_fork_version=spec.GENESIS_FORK_VERSION,
-    )
-
-
 @pytest.fixture
 def beacon_chain(
-    spec: SpecFulu, genesis: Genesis, task_manager: TaskManager
+    vero: Vero,
 ) -> BeaconChain:
-    return BeaconChain(spec=spec, genesis=genesis, task_manager=task_manager)
+    return vero.beacon_chain
 
 
 @pytest.fixture

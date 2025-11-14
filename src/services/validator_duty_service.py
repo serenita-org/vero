@@ -5,21 +5,18 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
 import msgspec
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from prometheus_client import Histogram
 
-from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
 from providers import (
-    BeaconChain,
     DutyCache,
     Keymanager,
     MultiBeaconNode,
     SignatureProvider,
+    Vero,
 )
 from schemas import SchemaBeaconAPI
-from tasks import TaskManager
 
 if TYPE_CHECKING:
     from services import ValidatorStatusTrackerService
@@ -35,14 +32,11 @@ class ValidatorDuty(Enum):
 
 class ValidatorDutyServiceOptions(TypedDict):
     multi_beacon_node: MultiBeaconNode
-    beacon_chain: BeaconChain
     signature_provider: SignatureProvider
     keymanager: Keymanager
     duty_cache: DutyCache
     validator_status_tracker_service: "ValidatorStatusTrackerService"
-    scheduler: AsyncIOScheduler
-    task_manager: TaskManager
-    cli_args: CLIArgs
+    vero: Vero
 
 
 _DUTY_START_TIME_METRIC = None
@@ -88,16 +82,17 @@ class ValidatorDutyService:
         **kwargs: Unpack[ValidatorDutyServiceOptions],
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
-        self.beacon_chain = kwargs["beacon_chain"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
         self.duty_cache = kwargs["duty_cache"]
         self.validator_status_tracker_service = kwargs[
             "validator_status_tracker_service"
         ]
-        self.scheduler = kwargs["scheduler"]
-        self.task_manager = kwargs["task_manager"]
-        self.cli_args = kwargs["cli_args"]
+        vero = kwargs["vero"]
+        self.beacon_chain = vero.beacon_chain
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
+        self.cli_args = vero.cli_args
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)

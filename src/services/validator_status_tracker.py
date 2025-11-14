@@ -1,11 +1,10 @@
 import asyncio
 import logging
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from prometheus_client import Gauge
 
 from observability import ERRORS_METRIC, ErrorType
-from providers import BeaconChain, MultiBeaconNode, SignatureProvider
+from providers import MultiBeaconNode, SignatureProvider, Vero
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
@@ -14,7 +13,6 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
-from tasks import TaskManager
 
 _VALIDATORS_COUNT = Gauge(
     "validator_status",
@@ -34,16 +32,14 @@ class ValidatorStatusTrackerService:
     def __init__(
         self,
         multi_beacon_node: MultiBeaconNode,
-        beacon_chain: BeaconChain,
         signature_provider: SignatureProvider,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
+        vero: Vero,
     ):
         self.multi_beacon_node = multi_beacon_node
-        self.beacon_chain = beacon_chain
+        self.beacon_chain = vero.beacon_chain
         self.signature_provider = signature_provider
-        self.scheduler = scheduler
-        self.task_manager = task_manager
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
 
         self.logger = logging.getLogger(self.__class__.__name__)
 
