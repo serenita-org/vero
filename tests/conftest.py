@@ -23,6 +23,7 @@ from providers import (
     DB,
     SignatureProvider,
     DutyCache,
+    Vero,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
@@ -299,21 +300,17 @@ async def validator_status_tracker(
 
 
 @pytest.fixture
+async def vero(cli_args: CLIArgs) -> Vero:
+    return Vero(cli_args=cli_args)
+
+
+@pytest.fixture
 async def multi_beacon_node(
-    cli_args: CLIArgs,
     _mocked_beacon_node_endpoints: None,
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
-    beacon_chain: BeaconChain,
+    vero: Vero,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     async with MultiBeaconNode(
-        beacon_node_urls=cli_args.beacon_node_urls,
-        beacon_node_urls_proposal=cli_args.beacon_node_urls_proposal,
-        spec=spec,
-        scheduler=scheduler,
-        task_manager=task_manager,
-        cli_args=cli_args,
+        vero=vero,
     ) as mbn:
         yield mbn
 

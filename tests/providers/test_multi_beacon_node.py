@@ -14,17 +14,15 @@ from functools import partial
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from remerkleable.bitfields import Bitlist, Bitvector
 
 from args import CLIArgs, _process_attestation_consensus_threshold
-from providers import BeaconChain, MultiBeaconNode
+from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
 from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
-from tasks import TaskManager
 
 
 @pytest.mark.parametrize(
@@ -72,10 +70,6 @@ async def test_initialize(
     expected_initialization_success: bool,
     mocked_fork_response: dict,  # type: ignore[type-arg]
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    beacon_chain: BeaconChain,
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon node is able to initialize if enough
@@ -83,9 +77,12 @@ async def test_initialize(
     """
     assert len(beacon_node_urls) == len(beacon_node_availabilities)
     _cli_args_for_test = deepcopy(cli_args)
+    _cli_args_for_test.beacon_node_urls = beacon_node_urls
     _cli_args_for_test.attestation_consensus_threshold = (
         _process_attestation_consensus_threshold(None, beacon_node_urls)
     )
+
+    vero = Vero(cli_args=_cli_args_for_test)
 
     async with contextlib.AsyncExitStack() as exit_stack:
         m = exit_stack.enter_context(aioresponses())
@@ -113,13 +110,13 @@ async def test_initialize(
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=spec.to_obj()),
+                        payload=dict(data=vero.spec.to_obj()),
                     ),
                 )
                 m.get(
                     url=re.compile(r"http://beacon-node-\w:1234/eth/v1/node/version"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=dict(version="vero/test")),
+                        payload=dict(data=dict(version="beacon-node/test")),
                     ),
                 )
             else:
@@ -131,14 +128,7 @@ async def test_initialize(
                     exception=ValueError("Beacon node unavailable"),
                 )
 
-        mbn_base = MultiBeaconNode(
-            beacon_node_urls=beacon_node_urls,
-            beacon_node_urls_proposal=[],
-            spec=spec,
-            scheduler=scheduler,
-            task_manager=task_manager,
-            cli_args=_cli_args_for_test,
-        )
+        mbn_base = MultiBeaconNode(vero=vero)
         mbn_base._init_timeout = 1
         mbn_base._init_retry_interval = 0.1
 

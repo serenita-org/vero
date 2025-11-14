@@ -1,10 +1,12 @@
 import asyncio
 import logging
 from math import floor
+from typing import TYPE_CHECKING
 
 from prometheus_client import Gauge, Histogram
 
-from providers import BeaconChain
+if TYPE_CHECKING:
+    from providers import BeaconChain
 
 EVENT_LOOP_LAG = Histogram(
     "event_loop_lag_seconds",
@@ -18,7 +20,7 @@ EVENT_LOOP_TASKS = Gauge(
 
 
 async def monitor_event_loop(
-    beacon_chain: BeaconChain, shutdown_event: asyncio.Event
+    beacon_chain: "BeaconChain", shutdown_event: asyncio.Event
 ) -> None:
     _logger = logging.getLogger("event-loop")
     event_loop = asyncio.get_running_loop()

@@ -7,7 +7,7 @@ import json
 import logging
 import warnings
 from collections.abc import AsyncIterable
-from typing import Literal, Unpack
+from typing import TYPE_CHECKING, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
@@ -15,7 +15,6 @@ import msgspec
 from aiohttp import ClientTimeout
 from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from prometheus_client import Counter as CounterMetric
@@ -34,7 +33,9 @@ from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
 from spec.base import Genesis, SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
+
+if TYPE_CHECKING:
+    from .vero import Vero
 
 _TIMEOUT_DEFAULT_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10
@@ -110,9 +111,7 @@ class BeaconNode:
     def __init__(
         self,
         base_url: str,
-        spec: SpecFulu,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
+        vero: "Vero",
     ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -123,11 +122,11 @@ class BeaconNode:
         if not self.host:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
-        self.spec = spec
-        self.SECONDS_PER_INTERVAL = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.spec = vero.spec
+        self.SECONDS_PER_INTERVAL = int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
-        self.scheduler = scheduler
-        self.task_manager = task_manager
+        self.scheduler = vero.scheduler
+        self.task_manager = vero.task_manager
 
         self.initialized = False
         self._score = 0

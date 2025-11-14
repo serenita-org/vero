@@ -2,19 +2,19 @@ import asyncio
 import logging
 import signal
 
-from services import BlockProposalService, ValidatorDutyService
-from tasks import TaskManager
+from providers import Vero
+from services import BlockProposalService
 
 _logger = logging.getLogger("vero-shutdown")
 
 
 async def shut_down(
-    validator_duty_services: list[ValidatorDutyService], shutdown_event: asyncio.Event
+    vero: Vero,
 ) -> None:
     # Wait for ongoing/upcoming validator duties to be completed
     # before shutting down
     block_proposal_service = next(
-        s for s in validator_duty_services if isinstance(s, BlockProposalService)
+        s for s in vero.validator_duty_services if isinstance(s, BlockProposalService)
     )
     beacon_chain = block_proposal_service.beacon_chain
 
@@ -40,24 +40,17 @@ async def shut_down(
     _logger.info("Waiting for duty completion")
     wait_tasks = [
         asyncio.create_task(s.wait_for_duty_completion())
-        for s in validator_duty_services
+        for s in vero.validator_duty_services
     ]
     await asyncio.gather(*wait_tasks)
 
     _logger.info("Shutting down...")
-    shutdown_event.set()
+    vero.shutdown_event.set()
 
 
 def shutdown_handler(
     signo: int,
-    validator_duty_services: list[ValidatorDutyService],
-    shutdown_event: asyncio.Event,
-    task_manager: TaskManager,
+    vero: Vero,
 ) -> None:
     _logger.info(f"Received shutdown signal {signal.Signals(signo).name}")
-    task_manager.create_task(
-        shut_down(
-            validator_duty_services=validator_duty_services,
-            shutdown_event=shutdown_event,
-        )
-    )
+    vero.task_manager.create_task(shut_down(vero=vero))

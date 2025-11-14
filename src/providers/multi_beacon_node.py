@@ -39,33 +39,27 @@ import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from remerkleable.complex import Container
 
-from args import CLIArgs
 from observability import ERRORS_METRIC, ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
 
 from .beacon_node import BeaconNode
+
+if TYPE_CHECKING:
+    from .vero import Vero
 
 
 class MultiBeaconNode:
     def __init__(
         self,
-        beacon_node_urls: list[str],
-        beacon_node_urls_proposal: list[str],
-        spec: SpecFulu,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
-        cli_args: CLIArgs,
+        vero: "Vero",
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
@@ -73,28 +67,26 @@ class MultiBeaconNode:
         self.beacon_nodes = [
             BeaconNode(
                 base_url=base_url,
-                spec=spec,
-                scheduler=scheduler,
-                task_manager=task_manager,
+                vero=vero,
             )
-            for base_url in beacon_node_urls
+            for base_url in vero.cli_args.beacon_node_urls
         ]
         self.beacon_nodes_proposal = [
             BeaconNode(
                 base_url=base_url,
-                spec=spec,
-                scheduler=scheduler,
-                task_manager=task_manager,
+                vero=vero,
             )
-            for base_url in beacon_node_urls_proposal
+            for base_url in vero.cli_args.beacon_node_urls_proposal
         ]
 
-        self.spec = spec
-        self.SECONDS_PER_INTERVAL = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.spec = vero.spec
+        self.SECONDS_PER_INTERVAL = int(vero.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
-        self.cli_args = cli_args
+        self.cli_args = vero.cli_args
 
-        self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
+        self._attestation_consensus_threshold = (
+            vero.cli_args.attestation_consensus_threshold
+        )
         # On startup, try to initialize beacon nodes for 5 minutes
         # before raising an Exception.
         self._init_timeout = 300

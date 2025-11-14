@@ -4,12 +4,10 @@ from copy import copy
 
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from providers import BeaconNode
-from spec.base import SpecFulu, Version
+from providers import BeaconNode, Vero
+from spec.base import Version
 from spec.common import UInt64SerializedAsString
-from tasks import TaskManager
 
 
 @pytest.mark.parametrize(
@@ -22,17 +20,15 @@ from tasks import TaskManager
 async def test_initialize_spec_mismatch(
     spec_mismatch: bool,
     mocked_genesis_response: dict,  # type: ignore[type-arg]
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
 ) -> None:
     """The BeaconNode should fail to initialize on a spec mismatch."""
     with contextlib.ExitStack() as stack:
         m = stack.enter_context(aioresponses())
 
-        spec_to_return = spec
+        spec_to_return = vero.spec
         if spec_mismatch:
-            spec_to_return = copy(spec)
+            spec_to_return = copy(vero.spec)
             spec_to_return.SLOTS_PER_EPOCH = UInt64SerializedAsString(5)
             spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
 
@@ -51,9 +47,7 @@ async def test_initialize_spec_mismatch(
 
         bn = BeaconNode(
             base_url="http://beacon-node-a:1234",
-            spec=spec,
-            scheduler=scheduler,
-            task_manager=task_manager,
+            vero=vero,
         )
         if spec_mismatch:
             with pytest.raises(

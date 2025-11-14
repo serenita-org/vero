@@ -1,10 +1,9 @@
 import pytest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from providers import BeaconChain, BeaconNode, MultiBeaconNode
+from providers import BeaconChain, BeaconNode, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from services import EventConsumerService
-from spec.base import SpecFulu
 from tasks import TaskManager
 
 
@@ -96,18 +95,14 @@ async def test_handle_event(
     event: SchemaBeaconAPI.BeaconNodeEvent,
     expected_log_messages: list[str],
     event_consumer: EventConsumerService,
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     event_consumer._handle_event(
         event=event,
         beacon_node=BeaconNode(
             base_url="http://bn-test",
-            spec=spec,
-            scheduler=scheduler,
-            task_manager=task_manager,
+            vero=vero,
         ),
     )
 
@@ -118,9 +113,7 @@ async def test_handle_event(
 @pytest.mark.usefixtures("_unregister_prometheus_metrics")
 async def test_recent_event_keys(
     event_consumer: EventConsumerService,
-    spec: SpecFulu,
-    scheduler: AsyncIOScheduler,
-    task_manager: TaskManager,
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     for i in range(100):
@@ -134,9 +127,7 @@ async def test_recent_event_keys(
             ),
             beacon_node=BeaconNode(
                 base_url="http://bn-test",
-                spec=spec,
-                scheduler=scheduler,
-                task_manager=task_manager,
+                vero=vero,
             ),
         )
 
