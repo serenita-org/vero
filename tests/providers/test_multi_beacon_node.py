@@ -247,6 +247,7 @@ async def test_initialize_retry_logic(
 
         # The above scenario should not result in multiple initialization attempts
         # for the BeaconNode instances.
+        assert len(mbn_base.initialized_beacon_nodes) == 3
         assert not any("ConflictingIdError" in m for m in caplog.messages)
 
 
