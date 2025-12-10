@@ -130,8 +130,6 @@ async def test_initialize(
             cli_args=_cli_args_for_test,
         )
         mbn_base._init_timeout = 1
-        # TODO remove this one - the internal property on MBN no longer exists post-fix
-        mbn_base._init_retry_interval = 0.1
         for bn in mbn_base.beacon_nodes:
             bn._init_retry_interval = 0.1
 
@@ -246,6 +244,9 @@ async def test_initialize_retry_logic(
             bn._init_retry_interval = 0.1
 
         await exit_stack.enter_async_context(mbn_base)
+
+        # The above scenario should not result in multiple initialization attempts
+        # for the BeaconNode instances.
         assert not any("ConflictingIdError" in m for m in caplog.messages)
 
 
