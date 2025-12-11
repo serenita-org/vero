@@ -111,8 +111,7 @@ class MultiBeaconNode:
 
         self.logger.info("Initializing beacon nodes")
         # Initialize the connected beacon nodes - retry logic is already present inside
-        init_coroutines = [bn.initialize_full() for bn in self.beacon_nodes]
-        await asyncio.gather(*init_coroutines)
+        await asyncio.gather(*(bn.initialize_full() for bn in self.beacon_nodes))
 
         while (
             len(self.initialized_beacon_nodes) < self._attestation_consensus_threshold
