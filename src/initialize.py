@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -148,7 +149,9 @@ async def run_services(
             genesis_timestamp=beacon_chain.get_timestamp_for_slot(0)
         )
 
-        process_pool_executor = ProcessPoolExecutor()
+        process_pool_executor = ProcessPoolExecutor(
+            max_workers=int(os.getenv("PYTHON_CPU_COUNT", "1"))
+        )
         keymanager = Keymanager(
             db=db,
             beacon_chain=beacon_chain,
