@@ -156,7 +156,7 @@ async def test_initialize_retry_logic(
     """Tests that the multi-beacon node correctly handles retry logic during initialization.
     This logic was improved in response to a bug report (https://github.com/serenita-org/vero/issues/245)
     where Vero attempted to initialize already-initialized beacon nodes which resulted in
-    ERROR messages in the logs.
+    ERROR-level messages in the logs.
     """
     beacon_node_urls = [
         "http://beacon-node-a:1234",
@@ -165,6 +165,8 @@ async def test_initialize_retry_logic(
     ]
 
     _cli_args_for_test = deepcopy(cli_args)
+    # Set the consensus threshold to 3/3, requiring all beacon nodes
+    # to initialize successfully
     _cli_args_for_test.attestation_consensus_threshold = 3
 
     async with contextlib.AsyncExitStack() as exit_stack:
@@ -172,7 +174,7 @@ async def test_initialize_retry_logic(
 
         # Mock responses.
         # Beacon node A and B are online right away and stay online.
-        # Beacon node C is offline at first but goes online later.
+        # Beacon node C is offline at first but becomes available later.
         # This means the very first initialization fails, and
         # the next one succeeds.
         online_bn_urls = beacon_node_urls[:2]
@@ -245,9 +247,26 @@ async def test_initialize_retry_logic(
 
         await exit_stack.enter_async_context(mbn_base)
 
-        # The above scenario should not result in multiple initialization attempts
-        # for the BeaconNode instances.
+        # First init of beacon-node-c will fail, causing the MultiBeaconNode
+        # initialization to fail at first too.
+        assert (
+            "Failed to initialize beacon node at http://beacon-node-c:1234: ValueError('Beacon node unavailable'). Retrying in 0.1 seconds."
+            in caplog.messages
+        )
+        assert (
+            "Failed to fully initialize a sufficient amount of beacon nodes - 2/3 initialized (required: 3)"
+            in caplog.messages
+        )
+        # The next requests to beacon-node-c succeed though, allowing it to initialize
+        # successfully on the second attempt.
+        assert "Initialized beacon node at http://beacon-node-c:1234" in caplog.messages
+        # This then allows the MultiBeaconNode to initialize as well.
+        assert "Successfully initialized 3/3 beacon nodes" in caplog.messages
         assert len(mbn_base.initialized_beacon_nodes) == 3
+
+        # The above scenario should not result in multiple initialization attempts
+        # for the BeaconNode instances (which cause ConflictingIdError exceptions
+        # in the scheduler for the `update_node_version` job).
         assert not any("ConflictingIdError" in m for m in caplog.messages)
 
 

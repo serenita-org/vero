@@ -120,7 +120,7 @@ class MultiBeaconNode:
                 raise RuntimeError(_init_error_message())
 
             self.logger.warning(_init_error_message())
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.1)
 
         # Check the connected beacon nodes genesis, spec
         if not len({bn.genesis for bn in self.initialized_beacon_nodes}) == 1:
