@@ -9,7 +9,6 @@ from spec.base import SpecFulu, parse_spec
 
 class Network(Enum):
     MAINNET = "mainnet"
-    HOLESKY = "holesky"
     HOODI = "hoodi"
 
     GNOSIS = "gnosis"
