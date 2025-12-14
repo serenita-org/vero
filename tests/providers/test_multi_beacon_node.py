@@ -90,34 +90,26 @@ async def test_initialize(
     async with contextlib.AsyncExitStack() as exit_stack:
         m = exit_stack.enter_context(aioresponses())
 
-        for _url, beacon_node_available in zip(
+        for bn_url, beacon_node_available in zip(
             beacon_node_urls,
             beacon_node_availabilities,
             strict=True,
         ):
             if beacon_node_available:
                 m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork",
-                    ),
-                    callback=lambda *args, **kwargs: CallbackResult(
-                        payload=mocked_fork_response,
-                    ),
-                )
-                m.get(
-                    url=re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
+                    url=re.compile(rf"{bn_url}/eth/v1/beacon/genesis"),
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=mocked_genesis_response,
                     ),
                 )
                 m.get(
-                    url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
+                    url=re.compile(rf"{bn_url}/eth/v1/config/spec"),
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=spec.to_obj()),
                     ),
                 )
                 m.get(
-                    url=re.compile(r"http://beacon-node-\w:1234/eth/v1/node/version"),
+                    url=re.compile(rf"{bn_url}/eth/v1/node/version"),
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=dict(version="vero/test")),
                     ),
@@ -125,9 +117,7 @@ async def test_initialize(
             else:
                 # Fail the first request that is made during initialization
                 m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork",
-                    ),
+                    url=re.compile(rf"{bn_url}/eth/v1/beacon/genesis"),
                     exception=ValueError("Beacon node unavailable"),
                 )
 
@@ -140,7 +130,8 @@ async def test_initialize(
             cli_args=_cli_args_for_test,
         )
         mbn_base._init_timeout = 1
-        mbn_base._init_retry_interval = 0.1
+        for bn in mbn_base.beacon_nodes:
+            bn._init_retry_interval = 0.1
 
         if expected_initialization_success:
             await exit_stack.enter_async_context(mbn_base)
@@ -150,6 +141,133 @@ async def test_initialize(
                 match="Failed to fully initialize a sufficient amount of beacon nodes",
             ):
                 await exit_stack.enter_async_context(mbn_base)
+
+
+async def test_initialize_retry_logic(
+    mocked_fork_response: dict,  # type: ignore[type-arg]
+    mocked_genesis_response: dict,  # type: ignore[type-arg]
+    beacon_chain: BeaconChain,
+    spec: SpecFulu,
+    scheduler: AsyncIOScheduler,
+    task_manager: TaskManager,
+    cli_args: CLIArgs,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Tests that the multi-beacon node correctly handles retry logic during initialization.
+    This logic was improved in response to a bug report (https://github.com/serenita-org/vero/issues/245)
+    where Vero attempted to initialize already-initialized beacon nodes which resulted in
+    ERROR-level messages in the logs.
+    """
+    beacon_node_urls = [
+        "http://beacon-node-a:1234",
+        "http://beacon-node-b:1234",
+        "http://beacon-node-c:1234",
+    ]
+
+    _cli_args_for_test = deepcopy(cli_args)
+    # Set the consensus threshold to 3/3, requiring all beacon nodes
+    # to initialize successfully
+    _cli_args_for_test.attestation_consensus_threshold = 3
+
+    async with contextlib.AsyncExitStack() as exit_stack:
+        m = exit_stack.enter_context(aioresponses())
+
+        # Mock responses.
+        # Beacon node A and B are online right away and stay online.
+        # Beacon node C is offline at first but becomes available later.
+        # This means the very first initialization fails, and
+        # the next one succeeds.
+        online_bn_urls = beacon_node_urls[:2]
+        initially_offline_bn_urls = beacon_node_urls[2:3]
+
+        for _url in online_bn_urls:
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/beacon/genesis"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=mocked_genesis_response,
+                ),
+                repeat=True,
+            )
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/config/spec"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=dict(data=spec.to_obj()),
+                ),
+                repeat=True,
+            )
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/node/version"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=dict(data=dict(version="vero/test")),
+                ),
+                repeat=True,
+            )
+
+        for _url in initially_offline_bn_urls:
+            # Fail the first request made during initialization, making the first init fail
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/beacon/genesis"),
+                exception=ValueError("Beacon node unavailable"),
+            )
+
+            # After the first init fails, the rest of the responses should return fine
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/beacon/genesis"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=mocked_genesis_response,
+                ),
+                repeat=True,
+            )
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/config/spec"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=dict(data=spec.to_obj()),
+                ),
+                repeat=True,
+            )
+            m.get(
+                url=re.compile(rf"{_url}/eth/v1/node/version"),
+                callback=lambda *args, **kwargs: CallbackResult(
+                    payload=dict(data=dict(version="vero/test")),
+                ),
+                repeat=True,
+            )
+
+        mbn_base = MultiBeaconNode(
+            beacon_node_urls=beacon_node_urls,
+            beacon_node_urls_proposal=[],
+            spec=spec,
+            scheduler=scheduler,
+            task_manager=task_manager,
+            cli_args=_cli_args_for_test,
+        )
+        mbn_base._init_timeout = 1
+        for bn in mbn_base.beacon_nodes:
+            bn._init_retry_interval = 0.1
+
+        await exit_stack.enter_async_context(mbn_base)
+
+        # First init of beacon-node-c will fail, causing the MultiBeaconNode
+        # initialization to fail at first too.
+        assert (
+            "Failed to initialize beacon node at http://beacon-node-c:1234: ValueError('Beacon node unavailable'). Retrying in 0.1 seconds."
+            in caplog.messages
+        )
+        assert (
+            "Failed to fully initialize a sufficient amount of beacon nodes - 2/3 initialized (required: 3)"
+            in caplog.messages
+        )
+        # The next requests to beacon-node-c succeed though, allowing it to initialize
+        # successfully on the second attempt.
+        assert "Initialized beacon node at http://beacon-node-c:1234" in caplog.messages
+        # This then allows the MultiBeaconNode to initialize as well.
+        assert "Successfully initialized 3/3 beacon nodes" in caplog.messages
+        assert len(mbn_base.initialized_beacon_nodes) == 3
+
+        # The above scenario should not result in multiple initialization attempts
+        # for the BeaconNode instances (which cause ConflictingIdError exceptions
+        # in the scheduler for the `update_node_version` job).
+        assert not any("ConflictingIdError" in m for m in caplog.messages)
 
 
 @pytest.mark.parametrize(

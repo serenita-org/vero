@@ -130,6 +130,7 @@ class BeaconNode:
         self.task_manager = task_manager
 
         self.initialized = False
+        self._init_retry_interval = 5.0
         self._score = 0
         _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
         _CHECKPOINT_CONFIRMATIONS.labels(host=self.host).reset()
@@ -205,10 +206,11 @@ class BeaconNode:
             )
         except Exception as e:
             self.logger.exception(
-                f"Failed to initialize beacon node at {self.base_url}: {e!r}",
+                f"Failed to initialize beacon node at {self.base_url}: {e!r}. Retrying in {self._init_retry_interval} seconds.",
             )
-            # Try to initialize again in 30 seconds
-            self.task_manager.create_task(self.initialize_full(), delay=30.0)
+            self.task_manager.create_task(
+                self.initialize_full(), delay=self._init_retry_interval
+            )
 
     @staticmethod
     async def _handle_nok_status_code(response: aiohttp.ClientResponse) -> None:

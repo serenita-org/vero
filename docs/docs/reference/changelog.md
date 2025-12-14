@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming release
+
+#### Bugfixes
+- Fix beacon node initialization retry logic ([#246](https://github.com/serenita-org/vero/pull/246))
+
 ## v1.3.0 { id="v1.3.0" }
 
 <small>November 5, 2025</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.3.0){:target="_blank"}

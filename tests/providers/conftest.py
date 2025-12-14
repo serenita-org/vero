@@ -37,13 +37,6 @@ async def multi_beacon_node_three_inited_nodes(
     )
     with aioresponses() as m:
         m.get(
-            re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/states/head/fork"),
-            callback=lambda *args, **kwargs: CallbackResult(
-                payload=mocked_fork_response,
-            ),
-            repeat=True,
-        )
-        m.get(
             re.compile(r"http://beacon-node-\w:1234/eth/v1/beacon/genesis"),
             callback=lambda *args, **kwargs: CallbackResult(
                 payload=mocked_genesis_response,
