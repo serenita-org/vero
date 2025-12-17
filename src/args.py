@@ -33,7 +33,6 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     keymanager_api_port: int
     metrics_address: str
     metrics_port: int
-    metrics_multiprocess_mode: bool
     log_level: int
     disable_slashing_detection: bool
 
@@ -261,11 +260,6 @@ def get_parser() -> argparse.ArgumentParser:
         help="The metrics server port number. Defaults to 8000.",
     )
     parser.add_argument(
-        "--metrics-multiprocess-mode",
-        action="store_true",
-        help="Provide this flag to collect metrics from all processes. This comes with some limitations, notably no cpu and memory metrics. See https://prometheus.github.io/client_python/multiprocess/ .",
-    )
-    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -350,7 +344,6 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             keymanager_api_port=parsed_args.keymanager_api_port,
             metrics_address=parsed_args.metrics_address,
             metrics_port=parsed_args.metrics_port,
-            metrics_multiprocess_mode=parsed_args.metrics_multiprocess_mode,
             log_level=logging.getLevelName(parsed_args.log_level),
             disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )

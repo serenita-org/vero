@@ -1,15 +1,11 @@
 import math
-import os
 import sys
 from enum import Enum
-from pathlib import Path
 
 from prometheus_client import (
-    REGISTRY,
     Counter,
     Gauge,
     Histogram,
-    multiprocess,
     start_http_server,
 )
 
@@ -17,30 +13,6 @@ from spec.base import SpecFulu
 from spec.constants import INTERVALS_PER_SLOT
 
 from ._vero_info import get_service_commit, get_service_version
-
-
-def setup_metrics(addr: str, port: int, multiprocess_mode: bool = False) -> None:
-    if multiprocess_mode:
-        # Wipe files in multiprocessing dir from previous run
-        #  See https://prometheus.github.io/client_python/multiprocess/
-        _multiprocessing_data_dir = os.getenv("PROMETHEUS_MULTIPROC_DIR")
-        if _multiprocessing_data_dir is None:
-            raise ValueError("PROMETHEUS_MULTIPROC_DIR environment variable is not set")
-
-        _multiprocessing_data_path = Path(_multiprocessing_data_dir)
-        if not _multiprocessing_data_path.is_dir():
-            raise ValueError(
-                f"PROMETHEUS_MULTIPROC_DIR {_multiprocessing_data_path} does not exist",
-            )
-
-        for file in _multiprocessing_data_path.iterdir():
-            Path.unlink(_multiprocessing_data_dir / file)
-
-        multiprocess.MultiProcessCollector(REGISTRY)  # type: ignore[no-untyped-call]
-
-    if "pytest" not in sys.modules:
-        # do not start the HTTP server while running tests
-        start_http_server(addr=addr, port=port)
 
 
 class ErrorType(Enum):
@@ -135,9 +107,10 @@ class Metrics:
         spec: SpecFulu,
         addr: str,
         port: int,
-        multiprocess_mode: bool = False,
     ) -> None:
-        setup_metrics(addr=addr, port=port, multiprocess_mode=multiprocess_mode)
+        if "pytest" not in sys.modules:
+            # do not start the HTTP server while running tests
+            start_http_server(addr=addr, port=port)
 
         self.errors_c = Counter(
             "errors",
@@ -151,7 +124,6 @@ class Metrics:
             "vero_info",
             "Information about the Vero build.",
             labelnames=["commit", "version"],
-            multiprocess_mode="max",
         )
         self.vero_info_g.labels(
             commit=get_service_commit(),
@@ -246,11 +218,21 @@ class Metrics:
             "validator_status",
             "Number of validators per status",
             labelnames=["status"],
-            multiprocess_mode="max",
         )
         self.slashing_detected_g = Gauge(
             "slashing_detected",
             "1 if any of the connected validators have been slashed, 0 otherwise",
-            multiprocess_mode="max",
         )
         self.slashing_detected_g.set(0)
+
+        # RemoteSigner
+        self.signed_messages_c = Counter(
+            "signed_messages",
+            "Number of signed messages",
+            labelnames=["signable_message_type"],
+        )
+        self.remote_signer_score_g = Gauge(
+            "remote_signer_score",
+            "Remote signer score",
+            labelnames=["host"],
+        )

@@ -59,7 +59,6 @@ class Vero:
             spec=self.spec,
             addr=cli_args.metrics_address,
             port=cli_args.metrics_port,
-            multiprocess_mode=cli_args.metrics_multiprocess_mode,
         )
 
         self.task_manager = TaskManager(

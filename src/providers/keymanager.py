@@ -51,8 +51,8 @@ class Keymanager(SignatureProvider):
         self.db = db
         self.beacon_chain = vero.beacon_chain
         self.multi_beacon_node = multi_beacon_node
-        self.task_manager = vero.task_manager
         self.cli_args = vero.cli_args
+        self.vero = vero
 
         self.enabled = vero.cli_args.enable_keymanager_api
         self.pubkey_to_remote_signer: dict[str, RemoteSigner] = {}
@@ -136,7 +136,7 @@ class Keymanager(SignatureProvider):
             signer = await self._exit_stack.enter_async_context(
                 RemoteSigner(
                     url,
-                    task_manager=self.task_manager,
+                    vero=self.vero,
                     process_pool_executor=self.process_pool_executor,
                 )
             )

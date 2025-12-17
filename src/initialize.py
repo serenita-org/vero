@@ -130,7 +130,7 @@ async def run_services(vero: Vero) -> None:
             signature_provider = await exit_stack.enter_async_context(
                 RemoteSigner(
                     url=vero.cli_args.remote_signer_url,
-                    task_manager=vero.task_manager,
+                    vero=vero,
                     process_pool_executor=process_pool_executor,
                 )
             )

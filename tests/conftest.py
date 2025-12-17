@@ -94,7 +94,6 @@ def cli_args(
         keymanager_api_port=8001,
         metrics_address="localhost",
         metrics_port=8000,
-        metrics_multiprocess_mode=False,
         log_level=logging.INFO,
         disable_slashing_detection=False,
     )
@@ -261,7 +260,7 @@ async def signature_provider(
             )
         async with RemoteSigner(
             url=cli_args.remote_signer_url,
-            task_manager=vero.task_manager,
+            vero=vero,
             process_pool_executor=process_pool_executor,
         ) as remote_signer:
             yield remote_signer

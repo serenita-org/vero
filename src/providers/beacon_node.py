@@ -44,13 +44,11 @@ _BEACON_NODE_SCORE = Gauge(
     "beacon_node_score",
     "Beacon node score",
     labelnames=["host"],
-    multiprocess_mode="max",
 )
 _BEACON_NODE_VERSION = Gauge(
     "beacon_node_version",
     "Beacon node score",
     labelnames=["host", "version"],
-    multiprocess_mode="max",
 )
 _block_value_buckets = [
     int(0.001 * 1e18),
