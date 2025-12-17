@@ -17,8 +17,6 @@ from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from prometheus_client import Counter as CounterMetric
-from prometheus_client import Gauge, Histogram
 from yarl import URL
 
 from observability import (
@@ -38,54 +36,6 @@ if TYPE_CHECKING:
 
 _TIMEOUT_DEFAULT_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10
-
-
-_BEACON_NODE_SCORE = Gauge(
-    "beacon_node_score",
-    "Beacon node score",
-    labelnames=["host"],
-)
-_BEACON_NODE_VERSION = Gauge(
-    "beacon_node_version",
-    "Beacon node score",
-    labelnames=["host", "version"],
-)
-_block_value_buckets = [
-    int(0.001 * 1e18),
-    int(0.01 * 1e18),
-    int(0.1 * 1e18),
-    int(1 * 1e18),
-    int(10 * 1e18),
-]
-_BEACON_NODE_CONSENSUS_BLOCK_VALUE = Histogram(
-    "beacon_node_consensus_block_value",
-    "Tracks the value of consensus layer rewards paid to the proposer in the block produced by this beacon node",
-    labelnames=["host"],
-    buckets=_block_value_buckets,
-)
-_BEACON_NODE_EXECUTION_PAYLOAD_VALUE = Histogram(
-    "beacon_node_execution_payload_value",
-    "Tracks the value of execution payloads in blocks produced by this beacon node",
-    labelnames=["host"],
-    buckets=_block_value_buckets,
-)
-_BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT = Histogram(
-    "beacon_node_aggregate_attestation_participant_count",
-    "Tracks the number of participants included in aggregates returned by this beacon node.",
-    labelnames=["host"],
-    buckets=[16, 32, 64, 128, 256, 512, 1_024, 2_048],
-)
-_BEACON_NODE_SYNC_CONTRIBUTION_PARTICIPANT_COUNT = Histogram(
-    "beacon_node_sync_contribution_participant_count",
-    "Tracks the number of participants included in sync contributions returned by this beacon node.",
-    labelnames=["host"],
-    buckets=[8, 16, 32, 64, 128],
-)
-_CHECKPOINT_CONFIRMATIONS = CounterMetric(
-    "checkpoint_confirmations",
-    "Tracks how many times each beacon node confirmed finality checkpoints.",
-    labelnames=["host"],
-)
 
 
 class BeaconNodeNotReady(Exception):
@@ -128,8 +78,8 @@ class BeaconNode:
         self.initialized = False
         self._init_retry_interval = 5.0
         self._score = 0
-        _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
-        _CHECKPOINT_CONFIRMATIONS.labels(host=self.host).reset()
+        self.metrics.beacon_node_score_g.labels(host=self.host).set(0)
+        self.metrics.checkpoint_confirmations_c.labels(host=self.host).reset()
         self.node_version = ""
 
         self._trace_default_request_ctx = dict(
@@ -164,7 +114,7 @@ class BeaconNode:
     @score.setter
     def score(self, value: int) -> None:
         self._score = max(0, min(value, BeaconNode.MAX_SCORE))
-        _BEACON_NODE_SCORE.labels(host=self.host).set(self._score)
+        self.metrics.beacon_node_score_g.labels(host=self.host).set(self._score)
 
     async def _initialize_full(self) -> None:
         # Raise if the spec returned by the beacon node differs
@@ -324,10 +274,12 @@ class BeaconNode:
             # for the same host
             with contextlib.suppress(KeyError), warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                _BEACON_NODE_VERSION.remove(self.host, self.node_version)
+                self.metrics.beacon_node_version_g.remove(self.host, self.node_version)
 
         self.node_version = resp_version
-        _BEACON_NODE_VERSION.labels(host=self.host, version=self.node_version).set(1)
+        self.metrics.beacon_node_version_g.labels(
+            host=self.host, version=self.node_version
+        ).set(1)
 
     async def produce_attestation_data(
         self,
@@ -394,7 +346,7 @@ class BeaconNode:
                     and att_data.target == expected_target_cp
                 ):
                     self.logger.info(f"Finality checkpoints confirmed by {self.host}")
-                    _CHECKPOINT_CONFIRMATIONS.labels(host=self.host).inc()
+                    self.metrics.checkpoint_confirmations_c.labels(host=self.host).inc()
                     return
             except Exception as e:
                 self.logger.warning(
@@ -577,7 +529,7 @@ class BeaconNode:
 
         att = SpecAttestation.AttestationElectra.from_obj(response.data)
 
-        _BEACON_NODE_AGGREGATE_ATTESTATION_PARTICIPANT_COUNT.labels(
+        self.metrics.beacon_node_aggregate_attestation_participant_count_h.labels(
             host=self.host
         ).observe(sum(att.aggregation_bits))
         return att
@@ -622,9 +574,9 @@ class BeaconNode:
         contribution = SpecSyncCommittee.Contribution.from_obj(
             json.loads(resp)["data"],
         )
-        _BEACON_NODE_SYNC_CONTRIBUTION_PARTICIPANT_COUNT.labels(host=self.host).observe(
-            sum(contribution.aggregation_bits)
-        )
+        self.metrics.beacon_node_sync_contribution_participant_count_h.labels(
+            host=self.host
+        ).observe(sum(contribution.aggregation_bits))
         return contribution
 
     async def publish_sync_committee_contribution_and_proofs(
@@ -734,12 +686,12 @@ class BeaconNode:
                 f" consensus block value {consensus_block_value},"
                 f" execution payload value {execution_payload_value}."
             )
-            _BEACON_NODE_CONSENSUS_BLOCK_VALUE.labels(host=self.host).observe(
-                consensus_block_value
-            )
-            _BEACON_NODE_EXECUTION_PAYLOAD_VALUE.labels(host=self.host).observe(
-                execution_payload_value
-            )
+            self.metrics.beacon_node_consensus_block_value_h.labels(
+                host=self.host
+            ).observe(consensus_block_value)
+            self.metrics.beacon_node_execution_payload_value_h.labels(
+                host=self.host
+            ).observe(execution_payload_value)
 
             return response
 

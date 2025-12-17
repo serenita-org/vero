@@ -225,6 +225,54 @@ class Metrics:
         )
         self.slashing_detected_g.set(0)
 
+        # BeaconNode
+        self.beacon_node_score_g = Gauge(
+            "beacon_node_score",
+            "Beacon node score",
+            labelnames=["host"],
+        )
+        self.beacon_node_version_g = Gauge(
+            "beacon_node_version",
+            "Beacon node version",
+            labelnames=["host", "version"],
+        )
+        self.beacon_node_aggregate_attestation_participant_count_h = Histogram(
+            "beacon_node_aggregate_attestation_participant_count",
+            "Tracks the number of participants included in aggregates returned by this beacon node.",
+            labelnames=["host"],
+            buckets=[16, 32, 64, 128, 256, 512, 1_024, 2_048],
+        )
+        self.beacon_node_sync_contribution_participant_count_h = Histogram(
+            "beacon_node_sync_contribution_participant_count",
+            "Tracks the number of participants included in sync contributions returned by this beacon node.",
+            labelnames=["host"],
+            buckets=[8, 16, 32, 64, 128],
+        )
+        _block_value_buckets = [
+            int(0.001 * 1e18),
+            int(0.01 * 1e18),
+            int(0.1 * 1e18),
+            int(1 * 1e18),
+            int(10 * 1e18),
+        ]
+        self.beacon_node_consensus_block_value_h = Histogram(
+            "beacon_node_consensus_block_value",
+            "Tracks the value of consensus layer rewards paid to the proposer in the block produced by this beacon node",
+            labelnames=["host"],
+            buckets=_block_value_buckets,
+        )
+        self.beacon_node_execution_payload_value_h = Histogram(
+            "beacon_node_execution_payload_value",
+            "Tracks the value of execution payloads in blocks produced by this beacon node",
+            labelnames=["host"],
+            buckets=_block_value_buckets,
+        )
+        self.checkpoint_confirmations_c = Counter(
+            "checkpoint_confirmations",
+            "Tracks how many times each beacon node confirmed finality checkpoints.",
+            labelnames=["host"],
+        )
+
         # RemoteSigner
         self.signed_messages_c = Counter(
             "signed_messages",
