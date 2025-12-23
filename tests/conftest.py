@@ -107,18 +107,6 @@ def _init_observability() -> None:
     )
 
 
-@pytest.fixture(scope="session")
-def spec() -> SpecFulu:
-    return get_network_spec(network=Network._TESTS)
-
-
-@pytest.fixture(autouse=True, scope="session")
-def _init_spec(spec: SpecFulu) -> None:
-    SpecAttestation.initialize(spec=spec)
-    SpecBeaconBlock.initialize(spec=spec)
-    SpecSyncCommittee.initialize(spec=spec)
-
-
 @pytest.fixture
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
@@ -299,9 +287,15 @@ async def multi_beacon_node_with_mocked_endpoints(
 
 
 @pytest.fixture
-def beacon_chain(spec: SpecFulu, vero: Vero) -> BeaconChain:
+def beacon_chain(vero: Vero) -> BeaconChain:
     # Just a convenience fixture
     return vero.beacon_chain
+
+
+@pytest.fixture
+def spec(vero: Vero) -> SpecFulu:
+    # Just a convenience fixture
+    return vero.spec
 
 
 @pytest.fixture
