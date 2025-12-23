@@ -28,7 +28,7 @@ from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
-from spec.base import Genesis, SpecFulu, parse_spec
+from spec.base import SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 
 if TYPE_CHECKING:
@@ -233,13 +233,6 @@ class BeaconNode:
     ) -> None:
         if response.execution_optimistic:
             raise ValueError(f"Execution optimistic on {self.host}")
-
-    async def get_genesis(self) -> Genesis:
-        resp = await self._make_request(
-            method="GET",
-            endpoint="/eth/v1/beacon/genesis",
-        )
-        return Genesis.from_obj(json.loads(resp)["data"])  # type: ignore[no-any-return]
 
     async def get_spec(self) -> SpecFulu:
         resp = await self._make_request(
