@@ -272,9 +272,8 @@ async def multi_beacon_node(
     request: pytest.FixtureRequest,
 ) -> AsyncGenerator[MultiBeaconNode, None]:
     # Skip initializing beacon nodes by default in tests
-    skip_init = getattr(request, "param", True)
-
-    async with MultiBeaconNode(vero=vero, skip_init=skip_init) as mbn:
+    # (initialization requires mocking API endpoints which can be impractical)
+    async with MultiBeaconNode(vero=vero, skip_init=True) as mbn:
         yield mbn
 
 
