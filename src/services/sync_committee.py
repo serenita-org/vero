@@ -7,9 +7,8 @@ from typing import Self, Unpack
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
-from prometheus_client import Counter
 
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -22,19 +21,6 @@ from spec.constants import (
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
 from spec.sync_committee import SpecSyncCommittee
-
-_VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES = Counter(
-    "vc_published_sync_committee_messages",
-    "Successfully published sync committee messages",
-)
-_VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.reset()
-
-_VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS = Counter(
-    "vc_published_sync_committee_contributions",
-    "Successfully published sync committee contributions",
-)
-_VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.reset()
-
 
 _PRODUCE_JOB_ID = (
     "SyncCommitteeService.produce_sync_message_if_not_yet_produced-slot-{duty_slot}"
@@ -159,7 +145,7 @@ class SyncCommitteeService(ValidatorDutyService):
             f"Producing sync message for slot {duty_slot} for {len(sync_committee_members)} validators, from head: {head_event is not None}",
         )
         self._last_slot_duty_started_for = duty_slot
-        self._duty_start_time_metric.labels(
+        self.metrics.duty_start_time_h.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
 
@@ -174,7 +160,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 self.logger.exception(
                     f"Failed to get beacon block root: {e!r}",
                 )
-                ERRORS_METRIC.labels(
+                self.metrics.errors_c.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
                 ).inc()
                 return
@@ -199,7 +185,7 @@ class SyncCommitteeService(ValidatorDutyService):
             try:
                 msg, sig, pubkey = await coro
             except Exception as e:
-                ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+                self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
                 self.logger.exception(
                     f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
                 )
@@ -233,7 +219,7 @@ class SyncCommitteeService(ValidatorDutyService):
             f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
         )
 
-        self._duty_submission_time_metric.labels(
+        self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
         try:
@@ -241,7 +227,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 messages=sync_messages_to_publish,
             )
         except Exception as e:
-            ERRORS_METRIC.labels(
+            self.metrics.errors_c.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -251,7 +237,7 @@ class SyncCommitteeService(ValidatorDutyService):
             self.logger.info(
                 f"Published sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
             )
-            _VC_PUBLISHED_SYNC_COMMITTEE_MESSAGES.inc(
+            self.metrics.vc_published_sync_committee_messages_c.inc(
                 amount=len(sync_messages_to_publish),
             )
         finally:
@@ -289,7 +275,7 @@ class SyncCommitteeService(ValidatorDutyService):
         try:
             selection_proofs = await asyncio.gather(*selection_proofs_coroutines)
         except Exception as e:
-            ERRORS_METRIC.labels(error_type=ErrorType.SIGNATURE.value).inc()
+            self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for sync selection proofs for slot {duty_slot}: {e!r}",
             )
@@ -356,7 +342,7 @@ class SyncCommitteeService(ValidatorDutyService):
         ):
             signed_contribution_and_proofs.append((msg.contribution_and_proof, sig))
 
-        self._duty_submission_time_metric.labels(
+        self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_CONTRIBUTION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
 
@@ -364,11 +350,11 @@ class SyncCommitteeService(ValidatorDutyService):
             await self.multi_beacon_node.publish_sync_committee_contribution_and_proofs(
                 signed_contribution_and_proofs=signed_contribution_and_proofs,
             )
-            _VC_PUBLISHED_SYNC_COMMITTEE_CONTRIBUTIONS.inc(
+            self.metrics.vc_published_sync_committee_contributions_c.inc(
                 amount=len(signed_contribution_and_proofs),
             )
         except Exception as e:
-            ERRORS_METRIC.labels(
+            self.metrics.errors_c.labels(
                 error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
             ).inc()
             self.logger.exception(
@@ -389,7 +375,7 @@ class SyncCommitteeService(ValidatorDutyService):
         self.logger.debug(
             f"Aggregating sync committee messages for slot {duty_slot}, {len(slot_sync_aggregate_duties)} duties",
         )
-        self._duty_start_time_metric.labels(
+        self.metrics.duty_start_time_h.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_CONTRIBUTION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
 

@@ -2,13 +2,12 @@ import asyncio
 
 import pytest
 
-from providers import BeaconChain, Keymanager
+from providers import BeaconChain, Keymanager, Vero
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
-from services.block_proposal import _VC_PUBLISHED_BLOCKS
 
 
 @pytest.mark.parametrize(
@@ -106,6 +105,7 @@ async def test_publish_block(
     fork_version: ForkVersion,
     enable_keymanager_api: bool,
     keymanager: Keymanager,
+    vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     if response_content_type == ContentType.OCTET_STREAM:
@@ -129,7 +129,7 @@ async def test_publish_block(
     block_proposal_service._last_slot_duty_started_for = 0
     block_proposal_service._last_slot_duty_completed_for = 0
 
-    blocks_published_before = _VC_PUBLISHED_BLOCKS._value.get()
+    blocks_published_before = vero.metrics.vc_published_blocks_c._value.get()
 
     # Wait for duty slot
     await asyncio.sleep(max(0.0, -beacon_chain.time_since_slot_start(duty_slot)))
@@ -137,7 +137,9 @@ async def test_publish_block(
     await block_proposal_service.propose_block(slot=duty_slot)
 
     assert any("Published block" in m for m in caplog.messages)
-    assert _VC_PUBLISHED_BLOCKS._value.get() == blocks_published_before + 1
+    assert (
+        vero.metrics.vc_published_blocks_c._value.get() == blocks_published_before + 1
+    )
     assert block_proposal_service._last_slot_duty_started_for == duty_slot
     assert block_proposal_service._last_slot_duty_completed_for == duty_slot
 

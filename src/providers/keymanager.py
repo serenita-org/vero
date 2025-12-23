@@ -8,7 +8,6 @@ from sqlite3 import IntegrityError
 from types import TracebackType
 from typing import Self
 
-from args import CLIArgs
 from schemas import SchemaRemoteSigner
 from schemas.keymanager_api import (
     DeleteStatus,
@@ -26,13 +25,12 @@ from schemas.keymanager_api import (
     VoluntaryExit,
 )
 from spec.utils import decode_graffiti
-from tasks import TaskManager
 
-from .beacon_chain import BeaconChain
 from .db.db import DB
 from .multi_beacon_node import MultiBeaconNode
 from .remote_signer import RemoteSigner
 from .signature_provider import SignatureProvider
+from .vero import Vero
 
 
 class PubkeyNotFound(Exception):
@@ -44,21 +42,19 @@ class Keymanager(SignatureProvider):
     def __init__(
         self,
         db: DB,
-        beacon_chain: BeaconChain,
         multi_beacon_node: MultiBeaconNode,
-        task_manager: TaskManager,
-        cli_args: CLIArgs,
+        vero: Vero,
         process_pool_executor: ProcessPoolExecutor,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.db = db
-        self.beacon_chain = beacon_chain
+        self.beacon_chain = vero.beacon_chain
         self.multi_beacon_node = multi_beacon_node
-        self.task_manager = task_manager
-        self.cli_args = cli_args
+        self.cli_args = vero.cli_args
+        self.vero = vero
 
-        self.enabled = cli_args.enable_keymanager_api
+        self.enabled = vero.cli_args.enable_keymanager_api
         self.pubkey_to_remote_signer: dict[str, RemoteSigner] = {}
         self.pubkey_to_fee_recipient_override: dict[str, EthAddress] = {}
         self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
@@ -81,7 +77,7 @@ class Keymanager(SignatureProvider):
             if "pytest" in sys.modules:
                 return
             self.api_task = asyncio.create_task(
-                start_server(keymanager=self, cli_args=cli_args)
+                start_server(keymanager=self, cli_args=vero.cli_args)
             )
 
     async def __aenter__(self) -> Self:
@@ -140,7 +136,7 @@ class Keymanager(SignatureProvider):
             signer = await self._exit_stack.enter_async_context(
                 RemoteSigner(
                     url,
-                    task_manager=self.task_manager,
+                    vero=self.vero,
                     process_pool_executor=self.process_pool_executor,
                 )
             )

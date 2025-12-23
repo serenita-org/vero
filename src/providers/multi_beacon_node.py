@@ -39,67 +39,67 @@ import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from opentelemetry import trace
 from remerkleable.complex import Container
 
-from args import CLIArgs
-from observability import ERRORS_METRIC, ErrorType
+from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
-from tasks import TaskManager
 
 from .beacon_node import BeaconNode
+
+if TYPE_CHECKING:
+    from .vero import Vero
 
 
 class MultiBeaconNode:
     def __init__(
         self,
-        beacon_node_urls: list[str],
-        beacon_node_urls_proposal: list[str],
-        spec: SpecFulu,
-        scheduler: AsyncIOScheduler,
-        task_manager: TaskManager,
-        cli_args: CLIArgs,
+        vero: "Vero",
+        skip_init: bool = False,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.metrics = vero.metrics
         self.tracer = trace.get_tracer(self.__class__.__name__)
 
         self.beacon_nodes = [
             BeaconNode(
                 base_url=base_url,
-                spec=spec,
-                scheduler=scheduler,
-                task_manager=task_manager,
+                vero=vero,
             )
-            for base_url in beacon_node_urls
+            for base_url in vero.cli_args.beacon_node_urls
         ]
         self.beacon_nodes_proposal = [
             BeaconNode(
                 base_url=base_url,
-                spec=spec,
-                scheduler=scheduler,
-                task_manager=task_manager,
+                vero=vero,
             )
-            for base_url in beacon_node_urls_proposal
+            for base_url in vero.cli_args.beacon_node_urls_proposal
         ]
 
-        self.spec = spec
-        self.SECONDS_PER_INTERVAL = int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.spec = vero.spec
+        self.SECONDS_PER_INTERVAL = int(vero.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
-        self.cli_args = cli_args
+        self.cli_args = vero.cli_args
 
-        self._attestation_consensus_threshold = cli_args.attestation_consensus_threshold
+        self._attestation_consensus_threshold = (
+            vero.cli_args.attestation_consensus_threshold
+        )
         # On startup, wait for beacon nodes to initialize for 5 minutes
         # before raising an Exception.
+        self._skip_init = skip_init
         self._init_timeout = 300
 
     async def initialize(self) -> None:
+        if self._skip_init:
+            for bn in self.beacon_nodes:
+                bn.initialized = True
+            return
+
         deadline = time.monotonic() + self._init_timeout
 
         def _init_error_message() -> str:
@@ -122,12 +122,7 @@ class MultiBeaconNode:
             self.logger.warning(_init_error_message())
             await asyncio.sleep(0.1)
 
-        # Check the connected beacon nodes genesis, spec
-        if not len({bn.genesis for bn in self.initialized_beacon_nodes}) == 1:
-            raise RuntimeError(
-                f"Beacon nodes provided different genesis:"
-                f" {[bn.genesis for bn in self.initialized_beacon_nodes]}",
-            )
+        # Check the connected beacon nodes spec
         if not len({bn.spec for bn in self.initialized_beacon_nodes}) == 1:
             raise RuntimeError(
                 f"Beacon nodes provided different specs:"
@@ -663,7 +658,7 @@ class MultiBeaconNode:
             try:
                 yield await task
             except Exception as e:
-                ERRORS_METRIC.labels(
+                self.metrics.errors_c.labels(
                     error_type=ErrorType.AGGREGATE_ATTESTATION_PRODUCE.value,
                 ).inc()
                 self.logger.exception(
@@ -755,7 +750,7 @@ class MultiBeaconNode:
             try:
                 yield await task
             except Exception:
-                ERRORS_METRIC.labels(
+                self.metrics.errors_c.labels(
                     error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PRODUCE.value,
                 ).inc()
 

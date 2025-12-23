@@ -13,6 +13,7 @@ import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 
+from args import CLIArgs
 from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
 
@@ -290,10 +291,27 @@ class BeaconNodeResponseSequence(TypedDict):
         ),
     ],
 )
+@pytest.mark.parametrize(
+    argnames="cli_args",
+    argvalues=[
+        pytest.param(
+            {
+                "beacon_node_urls": [
+                    "http://beacon-node-a:1234",
+                    "http://beacon-node-b:1234",
+                    "http://beacon-node-c:1234",
+                ],
+            },
+            id="3 beacon nodes",
+        )
+    ],
+    indirect=True,
+)
 async def test_produce_block_v3(
     bn_response_sequences: list[BeaconNodeResponseSequence],
     returned_block_value: int,
-    multi_beacon_node_three_inited_nodes: MultiBeaconNode,
+    multi_beacon_node: MultiBeaconNode,
+    cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon requests blocks from all beacon nodes
     and returns the one with the highest value.
@@ -340,7 +358,7 @@ async def test_produce_block_v3(
         )
 
         if success_expected:
-            result = await multi_beacon_node_three_inited_nodes.produce_block_v3(
+            result = await multi_beacon_node.produce_block_v3(
                 slot=1,
                 graffiti=b"test_produce_block_v3",
                 builder_boost_factor=90,
@@ -360,7 +378,7 @@ async def test_produce_block_v3(
                 expected_exception=RuntimeError,
                 match="Failed to get a response from all beacon nodes",
             ):
-                await multi_beacon_node_three_inited_nodes.produce_block_v3(
+                await multi_beacon_node.produce_block_v3(
                     slot=1,
                     graffiti=b"test_produce_block_v3",
                     builder_boost_factor=90,

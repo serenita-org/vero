@@ -11,25 +11,13 @@ from urllib.parse import urlparse
 import aiohttp
 import msgspec.json
 from aiohttp import ClientTimeout
-from prometheus_client import Counter, Gauge
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaRemoteSigner
-from tasks import TaskManager
 
 from .signature_provider import SignatureProvider
-
-_SIGNED_MESSAGES = Counter(
-    "signed_messages",
-    "Number of signed messages",
-    labelnames=["signable_message_type"],
-)
-_REMOTE_SIGNER_SCORE = Gauge(
-    "remote_signer_score",
-    "Remote signer score",
-    labelnames=["host"],
-)
+from .vero import Vero
 
 
 def _sign_messages_in_separate_process(
@@ -43,7 +31,7 @@ def _sign_messages_in_separate_process(
     ]:
         results = []
         async with RemoteSigner(
-            url=remote_signer_url, task_manager=None, process_pool_executor=None
+            url=remote_signer_url, vero=None, process_pool_executor=None
         ) as signer:
             for i in range(0, len(messages), batch_size):
                 messages_batch = messages[i : i + batch_size]
@@ -70,7 +58,7 @@ class RemoteSigner(SignatureProvider):
     def __init__(
         self,
         url: str,
-        task_manager: TaskManager | None,
+        vero: Vero | None,
         process_pool_executor: ProcessPoolExecutor | None,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -82,8 +70,9 @@ class RemoteSigner(SignatureProvider):
 
         self._score = RemoteSigner.MAX_SCORE
         # Regularly poll the health status of the remote signer
-        if task_manager:
-            task_manager.create_task(self.poll_health_periodically())
+        if vero is not None:
+            vero.task_manager.create_task(self.poll_health_periodically())
+        self.metrics = vero.metrics if vero else None
 
         self.process_pool_executor = process_pool_executor
 
@@ -157,7 +146,8 @@ class RemoteSigner(SignatureProvider):
     @score.setter
     def score(self, value: int) -> None:
         self._score = max(0, min(value, RemoteSigner.MAX_SCORE))
-        _REMOTE_SIGNER_SCORE.labels(host=self.host).set(self._score)
+        if self.metrics:
+            self.metrics.remote_signer_score_g.labels(host=self.host).set(self._score)
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -211,7 +201,10 @@ class RemoteSigner(SignatureProvider):
                     f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
                 )
 
-            _SIGNED_MESSAGES.labels(signable_message_type=type(message).__name__).inc()
+            if self.metrics:
+                self.metrics.signed_messages_c.labels(
+                    signable_message_type=type(message).__name__
+                ).inc()
             return message, (await resp.json())["signature"], identifier
 
     async def sign_in_batches(
