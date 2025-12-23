@@ -8,6 +8,13 @@ from args import CLIArgs, get_parser, parse_cli_args
 from spec.configs import Network
 from spec.utils import encode_graffiti
 
+MINIMUM_ARG_LIST = [
+    "--network=hoodi",
+    "--remote-signer-url=http://signer:9000",
+    "--beacon-node-urls=http://beacon-node:5052",
+    "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+]
+
 
 @pytest.mark.parametrize(
     argnames=(
@@ -61,7 +68,7 @@ from spec.utils import encode_graffiti
             [
                 "--network=sepolia",
                 "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=   ",
+                "--beacon-node-urls=http://beacon-node:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
             "argument --network: invalid choice: 'sepolia'",
@@ -95,11 +102,8 @@ from spec.utils import encode_graffiti
         ),
         pytest.param(
             [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+                *MINIMUM_ARG_LIST,
             ],
             None,
             {
@@ -114,11 +118,8 @@ from spec.utils import encode_graffiti
         ),
         pytest.param(
             [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node-1:5052",
                 "--beacon-node-urls-proposal=http://beacon-node-1:5052,http://beacon-node-1:5053",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
+                *MINIMUM_ARG_LIST,
             ],
             "Proposal beacon node URLs must have unique hostnames",
             {},
@@ -143,39 +144,21 @@ from spec.utils import encode_graffiti
             id="--attestation-consensus-threshold override",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--attestation-consensus-threshold=asd",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
+            ["--attestation-consensus-threshold=asd", *MINIMUM_ARG_LIST],
             "argument --attestation-consensus-threshold: invalid int value",
             {},
             [],
             id="--attestation-consensus-threshold invalid input - string instead of int",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--attestation-consensus-threshold=2",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
+            ["--attestation-consensus-threshold=2", *MINIMUM_ARG_LIST],
             "Invalid value for attestation_consensus_threshold (2) with 1 beacon node(s)",
             {},
             [],
             id="--attestation-consensus-threshold invalid input - threshold impossible to reach",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--attestation-consensus-threshold=0",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
+            ["--attestation-consensus-threshold=0", *MINIMUM_ARG_LIST],
             "Invalid value for attestation_consensus_threshold: 0",
             {},
             [],
@@ -218,52 +201,28 @@ from spec.utils import encode_graffiti
             id="--fee-recipient invalid input - non-hex character",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--data-dir=data",
-            ],
+            ["--data-dir=data", *MINIMUM_ARG_LIST],
             None,
             {"data_dir": "data"},
             ["data_dir: data"],
             id="--data-dir - relative path",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--data-dir=/tmp/data",
-            ],
+            ["--data-dir=/tmp/data", *MINIMUM_ARG_LIST],
             None,
             {"data_dir": "/tmp/data"},
             ["data_dir: /tmp/data"],
             id="--data-dir - absolute path",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--graffiti=short",
-            ],
+            ["--graffiti=short", *MINIMUM_ARG_LIST],
             None,
             {"graffiti": b"short".ljust(32, b"\x00")},
             ["graffiti: short"],
             id="--graffiti valid input",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--graffiti=🐟 💰 ❓",
-            ],
+            ["--graffiti=🐟 💰 ❓", *MINIMUM_ARG_LIST],
             None,
             {"graffiti": "🐟 💰 ❓".encode().ljust(32, b"\x00")},
             ["graffiti: 🐟 💰 ❓"],
@@ -271,11 +230,8 @@ from spec.utils import encode_graffiti
         ),
         pytest.param(
             [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
                 "--graffiti=waaaaaaaay_toooooo_loooooooooooooooooong",
+                *MINIMUM_ARG_LIST,
             ],
             "Encoded graffiti exceeds the maximum length of 32 bytes",
             {},
@@ -283,13 +239,7 @@ from spec.utils import encode_graffiti
             id="--graffiti invalid input - too long",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--gas-limit=1000000",
-            ],
+            ["--gas-limit=1000000", *MINIMUM_ARG_LIST],
             None,
             {"gas_limit": 1_000_000},
             ["gas_limit: 1000000"],
@@ -344,13 +294,7 @@ from spec.utils import encode_graffiti
             id="--gas-limit default value Chiado testnet",
         ),
         pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--gas-limit=two",
-            ],
+            ["--gas-limit=two", *MINIMUM_ARG_LIST],
             "--gas-limit: invalid int value: 'two'",
             {},
             [],
@@ -409,13 +353,7 @@ from spec.utils import encode_graffiti
             id="--enable-keymanager-api (no --remote-signer-url)",
         ),
         pytest.param(
-            [
-                "--network=mainnet",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node:5052",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-                "--log-level=DEBUG",
-            ],
+            ["--log-level=DEBUG", *MINIMUM_ARG_LIST],
             None,
             {
                 "log_level": logging.DEBUG,
