@@ -8,21 +8,20 @@ from typing import Any
 import msgspec.json
 import pytest
 from aioresponses import CallbackResult, aioresponses
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs
-from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode
+from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 
 
 @pytest.fixture
 async def attestation_data_provider(
     multi_beacon_node: MultiBeaconNode,
-    scheduler: AsyncIOScheduler,
+    vero: Vero,
 ) -> AttestationDataProvider:
     adp = AttestationDataProvider(
         multi_beacon_node=multi_beacon_node,
-        scheduler=scheduler,
+        scheduler=vero.scheduler,
     )
     # Default timeout is 1000 ms which doesn't work well for tests
     # where the slot time is 1000 ms - it doesn't leave any room for

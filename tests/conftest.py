@@ -191,14 +191,6 @@ def random_active_validator(
 
 
 @pytest.fixture
-async def scheduler() -> AsyncGenerator[AsyncIOScheduler, None]:
-    _scheduler = AsyncIOScheduler(event_loop=asyncio.get_running_loop())
-    _scheduler.start()
-    yield _scheduler
-    _scheduler.shutdown(wait=False)
-
-
-@pytest.fixture
 def empty_db(tmp_path: Path) -> Generator[DB, None]:
     with DB(data_dir=str(tmp_path)) as db:
         db.run_migrations()
