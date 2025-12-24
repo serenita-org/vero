@@ -34,8 +34,9 @@ class BeaconChain:
         # (accessing the attributes of the remerkleable-based Spec object directly
         # wastes a noticeable amount of CPU)
         self.SLOTS_PER_EPOCH = int(spec.SLOTS_PER_EPOCH)
-        self.SECONDS_PER_SLOT = int(spec.SECONDS_PER_SLOT)
-        self.SECONDS_PER_INTERVAL = self.SECONDS_PER_SLOT / INTERVALS_PER_SLOT
+        self.SLOT_DURATION_MS = int(spec.SLOT_DURATION_MS)
+        # # TODO remove SECONDS_PER_INTERVAL
+        self.SECONDS_PER_INTERVAL = (self.SLOT_DURATION_MS / INTERVALS_PER_SLOT) / 1_000
         self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD = int(
             spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
         )
@@ -101,16 +102,16 @@ class BeaconChain:
     def start_slot_ticker(self) -> None:
         self.task_manager.create_task(self.on_new_slot())
 
-    def get_timestamp_for_slot(self, slot: int) -> int:
-        return self.genesis_time + slot * self.SECONDS_PER_SLOT
+    def get_timestamp_for_slot(self, slot: int) -> float:
+        return self.genesis_time + (slot * self.SLOT_DURATION_MS) / 1_000
 
     @property
     def current_slot(self) -> int:
-        seconds_elapsed = floor(time.time()) - self.genesis_time
-        seconds_elapsed = max(0, seconds_elapsed)
-        return seconds_elapsed // self.SECONDS_PER_SLOT
+        ms_elapsed = floor(1_000 * (time.time() - self.genesis_time))
+        ms_elapsed = max(0, ms_elapsed)
+        return ms_elapsed // self.SLOT_DURATION_MS
 
-    async def _precise_wait_for_timestamp(self, timestamp: int) -> None:
+    async def _precise_wait_for_timestamp(self, timestamp: float) -> None:
         # A slightly more accurate version of asyncio.sleep()
         delay = timestamp - time.time()
 
