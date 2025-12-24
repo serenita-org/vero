@@ -29,7 +29,7 @@ from services import (
 _logger = logging.getLogger("vero-init")
 
 
-async def _wait_for_genesis(genesis_timestamp: int) -> None:
+async def _wait_for_genesis(genesis_timestamp: float) -> None:
     while True:
         time_remaining = genesis_timestamp - time.time()
         if time_remaining <= 0:
