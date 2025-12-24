@@ -1,4 +1,3 @@
-import math
 import sys
 from enum import Enum
 
@@ -10,7 +9,6 @@ from prometheus_client import (
 )
 
 from spec.base import SpecFulu
-from spec.constants import INTERVALS_PER_SLOT
 
 from ._vero_info import get_service_commit, get_service_version
 
@@ -39,51 +37,60 @@ class HandledRuntimeError(Exception):
 
 
 def _setup_head_event_time_metric(
-    seconds_per_slot: int,
-    attestation_deadline: float,
-    step_fine: float = 0.25,  # 250 ms
-    step_coarse: float = 1.0,  #   1 s
+    slot_duration_ms: int,
+    attestation_due_ms: int,
+    step_fine_ms: int = 250,
+    step_coarse_ms: int = 1_000,
 ) -> Histogram:
     """
-    For tracking at which point into the slot a head event was received
-    from each connected beacon node.
+    Tracks time into slot (seconds) at which a head event was received.
 
-    Histogram buckets are divided into:
-    *  Fine resolution (step_fine) until `attestation_deadline`
-    *  Coarse resolution (step_coarse) for the rest of the slot
+    Buckets:
+      - fine (step_fine_ms) up to attestation_due_ms (inclusive)
+      - coarse (step_coarse_ms) after that, until slot_duration_ms (inclusive)
     """
+    buckets_ms: list[int] = []
 
-    # Every multiple of step_fine that is <= attestation_deadline
-    k_max = int(attestation_deadline / step_fine)
-    fine_buckets = [round(step_fine * k, 2) for k in range(1, k_max + 1)]
+    # Fine buckets: step_fine_ms, 2*step_fine_ms, ... <= attestation_due_ms
+    k_max = attestation_due_ms // step_fine_ms
+    buckets_ms.extend(step_fine_ms * k for k in range(1, k_max + 1))
 
-    # Add the exact deadline edge if it is not already present
-    if round(attestation_deadline, 2) not in fine_buckets:
-        fine_buckets.append(round(attestation_deadline, 2))
+    # Add exact deadline edge if not already present
+    if buckets_ms and buckets_ms[-1] != attestation_due_ms:
+        buckets_ms.append(attestation_due_ms)
 
-    # First coarse edge after the deadline
-    first_coarse = math.ceil(attestation_deadline / step_coarse) * step_coarse
-    if first_coarse in fine_buckets:
-        first_coarse += step_coarse
+    # Coarse buckets start: first multiple of step_coarse_ms after due time
+    first_coarse_ms = ((attestation_due_ms // step_coarse_ms) + 1) * step_coarse_ms
 
-    n_coarse = math.ceil((seconds_per_slot - first_coarse) / step_coarse) + 1
-    coarse_buckets = [round(first_coarse + step_coarse * k, 2) for k in range(n_coarse)]
+    # Add coarse edges: first_coarse_ms, first_coarse_ms + step_coarse_ms, ... <= slot_duration_ms
+    t = first_coarse_ms
+    while t <= slot_duration_ms:
+        # Only append if it increases (protects against overlaps)
+        if t > buckets_ms[-1]:
+            buckets_ms.append(t)
+        t += step_coarse_ms
+
+    # Ensure the exact slot end is present
+    if buckets_ms[-1] != slot_duration_ms:
+        buckets_ms.append(slot_duration_ms)
+
+    buckets_s = [ms / 1000.0 for ms in buckets_ms]
 
     return Histogram(
         "head_event_time",
         "Time into slot at which a head event for the slot was received",
         labelnames=["host"],
-        buckets=fine_buckets + coarse_buckets,
+        buckets=buckets_s,
     )
 
 
 def _setup_duty_time_metrics(
-    seconds_per_slot: int,
+    slot_duration_ms: int,
 ) -> tuple[Histogram, Histogram]:
     buckets = [
         item
         for sublist in [
-            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(seconds_per_slot)
+            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(slot_duration_ms // 1_000)
         ]
         for item in sublist
     ]
@@ -153,13 +160,14 @@ class Metrics:
             labelnames=["host", "event_type"],
         )
         self.head_event_time_h = _setup_head_event_time_metric(
-            seconds_per_slot=int(spec.SECONDS_PER_SLOT),
-            attestation_deadline=int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            slot_duration_ms=int(spec.SLOT_DURATION_MS),
+            attestation_due_ms=int(spec.SLOT_DURATION_MS * spec.ATTESTATION_DUE_BPS)
+            // 10_000,
         )
 
         # ValidatorDutyService
         self.duty_start_time_h, self.duty_submission_time_h = _setup_duty_time_metrics(
-            seconds_per_slot=int(spec.SECONDS_PER_SLOT)
+            slot_duration_ms=int(spec.SLOT_DURATION_MS)
         )
 
         # AttestationService
