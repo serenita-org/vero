@@ -5,6 +5,8 @@ from remerkleable.basic import uint64, uint256
 from remerkleable.byte_arrays import Bytes32, Bytes48, Bytes96
 from remerkleable.core import ObjType
 
+from spec.constants import BASIS_POINTS
+
 
 def bytes_to_uint64(
     data: bytes,
@@ -25,6 +27,15 @@ class BLSSignature(Bytes96):
 class UInt64SerializedAsString(uint64):
     def to_obj(self) -> ObjType:
         return str(self)
+
+
+def get_slot_component_duration_ms(
+    basis_points: UInt64SerializedAsString, slot_duration_ms: UInt64SerializedAsString
+) -> int:
+    """
+    Calculate the duration of a slot component in milliseconds.
+    """
+    return int(basis_points * slot_duration_ms // BASIS_POINTS)
 
 
 class UInt256SerializedAsString(uint256):
