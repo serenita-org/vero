@@ -21,6 +21,7 @@ from services.validator_duty_service import (
 from spec.attestation import AttestationData, SpecAttestation
 from spec.common import (
     bytes_to_uint64,
+    get_slot_component_duration_ms,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
@@ -33,10 +34,18 @@ class AttestationService(ValidatorDutyService):
         super().__init__(**kwargs)
 
         self._attestation_due_s = (
-            int(self.spec.SLOT_DURATION_MS * self.spec.ATTESTATION_DUE_BPS) / 10_000_000
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
         )
         self._aggregate_due_s = (
-            int(self.spec.SLOT_DURATION_MS * self.spec.AGGREGATE_DUE_BPS) / 10_000_000
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
         )
 
         self.attestation_data_provider = AttestationDataProvider(
