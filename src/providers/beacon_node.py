@@ -30,7 +30,6 @@ from providers._response import raise_for_response_size
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
 from spec.base import SpecFulu, parse_spec
-from spec.constants import INTERVALS_PER_SLOT
 
 if TYPE_CHECKING:
     from .vero import Vero
@@ -74,9 +73,15 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = (
-            int(vero.spec.SLOT_DURATION_MS) / INTERVALS_PER_SLOT / 1_000
-        )
+        slot_ms = int(vero.spec.SLOT_DURATION_MS)
+        self._timeout_request_aggregate = (
+            slot_ms
+            - int(vero.spec.AGGREGATE_DUE_BPS * vero.spec.SLOT_DURATION_MS) / 10_000
+        ) / 1_000
+        self._timeout_request_contribution = (
+            slot_ms
+            - int(vero.spec.CONTRIBUTION_DUE_BPS * vero.spec.SLOT_DURATION_MS) / 10_000
+        ) / 1_000
         self._ignore_spec_mismatch = vero.cli_args.ignore_spec_mismatch
         self._force_json_wire_format = vero.cli_args.force_json_wire_format
 
@@ -553,7 +558,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_aggregate,
             ),
         )
 
@@ -601,7 +606,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_contribution,
             ),
         )
 
