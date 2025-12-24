@@ -373,6 +373,7 @@ async def test_produce_best_block(
                 graffiti=b"test_produce_best_block",
                 builder_boost_factor=90,
                 randao_reveal="randao",
+                soft_timeout=0.1666,
             )
             assert content_type == ContentType.JSON
             assert (
@@ -390,4 +391,5 @@ async def test_produce_best_block(
                     graffiti=b"test_produce_best_block",
                     builder_boost_factor=90,
                     randao_reveal="randao",
+                    soft_timeout=0.1666,
                 )
