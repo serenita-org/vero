@@ -288,6 +288,7 @@ async def test_get_aggregate_attestation(
     best_aggregate_score: int,
     beacon_chain: BeaconChain,
     multi_beacon_node: MultiBeaconNode,
+    spec: SpecFulu,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
@@ -297,8 +298,7 @@ async def test_get_aggregate_attestation(
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
                 bitlist_length = (
-                    beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
-                    * beacon_chain.MAX_COMMITTEES_PER_SLOT
+                    spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
                 )
                 aggregation_bits = [False] * 10
                 for idx in range(number_of_attesting_indices):
