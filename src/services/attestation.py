@@ -32,6 +32,13 @@ class AttestationService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
+        self._attestation_due_s = (
+            int(self.spec.SLOT_DURATION_MS * self.spec.ATTESTATION_DUE_BPS) / 10_000_000
+        )
+        self._aggregate_due_s = (
+            int(self.spec.SLOT_DURATION_MS * self.spec.AGGREGATE_DUE_BPS) / 10_000_000
+        )
+
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
             scheduler=self.scheduler,
@@ -82,7 +89,7 @@ class AttestationService(ValidatorDutyService):
         # aiming to attest 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._attestation_due_s,
             tz=datetime.UTC,
         )
 
@@ -368,7 +375,7 @@ class AttestationService(ValidatorDutyService):
         # Schedule aggregated attestation at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._aggregate_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(

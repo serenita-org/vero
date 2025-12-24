@@ -29,6 +29,15 @@ class SyncCommitteeService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
+        self._sync_message_due_s = (
+            int(self.spec.SLOT_DURATION_MS * self.spec.SYNC_MESSAGE_DUE_BPS)
+            / 10_000_000
+        )
+        self._contribution_due_s = (
+            int(self.spec.SLOT_DURATION_MS * self.spec.CONTRIBUTION_DUE_BPS)
+            / 10_000_000
+        )
+
         # Sync duties by sync committee period
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
             defaultdict(list)
@@ -71,7 +80,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # aiming to produce it 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._sync_message_due_s,
             tz=datetime.UTC,
         )
 
@@ -353,7 +362,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Sign and submit aggregated sync committee contributions at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._contribution_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
