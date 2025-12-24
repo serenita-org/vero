@@ -307,7 +307,7 @@ class MultiBeaconNode:
         Most of the logic in here makes sure we don't wait too long for a block to be
         produced by an unresponsive beacon node.
         """
-        # Times out at 1/2 of the SECONDS_PER_SLOT spec value into the slot
+        # Times out at 1/2 of the SECONDS_PER_INTERVAL spec value into the slot
         # (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
         # If no block has been returned by that point, it waits indefinitely for the
         # first block to be returned by any beacon node.
