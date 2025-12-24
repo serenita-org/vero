@@ -19,6 +19,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
+from spec.common import get_slot_component_duration_ms
 from spec.utils import encode_graffiti
 
 
@@ -26,9 +27,19 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
-        self._attestation_due_s = (
-            int(self.spec.SLOT_DURATION_MS * self.spec.ATTESTATION_DUE_BPS) / 10_000_000
+        # Block production API requests "soft" time out half-way into the attestation
+        # deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain). This ensures
+        # a single slow beacon node does not delay a block proposal too much.
+        # If no block has been produced by the soft timeout, we wait indefinitely for
+        # the first block to be produced by any beacon node, and propose that block.
+        attestation_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
         )
+        self._block_production_soft_timeout = 1 / 2 * attestation_due_s
 
         # Proposer duty by epoch
         self.proposer_duties: defaultdict[int, set[SchemaBeaconAPI.ProposerDuty]] = (
@@ -382,11 +393,7 @@ class BlockProposalService(ValidatorDutyService):
                     graffiti=graffiti,
                     builder_boost_factor=self.cli_args.builder_boost_factor,
                     randao_reveal=randao_reveal,
-                        # Soft-times out half-way into the attestation deadline
-                        # (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
-                        # If no block has been returned by that point, it waits indefinitely for the
-                        # first block to be returned by any beacon node and uses that.
-                        soft_timeout=1 / 2 * self._attestation_due_s,
+                    soft_timeout=self._block_production_soft_timeout,
                 )
             except Exception as e:
                 self.logger.exception(
