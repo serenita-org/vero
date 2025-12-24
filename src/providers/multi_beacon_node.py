@@ -125,7 +125,7 @@ class MultiBeaconNode:
             if time.monotonic() >= deadline:
                 raise RuntimeError(_init_error_message())
 
-            self.logger.warning(_init_error_message())
+            self.logger.debug(_init_error_message())
             await asyncio.sleep(0.1)
 
         self.logger.info(

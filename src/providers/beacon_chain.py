@@ -34,13 +34,6 @@ class BeaconChain:
         # wastes a noticeable amount of CPU)
         self.SLOTS_PER_EPOCH = int(spec.SLOTS_PER_EPOCH)
         self.SLOT_DURATION_MS = int(spec.SLOT_DURATION_MS)
-        # TODO move into val duty services? available under self.spec
-        self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD = int(
-            spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
-        )
-        self.MAX_VALIDATORS_PER_COMMITTEE = int(spec.MAX_VALIDATORS_PER_COMMITTEE)
-        self.MAX_COMMITTEES_PER_SLOT = int(spec.MAX_COMMITTEES_PER_SLOT)
-        self.SYNC_COMMITTEE_SIZE = int(spec.SYNC_COMMITTEE_SIZE)
 
         self.ELECTRA_FORK_EPOCH = int(spec.ELECTRA_FORK_EPOCH)
         self.ELECTRA_FORK_VERSION = spec.ELECTRA_FORK_VERSION
@@ -161,16 +154,3 @@ class BeaconChain:
 
     def compute_start_slot_at_epoch(self, epoch: int) -> int:
         return epoch * self.SLOTS_PER_EPOCH
-
-    def compute_epochs_for_sync_period(self, sync_period: int) -> tuple[int, int]:
-        start_epoch = sync_period * self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
-        end_epoch = start_epoch + self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
-        return start_epoch, end_epoch
-
-    def compute_sync_period_for_epoch(self, epoch: int) -> int:
-        return epoch // self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
-
-    def compute_sync_period_for_slot(self, slot: int) -> int:
-        return self.compute_sync_period_for_epoch(
-            epoch=slot // self.SLOTS_PER_EPOCH,
-        )
