@@ -120,15 +120,19 @@ async def test_lifecycle(
         f"Log lines not found: {[line for line in required_log_lines if not any(line in m for m in caplog.messages)]}"
     )
 
-    # Make sure no errors occurred
+    # Make sure no unexpected errors occurred
     err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
 
+    unexpected_err_messages = []
     for record in err_records:
         # Event stream is not mocked
         if "Error occurred while processing beacon node events" in record.message:
             continue
 
-        pytest.fail(f"Error occurred: {record.message}")
+        unexpected_err_messages.append(record.message)
+
+    if unexpected_err_messages:
+        pytest.fail(f"Unexpected errors occurred: {unexpected_err_messages}")
 
     # Send SIGTERM signal to process to initiate a clean shutdown
     os.kill(os.getpid(), signal.SIGTERM)

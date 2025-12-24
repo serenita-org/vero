@@ -70,7 +70,9 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.SECONDS_PER_INTERVAL = (
+            int(vero.spec.SLOT_DURATION_MS) / INTERVALS_PER_SLOT / 1_000
+        )
 
         self.scheduler = vero.scheduler
         self.task_manager = vero.task_manager
