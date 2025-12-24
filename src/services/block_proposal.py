@@ -26,6 +26,10 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
+        self._attestation_due_s = (
+            int(self.spec.SLOT_DURATION_MS * self.spec.ATTESTATION_DUE_BPS) / 10_000_000
+        )
+
         # Proposer duty by epoch
         self.proposer_duties: defaultdict[int, set[SchemaBeaconAPI.ProposerDuty]] = (
             defaultdict(set)
@@ -378,6 +382,11 @@ class BlockProposalService(ValidatorDutyService):
                     graffiti=graffiti,
                     builder_boost_factor=self.cli_args.builder_boost_factor,
                     randao_reveal=randao_reveal,
+                        # Soft-times out half-way into the attestation deadline
+                        # (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
+                        # If no block has been returned by that point, it waits indefinitely for the
+                        # first block to be returned by any beacon node and uses that.
+                        soft_timeout=1 / 2 * self._attestation_due_s,
                 )
             except Exception as e:
                 self.logger.exception(
