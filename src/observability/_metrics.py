@@ -9,6 +9,7 @@ from prometheus_client import (
 )
 
 from spec.base import SpecFulu
+from spec.common import get_slot_component_duration_ms
 
 from ._vero_info import get_service_commit, get_service_version
 
@@ -55,12 +56,23 @@ def _setup_head_event_time_metric(
     k_max = attestation_due_ms // step_fine_ms
     buckets_ms.extend(step_fine_ms * k for k in range(1, k_max + 1))
 
-    # Add exact deadline edge if not already present
-    if buckets_ms and buckets_ms[-1] != attestation_due_ms:
-        buckets_ms.append(attestation_due_ms)
-
     # Coarse buckets start: first multiple of step_coarse_ms after due time
     first_coarse_ms = ((attestation_due_ms // step_coarse_ms) + 1) * step_coarse_ms
+
+    # Add exact deadline edge if not already present.
+    # Skip adding the exact deadline if it is extremely close (<=1ms) to the
+    # first coarse bucket.
+    # The skipping is needed in practice due to the attestation deadline being
+    # 3999ms with 12s slot times because of integer division
+    # in `get_slot_component_duration_ms`. That in turn results in buckets
+    # of 3999 and 4000 which we don't want, they'd contain practically identical
+    # values.
+    if (
+        buckets_ms
+        and buckets_ms[-1] != attestation_due_ms
+        and first_coarse_ms - attestation_due_ms > 1
+    ):
+        buckets_ms.append(attestation_due_ms)
 
     # Add coarse edges: first_coarse_ms, first_coarse_ms + step_coarse_ms, ... <= slot_duration_ms
     t = first_coarse_ms
@@ -161,8 +173,10 @@ class Metrics:
         )
         self.head_event_time_h = _setup_head_event_time_metric(
             slot_duration_ms=int(spec.SLOT_DURATION_MS),
-            attestation_due_ms=int(spec.SLOT_DURATION_MS * spec.ATTESTATION_DUE_BPS)
-            // 10_000,
+            attestation_due_ms=get_slot_component_duration_ms(
+                basis_points=spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=spec.SLOT_DURATION_MS,
+            ),
         )
 
         # ValidatorDutyService

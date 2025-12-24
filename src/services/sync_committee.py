@@ -15,7 +15,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.common import bytes_to_uint64, hash_function
+from spec.common import bytes_to_uint64, get_slot_component_duration_ms, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -30,12 +30,18 @@ class SyncCommitteeService(ValidatorDutyService):
         super().__init__(**kwargs)
 
         self._sync_message_due_s = (
-            int(self.spec.SLOT_DURATION_MS * self.spec.SYNC_MESSAGE_DUE_BPS)
-            / 10_000_000
+            get_slot_component_duration_ms(
+                basis_points=self.spec.SYNC_MESSAGE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
         )
         self._contribution_due_s = (
-            int(self.spec.SLOT_DURATION_MS * self.spec.CONTRIBUTION_DUE_BPS)
-            / 10_000_000
+            get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
         )
 
         # Sync duties by sync committee period
