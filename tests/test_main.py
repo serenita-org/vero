@@ -118,11 +118,10 @@ async def test_lifecycle(
         f"Log lines not found: {[line for line in required_log_lines if not any(line in m for m in caplog.messages)]}"
     )
 
-    # Make sure no errors occurred
-    err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
-
-    for record in err_records:
-        pytest.fail(f"Error occurred: {record.message}")
+    # Make sure no unexpected errors occurred
+    err_messages = [r.message for r in caplog.records if r.levelno == logging.ERROR]
+    if err_messages:
+        pytest.fail(f"Unexpected errors occurred: {err_messages}")
 
     # Send SIGTERM signal to process to initiate a clean shutdown
     os.kill(os.getpid(), signal.SIGTERM)
