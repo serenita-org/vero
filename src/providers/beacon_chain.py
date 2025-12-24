@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from spec._ascii import FULU as FULU_ASCII_ART
 from spec.base import Genesis, SpecFulu, Version
-from spec.constants import INTERVALS_PER_SLOT
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -35,8 +34,7 @@ class BeaconChain:
         # wastes a noticeable amount of CPU)
         self.SLOTS_PER_EPOCH = int(spec.SLOTS_PER_EPOCH)
         self.SLOT_DURATION_MS = int(spec.SLOT_DURATION_MS)
-        # # TODO remove SECONDS_PER_INTERVAL
-        self.SECONDS_PER_INTERVAL = (self.SLOT_DURATION_MS / INTERVALS_PER_SLOT) / 1_000
+        # TODO move into val duty services? available under self.spec
         self.EPOCHS_PER_SYNC_COMMITTEE_PERIOD = int(
             spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
         )

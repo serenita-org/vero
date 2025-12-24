@@ -28,6 +28,9 @@ class SpecFulu(Container):
     # Phase 0
     SLOT_DURATION_MS: UInt64SerializedAsString
     ATTESTATION_DUE_BPS: UInt64SerializedAsString
+    AGGREGATE_DUE_BPS: UInt64SerializedAsString
+    SYNC_MESSAGE_DUE_BPS: UInt64SerializedAsString
+    CONTRIBUTION_DUE_BPS: UInt64SerializedAsString
     SLOTS_PER_EPOCH: UInt64SerializedAsString
     MAX_VALIDATORS_PER_COMMITTEE: UInt64SerializedAsString
     MAX_COMMITTEES_PER_SLOT: UInt64SerializedAsString
