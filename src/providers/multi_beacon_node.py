@@ -82,7 +82,9 @@ class MultiBeaconNode:
         ]
 
         self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(vero.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self.SECONDS_PER_INTERVAL = (
+            int(vero.spec.SLOT_DURATION_MS) / INTERVALS_PER_SLOT / 1_000
+        )
 
         self.cli_args = vero.cli_args
 
