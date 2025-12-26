@@ -3,7 +3,7 @@ name = "vero"
 version = "1.0.0"
 description = "Vero is a multi-node validator client software implementation, targeting Ethereum and Gnosis Chain."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "aiohttp>=3.11.13",
     "apscheduler>=3.11.0",
@@ -29,7 +29,7 @@ dev = [
 ]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 
 
@@ -58,7 +58,7 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 "tests/conftest.py" = ["F401", "F403", "F811", "I"]
 
 [tool.uv]
-required-version = "~=0.8.15"
+required-version = "~=0.9.0"
 
 [tool.uv.pip]
 generate-hashes = true
