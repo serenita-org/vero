@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -46,6 +47,7 @@ class Vero:
                 misfire_grace_time=None,  # default is 1 second
             ),
         )
+        self.thread_pool_executor = ThreadPoolExecutor()
 
         self.cli_args = cli_args
         self.spec = load_spec(cli_args=cli_args)

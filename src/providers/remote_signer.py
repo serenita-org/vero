@@ -17,40 +17,9 @@ from schemas import SchemaRemoteSigner
 from .signature_provider import SignatureProvider
 
 if TYPE_CHECKING:
-    from concurrent.futures import ProcessPoolExecutor
     from types import TracebackType
 
     from .vero import Vero
-
-
-def _sign_messages_in_separate_process(
-    remote_signer_url: str,
-    messages: list[SchemaRemoteSigner.SignableMessageT],
-    identifiers: list[str],
-    batch_size: int,
-) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
-    async def _sign_messages() -> list[
-        tuple[SchemaRemoteSigner.SignableMessageT, str, str]
-    ]:
-        results = []
-        async with RemoteSigner(
-            url=remote_signer_url, vero=None, process_pool_executor=None
-        ) as signer:
-            for i in range(0, len(messages), batch_size):
-                messages_batch = messages[i : i + batch_size]
-                identifiers_batch = identifiers[i : i + batch_size]
-                tasks = [
-                    signer.sign(msg, identifier)
-                    for msg, identifier in zip(
-                        messages_batch,
-                        identifiers_batch,
-                        strict=True,
-                    )
-                ]
-                results.extend(await asyncio.gather(*tasks))
-        return results
-
-    return asyncio.run(_sign_messages())
 
 
 class RemoteSigner(SignatureProvider):
@@ -61,8 +30,7 @@ class RemoteSigner(SignatureProvider):
     def __init__(
         self,
         url: str,
-        vero: Vero | None,
-        process_pool_executor: ProcessPoolExecutor | None,
+        vero: Vero,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -73,11 +41,10 @@ class RemoteSigner(SignatureProvider):
 
         self._score = RemoteSigner.MAX_SCORE
         # Regularly poll the health status of the remote signer
-        if vero is not None:
-            vero.task_manager.create_task(self.poll_health_periodically())
-        self.metrics = vero.metrics if vero else None
+        vero.task_manager.create_task(self.poll_health_periodically())
 
-        self.process_pool_executor = process_pool_executor
+        self.metrics = vero.metrics
+        self.thread_pool_executor = vero.thread_pool_executor
 
     async def __aenter__(self) -> Self:
         _user_agent = f"{get_service_name()}/{get_service_version()}"
@@ -139,8 +106,6 @@ class RemoteSigner(SignatureProvider):
         ):
             if not session.closed:
                 await session.close()
-        if self.process_pool_executor is not None:
-            self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
     @property
     def score(self) -> int:
@@ -149,8 +114,7 @@ class RemoteSigner(SignatureProvider):
     @score.setter
     def score(self, value: int) -> None:
         self._score = max(0, min(value, RemoteSigner.MAX_SCORE))
-        if self.metrics:
-            self.metrics.remote_signer_score_g.labels(host=self.host).set(self._score)
+        self.metrics.remote_signer_score_g.labels(host=self.host).set(self._score)
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -204,11 +168,36 @@ class RemoteSigner(SignatureProvider):
                     f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
                 )
 
-            if self.metrics:
-                self.metrics.signed_messages_c.labels(
-                    signable_message_type=type(message).__name__
-                ).inc()
+            self.metrics.signed_messages_c.labels(
+                signable_message_type=type(message).__name__
+            ).inc()
             return message, (await resp.json())["signature"], identifier
+
+    def _sign_in_thread(
+        self,
+        messages: list[SchemaRemoteSigner.SignableMessageT],
+        identifiers: list[str],
+        batch_size: int,
+    ) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
+        async def _sign_messages() -> list[
+            tuple[SchemaRemoteSigner.SignableMessageT, str, str]
+        ]:
+            results = []
+            for i in range(0, len(messages), batch_size):
+                messages_batch = messages[i : i + batch_size]
+                identifiers_batch = identifiers[i : i + batch_size]
+                tasks = [
+                    self.sign(msg, identifier)
+                    for msg, identifier in zip(
+                        messages_batch,
+                        identifiers_batch,
+                        strict=True,
+                    )
+                ]
+                results.extend(await asyncio.gather(*tasks))
+            return results
+
+        return asyncio.run(_sign_messages())
 
     async def sign_in_batches(
         self,
@@ -228,9 +217,6 @@ class RemoteSigner(SignatureProvider):
         Large amounts of messages (more than `batch_size`) are signed in a separate
         process to avoid blocking the event loop.
         """
-        if self.process_pool_executor is None:
-            raise RuntimeError("self.process_pool_executor is None")
-
         if len(messages) != len(identifiers):
             raise ValueError(
                 "Number of messages does not match the number of identifiers",
@@ -244,15 +230,14 @@ class RemoteSigner(SignatureProvider):
                 ),
             )
 
-        # For large amounts of messages, run the signing process in a separate
-        # process to avoid blocking the event loop for too long
+        # For large amounts of messages, emit the signing requests in a separate
+        # thread to avoid blocking the event loop for too long
         loop = asyncio.get_running_loop()
-        self.logger.debug(f"Signing {len(messages)} messages in a separate process")
+        self.logger.debug(f"Signing {len(messages)} messages in a separate thread")
         return await loop.run_in_executor(
-            self.process_pool_executor,
+            self.thread_pool_executor,
             functools.partial(
-                _sign_messages_in_separate_process,
-                remote_signer_url=self.url,
+                self._sign_in_thread,
                 messages=messages,
                 identifiers=identifiers,
                 batch_size=batch_size,

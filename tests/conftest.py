@@ -3,7 +3,6 @@ import logging
 import random
 import time
 from asyncio import AbstractEventLoop
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -167,18 +166,12 @@ def empty_db(tmp_path: Path) -> Generator[DB]:
         yield db
 
 
-@pytest.fixture(scope="session")
-def process_pool_executor() -> ProcessPoolExecutor:
-    return ProcessPoolExecutor()
-
-
 @pytest.fixture
 async def keymanager(
     empty_db: DB,
     multi_beacon_node_with_mocked_endpoints: MultiBeaconNode,
     remote_signer_url: str,
     vero: Vero,
-    process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
 ) -> AsyncGenerator[Keymanager]:
@@ -186,7 +179,6 @@ async def keymanager(
         db=empty_db,
         multi_beacon_node=multi_beacon_node_with_mocked_endpoints,
         vero=vero,
-        process_pool_executor=process_pool_executor,
     ) as keymanager:
         yield keymanager
 
@@ -203,7 +195,6 @@ async def signature_provider(
     keymanager: Keymanager,
     vero: Vero,
     remote_signer_url: str,
-    process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
 ) -> AsyncGenerator[SignatureProvider]:
     if enable_keymanager_api:
@@ -223,7 +214,6 @@ async def signature_provider(
         async with RemoteSigner(
             url=cli_args.remote_signer_url,
             vero=vero,
-            process_pool_executor=process_pool_executor,
         ) as remote_signer:
             yield remote_signer
 

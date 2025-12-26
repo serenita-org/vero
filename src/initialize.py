@@ -1,9 +1,7 @@
 import asyncio
 import contextlib
 import logging
-import os
 import time
-from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from observability.event_loop import monitor_event_loop
@@ -110,14 +108,10 @@ async def run_services(vero: Vero) -> None:
             genesis_timestamp=vero.beacon_chain.get_timestamp_for_slot(0)
         )
 
-        process_pool_executor = ProcessPoolExecutor(
-            max_workers=int(os.getenv("PYTHON_CPU_COUNT", "1"))
-        )
         keymanager = Keymanager(
             db=db,
             multi_beacon_node=multi_beacon_node,
             vero=vero,
-            process_pool_executor=process_pool_executor,
         )
         signature_provider: Keymanager | RemoteSigner
         if vero.cli_args.enable_keymanager_api:
@@ -131,7 +125,6 @@ async def run_services(vero: Vero) -> None:
                 RemoteSigner(
                     url=vero.cli_args.remote_signer_url,
                     vero=vero,
-                    process_pool_executor=process_pool_executor,
                 )
             )
 

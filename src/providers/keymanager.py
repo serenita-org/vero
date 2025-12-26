@@ -28,7 +28,6 @@ from .remote_signer import RemoteSigner
 from .signature_provider import SignatureProvider
 
 if TYPE_CHECKING:
-    from concurrent.futures import ProcessPoolExecutor
     from types import TracebackType
 
     from .db.db import DB
@@ -47,7 +46,6 @@ class Keymanager(SignatureProvider):
         db: DB,
         multi_beacon_node: MultiBeaconNode,
         vero: Vero,
-        process_pool_executor: ProcessPoolExecutor,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -62,8 +60,6 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_fee_recipient_override: dict[str, EthAddress] = {}
         self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
         self.pubkey_to_graffiti_override: dict[str, str] = {}
-
-        self.process_pool_executor = process_pool_executor
 
         # Create an AsyncExitStack for dynamically managed signers
         self._exit_stack = contextlib.AsyncExitStack()
@@ -140,7 +136,6 @@ class Keymanager(SignatureProvider):
                 RemoteSigner(
                     url,
                     vero=self.vero,
-                    process_pool_executor=self.process_pool_executor,
                 )
             )
             signers_by_url[url] = signer
