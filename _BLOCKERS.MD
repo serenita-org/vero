@@ -6,10 +6,11 @@
     - https://github.com/jcrist/msgspec/issues/651
     - https://github.com/jcrist/msgspec/pull/852
     - => workaround deployed: from __future__ import annotations
+    - => fixed version released (0.20.0)
   - remerkleable
     - accesses __annotations__ of classes internally
     - works as is, as long as we don't change the annotations (move them under TYPE_CHECKING)
-    - => exception added to ruff
+    - => exception added to ruff: `"src/spec/*" = ["TC001", "TC002"]`
 
 - Free-threading
   - aiohttp ✅ (3.13.0 release)
