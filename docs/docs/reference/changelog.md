@@ -1,5 +1,7 @@
 # Changelog
 
+# TODO add changelog entry (PYTHON_CPU_COUNT becomes a no-op)
+
 ## Upcoming release
 
 #### Features
