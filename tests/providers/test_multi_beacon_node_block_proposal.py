@@ -6,16 +6,18 @@ when multiple beacon nodes are provided to it. That includes:
 import asyncio
 import re
 from functools import partial
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import msgspec.json
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 
-from args import CLIArgs
-from providers import MultiBeaconNode
 from schemas import SchemaBeaconAPI
+
+if TYPE_CHECKING:
+    from args import CLIArgs
+    from providers import MultiBeaconNode
 
 
 class BeaconNodeResponse(TypedDict):

@@ -1,13 +1,15 @@
 import asyncio
 import logging
 from collections import deque
-from collections.abc import Callable, Coroutine, Hashable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from observability import ErrorType
 from providers import BeaconNode, Vero
 from schemas import SchemaBeaconAPI
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Hashable
 
 
 class EventConsumerService:

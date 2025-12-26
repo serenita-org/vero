@@ -1,8 +1,8 @@
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from observability import ErrorType
-from providers import MultiBeaconNode, SignatureProvider, Vero
 from schemas import SchemaBeaconAPI, SchemaValidator
 from schemas.validator import (
     ACTIVE_STATUSES,
@@ -11,6 +11,9 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
+
+if TYPE_CHECKING:
+    from providers import MultiBeaconNode, SignatureProvider, Vero
 
 
 class ValidatorStatusTrackerService:

@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from args import CLIArgs
-
 from .fee_recipient_endpoints import routes as fee_recipient_routes
 from .gas_limit_endpoints import routes as gas_limit_routes
 from .graffiti_endpoints import routes as graffiti_routes
@@ -17,6 +15,7 @@ from .remote_key_manager_endpoints import routes as remote_key_manager_routes
 from .voluntary_exit_endpoints import routes as voluntary_exit_routes
 
 if TYPE_CHECKING:
+    from args import CLIArgs
     from providers import Keymanager
 
 
@@ -35,7 +34,7 @@ def _get_bearer_token_value(cli_args: CLIArgs) -> str:
     return bearer_token_value
 
 
-def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
+def _create_app(keymanager: Keymanager, cli_args: CLIArgs) -> web.Application:
     app = web.Application(middlewares=[exception_handler, bearer_authentication])
 
     app["bearer_token"] = _get_bearer_token_value(cli_args=cli_args)
@@ -50,7 +49,7 @@ def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
     return app
 
 
-async def start_server(keymanager: "Keymanager", cli_args: CLIArgs) -> None:
+async def start_server(keymanager: Keymanager, cli_args: CLIArgs) -> None:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     logger = logging.getLogger("api.keymanager.api")
     try:

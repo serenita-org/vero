@@ -3,7 +3,6 @@ import logging
 import random
 import time
 from asyncio import AbstractEventLoop
-from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from unittest import mock
@@ -29,7 +28,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu, Fork, Genesis, Version
+from spec.base import Fork, Genesis, Version
 from spec.common import Epoch
 from spec.configs import Network, get_network_spec, get_genesis_for_network
 from tasks import TaskManager
@@ -42,6 +41,11 @@ from tests.mock_api.beacon_node import (
 )
 from tests.mock_api.remote_signer import *
 from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from spec.base import SpecFulu
+    from collections.abc import AsyncGenerator, Generator
 
 
 @pytest.fixture(scope="session")
@@ -109,7 +113,7 @@ def _init_observability() -> None:
 @pytest.fixture
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     requested_fork_version = getattr(request, "param", ForkVersion.FULU)
 
     with mock.patch.object(
@@ -157,7 +161,7 @@ def random_active_validator(
 
 
 @pytest.fixture
-def empty_db(tmp_path: Path) -> Generator[DB, None]:
+def empty_db(tmp_path: Path) -> Generator[DB]:
     with DB(data_dir=str(tmp_path)) as db:
         db.run_migrations()
         yield db
@@ -177,7 +181,7 @@ async def keymanager(
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
     _mocked_remote_signer_endpoints: None,
-) -> AsyncGenerator[Keymanager, None]:
+) -> AsyncGenerator[Keymanager]:
     async with Keymanager(
         db=empty_db,
         multi_beacon_node=multi_beacon_node_with_mocked_endpoints,
@@ -201,7 +205,7 @@ async def signature_provider(
     remote_signer_url: str,
     process_pool_executor: ProcessPoolExecutor,
     validators: list[ValidatorIndexPubkey],
-) -> AsyncGenerator[SignatureProvider, None]:
+) -> AsyncGenerator[SignatureProvider]:
     if enable_keymanager_api:
         # import the default fixture validators into the Keymanager provider
         await keymanager.import_remote_keys(
@@ -248,7 +252,7 @@ def vero(cli_args: CLIArgs, _unregister_prometheus_metrics: None) -> Vero:
 async def multi_beacon_node(
     vero: Vero,
     request: pytest.FixtureRequest,
-) -> AsyncGenerator[MultiBeaconNode, None]:
+) -> AsyncGenerator[MultiBeaconNode]:
     # Skip initializing beacon nodes by default in tests
     # (initialization requires mocking API endpoints which can be impractical)
     async with MultiBeaconNode(vero=vero, skip_init=True) as mbn:
@@ -276,7 +280,7 @@ def spec(vero: Vero) -> SpecFulu:
 
 
 @pytest.fixture
-def _unregister_prometheus_metrics() -> Generator[None, None, None]:
+def _unregister_prometheus_metrics() -> Generator[None]:
     """
     Clears the prometheus registry metrics after a test is done running.
     """

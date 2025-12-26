@@ -1,13 +1,16 @@
 import asyncio
 import os
+from typing import TYPE_CHECKING
 
 import pytest
 
-from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion, ValidatorStatus
-from schemas.validator import ValidatorIndexPubkey
-from services import AttestationService
+
+if TYPE_CHECKING:
+    from providers import BeaconChain, Vero
+    from schemas.validator import ValidatorIndexPubkey
+    from services import AttestationService
 
 
 @pytest.mark.parametrize(

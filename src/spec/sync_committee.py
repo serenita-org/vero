@@ -1,7 +1,8 @@
+from typing import TYPE_CHECKING
+
 from remerkleable.bitfields import Bitvector
 from remerkleable.complex import Container
 
-from spec.base import SpecFulu
 from spec.common import (
     BLSSignature,
     Root,
@@ -10,6 +11,9 @@ from spec.common import (
     ValidatorIndex,
 )
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
+
+if TYPE_CHECKING:
+    from spec.base import SpecFulu
 
 
 # Dynamic spec class creation

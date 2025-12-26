@@ -7,7 +7,6 @@ import aiohttp
 from aiohttp import ClientTimeout
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from args import CLIArgs
 from observability import Metrics, get_service_commit, get_service_version
 from providers import BeaconChain
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
@@ -16,6 +15,7 @@ from spec.configs import Network, get_genesis_for_network, get_network_spec
 from tasks import TaskManager
 
 if TYPE_CHECKING:
+    from args import CLIArgs
     from services import ValidatorDutyService
 
 

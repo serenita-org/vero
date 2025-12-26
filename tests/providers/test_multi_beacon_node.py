@@ -9,19 +9,22 @@ import contextlib
 import os
 import re
 from functools import partial
+from typing import TYPE_CHECKING
 
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist, Bitvector
 
-from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
-from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
+
+if TYPE_CHECKING:
+    from args import CLIArgs
+    from spec.base import SpecFulu
 
 
 @pytest.mark.parametrize(

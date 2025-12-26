@@ -1,12 +1,14 @@
 import asyncio
 import datetime
 import logging
+from typing import TYPE_CHECKING
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+if TYPE_CHECKING:
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from schemas import SchemaBeaconAPI
+    from schemas import SchemaBeaconAPI
 
-from .multi_beacon_node import MultiBeaconNode
+    from .multi_beacon_node import MultiBeaconNode
 
 
 class AttestationDataProvider:

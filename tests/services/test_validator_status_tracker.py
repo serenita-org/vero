@@ -1,12 +1,16 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
-from providers import Vero
 from schemas import SchemaBeaconAPI
-from services import (
-    AttestationService,
-    BlockProposalService,
-    ValidatorStatusTrackerService,
-)
+
+if TYPE_CHECKING:
+    from providers import Vero
+    from services import (
+        AttestationService,
+        BlockProposalService,
+        ValidatorStatusTrackerService,
+    )
 
 
 @pytest.fixture

@@ -1,12 +1,7 @@
+from typing import TYPE_CHECKING
+
 import pytest
 
-from providers import (
-    DutyCache,
-    Keymanager,
-    MultiBeaconNode,
-    SignatureProvider,
-    Vero,
-)
 from services import (
     AttestationService,
     BlockProposalService,
@@ -14,6 +9,15 @@ from services import (
     ValidatorStatusTrackerService,
 )
 from services.validator_duty_service import ValidatorDutyServiceOptions
+
+if TYPE_CHECKING:
+    from providers import (
+        DutyCache,
+        Keymanager,
+        MultiBeaconNode,
+        SignatureProvider,
+        Vero,
+    )
 
 
 @pytest.fixture

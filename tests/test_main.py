@@ -5,17 +5,21 @@ import os
 import pstats
 import signal
 import time
-from _lsprof import profiler_entry
-from collections.abc import Generator
+from typing import TYPE_CHECKING
 
 import pytest
 
 from main import main
-from providers import Vero
+
+if TYPE_CHECKING:
+    from _lsprof import profiler_entry
+    from collections.abc import Generator
+
+    from providers import Vero
 
 
 @pytest.fixture
-def _profile_program_run() -> Generator[None, None, None]:
+def _profile_program_run() -> Generator[None]:
     # CI environments report artificially high CPU usage due to virtualization
     # -> skipping the check of CPU usage there
     if os.getenv("CI") == "true":

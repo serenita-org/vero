@@ -3,14 +3,13 @@ import logging
 from math import floor
 from typing import TYPE_CHECKING
 
-from observability import Metrics
-
 if TYPE_CHECKING:
+    from observability import Metrics
     from providers import BeaconChain
 
 
 async def monitor_event_loop(
-    beacon_chain: "BeaconChain", metrics: Metrics, shutdown_event: asyncio.Event
+    beacon_chain: BeaconChain, metrics: Metrics, shutdown_event: asyncio.Event
 ) -> None:
     _logger = logging.getLogger("event-loop")
     event_loop = asyncio.get_running_loop()

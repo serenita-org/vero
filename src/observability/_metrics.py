@@ -1,6 +1,7 @@
 import math
 import sys
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from prometheus_client import (
     Counter,
@@ -9,10 +10,12 @@ from prometheus_client import (
     start_http_server,
 )
 
-from spec.base import SpecFulu
 from spec.constants import INTERVALS_PER_SLOT
 
 from ._vero_info import get_service_commit, get_service_version
+
+if TYPE_CHECKING:
+    from spec.base import SpecFulu
 
 
 class ErrorType(Enum):

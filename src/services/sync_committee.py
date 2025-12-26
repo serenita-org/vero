@@ -2,8 +2,7 @@ import asyncio
 import contextlib
 import datetime
 from collections import defaultdict
-from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
@@ -21,6 +20,9 @@ from spec.constants import (
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
 from spec.sync_committee import SpecSyncCommittee
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 _PRODUCE_JOB_ID = (
     "SyncCommitteeService.produce_sync_message_if_not_yet_produced-slot-{duty_slot}"

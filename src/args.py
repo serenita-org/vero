@@ -1,9 +1,9 @@
 import argparse
 import logging
 import sys
-from collections.abc import Sequence
 from logging import getLevelNamesMapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 import msgspec
@@ -11,6 +11,9 @@ import msgspec
 from observability import get_service_version
 from spec.configs import Network
 from spec.utils import decode_graffiti, encode_graffiti
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class CLIArgs(msgspec.Struct, kw_only=True):

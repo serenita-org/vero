@@ -45,7 +45,7 @@ class SpecAttestation:
     @classmethod
     def initialize(
         cls,
-        spec: "SpecFulu",
+        spec: SpecFulu,
     ) -> None:
         class AttestationElectra(Container):
             aggregation_bits: Bitlist[

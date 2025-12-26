@@ -3,10 +3,9 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from providers import BeaconChain, BeaconNode
-from schemas import SchemaBeaconAPI
-
 if TYPE_CHECKING:
+    from providers import BeaconChain, BeaconNode
+    from schemas import SchemaBeaconAPI
     from services import ValidatorStatusTrackerService
 
 
@@ -19,7 +18,7 @@ class DoppelgangerDetector:
         self,
         beacon_chain: BeaconChain,
         beacon_node: BeaconNode,
-        validator_status_tracker_service: "ValidatorStatusTrackerService",
+        validator_status_tracker_service: ValidatorStatusTrackerService,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 

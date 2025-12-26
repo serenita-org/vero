@@ -1,9 +1,11 @@
 from hashlib import sha256
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from remerkleable.basic import uint64, uint256
 from remerkleable.byte_arrays import Bytes32, Bytes48, Bytes96
-from remerkleable.core import ObjType
+
+if TYPE_CHECKING:
+    from remerkleable.core import ObjType
 
 
 def bytes_to_uint64(

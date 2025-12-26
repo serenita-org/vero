@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import signal
+from typing import TYPE_CHECKING
 
-from providers import Vero
 from services import BlockProposalService
+
+if TYPE_CHECKING:
+    from providers import Vero
 
 _logger = logging.getLogger("vero-shutdown")
 

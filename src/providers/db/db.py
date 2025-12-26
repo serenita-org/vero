@@ -1,11 +1,13 @@
 import logging
 import sqlite3
-from collections.abc import Generator
 from pathlib import Path
-from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from providers.db.migrations import MIGRATIONS, DbMigration
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from types import TracebackType
 
 
 class DB:
@@ -74,7 +76,7 @@ class DB:
 
     def batch_host_parameters(
         self, host_parameter_values: list[str]
-    ) -> Generator[list[str], None, None]:
+    ) -> Generator[list[str]]:
         """
         SQLite has a limit on the number of host parameters it can process
         in a single query set to 32,766 as of SQLite 3.32.0.

@@ -1,17 +1,20 @@
 import asyncio
 import re
 import time
-from collections.abc import Callable, Coroutine
 from contextlib import nullcontext
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec.json
 import pytest
 from aioresponses import CallbackResult, aioresponses
 
-from args import CLIArgs
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
+    from args import CLIArgs
 
 
 @pytest.fixture

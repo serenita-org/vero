@@ -6,14 +6,12 @@ import datetime
 import json
 import logging
 import warnings
-from collections.abc import AsyncIterable
 from typing import TYPE_CHECKING, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
 import msgspec
 from aiohttp import ClientTimeout
-from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
@@ -32,6 +30,10 @@ from spec.base import SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterable
+
+    from aiohttp.client import _RequestOptions
+
     from .vero import Vero
 
 _TIMEOUT_DEFAULT_CONNECT = 1
@@ -58,7 +60,7 @@ class BeaconNode:
     def __init__(
         self,
         base_url: str,
-        vero: "Vero",
+        vero: Vero,
     ) -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.metrics = vero.metrics
@@ -501,7 +503,7 @@ class BeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
+    ) -> SpecAttestation.AttestationElectra:
         resp_text = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
@@ -549,7 +551,7 @@ class BeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SpecSyncCommittee.Contribution:
         resp = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/sync_committee_contribution",

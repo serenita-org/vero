@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from remerkleable.bitfields import Bitvector
 from remerkleable.byte_arrays import ByteList, Bytes32, Bytes48, ByteVector
 from remerkleable.complex import Container, List, Vector
@@ -6,7 +8,6 @@ from spec.attestation import (
     AttestationData,
     SpecAttestation,
 )
-from spec.base import SpecFulu
 from spec.common import (
     BLSPubkey,
     BLSSignature,
@@ -19,6 +20,9 @@ from spec.common import (
     ValidatorIndex,
 )
 from spec.constants import BYTES_PER_FIELD_ELEMENT, DEPOSIT_CONTRACT_TREE_DEPTH
+
+if TYPE_CHECKING:
+    from spec.base import SpecFulu
 
 
 class Eth1Data(Container):

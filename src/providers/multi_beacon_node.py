@@ -37,12 +37,9 @@ import asyncio
 import logging
 import time
 from collections import Counter
-from collections.abc import AsyncIterator
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
 from opentelemetry import trace
-from remerkleable.complex import Container
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
@@ -53,13 +50,18 @@ from spec.constants import INTERVALS_PER_SLOT
 from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+    from types import TracebackType
+
+    from remerkleable.complex import Container
+
     from .vero import Vero
 
 
 class MultiBeaconNode:
     def __init__(
         self,
-        vero: "Vero",
+        vero: Vero,
         skip_init: bool = False,
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -256,7 +258,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
+    ) -> SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock:
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -612,7 +614,7 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
+    ) -> SpecAttestation.AttestationElectra:
         aggregates: list[
             SpecAttestation.AttestationElectra
         ] = await self._get_all_beacon_node_responses(
@@ -644,7 +646,7 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_indices: set[int],
-    ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
+    ) -> AsyncIterator[SpecAttestation.AttestationElectra]:
         tasks = [
             self.get_aggregate_attestation_v2(
                 attestation_data_root=attestation_data_root,
@@ -702,7 +704,7 @@ class MultiBeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SpecSyncCommittee.Contribution:
         contributions: list[
             SpecSyncCommittee.Contribution
         ] = await self._get_all_beacon_node_responses(

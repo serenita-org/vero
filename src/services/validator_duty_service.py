@@ -1,23 +1,24 @@
 import asyncio
 import logging
 from enum import Enum
-from types import TracebackType
 from typing import TYPE_CHECKING, Self, TypedDict, Unpack
 
 import msgspec
 from opentelemetry import trace
 
 from observability import ErrorType
-from providers import (
-    DutyCache,
-    Keymanager,
-    MultiBeaconNode,
-    SignatureProvider,
-    Vero,
-)
-from schemas import SchemaBeaconAPI
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
+    from providers import (
+        DutyCache,
+        Keymanager,
+        MultiBeaconNode,
+        SignatureProvider,
+        Vero,
+    )
+    from schemas import SchemaBeaconAPI
     from services import ValidatorStatusTrackerService
 
 
@@ -34,7 +35,7 @@ class ValidatorDutyServiceOptions(TypedDict):
     signature_provider: SignatureProvider
     keymanager: Keymanager
     duty_cache: DutyCache
-    validator_status_tracker_service: "ValidatorStatusTrackerService"
+    validator_status_tracker_service: ValidatorStatusTrackerService
     vero: Vero
 
 
