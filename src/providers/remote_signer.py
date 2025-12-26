@@ -11,9 +11,11 @@ from urllib.parse import urlparse
 import aiohttp
 import msgspec.json
 from aiohttp import ClientTimeout
+from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
+from providers._headers import ContentType
 from schemas import SchemaRemoteSigner
 
 from .signature_provider import SignatureProvider
@@ -77,7 +79,11 @@ class RemoteSigner(SignatureProvider):
         self.process_pool_executor = process_pool_executor
 
     async def __aenter__(self) -> Self:
-        _user_agent = f"{get_service_name()}/{get_service_version()}"
+        headers = {
+            ACCEPT: ContentType.JSON.value,
+            CONTENT_TYPE: ContentType.JSON.value,
+            USER_AGENT: f"{get_service_name()}/{get_service_version()}",
+        }
 
         self._trace_default_request_ctx = dict(
             host=self.host,
@@ -94,7 +100,7 @@ class RemoteSigner(SignatureProvider):
         self.low_priority_client_session = aiohttp.ClientSession(
             base_url=self.url,
             connector=aiohttp.TCPConnector(limit=10),
-            headers={"User-Agent": _user_agent},
+            headers=headers,
             trace_configs=[
                 RequestLatency(
                     host=self.host,
@@ -108,7 +114,7 @@ class RemoteSigner(SignatureProvider):
 
         self.high_priority_client_session = aiohttp.ClientSession(
             base_url=self.url,
-            headers={"User-Agent": _user_agent},
+            headers=headers,
             trace_configs=[
                 RequestLatency(
                     host=self.host,
@@ -190,6 +196,7 @@ class RemoteSigner(SignatureProvider):
 
         async with self._get_session_for_message(message).post(
             _endpoint.format(identifier=identifier),
+            headers={ACCEPT: ContentType.TEXT_PLAIN.value},
             data=self.json_encoder.encode(message),
             trace_request_ctx=dict(
                 path=_endpoint,
@@ -205,7 +212,7 @@ class RemoteSigner(SignatureProvider):
                 self.metrics.signed_messages_c.labels(
                     signable_message_type=type(message).__name__
                 ).inc()
-            return message, (await resp.json())["signature"], identifier
+            return message, (await resp.read()).decode(), identifier
 
     async def sign_in_batches(
         self,
