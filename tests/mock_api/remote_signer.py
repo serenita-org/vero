@@ -30,7 +30,7 @@ def _mocked_remote_signer_endpoints(
         )
 
     def _mocked_sign_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
-        return CallbackResult(payload={"signature": "0x" + os.urandom(96).hex()})
+        return CallbackResult(body="0x" + os.urandom(96).hex())
 
     mocked_responses.get(
         url=re.compile("http://remote-signer:1234/api/v1/eth2/publicKeys"),
