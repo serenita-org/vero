@@ -126,6 +126,180 @@ class AttestationService(ValidatorDutyService):
 
         await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
 
+    def _get_duties_for_slot(
+        self, slot: int
+    ) -> set[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+        slot_attester_duties = {
+            duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
+        }
+
+        for duty in slot_attester_duties:
+            self.attester_duties[epoch].remove(duty)
+        return slot_attester_duties
+
+    async def _produce_attestation_data(
+        self, slot: int, head_event: SchemaBeaconAPI.HeadEvent | None
+    ) -> SchemaBeaconAPI.AttestationData:
+        consensus_start = asyncio.get_running_loop().time()
+        try:
+            att_data = await asyncio.wait_for(
+                self.attestation_data_provider.produce_attestation_data(
+                    slot=slot,
+                    head_event_block_root=head_event.block if head_event else None,
+                ),
+                timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
+                - time.time(),
+            )
+        except TimeoutError as e:
+            self.logger.exception(
+                f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes ({head_event=}): {e!r}",
+            )
+            self.metrics.vc_attestation_consensus_failures_c.inc()
+            self.metrics.errors_c.labels(
+                error_type=ErrorType.ATTESTATION_CONSENSUS.value,
+            ).inc()
+            raise
+
+        consensus_time = asyncio.get_running_loop().time() - consensus_start
+        self.logger.debug(
+            f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
+        )
+        self.metrics.vc_attestation_consensus_time_h.observe(consensus_time)
+
+        # Ensure attestation data checkpoints are not in the future
+        current_epoch = self.beacon_chain.current_epoch
+        if any(
+            int(cp.epoch) > current_epoch for cp in (att_data.source, att_data.target)
+        ):
+            raise RuntimeError(
+                f"Checkpoint in returned attestation data is in the future:"
+                f"\nCurrent epoch: {current_epoch}"
+                f"\nAttestation data: {att_data}"
+            )
+
+        return att_data
+
+    async def _get_signed_attestations(
+        self,
+        slot: int,
+        att_data: SchemaBeaconAPI.AttestationData,
+        duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+    ) -> list[SchemaBeaconAPI.SingleAttestation]:
+        signed_attestations: list[SchemaBeaconAPI.SingleAttestation] = []
+
+        pubkey_to_duty = {d.pubkey: d for d in duties}
+        message = SchemaRemoteSigner.AttestationSignableMessage(
+            fork_info=self.beacon_chain.get_fork_info(slot=slot),
+            attestation=msgspec.to_builtins(att_data),
+        )
+
+        for coro in asyncio.as_completed(
+            [
+                self.signature_provider.sign(
+                    message=message,
+                    identifier=duty.pubkey,
+                )
+                for duty in duties
+            ],
+        ):
+            try:
+                message, signature, pubkey = await coro
+            except Exception as e:
+                self.metrics.errors_c.labels(
+                    error_type=ErrorType.SIGNATURE.value,
+                ).inc()
+                self.logger.exception(
+                    f"Failed to get signature for attestation for slot {slot}: {e!r}",
+                )
+                continue
+
+            duty = pubkey_to_duty[pubkey]
+
+            # SingleAttestation object from the CL spec
+            signed_attestations.append(
+                SchemaBeaconAPI.SingleAttestation(
+                    committee_index=duty.committee_index,
+                    attester_index=duty.validator_index,
+                    data=att_data,
+                    signature=signature,
+                ),
+            )
+
+        return signed_attestations
+
+    async def _publish_attestations(
+        self,
+        slot: int,
+        att_data: SchemaBeaconAPI.AttestationData,
+        signed_attestations: list[SchemaBeaconAPI.SingleAttestation],
+    ) -> None:
+        self.logger.debug(
+            f"Publishing attestations for slot {slot}, count: {len(signed_attestations)}, head root: {att_data.beacon_block_root}",
+        )
+        self.metrics.duty_submission_time_h.labels(
+            duty=ValidatorDuty.ATTESTATION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
+
+        try:
+            await self.multi_beacon_node.publish_attestations(
+                attestations=signed_attestations,
+                fork_version=self.beacon_chain.current_fork_version,
+            )
+        except Exception as e:
+            self.metrics.errors_c.labels(
+                error_type=ErrorType.ATTESTATION_PUBLISH.value,
+            ).inc()
+            self.logger.exception(
+                f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
+            )
+        else:
+            self.logger.info(
+                f"Published attestations for slot {slot}, count: {len(signed_attestations)}, head root: {att_data.beacon_block_root}",
+            )
+            self.metrics.vc_published_attestations_c.inc(
+                amount=len(signed_attestations),
+            )
+
+    async def _attest(
+        self,
+        slot: int,
+        head_event: SchemaBeaconAPI.HeadEvent | None,
+        duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
+    ) -> None:
+        self.logger.debug(
+            f"Attesting for {slot=}, {head_event=}, {len(duties)} duties",
+        )
+        self._last_slot_duty_started_for = slot
+        self.metrics.duty_start_time_h.labels(
+            duty=ValidatorDuty.ATTESTATION.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
+
+        att_data = await self._produce_attestation_data(
+            slot=slot, head_event=head_event
+        )
+
+        # Use the AttestationData later on for aggregation duties
+        self.task_manager.create_task(
+            self.prepare_and_aggregate_attestations(
+                slot=slot,
+                att_data=att_data,
+                aggregator_duties=[d for d in duties if d.is_aggregator],
+            )
+        )
+
+        # Sign the AttestationData
+        signed_attestations = await self._get_signed_attestations(
+            slot=slot,
+            att_data=att_data,
+            duties=duties,
+        )
+
+        # Published the signed attestations
+        await self._publish_attestations(
+            slot=slot, att_data=att_data, signed_attestations=signed_attestations
+        )
+
     async def attest_if_not_yet_attested(
         self,
         slot: int,
@@ -161,21 +335,20 @@ class AttestationService(ValidatorDutyService):
                 f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
             )
 
-        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
-        slot_attester_duties = {
-            duty for duty in self.attester_duties[epoch] if int(duty.slot) == slot
-        }
+        duties = self._get_duties_for_slot(slot)
 
-        for duty in slot_attester_duties:
-            self.attester_duties[epoch].remove(duty)
-
-        if len(slot_attester_duties) == 0:
-            self.logger.debug(f"No remaining attester duties for slot {slot}")
+        if len(duties) > 0:
+            try:
+                await self._attest(slot=slot, head_event=head_event, duties=duties)
+            finally:
+                self._last_slot_duty_completed_for = slot
+        else:
+            # Produce attestation data if there is an attester
+            # duty scheduled for later in the epoch.
+            # This ensures finality checkpoints are confirmed and cached early
+            # into the epoch, even with a low number of active validators.
+            epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
             if len(self.attester_duties[epoch]) > 0:
-                # Produce attestation data if there is an attester
-                # duty scheduled for later in the epoch.
-                # This ensures finality checkpoints are confirmed and cached early
-                # into the epoch, even with a low number of active validators.
                 _ = await asyncio.wait_for(
                     self.attestation_data_provider.produce_attestation_data(
                         slot=slot,
@@ -184,134 +357,6 @@ class AttestationService(ValidatorDutyService):
                     timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
                     - time.time(),
                 )
-            return
-
-        self.logger.debug(
-            f"Attesting for {slot=}, {head_event=}, {len(slot_attester_duties)} duties",
-        )
-        self._last_slot_duty_started_for = slot
-        self.metrics.duty_start_time_h.labels(
-            duty=ValidatorDuty.ATTESTATION.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
-
-        consensus_start = asyncio.get_running_loop().time()
-        next_slot_start_ts = self.beacon_chain.get_timestamp_for_slot(slot + 1)
-        try:
-            att_data = await asyncio.wait_for(
-                self.attestation_data_provider.produce_attestation_data(
-                    slot=slot,
-                    head_event_block_root=head_event.block if head_event else None,
-                ),
-                timeout=next_slot_start_ts - time.time(),
-            )
-        except TimeoutError as e:
-            self.logger.exception(
-                f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes ({head_event=}): {e!r}",
-            )
-            self.metrics.vc_attestation_consensus_failures_c.inc()
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.ATTESTATION_CONSENSUS.value,
-            ).inc()
-            self._last_slot_duty_completed_for = slot
-            return
-        else:
-            consensus_time = asyncio.get_running_loop().time() - consensus_start
-            self.logger.debug(
-                f"Reached consensus on attestation data in {consensus_time:.3f} seconds",
-            )
-            self.metrics.vc_attestation_consensus_time_h.observe(consensus_time)
-
-        self.logger.debug(f"{att_data=}, {head_event=}")
-
-        # Ensure attestation data checkpoints are not in the future
-        current_epoch = self.beacon_chain.current_epoch
-        if any(
-            int(cp.epoch) > current_epoch for cp in (att_data.source, att_data.target)
-        ):
-            raise RuntimeError(
-                f"Checkpoint in returned attestation data is in the future:"
-                f"\nCurrent epoch: {current_epoch}"
-                f"\nAttestation data: {att_data}"
-            )
-
-        # Use the AttestationData later on for aggregation duties
-        self.task_manager.create_task(
-            self.prepare_and_aggregate_attestations(
-                slot=slot,
-                att_data=att_data,
-                aggregator_duties=[d for d in slot_attester_duties if d.is_aggregator],
-            )
-        )
-
-        # Sign the AttestationData
-        attestations_objects_to_publish: list[SchemaBeaconAPI.SingleAttestation] = []
-
-        pubkey_to_duty = {d.pubkey: d for d in slot_attester_duties}
-        message = SchemaRemoteSigner.AttestationSignableMessage(
-            fork_info=self.beacon_chain.get_fork_info(slot=slot),
-            attestation=msgspec.to_builtins(att_data),
-        )
-
-        for coro in asyncio.as_completed(
-            [
-                self.signature_provider.sign(
-                    message=message,
-                    identifier=duty.pubkey,
-                )
-                for duty in slot_attester_duties
-            ],
-        ):
-            try:
-                message, signature, pubkey = await coro
-            except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.SIGNATURE.value,
-                ).inc()
-                self.logger.exception(
-                    f"Failed to get signature for attestation for slot {slot}: {e!r}",
-                )
-                continue
-
-            duty = pubkey_to_duty[pubkey]
-
-            # SingleAttestation object from the CL spec
-            attestations_objects_to_publish.append(
-                SchemaBeaconAPI.SingleAttestation(
-                    committee_index=duty.committee_index,
-                    attester_index=duty.validator_index,
-                    data=att_data,
-                    signature=signature,
-                ),
-            )
-
-        self.logger.debug(
-            f"Publishing attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
-        )
-        self.metrics.duty_submission_time_h.labels(
-            duty=ValidatorDuty.ATTESTATION.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
-
-        try:
-            await self.multi_beacon_node.publish_attestations(
-                attestations=attestations_objects_to_publish,
-                fork_version=self.beacon_chain.current_fork_version,
-            )
-        except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.ATTESTATION_PUBLISH.value,
-            ).inc()
-            self.logger.exception(
-                f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
-            )
-        else:
-            self.logger.info(
-                f"Published attestations for slot {slot}, count: {len(attestations_objects_to_publish)}, head root: {att_data.beacon_block_root}",
-            )
-            self.metrics.vc_published_attestations_c.inc(
-                amount=len(attestations_objects_to_publish),
-            )
-        finally:
-            self._last_slot_duty_completed_for = slot
 
     async def prepare_and_aggregate_attestations(
         self,
