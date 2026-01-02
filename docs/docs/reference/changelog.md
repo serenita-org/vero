@@ -2,11 +2,19 @@
 
 ## Upcoming release
 
+
+
+## v1.3.1 { id="v1.3.1" }
+
+<small>TBD</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.3.1){:target="_blank"}
+
 #### Features
 - Remove the Holešky testnet from the set of supported networks
 
 #### Bugfixes
 - Fix beacon node initialization retry logic ([#246](https://github.com/serenita-org/vero/pull/246))
+
+___
 
 ## v1.3.0 { id="v1.3.0" }
 
