@@ -1,7 +1,7 @@
 # A preset only used for tests.
 # It is a copy of the Hoodi preset, with the following changes:
-# 1) SECONDS_PER_SLOT set to 1 second.
-# 2) Fork epochs are overridden - tests run against the latest fork version unless specified otherwise
+# 1) SLOT_DURATION_MS set to 1 second to make tests run faster.
+# 2) Fork epochs are overridden - tests run against the latest fork version unless specified otherwise.
 # Extends the mainnet preset
 PRESET_BASE: mainnet
 CONFIG_NAME: _tests
