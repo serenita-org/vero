@@ -22,9 +22,7 @@ from spec.constants import (
 )
 from spec.sync_committee import SpecSyncCommittee
 
-_PRODUCE_JOB_ID = (
-    "SyncCommitteeService.produce_sync_message_if_not_yet_produced-slot-{duty_slot}"
-)
+_PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
 
 class SyncCommitteeService(ValidatorDutyService):
@@ -78,7 +76,7 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
         self.scheduler.add_job(
-            func=self.produce_sync_message_if_not_yet_produced,
+            func=self.produce_sync_message,
             trigger="date",
             next_run_time=_produce_deadline,
             kwargs=dict(duty_slot=slot),
@@ -91,12 +89,144 @@ class SyncCommitteeService(ValidatorDutyService):
             self.task_manager.create_task(super().update_duties())
 
     async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
-        await self.produce_sync_message_if_not_yet_produced(
+        await self.produce_sync_message(
             duty_slot=int(event.slot),
             head_event=event,
         )
 
-    async def produce_sync_message_if_not_yet_produced(
+    async def _get_head_block_root(self) -> str:
+        try:
+            return await self.multi_beacon_node.get_block_root(
+                block_id="head",
+            )
+        except Exception as e:
+            self.logger.exception(
+                f"Failed to get beacon block root: {e!r}",
+            )
+            self.metrics.errors_c.labels(
+                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
+            ).inc()
+            raise
+
+    async def _get_signed_sync_messages(
+        self,
+        duty_slot: int,
+        sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
+        beacon_block_root: str,
+    ) -> list[SchemaBeaconAPI.SyncCommitteeSignature]:
+        _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
+        coroutines = [
+            self.signature_provider.sign(
+                message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
+                    fork_info=_fork_info,
+                    sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
+                        beacon_block_root=beacon_block_root,
+                        slot=str(duty_slot),
+                    ),
+                ),
+                identifier=validator.pubkey,
+            )
+            for validator in sync_committee_members
+        ]
+
+        signed_messages: list[SchemaBeaconAPI.SyncCommitteeSignature] = []
+        for coro in asyncio.as_completed(coroutines):
+            try:
+                msg, sig, pubkey = await coro
+            except Exception as e:
+                self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
+                self.logger.exception(
+                    f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
+                )
+                continue
+
+            signed_messages.append(
+                SchemaBeaconAPI.SyncCommitteeSignature(
+                    beacon_block_root=msg.sync_committee_message.beacon_block_root,
+                    slot=str(msg.sync_committee_message.slot),
+                    validator_index=next(
+                        str(v.index)
+                        for v in sync_committee_members
+                        if v.pubkey == pubkey
+                    ),
+                    signature=sig,
+                ),
+            )
+
+        return signed_messages
+
+    async def _publish_sync_messages(
+        self,
+        duty_slot: int,
+        signed_sync_messages: list[SchemaBeaconAPI.SyncCommitteeSignature],
+    ) -> None:
+        self.logger.debug(
+            f"Publishing sync committee messages for slot {duty_slot}, count: {len(signed_sync_messages)}",
+        )
+
+        self.metrics.duty_submission_time_h.labels(
+            duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
+        try:
+            await self.multi_beacon_node.publish_sync_committee_messages(
+                messages=signed_sync_messages,
+            )
+        except Exception as e:
+            self.metrics.errors_c.labels(
+                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
+            ).inc()
+            self.logger.exception(
+                f"Failed to publish sync committee messages for slot {duty_slot}: {e!r}",
+            )
+        else:
+            self.logger.info(
+                f"Published sync committee messages for slot {duty_slot}, count: {len(signed_sync_messages)}",
+            )
+            self.metrics.vc_published_sync_committee_messages_c.inc(
+                amount=len(signed_sync_messages),
+            )
+
+    async def _produce_sync_message(
+        self,
+        duty_slot: int,
+        sync_period: int,
+        head_event: SchemaBeaconAPI.HeadEvent | None,
+        sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
+    ) -> None:
+        self.logger.debug(
+            f"Producing sync message for slot {duty_slot} for {len(sync_committee_members)} validators, from head: {head_event is not None}",
+        )
+        self._last_slot_duty_started_for = duty_slot
+        self.metrics.duty_start_time_h.labels(
+            duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
+        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
+
+        beacon_block_root = (
+            head_event.block if head_event else await self._get_head_block_root()
+        )
+
+        # Use the beacon_block_root later on for sync contribution duties
+        self.task_manager.create_task(
+            self.prepare_and_aggregate_sync_messages(
+                duty_slot=duty_slot,
+                beacon_block_root=beacon_block_root,
+                sync_duties=self.sync_duties[sync_period],
+            ),
+        )
+
+        # Sign the sync messages
+        signed_sync_messages = await self._get_signed_sync_messages(
+            duty_slot=duty_slot,
+            sync_committee_members=sync_committee_members,
+            beacon_block_root=beacon_block_root,
+        )
+
+        # Publish the messages
+        await self._publish_sync_messages(
+            duty_slot=duty_slot, signed_sync_messages=signed_sync_messages
+        )
+
+    async def produce_sync_message(
         self,
         duty_slot: int,
         head_event: SchemaBeaconAPI.HeadEvent | None = None,
@@ -141,104 +271,12 @@ class SyncCommitteeService(ValidatorDutyService):
             self.logger.debug(f"No remaining sync duties for slot {duty_slot}")
             return
 
-        self.logger.debug(
-            f"Producing sync message for slot {duty_slot} for {len(sync_committee_members)} validators, from head: {head_event is not None}",
-        )
-        self._last_slot_duty_started_for = duty_slot
-        self.metrics.duty_start_time_h.labels(
-            duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
-
-        if head_event:
-            beacon_block_root = head_event.block
-        else:
-            try:
-                beacon_block_root = await self.multi_beacon_node.get_block_root(
-                    block_id="head",
-                )
-            except Exception as e:
-                self.logger.exception(
-                    f"Failed to get beacon block root: {e!r}",
-                )
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
-                ).inc()
-                return
-
-        _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
-        coroutines = [
-            self.signature_provider.sign(
-                message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
-                    fork_info=_fork_info,
-                    sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
-                        beacon_block_root=beacon_block_root,
-                        slot=str(duty_slot),
-                    ),
-                ),
-                identifier=validator.pubkey,
-            )
-            for validator in sync_committee_members
-        ]
-
-        sync_messages_to_publish: list[SchemaBeaconAPI.SyncCommitteeSignature] = []
-        for coro in asyncio.as_completed(coroutines):
-            try:
-                msg, sig, pubkey = await coro
-            except Exception as e:
-                self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.exception(
-                    f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
-                )
-                continue
-
-            sync_messages_to_publish.append(
-                SchemaBeaconAPI.SyncCommitteeSignature(
-                    beacon_block_root=msg.sync_committee_message.beacon_block_root,
-                    slot=str(msg.sync_committee_message.slot),
-                    validator_index=next(
-                        str(v.index)
-                        for v in sync_committee_members
-                        if v.pubkey == pubkey
-                    ),
-                    signature=sig,
-                ),
-            )
-
-        # Add the aggregation duty to the schedule *before*
-        # publishing sync messages so that any delays in publishing
-        # do not affect the aggregation duty start time
-        self.task_manager.create_task(
-            self.prepare_and_aggregate_sync_messages(
-                duty_slot=duty_slot,
-                beacon_block_root=beacon_block_root,
-                sync_duties=self.sync_duties[sync_period],
-            ),
-        )
-
-        self.logger.debug(
-            f"Publishing sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
-        )
-
-        self.metrics.duty_submission_time_h.labels(
-            duty=ValidatorDuty.SYNC_COMMITTEE_MESSAGE.value,
-        ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
         try:
-            await self.multi_beacon_node.publish_sync_committee_messages(
-                messages=sync_messages_to_publish,
-            )
-        except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
-            ).inc()
-            self.logger.exception(
-                f"Failed to publish sync committee messages for slot {duty_slot}: {e!r}",
-            )
-        else:
-            self.logger.info(
-                f"Published sync committee messages for slot {duty_slot}, count: {len(sync_messages_to_publish)}",
-            )
-            self.metrics.vc_published_sync_committee_messages_c.inc(
-                amount=len(sync_messages_to_publish),
+            await self._produce_sync_message(
+                duty_slot=duty_slot,
+                head_event=head_event,
+                sync_period=sync_period,
+                sync_committee_members=sync_committee_members,
             )
         finally:
             self._last_slot_duty_completed_for = duty_slot
