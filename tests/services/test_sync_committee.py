@@ -33,7 +33,7 @@ async def test_update_duties(
     ],
     indirect=True,
 )
-async def test_produce_sync_message_if_not_yet_produced(
+async def test_produce_sync_message(
     sync_committee_service: SyncCommitteeService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
@@ -60,9 +60,7 @@ async def test_produce_sync_message_if_not_yet_produced(
     sync_messages_published_before = (
         vero.metrics.vc_published_sync_committee_messages_c._value.get()
     )
-    await sync_committee_service.produce_sync_message_if_not_yet_produced(
-        duty_slot=duty_slot,
-    )
+    await sync_committee_service.produce_sync_message(duty_slot=duty_slot)
 
     assert any("Published sync committee messages" in m for m in caplog.messages)
     assert (
