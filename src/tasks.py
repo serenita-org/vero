@@ -4,7 +4,7 @@ from collections.abc import Coroutine
 from functools import partial
 from typing import Any
 
-from observability import ErrorType, Metrics
+from observability import ErrorType, HandledRuntimeError, Metrics
 
 
 class TaskManager:
@@ -22,6 +22,11 @@ class TaskManager:
         try:
             # Re-raise the exception to get a nice traceback
             task.result()
+        except HandledRuntimeError:
+            # These errors have already been fully handled elsewhere,
+            # and we don't want to log anything else or count these
+            # exceptions towards `ErrorType.OTHER` in the errors metric.
+            pass
         except Exception as e:
             self.logger.exception(
                 f"Task {task} failed with exception {e!r}",

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from apscheduler.jobstores.base import JobLookupError
 
-from observability import ErrorType
+from observability import ErrorType, HandledRuntimeError
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -103,10 +103,10 @@ class SyncCommitteeService(ValidatorDutyService):
             self.logger.exception(
                 f"Failed to get beacon block root: {e!r}",
             )
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE.value,
-            ).inc()
-            raise
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE,
+            ) from None
 
     async def _get_signed_sync_messages(
         self,
@@ -172,12 +172,13 @@ class SyncCommitteeService(ValidatorDutyService):
                 messages=signed_sync_messages,
             )
         except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH.value,
-            ).inc()
             self.logger.exception(
                 f"Failed to publish sync committee messages for slot {duty_slot}: {e!r}",
             )
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PUBLISH,
+            ) from None
         else:
             self.logger.info(
                 f"Published sync committee messages for slot {duty_slot}, count: {len(signed_sync_messages)}",
@@ -313,11 +314,12 @@ class SyncCommitteeService(ValidatorDutyService):
         try:
             selection_proofs = await asyncio.gather(*selection_proofs_coroutines)
         except Exception as e:
-            self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for sync selection proofs for slot {duty_slot}: {e!r}",
             )
-            return
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
+            ) from None
 
         duties_with_proofs = []
         for duty in sync_duties:
@@ -392,12 +394,13 @@ class SyncCommitteeService(ValidatorDutyService):
                 amount=len(signed_contribution_and_proofs),
             )
         except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH.value,
-            ).inc()
             self.logger.exception(
                 f"Failed to publish sync committee contribution and proofs for slot {duty_slot}: {e!r}",
             )
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.SYNC_COMMITTEE_CONTRIBUTION_PUBLISH,
+            ) from None
 
     async def aggregate_sync_messages(
         self,

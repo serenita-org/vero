@@ -12,7 +12,7 @@ from opentelemetry.trace import (
 )
 from remerkleable.complex import Container
 
-from observability import ErrorType
+from observability import ErrorType, HandledRuntimeError
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -338,13 +338,13 @@ class BlockProposalService(ValidatorDutyService):
             try:
                 await self._fetch_randao_reveal(duty=duty)
             except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.BLOCK_PRODUCE.value,
-                ).inc()
                 self.logger.exception(
                     f"Failed to get RANDAO reveal: {e!r}",
                 )
-                raise
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c,
+                    error_type=ErrorType.BLOCK_PRODUCE,
+                ) from None
             else:
                 return self.randao_reveal_cache.pop(slot)
 
@@ -380,13 +380,13 @@ class BlockProposalService(ValidatorDutyService):
                     randao_reveal=randao_reveal,
                 )
             except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.BLOCK_PRODUCE.value,
-                ).inc()
                 self.logger.exception(
                     f"Failed to produce block: {e!r}",
                 )
-                raise
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c,
+                    error_type=ErrorType.BLOCK_PRODUCE,
+                ) from None
             else:
                 if full_response.execution_payload_blinded:
                     beacon_block = block_contents_or_blinded_block
@@ -425,13 +425,12 @@ class BlockProposalService(ValidatorDutyService):
                     identifier=duty.pubkey,
                 )
             except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.SIGNATURE.value,
-                ).inc()
                 self.logger.exception(
                     f"Failed to get signature for block: {e!r}",
                 )
-                raise
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
+                ) from None
             else:
                 return signature
 
@@ -473,13 +472,13 @@ class BlockProposalService(ValidatorDutyService):
                         ),
                     )
             except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.BLOCK_PUBLISH.value,
-                ).inc()
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
                 )
-                raise
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c,
+                    error_type=ErrorType.BLOCK_PUBLISH,
+                ) from None
             else:
                 self.logger.info(
                     f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
