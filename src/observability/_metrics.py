@@ -33,6 +33,11 @@ class ErrorType(Enum):
     OTHER = "other"
 
 
+class HandledRuntimeError(Exception):
+    def __init__(self, errors_counter: Counter, error_type: ErrorType) -> None:
+        errors_counter.labels(error_type=error_type.value).inc()
+
+
 def _setup_head_event_time_metric(
     seconds_per_slot: int,
     attestation_deadline: float,

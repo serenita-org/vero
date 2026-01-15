@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from ._logging import setup_logging
-from ._metrics import ErrorType, Metrics
+from ._metrics import ErrorType, HandledRuntimeError, Metrics
 from ._profiling import setup_profiling
 from ._tracing import setup_tracing
 from ._vero_info import get_service_commit, get_service_name, get_service_version
@@ -21,6 +21,7 @@ def init_observability(
 
 __all__ = [
     "ErrorType",
+    "HandledRuntimeError",
     "Metrics",
     "get_service_commit",
     "get_service_name",

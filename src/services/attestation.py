@@ -10,7 +10,7 @@ from uuid import uuid4
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
 
-from observability import ErrorType
+from observability import ErrorType, HandledRuntimeError
 from providers import AttestationDataProvider
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
@@ -156,10 +156,10 @@ class AttestationService(ValidatorDutyService):
                 f"Failed to reach consensus on attestation data for slot {slot} among connected beacon nodes ({head_event=}): {e!r}",
             )
             self.metrics.vc_attestation_consensus_failures_c.inc()
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.ATTESTATION_CONSENSUS.value,
-            ).inc()
-            raise
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.ATTESTATION_CONSENSUS,
+            ) from None
 
         consensus_time = asyncio.get_running_loop().time() - consensus_start
         self.logger.debug(
@@ -247,12 +247,13 @@ class AttestationService(ValidatorDutyService):
                 fork_version=self.beacon_chain.current_fork_version,
             )
         except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.ATTESTATION_PUBLISH.value,
-            ).inc()
             self.logger.exception(
                 f"Failed to publish attestations for slot {att_data.slot}: {e!r}",
             )
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.ATTESTATION_PUBLISH,
+            ) from None
         else:
             self.logger.info(
                 f"Published attestations for slot {slot}, count: {len(signed_attestations)}, head root: {att_data.beacon_block_root}",
@@ -419,12 +420,13 @@ class AttestationService(ValidatorDutyService):
                 amount=len(signed_aggregate_and_proofs),
             )
         except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH.value,
-            ).inc()
             self.logger.exception(
                 f"Failed to publish aggregate and proofs for slot {slot}: {e!r}",
             )
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c,
+                error_type=ErrorType.AGGREGATE_ATTESTATION_PUBLISH,
+            ) from None
 
     async def aggregate_attestations(
         self,
@@ -526,11 +528,12 @@ class AttestationService(ValidatorDutyService):
                 identifiers=identifiers,
             )
         except Exception as e:
-            self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
             self.logger.exception(
                 f"Failed to get signatures for aggregation selection proofs: {e!r}",
             )
-            raise
+            raise HandledRuntimeError(
+                errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
+            ) from None
 
         pubkey_to_selection_proof = {
             pubkey: bytes.fromhex(sig[2:]) for _, sig, pubkey in signatures
