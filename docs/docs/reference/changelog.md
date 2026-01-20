@@ -2,6 +2,8 @@
 
 ## Upcoming release
 
+#### Features
+- Add `--ignore-spec-mismatch` flag
 
 
 ## v1.3.1 { id="v1.3.1" }

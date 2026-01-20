@@ -71,6 +71,7 @@ class BeaconNode:
 
         self.spec = vero.spec
         self.SECONDS_PER_INTERVAL = int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self._ignore_spec_mismatch = vero.cli_args.ignore_spec_mismatch
 
         self.scheduler = vero.scheduler
         self.task_manager = vero.task_manager
@@ -119,7 +120,7 @@ class BeaconNode:
     async def _initialize_full(self) -> None:
         # Raise if the spec returned by the beacon node differs
         bn_spec = await self.get_spec()
-        if self.spec != bn_spec:
+        if self.spec != bn_spec and not self._ignore_spec_mismatch:
             msg = f"Spec values returned by beacon node {self.host} not equal to hardcoded spec values:"
             for field in self.spec.fields():
                 if getattr(self.spec, field) != getattr(bn_spec, field):

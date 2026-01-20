@@ -70,6 +70,7 @@ def cli_args(
     attestation_consensus_threshold = indirect_params.get(
         "attestation_consensus_threshold", None
     )
+    ignore_spec_mismatch = indirect_params.get("ignore_spec_mismatch", False)
 
     return CLIArgs(
         network=Network._TESTS,
@@ -94,6 +95,7 @@ def cli_args(
         metrics_address="localhost",
         metrics_port=8000,
         log_level=logging.INFO,
+        ignore_spec_mismatch=ignore_spec_mismatch,
         disable_slashing_detection=False,
     )
 

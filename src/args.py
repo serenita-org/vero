@@ -34,6 +34,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     metrics_address: str
     metrics_port: int
     log_level: int
+    ignore_spec_mismatch: bool
     disable_slashing_detection: bool
 
 
@@ -267,6 +268,18 @@ def get_parser() -> argparse.ArgumentParser:
         help="The logging level to use. Defaults to INFO.",
     )
     parser.add_argument(
+        "--ignore-spec-mismatch",
+        action="store_true",
+        help="""
+        Ignores a mismatch between spec values returned by a beacon node and
+        spec values included in Vero (which normally prevents such beacon nodes
+        from being used).
+
+        This flag can be used when a beacon node does not yet support new spec
+        values (e.g. for upcoming network upgrades).
+        """,
+    )
+    parser.add_argument(
         "----DANGER----disable-slashing-detection",
         action="store_true",
         help="[DANGEROUS] Disables Vero's proactive slashing detection.",
@@ -345,6 +358,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             metrics_address=parsed_args.metrics_address,
             metrics_port=parsed_args.metrics_port,
             log_level=logging.getLevelName(parsed_args.log_level),
+            ignore_spec_mismatch=parsed_args.ignore_spec_mismatch,
             disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )
     except ValueError as e:
