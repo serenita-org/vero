@@ -3,6 +3,11 @@
 There are already several validator client implementations
 – why do we need another one?
 
+The short answer is: we lacked a simple way to protect validators
+from client bugs. You'll find the long answer below.
+
+You may also skip directly to the [feature comparison](#feature-comparison).
+
 ## Client Diversity
 
 [Much](https://ethereum.org/en/developers/docs/nodes-and-clients/client-diversity/){:target="_blank"}
@@ -40,7 +45,7 @@ and EL side.
 We came across a few options that seemed to fulfill that requirement:
 
 1. [Vouch](https://github.com/attestantio/vouch){:target="_blank"} combined with its majority attestation strategy
-2. ~~DVT - [SSV](https://github.com/ssvlabs/ssv){:target="_blank"}~~ _(does not support attestation consensus)_
+2. DVT - [SSV](https://github.com/ssvlabs/ssv){:target="_blank"}
 3. DVT - Obol's [Charon](https://github.com/ObolNetwork/charon){:target="_blank"}
 
 The above options are solid choices. However, each of those
@@ -71,9 +76,7 @@ options also comes with some downsides.
     to pay a network fee. This requires managing and monitoring a balance
     of SSV tokens.
 
-    At the time of writing it is not possible to
-    configure an SSV cluster in a way that would prevent validators
-    from voting for an invalid chain.
+    Any issue with SSV software would be non-trivial to recover from.
 
     *TLDR: expensive validator registrations, SSV token requirement*
 
@@ -97,8 +100,9 @@ An issue in any of the above implementations would require
 an urgent fix from their respective maintainers. It would be
 challenging to switch back to a different kind of setup in case
 an issue were to occur.
-**All three of the above solutions also share critical
-dependencies, including:**
+
+In addition, all three of the above solutions also share critical
+dependencies, including:
 
 - `attestantio/go-eth2-client` (communication with beacon nodes)
 - `ferranbt/fastssz`, `pk910/dynamic-ssz` (SSZ data manipulation, encoding/decoding)
@@ -139,24 +143,48 @@ switch back from— in case any issue were to occur.
 
 ## Feature comparison
 
+|                                                             | Vero | Vouch |      DVT      | Traditional VC |
+|-------------------------------------------------------------|:----:|:-----:|:-------------:|:--------------:|
+| [Attestation consensus](#attestation-consensus)             |  ✅   |   ✅   |       ✅       |       ❌        |
+| [Slashing Detection](#slashing-detection)                   |  ✅   |   ❌   |       ❌       | 🟠 (Teku only) |
+| [Ethereum Remote Signing API](#ethereum-remote-signing-api) |  ✅   |   ❌   |      N/A      |       ✅        |
+| Simple to set up                                            |  ✅   |   ❌   |       ❌       |       ✅        |
+| Open Source                                                 |  ✅   |   ✅   | 🟠 (SSV only) |       ✅        |
+| Gnosis Chain support                                        |  ✅   |   ❌   |       ❌       |       🟠       |
+| Active-active redundancy*                                   |  ✅   |   ✅   |       ✅       |       ❌        |
+| Distributed validator keys**                                |  ❌   |   ✅   |       ✅       |       ❌        |
+
+
+<sub>* Vero Sponsor feature</sub>
+
+<sub>** Please reach out if the lack of this feature is blocking you from adopting Vero. We
+are considering adding support for it.</sub>
+
 ### Attestation consensus
 
 The validator client requires a threshold of connected clients
-to agree on the state of the chain before voting for it.
+to agree on the state of the chain before voting for it. This
+is a critical feature that prevents validators from voting for
+an incorrect chain due to a consensus bug.
 
-|                | Attestation consensus |
-|----------------|-----------------------|
-| Vero           | ✅                     |
-| Vouch          | ✅ (majority strategy) |
-| Traditional VC | ❌                     |
-| DVT - Charon   | ❌                     |
-| DVT - SSV      | ❌                     |
+For this protection mechanism to work, node operators must run
+a diverse mix of CL/EL client pairs.
+
+|                | Attestation consensus | Notes                                                |
+|----------------|-----------------------|------------------------------------------------------|
+| Vero           | ✅                     |                                                      |
+| Vouch          | ✅                     | majority / combinedmajority attestationdata strategy |
+| DVT - Charon   | ✅                     | opt-in, as of Oct 2025                               |
+| DVT - SSV      | ✅                     | as of Nov 2025                                       |
+| Traditional VC | ❌                     |                                                      |
 
 ### Slashing detection
 
-Monitors slashing events on the network and immediately stops
-performing validator duties as soon as any of the locally managed
-validators get slashed.
+The validator client monitors slashing events on the network
+and immediately stops performing validator duties as soon as
+any of the locally managed validators get slashed. More
+information about this feature is available
+[here](../reference/slashing_protection.md).
 
 |                | Slashing detection |
 |----------------|--------------------|
@@ -184,29 +212,3 @@ back just as easily.
 | Vouch          | ❌                           |
 | DVT - Charon   | N/A                         |
 | DVT - SSV      | N/A                         |
-
-### Gnosis Chain support
-
-Supports performing validator duties on Gnosis Chain.
-
-|                | Gnosis Chain support |
-|----------------|----------------------|
-| Vero           | ✅                    |
-| Traditional VC | ✅ (most of them)     |
-| Vouch          | ❌                    |
-| DVT - Charon   | ❌                    |
-| DVT - SSV      | ❌                    |
-
-### Open Source
-
-Vero is completely open-source without any strings attached. It is released
-as a public good to strengthen the Ethereum network, make running multi-node
-setups more accessible and thereby improve the client diversity situation.
-
-|                | Open Source |
-|----------------|-------------|
-| Vero           | ✅           |
-| Traditional VC | ✅           |
-| Vouch          | ✅           |
-| DVT - SSV      | ✅           |
-| DVT - Charon   | ❌           |
