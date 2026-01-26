@@ -26,7 +26,7 @@ class ValidatorStatusTrackerService:
         self.scheduler = vero.scheduler
         self.task_manager = vero.task_manager
 
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logging.getLogger("ValidatorStatusTracker")
         self.metrics = vero.metrics
 
         self._slashing_detected = False
@@ -140,6 +140,9 @@ class ValidatorStatusTrackerService:
             self.logger.warning("No active or pending validators detected")
 
         if minimal_update:
+            self.logger.info(
+                f"Validators: {len(active_pubkeys)} active, {len(pending_pubkeys)} pending (total: {len(managed_pubkeys)})",
+            )
             return
 
         self.exited_validators = await self.multi_beacon_node.get_validators(

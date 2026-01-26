@@ -79,27 +79,25 @@ async def test_lifecycle(
     required_log_lines = [
         "Initialized beacon node",
         "Current slot: ",
-        "Initialized validator status tracker",
         "Started validator duty services",
         "Subscribing to events",
-        "Updated duties",
-        "Published block for slot",
-        "Published attestations for slot",
-        "Published sync committee messages for slot",
     ]
 
     if enable_keymanager_api:
-        # Slightly fewer checks for this mode since it's not that easy
-        # to register validator keys from inside this test
-        for line in (
-            "Updated duties",
-            "Published block for slot",
-            "Published attestations for slot",
-            "Published sync committee messages for slot",
-        ):
-            required_log_lines.remove(line)
-
+        # It's not that easy to register validator keys from inside this test
+        # for the Keymanager mode. So we'll not actually expect to perform duties
+        # from within this test.
         required_log_lines.append("No active or pending validators detected")
+    else:
+        required_log_lines.extend(
+            [
+                "Validators: 4 active, 1 pending (total: 5)",
+                "Updated duties",
+                "Published block for slot",
+                "Published attestations for slot",
+                "Published sync committee messages for slot",
+            ]
+        )
 
     timeout = 5
     start = asyncio.get_running_loop().time()

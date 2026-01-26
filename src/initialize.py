@@ -148,7 +148,6 @@ async def run_services(vero: Vero) -> None:
         vero.beacon_chain.new_slot_handlers.append(
             validator_status_tracker_service.on_new_slot
         )
-        _logger.info("Initialized validator status tracker")
 
         if vero.cli_args.enable_doppelganger_detection:
             try:
