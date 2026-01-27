@@ -40,9 +40,23 @@ class AttestationService(ValidatorDutyService):
             )
             / 1_000
         )
+        self._attestation_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
         self._aggregate_due_s = (
             get_slot_component_duration_ms(
                 basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._aggregate_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS_GLOAS,
                 slot_duration_ms=self.spec.SLOT_DURATION_MS,
             )
             / 1_000
@@ -96,9 +110,17 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to attest 1/3 into the slot at the latest.
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            attestation_due_s = self._attestation_due_s_gloas
+        else:
+            attestation_due_s = self._attestation_due_s
+
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self._attestation_due_s,
+            + attestation_due_s,
             tz=datetime.UTC,
         )
 
@@ -381,10 +403,17 @@ class AttestationService(ValidatorDutyService):
         att_data: SchemaBeaconAPI.AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
-        # Schedule aggregated attestation at 2/3 of the slot
+        # Schedule aggregated attestation
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            aggregate_due_s = self._aggregate_due_s_gloas
+        else:
+            aggregate_due_s = self._aggregate_due_s
+
         aggregation_run_time = datetime.datetime.fromtimestamp(
-            timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self._aggregate_due_s,
+            timestamp=self.beacon_chain.get_timestamp_for_slot(slot) + aggregate_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
