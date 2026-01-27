@@ -17,7 +17,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -42,7 +42,7 @@ def response_content_type(request: pytest.FixtureRequest) -> ContentType:
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecFulu,
+    spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,

@@ -7,8 +7,8 @@ from math import floor
 from typing import TYPE_CHECKING, Any
 
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
-from spec._ascii import FULU as FULU_ASCII_ART
-from spec.base import Genesis, SpecFulu, Version
+from spec._ascii import GLOAS as GLOAS_ASCII_ART
+from spec.base import Genesis, SpecGloas, Version
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class BeaconChain:
     def __init__(
         self,
-        spec: SpecFulu,
+        spec: SpecGloas,
         genesis: Genesis,
         task_manager: TaskManager,
     ):
@@ -49,12 +49,21 @@ class BeaconChain:
             current_version=spec.FULU_FORK_VERSION.to_obj(),
             epoch=str(self.FULU_FORK_EPOCH),
         )
+        self.GLOAS_FORK_EPOCH = int(spec.GLOAS_FORK_EPOCH)
+        self.GLOAS_FORK_VERSION = spec.GLOAS_FORK_VERSION
+        self.GLOAS_FORK = SchemaRemoteSigner.Fork(
+            previous_version=spec.FULU_FORK_VERSION.to_obj(),
+            current_version=spec.GLOAS_FORK_VERSION.to_obj(),
+            epoch=str(self.GLOAS_FORK_EPOCH),
+        )
 
         current_epoch = self.current_slot // self.SLOTS_PER_EPOCH
-        if current_epoch >= self.FULU_FORK_EPOCH:
+        if current_epoch >= self.GLOAS_FORK_EPOCH:
+            self.current_fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+        elif current_epoch >= self.FULU_FORK_EPOCH:
+            self._log_fork_readiness()
             self.current_fork_version = SchemaBeaconAPI.ForkVersion.FULU
         elif current_epoch >= self.ELECTRA_FORK_EPOCH:
-            self._log_fork_readiness()
             self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
         else:
             raise NotImplementedError(f"Unsupported fork for epoch {current_epoch}")
@@ -66,6 +75,8 @@ class BeaconChain:
     def get_fork(self, slot: int) -> SchemaRemoteSigner.Fork:
         slot_epoch = slot // self.SLOTS_PER_EPOCH
 
+        if slot_epoch >= self.GLOAS_FORK_EPOCH:
+            return self.GLOAS_FORK
         if slot_epoch >= self.FULU_FORK_EPOCH:
             return self.FULU_FORK
         if slot_epoch >= self.ELECTRA_FORK_EPOCH:
@@ -81,6 +92,8 @@ class BeaconChain:
     def get_fork_version(self, slot: int) -> Version:
         slot_epoch = slot // self.SLOTS_PER_EPOCH
 
+        if slot_epoch >= self.GLOAS_FORK_EPOCH:
+            return self.GLOAS_FORK_VERSION
         if slot_epoch >= self.FULU_FORK_EPOCH:
             return self.FULU_FORK_VERSION
         if slot_epoch >= self.ELECTRA_FORK_EPOCH:
@@ -88,7 +101,7 @@ class BeaconChain:
         raise NotImplementedError(f"Unsupported fork for epoch {slot_epoch}")
 
     def _log_fork_readiness(self) -> None:
-        self.logger.info(f"Ready for Fulu at epoch {self.FULU_FORK_EPOCH}")
+        self.logger.info(f"Ready for Gloas at epoch {self.GLOAS_FORK_EPOCH}")
 
     def start_slot_ticker(self) -> None:
         self.task_manager.create_task(self.on_new_slot())
@@ -133,11 +146,11 @@ class BeaconChain:
         self.logger.info(f"Slot {_current_slot}")
 
         if _is_new_epoch:
-            if _current_epoch < self.FULU_FORK_EPOCH:
+            if _current_epoch < self.GLOAS_FORK_EPOCH:
                 self._log_fork_readiness()
-            elif _current_epoch == self.FULU_FORK_EPOCH:
-                self.current_fork_version = SchemaBeaconAPI.ForkVersion.FULU
-                self.logger.info(f"Fulu fork epoch reached! {FULU_ASCII_ART}")
+            elif _current_epoch == self.GLOAS_FORK_EPOCH:
+                self.current_fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+                self.logger.info(f"Gloas fork epoch reached! {GLOAS_ASCII_ART}")
 
         for handler in self.new_slot_handlers:
             self.task_manager.create_task(handler(_current_slot, _is_new_epoch))

@@ -24,7 +24,7 @@ class Genesis(Container):
     genesis_fork_version: Version
 
 
-class SpecFulu(Container):
+class SpecGloas(Container):
     # Phase 0
     SLOT_DURATION_MS: UInt64SerializedAsString
     ATTESTATION_DUE_BPS: UInt64SerializedAsString
@@ -81,6 +81,15 @@ class SpecFulu(Container):
     FULU_FORK_EPOCH: UInt64SerializedAsString
     FULU_FORK_VERSION: Version
 
+    # Gloas
+    GLOAS_FORK_EPOCH: UInt64SerializedAsString
+    GLOAS_FORK_VERSION: Version
+    ATTESTATION_DUE_BPS_GLOAS: UInt64SerializedAsString
+    AGGREGATE_DUE_BPS_GLOAS: UInt64SerializedAsString
+    SYNC_MESSAGE_DUE_BPS_GLOAS: UInt64SerializedAsString
+    CONTRIBUTION_DUE_BPS_GLOAS: UInt64SerializedAsString
+    PAYLOAD_ATTESTATION_DUE_BPS: UInt64SerializedAsString
+
     @classmethod
     def from_obj(cls, obj: ObjType) -> Self:
         if not isinstance(obj, dict):
@@ -105,5 +114,5 @@ class SpecFulu(Container):
         return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
 
 
-def parse_spec(data: dict[str, str]) -> SpecFulu:
-    return SpecFulu.from_obj(data)
+def parse_spec(data: dict[str, str]) -> SpecGloas:
+    return SpecGloas.from_obj(data)

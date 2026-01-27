@@ -29,7 +29,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu, Fork, Genesis, Version
+from spec.base import SpecGloas, Fork, Genesis, Version
 from spec.common import Epoch
 from spec.configs import Network, get_network_spec, get_genesis_for_network
 from tasks import TaskManager
@@ -272,7 +272,7 @@ def beacon_chain(vero: Vero) -> BeaconChain:
 
 
 @pytest.fixture
-def spec(vero: Vero) -> SpecFulu:
+def spec(vero: Vero) -> SpecGloas:
     # Just a convenience fixture
     return vero.spec
 
