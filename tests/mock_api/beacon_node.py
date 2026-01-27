@@ -17,7 +17,7 @@ from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import preset_types
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
@@ -50,7 +50,7 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecFulu,
+    spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
