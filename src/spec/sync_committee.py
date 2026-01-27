@@ -1,7 +1,7 @@
 from remerkleable.bitfields import Bitvector
 from remerkleable.complex import Container
 
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.common import (
     BLSSignature,
     Root,
@@ -21,7 +21,7 @@ class SpecSyncCommittee:
     @classmethod
     def initialize(
         cls,
-        spec: SpecFulu,
+        spec: SpecGloas,
     ) -> None:
         class SyncCommitteeContribution(Container):
             # Slot to which this contribution pertains

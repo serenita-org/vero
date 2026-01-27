@@ -5,7 +5,7 @@ from typing import Any, Literal, get_args
 
 from yaml import BaseLoader, load
 
-from spec.base import Genesis, SpecFulu, parse_spec
+from spec.base import Genesis, SpecGloas, parse_spec
 
 
 class Network(Enum):
@@ -74,7 +74,7 @@ Preset = Literal["mainnet", "minimal", "gnosis"]
 
 def get_network_spec(
     network: Network, network_custom_config_path: str | None = None
-) -> tuple[SpecFulu, Preset]:
+) -> tuple[SpecGloas, Preset]:
     spec_dict = {}
 
     if network == Network.CUSTOM:

@@ -48,6 +48,12 @@ ELECTRA_FORK_EPOCH: 0
 FULU_FORK_VERSION: 0x70000910
 FULU_FORK_EPOCH: 0
 
+# TODO re-align with Hoodi config once it's out
+
+# Gloas
+GLOAS_FORK_VERSION: 0x80000910
+GLOAS_FORK_EPOCH: 0
+
 # Time parameters
 # ---------------------------------------------------------------
 # 1 second (*deprecated*)
@@ -74,6 +80,20 @@ AGGREGATE_DUE_BPS: 6667
 SYNC_MESSAGE_DUE_BPS: 3333
 # 6667 basis points, ~67% of SLOT_DURATION_MS
 CONTRIBUTION_DUE_BPS: 6667
+
+# Gloas
+# 2**12 (= 4,096) epochs
+MIN_BUILDER_WITHDRAWABILITY_DELAY: 4096
+# 2500 basis points, 25% of SLOT_DURATION_MS
+ATTESTATION_DUE_BPS_GLOAS: 2500
+# 5000 basis points, 50% of SLOT_DURATION_MS
+AGGREGATE_DUE_BPS_GLOAS: 5000
+# 2500 basis points, 25% of SLOT_DURATION_MS
+SYNC_MESSAGE_DUE_BPS_GLOAS: 2500
+# 5000 basis points, 50% of SLOT_DURATION_MS
+CONTRIBUTION_DUE_BPS_GLOAS: 5000
+# 7500 basis points, 75% of SLOT_DURATION_MS
+PAYLOAD_ATTESTATION_DUE_BPS: 7500
 
 # Validator cycle
 # ---------------------------------------------------------------

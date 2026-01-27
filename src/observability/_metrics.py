@@ -8,7 +8,7 @@ from prometheus_client import (
     start_http_server,
 )
 
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.common import get_slot_component_duration_ms
 
 from ._vero_info import get_service_commit, get_service_version
@@ -128,7 +128,7 @@ def _setup_duty_time_metrics(
 class Metrics:
     def __init__(
         self,
-        spec: SpecFulu,
+        spec: SpecGloas,
         addr: str,
         port: int,
     ) -> None:

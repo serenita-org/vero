@@ -11,7 +11,7 @@ from args import CLIArgs
 from observability import Metrics, get_service_commit, get_service_version
 from providers import BeaconChain
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import Genesis, SpecFulu
+from spec.base import Genesis, SpecGloas
 from spec.configs import Network, get_genesis_for_network, get_network_spec
 from spec.rust_ssz import init_with_preset
 from tasks import TaskManager
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from services import ValidatorDutyService
 
 
-def load_spec(cli_args: CLIArgs) -> SpecFulu:
+def load_spec(cli_args: CLIArgs) -> SpecGloas:
     spec, preset = get_network_spec(
         network=cli_args.network,
         network_custom_config_path=cli_args.network_custom_config_path,
