@@ -3,6 +3,7 @@
 ## Upcoming release
 
 #### Features
+- Add support for the Gloas fork
 - Add `--ignore-spec-mismatch` flag
 
 
