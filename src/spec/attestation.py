@@ -13,7 +13,7 @@ from spec.common import (
 )
 
 if TYPE_CHECKING:
-    from spec.base import SpecFulu
+    from spec.base import SpecGloas
 
 
 class CommitteeIndex(UInt64SerializedAsString):
@@ -45,7 +45,7 @@ class SpecAttestation:
     @classmethod
     def initialize(
         cls,
-        spec: "SpecFulu",
+        spec: "SpecGloas",
     ) -> None:
         class AttestationElectra(Container):
             aggregation_bits: Bitlist[

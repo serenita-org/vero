@@ -21,6 +21,7 @@ from services.validator_duty_service import (
 from spec.attestation import AttestationData, SpecAttestation
 from spec.common import (
     bytes_to_uint64,
+    get_slot_component_duration_ms,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
@@ -31,6 +32,35 @@ _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot
 class AttestationService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
+
+        self._attestation_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._attestation_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._aggregate_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._aggregate_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
 
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
@@ -80,9 +110,17 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to attest 1/3 into the slot at the latest.
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            attestation_due_s = self._attestation_due_s_gloas
+        else:
+            attestation_due_s = self._attestation_due_s
+
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + attestation_due_s,
             tz=datetime.UTC,
         )
 
@@ -365,10 +403,17 @@ class AttestationService(ValidatorDutyService):
         att_data: SchemaBeaconAPI.AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
-        # Schedule aggregated attestation at 2/3 of the slot
+        # Schedule aggregated attestation
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            aggregate_due_s = self._aggregate_due_s_gloas
+        else:
+            aggregate_due_s = self._aggregate_due_s
+
         aggregation_run_time = datetime.datetime.fromtimestamp(
-            timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            timestamp=self.beacon_chain.get_timestamp_for_slot(slot) + aggregate_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
