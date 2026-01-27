@@ -66,6 +66,7 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
 class ForkVersion(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
+    GLOAS = "gloas"
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):

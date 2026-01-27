@@ -35,7 +35,7 @@ from spec import (
     Checkpoint,
     preset_types,
 )
-from spec.base import SpecFulu, parse_spec
+from spec.base import SpecGloas, parse_spec
 from spec.common import get_slot_component_duration_ms
 
 if TYPE_CHECKING:
@@ -292,7 +292,7 @@ class BeaconNode:
         if response.execution_optimistic:
             raise ValueError(f"Execution optimistic on {self.host}")
 
-    async def get_spec(self) -> SpecFulu:
+    async def get_spec(self) -> SpecGloas:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
