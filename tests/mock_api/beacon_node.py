@@ -183,6 +183,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version not in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
@@ -402,6 +403,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 attestations = msgspec.json.decode(
                     kwargs["data"].decode(),
@@ -431,6 +433,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 assert aggregate["committee_bits"] == "0x0040000000000000"
                 assert aggregate["aggregation_bits"] == "0x7507"
