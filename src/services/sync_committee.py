@@ -15,7 +15,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.common import bytes_to_uint64, hash_function
+from spec.common import bytes_to_uint64, get_slot_component_duration_ms, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -28,6 +28,29 @@ _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 class SyncCommitteeService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
+
+        self._sync_message_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.SYNC_MESSAGE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._contribution_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+
+        self._sync_subcommittee_size_uint = (
+            self.spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
+        )
+        self._sync_subcommittee_size = int(self._sync_subcommittee_size_uint)
+        self._epochs_per_sync_committee_period = int(
+            self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        )
 
         # Sync duties by sync committee period
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
@@ -58,10 +81,18 @@ class SyncCommitteeService(ValidatorDutyService):
         except Exception as e:
             self.logger.warning(f"Failed to cache duties: {e}")
 
+    def compute_sync_period_for_epoch(self, epoch: int) -> int:
+        return epoch // self._epochs_per_sync_committee_period
+
+    def compute_sync_period_for_slot(self, slot: int) -> int:
+        return self.compute_sync_period_for_epoch(
+            epoch=slot // self.beacon_chain.SLOTS_PER_EPOCH,
+        )
+
     def has_duty_for_slot(self, slot: int) -> bool:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
 
-        sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
+        sync_period = self.compute_sync_period_for_epoch(epoch)
 
         return len(self.sync_duties[sync_period]) > 0
 
@@ -71,7 +102,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # aiming to produce it 1/3 into the slot at the latest.
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._sync_message_due_s,
             tz=datetime.UTC,
         )
 
@@ -249,7 +280,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
-        sync_period = self.beacon_chain.compute_sync_period_for_slot(duty_slot + 1)
+        sync_period = self.compute_sync_period_for_slot(duty_slot + 1)
 
         sync_committee_members = {
             SchemaValidator.ValidatorIndexPubkey(
@@ -353,7 +384,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Sign and submit aggregated sync committee contributions at 2/3 of the slot
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            + self._contribution_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
@@ -489,27 +520,21 @@ class SyncCommitteeService(ValidatorDutyService):
         subnets = set()
 
         for idx in indexes_in_committee:
-            subnets.add(
-                idx
-                // int(
-                    self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
-                ),
-            )
+            subnets.add(idx // self._sync_subcommittee_size)
 
         return subnets
 
     def _is_aggregator(self, selection_proof: bytes) -> bool:
         modulo = max(
             1,
-            self.beacon_chain.SYNC_COMMITTEE_SIZE
-            // SYNC_COMMITTEE_SUBNET_COUNT
+            self._sync_subcommittee_size_uint
             // TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
         return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0  # type: ignore[no-any-return]
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
-        current_sync_period = self.beacon_chain.compute_sync_period_for_epoch(
+        current_sync_period = self.compute_sync_period_for_epoch(
             current_epoch,
         )
         for sync_period in list(self.sync_duties.keys()):
@@ -549,7 +574,7 @@ class SyncCommitteeService(ValidatorDutyService):
         #  ( https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee )
 
         for epoch in (current_epoch,):
-            sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
+            sync_period = self.compute_sync_period_for_epoch(epoch)
             self.logger.debug(
                 f"Updating sync duties for epoch {epoch} -> sync period {sync_period}",
             )
@@ -566,9 +591,7 @@ class SyncCommitteeService(ValidatorDutyService):
             self.sync_duties[sync_period] = fetched_duties
 
             # Prepare sync committee subnet subscriptions for aggregation duties
-            until_epoch = (
-                sync_period + 1
-            ) * self.beacon_chain.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+            until_epoch = (sync_period + 1) * self._epochs_per_sync_committee_period
             sync_committee_subscriptions_data = [
                 SchemaBeaconAPI.SubscribeToSyncCommitteeSubnetRequestBody(
                     validator_index=duty.validator_index,
