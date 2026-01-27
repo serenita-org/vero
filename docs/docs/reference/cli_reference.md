@@ -214,6 +214,17 @@ The logging level to use, one of `CRITICAL, ERROR, WARNING, INFO, DEBUG`. Defaul
 
 ___
 
+#### `--ignore-spec-mismatch`
+
+Ignores a mismatch between spec values returned by a beacon node and
+spec values included in Vero (which normally prevents such beacon nodes
+from being used).
+
+This flag can be used when a beacon node does not yet support new spec
+values (e.g. for upcoming network upgrades).
+
+___
+
 ### Dangerous Flags
 
 ??? danger "Expand"

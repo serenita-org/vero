@@ -17,6 +17,24 @@ from spec.common import UInt64SerializedAsString
         pytest.param(True, id="mismatch"),
     ],
 )
+@pytest.mark.parametrize(
+    argnames="cli_args",
+    argvalues=[
+        pytest.param(
+            {
+                "ignore_spec_mismatch": False,
+            },
+            id="spec mismatch not ignored",
+        ),
+        pytest.param(
+            {
+                "ignore_spec_mismatch": True,
+            },
+            id="spec mismatch ignored",
+        ),
+    ],
+    indirect=["cli_args"],
+)
 async def test_initialize_spec_mismatch(
     spec_mismatch: bool,
     vero: Vero,
@@ -42,11 +60,12 @@ async def test_initialize_spec_mismatch(
             base_url="http://beacon-node-a:1234",
             vero=vero,
         )
-        if spec_mismatch:
+        if not spec_mismatch or vero.cli_args.ignore_spec_mismatch:
+            # No mismatch, or mismatch explicitly ignored -> init should not raise
+            await bn._initialize_full()
+        else:
             with pytest.raises(
                 ValueError,
                 match="Spec values returned by beacon node beacon-node-a not equal to hardcoded spec values",
             ):
                 await bn._initialize_full()
-        else:
-            await bn._initialize_full()
