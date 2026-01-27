@@ -36,9 +36,23 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             / 1_000
         )
+        self._sync_message_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.SYNC_MESSAGE_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
         self._contribution_due_s = (
             get_slot_component_duration_ms(
                 basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._contribution_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS_GLOAS,
                 slot_duration_ms=self.spec.SLOT_DURATION_MS,
             )
             / 1_000
@@ -100,9 +114,17 @@ class SyncCommitteeService(ValidatorDutyService):
         # Schedule sync message job at the deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to produce it 1/3 into the slot at the latest.
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            sync_message_due_s = self._sync_message_due_s_gloas
+        else:
+            sync_message_due_s = self._sync_message_due_s
+
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self._sync_message_due_s,
+            + sync_message_due_s,
             tz=datetime.UTC,
         )
 
@@ -381,10 +403,18 @@ class SyncCommitteeService(ValidatorDutyService):
                 ),
             )
 
-        # Sign and submit aggregated sync committee contributions at 2/3 of the slot
+        # Sign and submit aggregated sync committee contributions
+        if (
+            self.beacon_chain.current_fork_version
+            == self.beacon_chain.GLOAS_FORK_VERSION
+        ):
+            contribution_due_s = self._contribution_due_s_gloas
+        else:
+            contribution_due_s = self._contribution_due_s
+
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + self._contribution_due_s,
+            + contribution_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
