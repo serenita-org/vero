@@ -355,7 +355,7 @@ class Keymanager(SignatureProvider):
         if epoch is None:
             epoch = self.beacon_chain.current_epoch
 
-        msg, sig, pubkey = await self.sign(
+        _, sig, _ = await self.sign(
             message=SchemaRemoteSigner.VoluntaryExitSignableMessage(
                 fork_info=self.beacon_chain.get_fork_info(
                     slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch

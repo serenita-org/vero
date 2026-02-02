@@ -440,8 +440,8 @@ def test_parse_cli_args_full_set() -> None:
     arg_names = []
     for arg in list_of_args:
         if "=" in arg:
-            name, value = arg.split("=", 1)
-            arg_names.append(name)
+            arg_name, _ = arg.split("=", 1)
+            arg_names.append(arg_name)
         else:
             arg_names.append(arg)
 
