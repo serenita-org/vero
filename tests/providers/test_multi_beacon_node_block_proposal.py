@@ -364,10 +364,7 @@ async def test_produce_block_v3(
                 builder_boost_factor=90,
                 randao_reveal="randao",
             )
-            (
-                block,
-                full_response,
-            ) = result
+            _block, full_response = result
             assert (
                 int(full_response.consensus_block_value)
                 + int(full_response.execution_payload_value)
