@@ -626,11 +626,13 @@ class MultiBeaconNode:
         best_aggregate_attester_count = 0
 
         for aggregate in aggregates:
-            if sum(aggregate.aggregation_bits) > best_aggregate_attester_count:
-                best_aggregate = aggregate
-                best_aggregate_attester_count = sum(aggregate.aggregation_bits)
+            attester_count = sum(aggregate.aggregation_bits)
 
-                # Return early if all attesters' votes are included in the aggregate
+            if attester_count > best_aggregate_attester_count:
+                best_aggregate = aggregate
+                best_aggregate_attester_count = attester_count
+
+                # Return early if the aggregate is ideal
                 if best_aggregate_attester_count == len(aggregate.aggregation_bits):
                     return aggregate
 
@@ -716,11 +718,13 @@ class MultiBeaconNode:
         best_contribution_participant_count = 0
 
         for contribution in contributions:
-            if sum(contribution.aggregation_bits) > best_contribution_participant_count:
-                best_contribution = contribution
-                best_contribution_participant_count = sum(contribution.aggregation_bits)
+            participant_count = sum(contribution.aggregation_bits)
 
-                # Return early if all attesters' votes are included in the aggregate
+            if participant_count > best_contribution_participant_count:
+                best_contribution = contribution
+                best_contribution_participant_count = participant_count
+
+                # Return early if the contribution is ideal
                 if best_contribution_participant_count == len(
                     contribution.aggregation_bits,
                 ):
