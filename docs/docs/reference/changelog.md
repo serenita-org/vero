@@ -3,6 +3,8 @@
 ## Upcoming release
 
 #### Features
+- Use SSZ encoding by default during block proposals
+- Add `--force-json-wire-format` flag
 - Add `--ignore-spec-mismatch` flag
 
 

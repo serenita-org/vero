@@ -409,6 +409,7 @@ def test_parse_cli_args_full_set() -> None:
         "--metrics-port=4321",
         "--log-level=DEBUG",
         "--ignore-spec-mismatch",
+        "--force-json-wire-format",
         "----DANGER----disable-slashing-detection",
     ]
     expected_attr_values = {
@@ -433,6 +434,7 @@ def test_parse_cli_args_full_set() -> None:
         "metrics_port": 4321,
         "log_level": logging.DEBUG,
         "ignore_spec_mismatch": True,
+        "force_json_wire_format": True,
         "disable_slashing_detection": True,
     }
 
@@ -492,6 +494,7 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         metrics_port=8000,
         log_level=logging.INFO,
         ignore_spec_mismatch=False,
+        force_json_wire_format=False,
         disable_slashing_detection=False,
     )
 

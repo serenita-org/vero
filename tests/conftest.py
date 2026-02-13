@@ -71,6 +71,7 @@ def cli_args(
         "attestation_consensus_threshold", None
     )
     ignore_spec_mismatch = indirect_params.get("ignore_spec_mismatch", False)
+    force_json_wire_format = indirect_params.get("force_json_wire_format", False)
 
     return CLIArgs(
         network=Network._TESTS,
@@ -96,6 +97,7 @@ def cli_args(
         metrics_port=8000,
         log_level=logging.INFO,
         ignore_spec_mismatch=ignore_spec_mismatch,
+        force_json_wire_format=force_json_wire_format,
         disable_slashing_detection=False,
     )
 

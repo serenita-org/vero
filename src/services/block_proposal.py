@@ -10,15 +10,16 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
-from remerkleable.complex import Container
 
 from observability import ErrorType, HandledRuntimeError
+from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
+from spec.rust_ssz import ElectraBeaconBlockContentsType, ElectraBlindedBeaconBlockType
 from spec.utils import encode_graffiti
 
 
@@ -351,7 +352,7 @@ class BlockProposalService(ValidatorDutyService):
     async def _produce_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str
     ) -> tuple[
-        Container,
+        ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType,
         SchemaRemoteSigner.BeaconBlockHeader,
         SchemaBeaconAPI.ProduceBlockV3Response,
     ]:
@@ -388,20 +389,10 @@ class BlockProposalService(ValidatorDutyService):
                     error_type=ErrorType.BLOCK_PRODUCE,
                 ) from None
             else:
-                if full_response.execution_payload_blinded:
-                    beacon_block = block_contents_or_blinded_block
-                else:
-                    beacon_block = block_contents_or_blinded_block.block
-
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
-                    slot=str(beacon_block.slot),
-                    proposer_index=str(beacon_block.proposer_index),
-                    parent_root=str(beacon_block.parent_root),
-                    state_root=str(beacon_block.state_root),
-                    body_root="0x" + beacon_block.body.hash_tree_root().hex(),
+                    **block_contents_or_blinded_block.header_dict()
                 )
-
-                return beacon_block, block_header, full_response
+                return block_contents_or_blinded_block, block_header, full_response
 
     async def _sign_block(
         self,
@@ -437,9 +428,10 @@ class BlockProposalService(ValidatorDutyService):
     async def _publish_block(
         self,
         slot: int,
-        full_response: SchemaBeaconAPI.ProduceBlockV3Response,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         signature: str,
-        beacon_block: Container,
+        block_contents_or_blinded_block: ElectraBeaconBlockContentsType
+        | ElectraBlindedBeaconBlockType,
     ) -> None:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(
@@ -450,27 +442,34 @@ class BlockProposalService(ValidatorDutyService):
             name=f"{self.__class__.__name__}._publish_block",
         ):
             try:
-                if full_response.execution_payload_blinded:
-                    # Blinded block
-                    await self.multi_beacon_node.publish_blinded_block_v2(
-                        fork_version=full_response.version,
-                        signed_blinded_beacon_block=SchemaBeaconAPI.SignedBeaconBlock(
-                            message=full_response.data,
-                            signature=signature,
-                        ),
+                from spec.rust_ssz import rust_ssz_types
+
+                signed_object = block_contents_or_blinded_block.sign(
+                    signature=signature
+                )
+                if self.cli_args.force_json_wire_format:
+                    encoded = signed_object.to_json()
+                    content_type = ContentType.JSON
+                else:
+                    encoded = signed_object.to_ssz()
+                    content_type = ContentType.OCTET_STREAM
+
+                if isinstance(
+                    block_contents_or_blinded_block,
+                    rust_ssz_types().ElectraBeaconBlockContents,
+                ):
+                    await self.multi_beacon_node.publish_block_v2(
+                        fork_version=fork_version,
+                        signed_block_contents=encoded,
+                        content_type=content_type,
                     )
                 else:
-                    await self.multi_beacon_node.publish_block_v2(
-                        fork_version=full_response.version,
-                        signed_beacon_block_contents=SchemaBeaconAPI.BlockContentsSigned(
-                            signed_block=SchemaBeaconAPI.SignedBeaconBlock(
-                                message=full_response.data["block"],
-                                signature=signature,
-                            ),
-                            kzg_proofs=full_response.data["kzg_proofs"],
-                            blobs=full_response.data["blobs"],
-                        ),
+                    await self.multi_beacon_node.publish_blinded_block_v2(
+                        fork_version=fork_version,
+                        signed_blinded_beacon_block=encoded,
+                        content_type=content_type,
                     )
+
             except Exception as e:
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
@@ -480,8 +479,9 @@ class BlockProposalService(ValidatorDutyService):
                     error_type=ErrorType.BLOCK_PUBLISH,
                 ) from None
             else:
+                block_root = block_contents_or_blinded_block.block_hash_tree_root()
                 self.logger.info(
-                    f"Published block for slot {slot}, root 0x{beacon_block.hash_tree_root().hex()}",
+                    f"Published block for slot {slot}, root {block_root}",
                 )
                 self.metrics.vc_published_blocks_c.inc()
 
@@ -510,7 +510,11 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, duty=duty)
 
-            beacon_block, block_header, full_response = await self._produce_block(
+            (
+                block_contents_or_blinded_block,
+                block_header,
+                full_response,
+            ) = await self._produce_block(
                 slot=slot, duty=duty, randao_reveal=randao_reveal
             )
 
@@ -525,9 +529,9 @@ class BlockProposalService(ValidatorDutyService):
 
             await self._publish_block(
                 slot=slot,
-                full_response=full_response,
+                fork_version=full_response.version,
                 signature=signature,
-                beacon_block=beacon_block,
+                block_contents_or_blinded_block=block_contents_or_blinded_block,
             )
 
     async def propose_block(self, slot: int) -> None:

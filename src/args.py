@@ -35,6 +35,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     metrics_port: int
     log_level: int
     ignore_spec_mismatch: bool
+    force_json_wire_format: bool
     disable_slashing_detection: bool
 
 
@@ -280,6 +281,15 @@ def get_parser() -> argparse.ArgumentParser:
         """,
     )
     parser.add_argument(
+        "--force-json-wire-format",
+        action="store_true",
+        help="""
+        Forces Vero to use JSON encoding in Beacon API requests.
+
+        JSON is less performant but can make debugging issues easier.
+        """,
+    )
+    parser.add_argument(
         "----DANGER----disable-slashing-detection",
         action="store_true",
         help="[DANGEROUS] Disables Vero's proactive slashing detection.",
@@ -359,6 +369,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             metrics_port=parsed_args.metrics_port,
             log_level=logging.getLevelName(parsed_args.log_level),
             ignore_spec_mismatch=parsed_args.ignore_spec_mismatch,
+            force_json_wire_format=parsed_args.force_json_wire_format,
             disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )
     except ValueError as e:

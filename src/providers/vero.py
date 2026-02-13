@@ -13,6 +13,7 @@ from providers import BeaconChain
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.base import Genesis, SpecFulu
 from spec.configs import Network, get_genesis_for_network, get_network_spec
+from spec.rust_ssz import init_with_preset
 from tasks import TaskManager
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
 
 def load_spec(cli_args: CLIArgs) -> SpecFulu:
-    spec = get_network_spec(
+    spec, preset = get_network_spec(
         network=cli_args.network,
         network_custom_config_path=cli_args.network_custom_config_path,
     )
@@ -28,6 +29,9 @@ def load_spec(cli_args: CLIArgs) -> SpecFulu:
     SpecAttestation.initialize(spec=spec)
     SpecBeaconBlock.initialize(spec=spec)
     SpecSyncCommittee.initialize(spec=spec)
+
+    # Init the correct preset SSZ objects from the Rust SSZ library
+    init_with_preset(preset=preset)
 
     return spec
 
