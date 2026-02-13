@@ -1,19 +1,35 @@
 ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm@sha256:123be5684f39d8476e64f47a5fddf38f5e9d839baff5c023c815ae5bdfae0df7"
+ARG RUST_IMAGE_TAG="1.92.0-bookworm@sha256:e90e846de4124376164ddfbaab4b0774c7bdeef5e738866295e5a90a34a307a2"
 ARG UV_IMAGE_TAG="0.8.15@sha256:a5727064a0de127bdb7c9d3c1383f3a9ac307d9f2d8a391edc7896c54289ced0"
 
 # uv image
 FROM ghcr.io/astral-sh/uv:${UV_IMAGE_TAG} AS uv-image
+
+# Rust toolchain image (for building local PyO3 extensions)
+FROM docker.io/library/rust:${RUST_IMAGE_TAG} AS rust-toolchain
 
 # Build image
 FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
 WORKDIR /vero
 
+# Install native build tools needed by Rust crates with C/asm deps
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Bring in Rust toolchain from official Rust image
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+ENV PATH="/usr/local/cargo/bin:${PATH}"
+
 # Install and compile dependencies
 RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=rust/grandine_bindings,target=rust/grandine_bindings,rw \
     uv sync --frozen --no-dev --compile-bytecode --no-install-project
 
 # App image

@@ -3,6 +3,9 @@
 ## Upcoming release
 
 #### Features
+- Add Python bindings for Grandine SSZ library
+- Use SSZ encoding by default during block proposals
+- Add `--force-json-wire-format` flag
 - Add `--ignore-spec-mismatch` flag
 
 

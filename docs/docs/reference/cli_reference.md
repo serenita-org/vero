@@ -225,6 +225,14 @@ values (e.g. for upcoming network upgrades).
 
 ___
 
+#### `--force-json-wire-format`
+
+Forces Vero to use JSON encoding in Beacon API requests.
+
+JSON is less performant but can make debugging issues easier.
+
+___
+
 ### Dangerous Flags
 
 ??? danger "Expand"
