@@ -61,6 +61,7 @@ class Checkpoint(msgspec.Struct, frozen=True):
 class ForkVersion(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
+    GLOAS = "gloas"
 
 
 class AttestationData(msgspec.Struct, frozen=True):

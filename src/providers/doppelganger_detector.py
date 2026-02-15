@@ -117,7 +117,7 @@ class DoppelgangerDetector:
         ) - 1
         ts_to_wait_for = self.beacon_chain.get_timestamp_for_slot(
             slot=last_slot_in_next_epoch,
-        ) + (self.beacon_chain.SECONDS_PER_SLOT / 2)
+        ) + (self.beacon_chain.SLOT_DURATION_MS / 2 / 1_000)
         self.logger.info(
             f"Waiting for last slot in epoch {epoch_to_monitor_for_attestations + 1}: {last_slot_in_next_epoch}"
         )

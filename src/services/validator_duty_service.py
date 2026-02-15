@@ -56,6 +56,7 @@ class ValidatorDutyService:
         self.task_manager = vero.task_manager
         self.metrics = vero.metrics
         self.cli_args = vero.cli_args
+        self.spec = vero.spec
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)

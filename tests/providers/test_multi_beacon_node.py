@@ -19,7 +19,7 @@ from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from spec.attestation import AttestationData, SpecAttestation
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from spec.sync_committee import SpecSyncCommittee
 
@@ -141,7 +141,7 @@ async def test_initialize(
 )
 async def test_initialize_retry_logic(
     beacon_chain: BeaconChain,
-    spec: SpecFulu,
+    spec: SpecGloas,
     cli_args: CLIArgs,
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
@@ -284,6 +284,7 @@ async def test_get_aggregate_attestation(
     best_aggregate_score: int,
     beacon_chain: BeaconChain,
     multi_beacon_node: MultiBeaconNode,
+    spec: SpecGloas,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
@@ -293,8 +294,7 @@ async def test_get_aggregate_attestation(
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
                 bitlist_length = (
-                    beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
-                    * beacon_chain.MAX_COMMITTEES_PER_SLOT
+                    spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
                 )
                 agg_bits_to_return = Bitlist[bitlist_length](False for _ in range(10))
                 for idx in range(number_of_attesting_indices):
@@ -400,7 +400,7 @@ async def test_get_sync_committee_contribution(
     best_contribution_score: int,
     multi_beacon_node: MultiBeaconNode,
     cli_args: CLIArgs,
-    spec: SpecFulu,
+    spec: SpecGloas,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
