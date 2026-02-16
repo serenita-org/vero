@@ -71,5 +71,5 @@ This repository uses pre-commit hooks for linting.
 necessary to manually install the git hooks by running
 `uv run pre-commit install`. A pre-commit hook is then
 automatically ran before every change you commit.
-You can also manually run the hooks without commiting by running
+You can also manually run the hooks without committing by running
 `uv run pre-commit run --all-files`.

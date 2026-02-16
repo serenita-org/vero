@@ -26,7 +26,7 @@ its small codebase, a
 and high test coverage.
 
 Vero is also regularly tested against all open-source
-beacon node implementations to ensure compatibilty using
+beacon node implementations to ensure compatibility using
 [ethereum-package](https://github.com/ethpandaops/ethereum-package){:target="_blank"}.
 
 ## Vendor Lock-in

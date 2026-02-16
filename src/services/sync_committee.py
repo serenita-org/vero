@@ -519,7 +519,7 @@ class SyncCommitteeService(ValidatorDutyService):
     async def _update_duties(self) -> None:
         # We check for duties for exited validators here too since
         # it is possible for an exited validator to be scheduled for
-        # sync commitee duties (when scheduled shortly before the
+        # sync committee duties (when scheduled shortly before the
         # validator exits).
         # Even a validator in `withdrawal_done` status
         # can still be scheduled for sync committee duties!
@@ -535,7 +535,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             return
         self.logger.debug(
-            f"Updating sync commitee duties for {len(_validator_indices)} validators"
+            f"Updating sync committee duties for {len(_validator_indices)} validators"
         )
 
         current_epoch = self.beacon_chain.current_epoch
