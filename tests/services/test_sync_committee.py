@@ -131,7 +131,7 @@ async def test_update_duties_exited_validators(
     """
     # Tests that we update sync duties for exited validators too since
     # it is possible for an exited validator to be scheduled for
-    # sync commitee duties (when scheduled shortly before the
+    # sync committee duties (when scheduled shortly before the
     # validator exits).
     # See https://ethresear.ch/t/sync-committees-exited-validators-participating-in-sync-committee/15634
     """
@@ -157,5 +157,5 @@ async def test_update_duties_exited_validators(
 
     # We should be requesting duties for the exited validators too
     assert any(
-        "Updating sync commitee duties for 5 validators" in m for m in caplog.messages
+        "Updating sync committee duties for 5 validators" in m for m in caplog.messages
     )
