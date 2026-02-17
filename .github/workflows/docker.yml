@@ -9,12 +9,12 @@ on:
     tags: [ v* ]
 
 jobs:
-  verify-configs:
-    uses: ./.github/workflows/verify-configs.yml
+  verify-spec-values:
+    uses: ./.github/workflows/verify-spec-values.yml
 
   build-and-push:
-    # This depends on the verify-configs job above
-    needs: verify-configs
+    # Ensure spec values are up-to-date before building an image
+    needs: verify-spec-values
 
     runs-on: ubuntu-latest
 
