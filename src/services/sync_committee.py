@@ -15,10 +15,16 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.common import bytes_to_uint64, hash_function
+from spec.common import Root, Slot, bytes_to_uint64, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
+)
+from spec.signing_root import (
+    DOMAIN_CONTRIBUTION_AND_PROOF,
+    DOMAIN_SYNC_COMMITTEE,
+    DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+    compute_signing_root,
 )
 from spec.sync_committee import SpecSyncCommittee
 
@@ -119,6 +125,11 @@ class SyncCommitteeService(ValidatorDutyService):
             self.signature_provider.sign(
                 message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
                     fork_info=_fork_info,
+                    signing_root="0x"
+                    + compute_signing_root(
+                        ssz_object=Root(beacon_block_root),
+                        domain=DOMAIN_SYNC_COMMITTEE,
+                    ).hex(),
                     sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
                         beacon_block_root=beacon_block_root,
                         slot=str(duty_slot),
@@ -300,6 +311,11 @@ class SyncCommitteeService(ValidatorDutyService):
                     self.signature_provider.sign(
                         SchemaRemoteSigner.SyncCommitteeSelectionProofSignableMessage(
                             fork_info=_fork_info,
+                            signing_root="0x"
+                            + compute_signing_root(
+                                ssz_object=Slot(duty_slot),
+                                domain=DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+                            ).hex(),
                             sync_aggregator_selection_data=SchemaRemoteSigner.SyncAggregatorSelectionData(
                                 slot=str(duty_slot),
                                 subcommittee_index=str(subcommittee_index),
@@ -455,14 +471,21 @@ class SyncCommitteeService(ValidatorDutyService):
                         and duty_sp.is_aggregator
                     ):
                         contribution_count += 1
+                        contrib_and_proof = SpecSyncCommittee.ContributionAndProof(
+                            aggregator_index=int(duty.validator_index),
+                            contribution=contribution,
+                            selection_proof=duty_sp.selection_proof,
+                        )
+
                         messages.append(
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
-                                contribution_and_proof=SpecSyncCommittee.ContributionAndProof(
-                                    aggregator_index=int(duty.validator_index),
-                                    contribution=contribution,
-                                    selection_proof=duty_sp.selection_proof,
-                                ).to_obj(),
+                                signing_root="0x"
+                                + compute_signing_root(
+                                    ssz_object=contrib_and_proof,
+                                    domain=DOMAIN_CONTRIBUTION_AND_PROOF,
+                                ).hex(),
+                                contribution_and_proof=contrib_and_proof.to_obj(),
                             )
                         )
                         identifiers.append(duty.pubkey)

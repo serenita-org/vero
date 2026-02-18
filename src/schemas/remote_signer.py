@@ -22,6 +22,7 @@ SignableMessageT = TypeVar("SignableMessageT", bound="SignableMessage")
 
 class SignableMessage(msgspec.Struct):
     type: SigningRequestType
+    signing_root: str
 
 
 class Fork(msgspec.Struct):

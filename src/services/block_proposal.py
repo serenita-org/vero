@@ -4,6 +4,7 @@ from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
 
+import msgspec.json
 from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
@@ -18,6 +19,14 @@ from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
+)
+from spec.block import BeaconBlockHeader
+from spec.common import Epoch
+from spec.signing_root import (
+    DOMAIN_BEACON_PROPOSER,
+    DOMAIN_RANDAO,
+    RandaoReveal,
+    compute_signing_root,
 )
 from spec.utils import encode_graffiti
 
@@ -305,13 +314,19 @@ class BlockProposalService(ValidatorDutyService):
         self.logger.debug(f"Fetching RANDAO reveal for slot {duty.slot}")
 
         slot = int(duty.slot)
-        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+        epoch = Epoch(slot // self.beacon_chain.SLOTS_PER_EPOCH)
+
+        randao_reveal_obj = RandaoReveal(epoch=epoch)
 
         _, randao_reveal, _ = await self.signature_provider.sign(
             message=SchemaRemoteSigner.RandaoRevealSignableMessage(
                 fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                signing_root="0x"
+                + compute_signing_root(
+                    ssz_object=randao_reveal_obj, domain=DOMAIN_RANDAO
+                ).hex(),
                 randao_reveal=SchemaRemoteSigner.RandaoReveal(
-                    epoch=str(epoch),
+                    epoch=epoch.to_obj(),
                 ),
             ),
             identifier=duty.pubkey,
@@ -414,9 +429,16 @@ class BlockProposalService(ValidatorDutyService):
             name=f"{self.__class__.__name__}._sign_block",
         ):
             try:
+                block_header_ssz = BeaconBlockHeader.from_obj(
+                    msgspec.to_builtins(block_header)
+                )
                 _, signature, _ = await self.signature_provider.sign(
                     message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
                         fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                        signing_root="0x"
+                        + compute_signing_root(
+                            ssz_object=block_header_ssz, domain=DOMAIN_BEACON_PROPOSER
+                        ).hex(),
                         beacon_block=SchemaRemoteSigner.BeaconBlock(
                             version=block_version,
                             block_header=block_header,

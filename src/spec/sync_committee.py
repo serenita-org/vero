@@ -12,6 +12,11 @@ from spec.common import (
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 
 
+class SyncCommitteeMessage(Container):
+    beacon_block_root: Root
+    slot: Slot
+
+
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecSyncCommittee:

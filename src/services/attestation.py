@@ -20,10 +20,17 @@ from services.validator_duty_service import (
 )
 from spec.attestation import AttestationData, SpecAttestation
 from spec.common import (
+    Slot,
     bytes_to_uint64,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
+from spec.signing_root import (
+    DOMAIN_AGGREGATE_AND_PROOF,
+    DOMAIN_BEACON_ATTESTER,
+    DOMAIN_SELECTION_PROOF,
+    compute_signing_root,
+)
 
 _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 
@@ -191,6 +198,11 @@ class AttestationService(ValidatorDutyService):
         pubkey_to_duty = {d.pubkey: d for d in duties}
         message = SchemaRemoteSigner.AttestationSignableMessage(
             fork_info=self.beacon_chain.get_fork_info(slot=slot),
+            signing_root="0x"
+            + compute_signing_root(
+                ssz_object=AttestationData.from_obj(msgspec.to_builtins(att_data)),
+                domain=DOMAIN_BEACON_ATTESTER,
+            ).hex(),
             attestation=msgspec.to_builtins(att_data),
         )
 
@@ -471,14 +483,20 @@ class AttestationService(ValidatorDutyService):
             for duty in aggregator_duties:
                 if aggregate.committee_bits[int(duty.committee_index)]:
                     aggregate_count += 1
+                    agg_and_proof = SpecAttestation.AggregateAndProofElectra(
+                        aggregator_index=int(duty.validator_index),
+                        aggregate=aggregate,
+                        selection_proof=duty.selection_proof,
+                    )
                     messages.append(
                         SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
                             fork_info=_fork_info,
-                            aggregate_and_proof=SpecAttestation.AggregateAndProofElectra(
-                                aggregator_index=int(duty.validator_index),
-                                aggregate=aggregate,
-                                selection_proof=duty.selection_proof,
-                            ).to_obj(),
+                            signing_root="0x"
+                            + compute_signing_root(
+                                ssz_object=agg_and_proof,
+                                domain=DOMAIN_AGGREGATE_AND_PROOF,
+                            ).hex(),
+                            aggregate_and_proof=agg_and_proof.to_obj(),
                         )
                     )
                     identifiers.append(duty.pubkey)
@@ -518,6 +536,11 @@ class AttestationService(ValidatorDutyService):
                 signable_messages.append(
                     SchemaRemoteSigner.AggregationSlotSignableMessage(
                         fork_info=_fork_info,
+                        signing_root="0x"
+                        + compute_signing_root(
+                            ssz_object=Slot(int(duty.slot)),
+                            domain=DOMAIN_SELECTION_PROOF,
+                        ).hex(),
                         aggregation_slot=SchemaRemoteSigner.Slot(slot=str(duty.slot)),
                     ),
                 )
