@@ -4,11 +4,12 @@
 //! `<https://github.com/gnosischain/specs>`
 //!
 //! Key differences from Mainnet:
+//! - `BASE_REWARD_FACTOR`: 25 (Mainnet: 64)
 //! - `SLOTS_PER_EPOCH`: 16 (Mainnet: 32)
 //! - `EPOCHS_PER_SYNC_COMMITTEE_PERIOD`: 512 (Mainnet: 256)
-//! - `BASE_REWARD_FACTOR`: 25 (Mainnet: 64)
-//! - `MAX_WITHDRAWALS_PER_PAYLOAD`: 8 (Mainnet: 16)
 //! - `MAX_VALIDATORS_PER_WITHDRAWALS_SWEEP`: 8192 (Mainnet: 16384)
+//! - `MAX_WITHDRAWALS_PER_PAYLOAD`: 8 (Mainnet: 16)
+//! - `MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP`: 6 (Mainnet: 8)
 
 use grandine_types::phase0::primitives::Gwei;
 use grandine_types::preset::{Preset, PresetName};
@@ -23,7 +24,7 @@ use typenum::{
 pub struct Gnosis;
 
 impl Preset for Gnosis {
-    // Phase 0 - Mostly same as Mainnet except where noted
+    // Phase 0 - Different from Mainnet
     type EpochsPerEth1VotingPeriod = U64;
     type EpochsPerHistoricalRoot = U512;
     type EpochsPerHistoricalVector = U65536;
@@ -37,7 +38,7 @@ impl Preset for Gnosis {
     type MaxValidatorsPerCommittee = U2048;
     type MaxVoluntaryExits = U16;
     type MinSeedLookahead = U1;
-    // Key difference: Gnosis has 16 slots per epoch (Mainnet has 32)
+    // Gnosis: 16, Mainnet: 32
     type SlotsPerEpoch = U16;
     type ValidatorRegistryLimit = U1099511627776;
 
@@ -107,7 +108,7 @@ impl Preset for Gnosis {
     const TARGET_COMMITTEE_SIZE: NonZeroU64 = NonZeroU64::new(128).unwrap();
     const WHISTLEBLOWER_REWARD_QUOTIENT: NonZeroU64 = NonZeroU64::new(512).unwrap();
 
-    // Altair - Same as Mainnet except where noted
+    // Altair - Different from Mainnet
     // Gnosis: 512, Mainnet: 256
     const EPOCHS_PER_SYNC_COMMITTEE_PERIOD: NonZeroU64 = NonZeroU64::new(512).unwrap();
     const INACTIVITY_PENALTY_QUOTIENT_ALTAIR: NonZeroU64 = NonZeroU64::new(3_u64 << 24).unwrap();
@@ -124,9 +125,10 @@ impl Preset for Gnosis {
     // Gnosis: 8192, Mainnet: 16384
     const MAX_VALIDATORS_PER_WITHDRAWALS_SWEEP: u64 = 1 << 13;
 
-    // Electra - Same as Mainnet
+    // Electra - Different from Mainnet
     const MAX_EFFECTIVE_BALANCE_ELECTRA: Gwei = 2_048_000_000_000;
-    const MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP: u64 = 8;
+    // Gnosis: 6, Mainnet: 8
+    const MAX_PENDING_PARTIALS_PER_WITHDRAWALS_SWEEP: u64 = 6;
     const MAX_PENDING_DEPOSITS_PER_EPOCH: u64 = 16;
     const MIN_ACTIVATION_BALANCE: Gwei = 32_000_000_000;
     const MIN_SLASHING_PENALTY_QUOTIENT_ELECTRA: NonZeroU64 = NonZeroU64::new(4096).unwrap();
