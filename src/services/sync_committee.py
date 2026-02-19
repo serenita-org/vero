@@ -15,7 +15,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.common import Root, Slot, bytes_to_uint64, hash_function
+from spec.common import Root, bytes_to_uint64, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -27,7 +27,7 @@ from spec.signing_root import (
     compute_domain,
     compute_signing_root,
 )
-from spec.sync_committee import SpecSyncCommittee
+from spec.sync_committee import SpecSyncCommittee, SyncAggregatorSelectionData
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
@@ -322,7 +322,10 @@ class SyncCommitteeService(ValidatorDutyService):
                             fork_info=_fork_info,
                             signing_root="0x"
                             + compute_signing_root(
-                                ssz_object=Slot(duty_slot),
+                                ssz_object=SyncAggregatorSelectionData(
+                                    slot=duty_slot,
+                                    subcommittee_index=subcommittee_index,
+                                ),
                                 domain=compute_domain(
                                     domain_type=DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
                                     fork_version=_fork_version,

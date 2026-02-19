@@ -17,6 +17,11 @@ class SyncCommitteeMessage(Container):
     slot: Slot
 
 
+class SyncAggregatorSelectionData(Container):
+    slot: Slot
+    subcommittee_index: UInt64SerializedAsString
+
+
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecSyncCommittee:
