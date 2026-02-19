@@ -520,7 +520,7 @@ class AttestationService(ValidatorDutyService):
                         slot=slot,
                         messages=messages,
                         identifiers=identifiers,
-                        fork_version=_fork_version,
+                        fork_version=self.beacon_chain.current_fork_version,
                     )
                 )
             )
