@@ -26,6 +26,7 @@ from spec.signing_root import (
     DOMAIN_BEACON_PROPOSER,
     DOMAIN_RANDAO,
     RandaoReveal,
+    compute_domain,
     compute_signing_root,
 )
 from spec.utils import encode_graffiti
@@ -315,15 +316,23 @@ class BlockProposalService(ValidatorDutyService):
 
         slot = int(duty.slot)
         epoch = Epoch(slot // self.beacon_chain.SLOTS_PER_EPOCH)
+        _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
 
         randao_reveal_obj = RandaoReveal(epoch=epoch)
 
         _, randao_reveal, _ = await self.signature_provider.sign(
             message=SchemaRemoteSigner.RandaoRevealSignableMessage(
-                fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                fork_info=_fork_info,
                 signing_root="0x"
                 + compute_signing_root(
-                    ssz_object=randao_reveal_obj, domain=DOMAIN_RANDAO
+                    ssz_object=randao_reveal_obj,
+                    domain=compute_domain(
+                        domain_type=DOMAIN_RANDAO,
+                        fork_version=_fork_version,
+                        genesis_validators_root=_genesis_validators_root,
+                    ),
                 ).hex(),
                 randao_reveal=SchemaRemoteSigner.RandaoReveal(
                     epoch=epoch.to_obj(),
@@ -432,12 +441,20 @@ class BlockProposalService(ValidatorDutyService):
                 block_header_ssz = BeaconBlockHeader.from_obj(
                     msgspec.to_builtins(block_header)
                 )
+                _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+                _fork_version = self.beacon_chain.get_fork_version(slot=slot)
+                _genesis_validators_root = self.beacon_chain.genesis_validators_root
                 _, signature, _ = await self.signature_provider.sign(
                     message=SchemaRemoteSigner.BeaconBlockV2SignableMessage(
-                        fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                        fork_info=_fork_info,
                         signing_root="0x"
                         + compute_signing_root(
-                            ssz_object=block_header_ssz, domain=DOMAIN_BEACON_PROPOSER
+                            ssz_object=block_header_ssz,
+                            domain=compute_domain(
+                                domain_type=DOMAIN_BEACON_PROPOSER,
+                                fork_version=_fork_version,
+                                genesis_validators_root=_genesis_validators_root,
+                            ),
                         ).hex(),
                         beacon_block=SchemaRemoteSigner.BeaconBlock(
                             version=block_version,

@@ -24,6 +24,7 @@ from spec.signing_root import (
     DOMAIN_CONTRIBUTION_AND_PROOF,
     DOMAIN_SYNC_COMMITTEE,
     DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+    compute_domain,
     compute_signing_root,
 )
 from spec.sync_committee import SpecSyncCommittee
@@ -121,6 +122,8 @@ class SyncCommitteeService(ValidatorDutyService):
         beacon_block_root: str,
     ) -> list[SchemaBeaconAPI.SyncCommitteeSignature]:
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=duty_slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
         coroutines = [
             self.signature_provider.sign(
                 message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
@@ -128,7 +131,11 @@ class SyncCommitteeService(ValidatorDutyService):
                     signing_root="0x"
                     + compute_signing_root(
                         ssz_object=Root(beacon_block_root),
-                        domain=DOMAIN_SYNC_COMMITTEE,
+                        domain=compute_domain(
+                            domain_type=DOMAIN_SYNC_COMMITTEE,
+                            fork_version=_fork_version,
+                            genesis_validators_root=_genesis_validators_root,
+                        ),
                     ).hex(),
                     sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
                         beacon_block_root=beacon_block_root,
@@ -301,6 +308,8 @@ class SyncCommitteeService(ValidatorDutyService):
     ) -> None:
         # Prepare data for contribution and proof
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=duty_slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
         selection_proofs_coroutines = []
         for duty in sync_duties:
             subcommittee_indexes = self._compute_subnets_for_sync_committee(
@@ -314,7 +323,11 @@ class SyncCommitteeService(ValidatorDutyService):
                             signing_root="0x"
                             + compute_signing_root(
                                 ssz_object=Slot(duty_slot),
-                                domain=DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+                                domain=compute_domain(
+                                    domain_type=DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
+                                    fork_version=_fork_version,
+                                    genesis_validators_root=_genesis_validators_root,
+                                ),
                             ).hex(),
                             sync_aggregator_selection_data=SchemaRemoteSigner.SyncAggregatorSelectionData(
                                 slot=str(duty_slot),
@@ -454,6 +467,8 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=duty_slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
         _sign_and_publish_tasks = []
         async for (
             contribution
@@ -483,7 +498,11 @@ class SyncCommitteeService(ValidatorDutyService):
                                 signing_root="0x"
                                 + compute_signing_root(
                                     ssz_object=contrib_and_proof,
-                                    domain=DOMAIN_CONTRIBUTION_AND_PROOF,
+                                    domain=compute_domain(
+                                        domain_type=DOMAIN_CONTRIBUTION_AND_PROOF,
+                                        fork_version=_fork_version,
+                                        genesis_validators_root=_genesis_validators_root,
+                                    ),
                                 ).hex(),
                                 contribution_and_proof=contrib_and_proof.to_obj(),
                             )

@@ -29,6 +29,7 @@ from spec.signing_root import (
     DOMAIN_AGGREGATE_AND_PROOF,
     DOMAIN_BEACON_ATTESTER,
     DOMAIN_SELECTION_PROOF,
+    compute_domain,
     compute_signing_root,
 )
 
@@ -196,12 +197,19 @@ class AttestationService(ValidatorDutyService):
         signed_attestations: list[SchemaBeaconAPI.SingleAttestation] = []
 
         pubkey_to_duty = {d.pubkey: d for d in duties}
+        _fork_info = self.beacon_chain.get_fork_info(slot=slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
         message = SchemaRemoteSigner.AttestationSignableMessage(
-            fork_info=self.beacon_chain.get_fork_info(slot=slot),
+            fork_info=_fork_info,
             signing_root="0x"
             + compute_signing_root(
                 ssz_object=AttestationData.from_obj(msgspec.to_builtins(att_data)),
-                domain=DOMAIN_BEACON_ATTESTER,
+                domain=compute_domain(
+                    domain_type=DOMAIN_BEACON_ATTESTER,
+                    fork_version=_fork_version,
+                    genesis_validators_root=_genesis_validators_root,
+                ),
             ).hex(),
             attestation=msgspec.to_builtins(att_data),
         )
@@ -470,7 +478,8 @@ class AttestationService(ValidatorDutyService):
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
-        _fork_version = self.beacon_chain.current_fork_version
+        _fork_version = self.beacon_chain.get_fork_version(slot=slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
         _sign_and_publish_tasks = []
 
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
@@ -494,7 +503,11 @@ class AttestationService(ValidatorDutyService):
                             signing_root="0x"
                             + compute_signing_root(
                                 ssz_object=agg_and_proof,
-                                domain=DOMAIN_AGGREGATE_AND_PROOF,
+                                domain=compute_domain(
+                                    domain_type=DOMAIN_AGGREGATE_AND_PROOF,
+                                    fork_version=_fork_version,
+                                    genesis_validators_root=_genesis_validators_root,
+                                ),
                             ).hex(),
                             aggregate_and_proof=agg_and_proof.to_obj(),
                         )
@@ -526,6 +539,8 @@ class AttestationService(ValidatorDutyService):
         # Fork info for all slots in the same epoch will be the same
         _fork_slot = int(next(d.slot for d in duties))
         _fork_info = self.beacon_chain.get_fork_info(slot=_fork_slot)
+        _fork_version = self.beacon_chain.get_fork_version(slot=_fork_slot)
+        _genesis_validators_root = self.beacon_chain.genesis_validators_root
 
         # Gather aggregation duty selection proofs
         try:
@@ -539,7 +554,11 @@ class AttestationService(ValidatorDutyService):
                         signing_root="0x"
                         + compute_signing_root(
                             ssz_object=Slot(int(duty.slot)),
-                            domain=DOMAIN_SELECTION_PROOF,
+                            domain=compute_domain(
+                                domain_type=DOMAIN_SELECTION_PROOF,
+                                fork_version=_fork_version,
+                                genesis_validators_root=_genesis_validators_root,
+                            ),
                         ).hex(),
                         aggregation_slot=SchemaRemoteSigner.Slot(slot=str(duty.slot)),
                     ),
