@@ -3,7 +3,7 @@ import time
 from pathlib import Path
 
 import msgspec.json
-from grandine_bindings import ElectraSignedBeaconBlockMainnet
+from grandine_py import ElectraSignedBeaconBlockMainnet
 
 from spec import SpecAttestation, SpecBeaconBlock
 from spec.configs import Network, get_network_spec

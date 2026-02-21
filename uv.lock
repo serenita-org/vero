@@ -531,7 +531,7 @@ wheels = [
 [[package]]
 name = "grandine-py"
 version = "0.1.0"
-source = { git = "https://github.com/eth2353/grandine-py?rev=v0.1.0#3ebdc65d737ae09fd0ee7f49348a99540e31f1d6" }
+source = { git = "https://github.com/eth2353/grandine-py?rev=v0.1.1#123a7b79d05f4a20ceb0d793209ede672f8c151c" }
 
 [[package]]
 name = "grpcio"
@@ -1465,7 +1465,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.13" },
     { name = "apscheduler", specifier = ">=3.11.0" },
-    { name = "grandine-py", git = "https://github.com/eth2353/grandine-py?rev=v0.1.0" },
+    { name = "grandine-py", git = "https://github.com/eth2353/grandine-py?rev=v0.1.1" },
     { name = "msgspec", specifier = ">=0.19.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.31.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.31.0" },
