@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from grandine_bindings import (
     ElectraBeaconBlockContentsGnosis,
@@ -9,24 +10,19 @@ from grandine_bindings import (
     ElectraBlindedBeaconBlockMinimal,
 )
 
-from spec.configs import Preset
+if TYPE_CHECKING:
+    from grandine_bindings import (
+        ElectraBeaconBlockContentsType,
+        ElectraBlindedBeaconBlockType,
+    )
 
-type ElectraBeaconBlockContentsType = (
-    ElectraBeaconBlockContentsMainnet
-    | ElectraBeaconBlockContentsGnosis
-    | ElectraBeaconBlockContentsMinimal
-)
-type ElectraBlindedBeaconBlockType = (
-    ElectraBlindedBeaconBlockMainnet
-    | ElectraBlindedBeaconBlockGnosis
-    | ElectraBlindedBeaconBlockMinimal
-)
+from spec.configs import Preset
 
 
 @dataclass(frozen=True)
 class RustSSZTypes:
-    ElectraBeaconBlockContents: type[ElectraBeaconBlockContentsType]
-    ElectraBlindedBeaconBlock: type[ElectraBlindedBeaconBlockType]
+    ElectraBeaconBlockContents: type["ElectraBeaconBlockContentsType"]
+    ElectraBlindedBeaconBlock: type["ElectraBlindedBeaconBlockType"]
 
 
 _types: RustSSZTypes | None = None

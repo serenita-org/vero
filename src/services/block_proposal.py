@@ -2,7 +2,7 @@ import asyncio
 import time
 from collections import defaultdict
 from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -20,11 +20,15 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec.rust_ssz import (
-    ElectraBeaconBlockContentsType,
-    ElectraBlindedBeaconBlockType,
     rust_ssz_types,
 )
 from spec.utils import encode_graffiti
+
+if TYPE_CHECKING:
+    from grandine_bindings import (
+        ElectraBeaconBlockContentsType,
+        ElectraBlindedBeaconBlockType,
+    )
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -356,7 +360,7 @@ class BlockProposalService(ValidatorDutyService):
     async def _produce_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str
     ) -> tuple[
-        ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType,
+        "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
         SchemaRemoteSigner.BeaconBlockHeader,
         SchemaBeaconAPI.ProduceBlockV3Response,
     ]:
@@ -434,8 +438,7 @@ class BlockProposalService(ValidatorDutyService):
         slot: int,
         fork_version: SchemaBeaconAPI.ForkVersion,
         signature: str,
-        block_contents_or_blinded_block: ElectraBeaconBlockContentsType
-        | ElectraBlindedBeaconBlockType,
+        block_contents_or_blinded_block: "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
     ) -> None:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(

@@ -58,3 +58,14 @@ class ElectraBlindedBeaconBlockGnosis(_SSZObject):
     def block_hash_tree_root(self) -> str: ...
 
 class ElectraSignedBlindedBeaconBlockGnosis(_SSZObject): ...
+
+type ElectraBeaconBlockContentsType = (
+    ElectraBeaconBlockContentsMainnet
+    | ElectraBeaconBlockContentsGnosis
+    | ElectraBeaconBlockContentsMinimal
+)
+type ElectraBlindedBeaconBlockType = (
+    ElectraBlindedBeaconBlockMainnet
+    | ElectraBlindedBeaconBlockGnosis
+    | ElectraBlindedBeaconBlockMinimal
+)

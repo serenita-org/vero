@@ -49,8 +49,6 @@ from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
 from spec.rust_ssz import (
-    ElectraBeaconBlockContentsType,
-    ElectraBlindedBeaconBlockType,
     rust_ssz_types,
 )
 
@@ -58,6 +56,11 @@ from ._headers import ContentType
 from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
+    from grandine_bindings import (
+        ElectraBeaconBlockContentsType,
+        ElectraBlindedBeaconBlockType,
+    )
+
     from spec import SpecAttestation, SpecSyncCommittee
 
     from .vero import Vero
@@ -263,7 +266,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType:
+    ) -> "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -431,7 +434,7 @@ class MultiBeaconNode:
         builder_boost_factor: int,
         randao_reveal: str,
     ) -> tuple[
-        ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType,
+        "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
         SchemaBeaconAPI.ProduceBlockV3Response,
     ]:
         # TODO small room for improvement here.
