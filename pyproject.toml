@@ -15,7 +15,7 @@ dependencies = [
     "pyroscope-otel>=0.4.0",
     "pyyaml>=6.0.2",
     "remerkleable>=0.1.28",
-    "grandine_bindings",
+    "grandine-py",
 ]
 
 [dependency-groups]
@@ -62,7 +62,7 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 required-version = "~=0.8.15"
 
 [tool.uv.sources]
-grandine_bindings = { path = "rust/grandine_bindings" }
+grandine-py = { git = "https://github.com/eth2353/grandine-py", rev = "v0.1.0" }
 
 [tool.uv.pip]
 generate-hashes = true

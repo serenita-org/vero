@@ -529,9 +529,9 @@ wheels = [
 ]
 
 [[package]]
-name = "grandine-bindings"
+name = "grandine-py"
 version = "0.1.0"
-source = { directory = "rust/grandine_bindings" }
+source = { git = "https://github.com/eth2353/grandine-py?rev=v0.1.0#3ebdc65d737ae09fd0ee7f49348a99540e31f1d6" }
 
 [[package]]
 name = "grpcio"
@@ -1439,7 +1439,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "apscheduler" },
-    { name = "grandine-bindings" },
+    { name = "grandine-py" },
     { name = "msgspec" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-sdk" },
@@ -1465,7 +1465,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.13" },
     { name = "apscheduler", specifier = ">=3.11.0" },
-    { name = "grandine-bindings", directory = "rust/grandine_bindings" },
+    { name = "grandine-py", git = "https://github.com/eth2353/grandine-py?rev=v0.1.0" },
     { name = "msgspec", specifier = ">=0.19.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.31.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.31.0" },

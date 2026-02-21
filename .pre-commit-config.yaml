@@ -56,34 +56,6 @@ repos:
         name: export dev dependencies -> requirements-dev.txt
         args: ["--dev", "--output-file=requirements-dev.txt"]
 
-  - repo: https://github.com/bnjbvr/cargo-machete
-    rev: v0.9.1
-    hooks:
-    - id: cargo-machete
-
-  - repo: local
-    hooks:
-    - id: cargo-fmt
-      name: cargo fmt (rust/grandine_bindings)
-      language: system
-      entry: cargo fmt --manifest-path rust/grandine_bindings/Cargo.toml --all --check
-      pass_filenames: false
-      files: ^rust/grandine_bindings/
-
-    - id: cargo-check
-      name: cargo check (rust/grandine_bindings)
-      language: system
-      entry: cargo check --manifest-path rust/grandine_bindings/Cargo.toml
-      pass_filenames: false
-      files: ^rust/grandine_bindings/
-
-    - id: cargo-clippy
-      name: cargo clippy (rust/grandine_bindings)
-      language: system
-      entry: cargo clippy --manifest-path rust/grandine_bindings/Cargo.toml --all-targets --all-features -- -D warnings -W clippy::pedantic
-      pass_filenames: false
-      files: ^rust/grandine_bindings/
-
   - repo: local
     hooks:
       - id: check-spec-types

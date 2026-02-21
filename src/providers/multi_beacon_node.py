@@ -56,7 +56,7 @@ from ._headers import ContentType
 from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
-    from grandine_bindings import (
+    from grandine_py import (
         ElectraBeaconBlockContentsType,
         ElectraBlindedBeaconBlockType,
     )
@@ -302,7 +302,7 @@ class MultiBeaconNode:
 
         try:
             block_cls = block_map[response.version]
-            return getattr(block_cls, decode_function)(response.data)  # type: ignore[no-any-return]
+            return getattr(block_cls, decode_function)(response.data)
         except KeyError:
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"

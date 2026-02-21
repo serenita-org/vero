@@ -25,7 +25,7 @@ from spec.rust_ssz import (
 from spec.utils import encode_graffiti
 
 if TYPE_CHECKING:
-    from grandine_bindings import (
+    from grandine_py import (
         ElectraBeaconBlockContentsType,
         ElectraBlindedBeaconBlockType,
     )

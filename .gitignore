@@ -1,9 +1,2 @@
 docs/.cache
 .venv
-
-# Python build/cache artifacts
-__pycache__/
-*.py[cod]
-
-# Rust/Cargo build artifacts
-rust/grandine_bindings/target

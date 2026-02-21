@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from grandine_bindings import (
+from grandine_py import (
     ElectraBeaconBlockContentsGnosis,
     ElectraBeaconBlockContentsMainnet,
     ElectraBeaconBlockContentsMinimal,
@@ -11,7 +11,7 @@ from grandine_bindings import (
 )
 
 if TYPE_CHECKING:
-    from grandine_bindings import (
+    from grandine_py import (
         ElectraBeaconBlockContentsType,
         ElectraBlindedBeaconBlockType,
     )
