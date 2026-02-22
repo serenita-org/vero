@@ -11,6 +11,12 @@ For example:
 docker run ghcr.io/serenita-org/vero:v1.2.0 --network=hoodi --remote-signer-url=http://signer:9000 --beacon-node-urls=http://lodestar:5052 --fee-recipient=0x0000000000000000000000000000000000000000
 ```
 
+!!! tip "Image Tags"
+
+    - Use specific versions like `v1.2.0` for production (ensures reproducibility)
+    - The `latest` tag always points to the most recent release
+    - Check [GitHub Releases](https://github.com/serenita-org/vero/releases){:target="_blank"} for available versions
+
 You can build Vero's image yourself using the included
 [Dockerfile](https://github.com/serenita-org/vero/blob/master/Dockerfile){:target="_blank"}.
 
