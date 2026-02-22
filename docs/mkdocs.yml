@@ -22,6 +22,7 @@ nav:
     - usage/mev.md
     - usage/keymanager_api.md
     - usage/compatibility.md
+    - usage/migrating.md
   - Reference:
     - reference/using_multiple_beacon_nodes.md
     - reference/slashing_protection.md
