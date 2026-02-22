@@ -23,3 +23,9 @@ Vero is currently compatible with all open-source Ethereum consensus layer (CL) 
     🟠 Issues that may impact some validator duties occasionally.
 
     🔴 Major issues that prevent validator duties from being performed.
+
+!!! note "Compatibility Updates"
+
+    This compatibility table is updated with each Vero release.
+    If you encounter issues with a client version not listed here,
+    please [open an issue on GitHub](https://github.com/serenita-org/vero/issues){:target="_blank"}.
