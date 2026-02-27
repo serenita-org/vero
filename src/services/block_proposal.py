@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import time
 from collections import defaultdict
 from types import TracebackType
@@ -41,7 +42,7 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-        self.randao_reveal_cache: dict[int, str] = dict()
+        self.randao_reveal_cache: dict[tuple[int, str], str] = dict()
 
     async def __aenter__(self) -> Self:
         try:
@@ -131,7 +132,9 @@ class BlockProposalService(ValidatorDutyService):
         # Prepare for block proposals due in the next slot
         duty_for_next_slot = self.duty_for_slot(slot + 1)
         if duty_for_next_slot:
-            await self._fetch_randao_reveal(duty=duty_for_next_slot)
+            await self._fetch_randao_reveal(
+                slot=slot + 1, pubkey=duty_for_next_slot.pubkey
+            )
             # Call the `prepare_beacon_proposer` endpoint one more time
             # just before a block proposal is scheduled to decrease
             # the chances of the fee recipient being set incorrectly,
@@ -310,10 +313,9 @@ class BlockProposalService(ValidatorDutyService):
                 f"Published validator registrations, count: {len(validator_batch)}"
             )
 
-    async def _fetch_randao_reveal(self, duty: SchemaBeaconAPI.ProposerDuty) -> None:
-        self.logger.debug(f"Fetching RANDAO reveal for slot {duty.slot}")
+    async def _fetch_randao_reveal(self, slot: int, pubkey: str) -> None:
+        self.logger.debug(f"Fetching RANDAO reveal for slot {slot}")
 
-        slot = int(duty.slot)
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
 
         _, randao_reveal, _ = await self.signature_provider.sign(
@@ -323,29 +325,31 @@ class BlockProposalService(ValidatorDutyService):
                     epoch=str(epoch),
                 ),
             ),
-            identifier=duty.pubkey,
+            identifier=pubkey,
         )
-        self.randao_reveal_cache[slot] = randao_reveal
+        self.randao_reveal_cache[(slot, pubkey)] = randao_reveal
 
     async def _get_randao_reveal(
-        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
+        self,
+        slot: int,
+        pubkey: str,
     ) -> str:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._get_randao_reveal",
         ):
             # Try to get it from the cache - it should be pre-populated
             # in the slot before a proposal is due
-            if slot in self.randao_reveal_cache:
-                return self.randao_reveal_cache.pop(slot)
-
-            self.logger.warning(
-                f"Failed to get RANDAO reveal for slot {slot} from cache"
-            )
+            cache_key = (slot, pubkey)
+            with contextlib.suppress(KeyError):
+                return self.randao_reveal_cache.pop(cache_key)
 
             # We failed to retrieve the value from the cache, fall back to
             # fetching it on-demand
+            self.logger.warning(
+                f"Failed to get RANDAO reveal from cache. Cache key: {cache_key}"
+            )
             try:
-                await self._fetch_randao_reveal(duty=duty)
+                await self._fetch_randao_reveal(slot=slot, pubkey=pubkey)
             except Exception as e:
                 self.logger.exception(
                     f"Failed to get RANDAO reveal: {e!r}",
@@ -355,7 +359,7 @@ class BlockProposalService(ValidatorDutyService):
                     error_type=ErrorType.BLOCK_PRODUCE,
                 ) from None
             else:
-                return self.randao_reveal_cache.pop(slot)
+                return self.randao_reveal_cache.pop(cache_key)
 
     async def _produce_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str
@@ -513,7 +517,7 @@ class BlockProposalService(ValidatorDutyService):
             context=trace.set_span_in_context(span=NonRecordingSpan(span_ctx)),
             attributes={"beacon_chain.slot": slot},
         ):
-            randao_reveal = await self._get_randao_reveal(slot=slot, duty=duty)
+            randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
             (
                 block_contents_or_blinded_block,
