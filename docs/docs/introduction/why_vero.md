@@ -143,21 +143,21 @@ switch back from— in case any issue were to occur.
 
 ## Feature comparison
 
-|                                                             | Vero | Vouch |      DVT      | Traditional VC |
-|-------------------------------------------------------------|:----:|:-----:|:-------------:|:--------------:|
-| [Attestation consensus](#attestation-consensus)             |  ✅   |   ✅   |       ✅       |       ❌        |
-| [Slashing Detection](#slashing-detection)                   |  ✅   |   ❌   |       ❌       | 🟠 (Teku only) |
-| [Ethereum Remote Signing API](#ethereum-remote-signing-api) |  ✅   |   ❌   |      N/A      |       ✅        |
-| Simple to set up                                            |  ✅   |   ❌   |       ❌       |       ✅        |
-| Open Source                                                 |  ✅   |   ✅   | 🟠 (SSV only) |       ✅        |
-| Gnosis Chain support                                        |  ✅   |   ❌   |       ❌       |       🟠       |
-| Active-active redundancy*                                   |  ✅   |   ✅   |       ✅       |       ❌        |
-| Distributed validator keys**                                |  ❌   |   ✅   |       ✅       |       ❌        |
+|                                                             |      Vero      | Vouch |           DVT            |      Traditional VC       |
+|-------------------------------------------------------------|:--------------:|:-----:|:------------------------:|:-------------------------:|
+| [Attestation consensus](#attestation-consensus)             |       ✅        |   ✅   |            ✅             |             ❌             |
+| [Slashing Detection](#slashing-detection)                   |       ✅        |   ❌   |            ❌             | 🟠 <sup>(Teku only)</sup> |
+| [Ethereum Remote Signing API](#ethereum-remote-signing-api) |       ✅        |   ❌   |           N/A            |             ✅             |
+| Simple to set up                                            |       ✅        |   ❌   |            ❌             |             ✅             |
+| Active-active redundancy                                    | ✅<sup>1)</sup> |   ✅   |            ✅             |             ❌             |
+| Distributed validator keys                                  | ❌<sup>2)</sup> |   ✅   |            ✅             |             ❌             |
+| Open Source                                                 |       ✅        |   ✅   | 🟠 <sup>(SSV only)</sup> |             ✅             |
+| Gnosis Chain support                                        |       ✅        |   ❌   |            ❌             |            🟠             |
 
 
-<sub>* Vero Sponsor feature</sub>
+<sub>1) Exclusive feature for Vero Sponsors.</sub>
 
-<sub>** Please reach out if the lack of this feature is blocking you from adopting Vero. We
+<sub>2) Please reach out if the lack of this feature is blocking you from adopting Vero. We
 are considering adding support for it.</sub>
 
 ### Attestation consensus
