@@ -331,12 +331,6 @@ class AttestationService(ValidatorDutyService):
         If we see a head event in time, we cancel the scheduled function call
         at the attestation deadline.
         """
-        if head_event is not None:
-            with contextlib.suppress(JobLookupError):
-                self.scheduler.remove_job(
-                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
-                )
-
         if (
             self.validator_status_tracker_service.slashing_detected
             and not self.cli_args.disable_slashing_detection
@@ -352,6 +346,12 @@ class AttestationService(ValidatorDutyService):
             raise RuntimeError(
                 f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
             )
+
+        if head_event is not None:
+            with contextlib.suppress(JobLookupError):
+                self.scheduler.remove_job(
+                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+                )
 
         duties = self._get_duties_for_slot(slot)
 
