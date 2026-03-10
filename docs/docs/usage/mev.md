@@ -26,12 +26,17 @@ with MEV relays.
 
 ## MEV and multiple beacon nodes
 
-By default, Vero uses the first connected beacon node
-to submit its validator registrations
-(=&nbsp;the first URL provided in the `--beacon-node-urls` CLI argument).
+For validator registrations, Vero uses a single beacon node
+to avoid overwhelming MEV relays with duplicate registrations.
+It selects the currently highest-scoring connected node.
 
-Therefore, ensure that the first connected beacon node is
-connected to all the MEV relays you wish to use.
+When node scores are equal, this defaults to the first URL in
+`--beacon-node-urls`.
+If that beacon node's score drops (e.g. due to downtime or slow responses),
+Vero automatically fails over to the next highest-scoring beacon node.
+
+Therefore, ensure all connected beacon nodes are configured to reach
+all MEV relays you intend to use.
 
 There are multiple choices you can make
 when it comes to setting this up in a multi-client environment.
