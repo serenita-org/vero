@@ -45,7 +45,7 @@ async def test_produce_sync_message(
     duty_slot = beacon_chain.current_slot
 
     # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
-    sync_period = beacon_chain.compute_sync_period_for_slot(duty_slot + 1)
+    sync_period = sync_committee_service.compute_sync_period_for_slot(duty_slot + 1)
 
     sync_committee_service.sync_duties[sync_period] = [
         SchemaBeaconAPI.SyncDuty(

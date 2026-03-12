@@ -12,6 +12,7 @@ import pytest
 
 from main import main
 from providers import Vero
+from schemas.beacon_api import ForkVersion
 
 
 @pytest.fixture
@@ -61,6 +62,15 @@ def _profile_program_run() -> Generator[None, None, None]:
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "fork_version",
+    [
+        pytest.param(ForkVersion.ELECTRA, id="Electra"),
+        pytest.param(ForkVersion.FULU, id="Fulu"),
+        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+    ],
+    indirect=True,
+)
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
 @pytest.mark.usefixtures("_profile_program_run")
@@ -68,6 +78,7 @@ def _profile_program_run() -> Generator[None, None, None]:
 async def test_lifecycle(
     vero: Vero,
     enable_keymanager_api: bool,
+    fork_version: ForkVersion,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
@@ -118,15 +129,19 @@ async def test_lifecycle(
         f"Log lines not found: {[line for line in required_log_lines if not any(line in m for m in caplog.messages)]}"
     )
 
-    # Make sure no errors occurred
+    # Make sure no unexpected errors occurred
     err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
 
+    unexpected_err_messages = []
     for record in err_records:
         # Event stream is not mocked
         if "Error occurred while processing beacon node events" in record.message:
             continue
 
-        pytest.fail(f"Error occurred: {record.message}")
+        unexpected_err_messages.append(record.message)
+
+    if unexpected_err_messages:
+        pytest.fail(f"Unexpected errors occurred: {unexpected_err_messages}")
 
     # Send SIGTERM signal to process to initiate a clean shutdown
     os.kill(os.getpid(), signal.SIGTERM)

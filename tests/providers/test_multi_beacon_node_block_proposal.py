@@ -363,6 +363,7 @@ async def test_produce_block_v3(
                 graffiti=b"test_produce_block_v3",
                 builder_boost_factor=90,
                 randao_reveal="randao",
+                soft_timeout=0.1666,
             )
             _block, full_response = result
             assert (
@@ -380,4 +381,5 @@ async def test_produce_block_v3(
                     graffiti=b"test_produce_block_v3",
                     builder_boost_factor=90,
                     randao_reveal="randao",
+                    soft_timeout=0.1666,
                 )
