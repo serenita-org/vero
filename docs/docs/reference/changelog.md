@@ -4,6 +4,7 @@
 
 #### Features
 - Add `--ignore-spec-mismatch` flag
+- Schedule Fusaka on the Chiado testnet
 
 
 ## v1.3.1 { id="v1.3.1" }
