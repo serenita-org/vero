@@ -4,8 +4,16 @@
 
 #### Features
 - Add `--ignore-spec-mismatch` flag
+
+
+## v1.3.2 { id="v1.3.2" }
+
+<small>March 12, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.3.2){:target="_blank"}
+
+#### Features
 - Schedule Fusaka on the Chiado testnet
 
+___
 
 ## v1.3.1 { id="v1.3.1" }
 
