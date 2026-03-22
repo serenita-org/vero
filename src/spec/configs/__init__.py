@@ -89,6 +89,9 @@ def get_network_spec(
         )
 
     preset_name = spec_dict["PRESET_BASE"].strip("'")
+    if preset_name not in get_args(Preset):
+        raise ValueError(f"Unknown preset: {preset_name}")
+
     preset_files_dir = Path(__file__).parent / "presets" / preset_name
     for fname in preset_files_dir.iterdir():
         spec_dict.update(
@@ -96,9 +99,5 @@ def get_network_spec(
                 Path(preset_files_dir) / fname,
             )
         )
-
-    # Check if preset_name contains one of the supported Literal values
-    if preset_name not in get_args(Preset):
-        raise ValueError(f"Unknown preset: {preset_name}")
 
     return parse_spec(data=spec_dict), preset_name
