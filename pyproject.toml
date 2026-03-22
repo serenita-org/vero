@@ -62,7 +62,7 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 required-version = "~=0.8.15"
 
 [tool.uv.sources]
-grandine-py = { git = "https://github.com/eth2353/grandine-py", rev = "v0.1.1" }
+grandine-py = { git = "https://github.com/eth2353/grandine-py", rev = "v0.1.2" }
 
 [tool.uv.pip]
 generate-hashes = true
