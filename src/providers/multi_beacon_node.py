@@ -46,13 +46,23 @@ from remerkleable.complex import Container
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
-from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
+from spec.rust_ssz import (
+    rust_ssz_types,
+)
 
+from ._headers import ContentType
 from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
+    from grandine_py import (
+        ElectraBeaconBlockContentsType,
+        ElectraBlindedBeaconBlockType,
+    )
+
+    from spec import SpecAttestation, SpecSyncCommittee
+
     from .vero import Vero
 
 
@@ -249,7 +259,7 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "SpecBeaconBlock.ElectraBlockContents | SpecBeaconBlock.ElectraBlindedBlock":
+    ) -> "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType":
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -261,21 +271,25 @@ class MultiBeaconNode:
         #  (probably not all CLs support this but still...)
         #  That would help a bit since we wouldn't be deserializing
         #  the execution payload - transactions.
+
+        # Decide decode function based on encoding indicated in Content-Type header
         decode_function = (
-            "decode_bytes" if isinstance(response.data, bytes) else "from_obj"
+            "from_json" if response.content_type == ContentType.JSON else "from_ssz"
         )
+
+        _types = rust_ssz_types()
 
         block_map = {
             SchemaBeaconAPI.ForkVersion.ELECTRA: (
-                SpecBeaconBlock.ElectraBlindedBlock
+                _types.ElectraBlindedBeaconBlock
                 if response.execution_payload_blinded
-                else SpecBeaconBlock.ElectraBlockContents
+                else _types.ElectraBeaconBlockContents
             ),
             # Block containers unchanged in Fulu => reusing Electra containers
             SchemaBeaconAPI.ForkVersion.FULU: (
-                SpecBeaconBlock.ElectraBlindedBlock
+                _types.ElectraBlindedBeaconBlock
                 if response.execution_payload_blinded
-                else SpecBeaconBlock.ElectraBlockContents
+                else _types.ElectraBeaconBlockContents
             ),
         }
 
@@ -412,7 +426,10 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-    ) -> tuple[Container, SchemaBeaconAPI.ProduceBlockV3Response]:
+    ) -> tuple[
+        "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
+        SchemaBeaconAPI.ProduceBlockV3Response,
+    ]:
         # TODO small room for improvement here.
         #  We are currently choosing the best block based on total
         #  block value (consensus+exec).
@@ -427,9 +444,8 @@ class MultiBeaconNode:
         )
 
         # Parse block
-        return self._parse_block_response(
-            response=best_block_response,
-        ), best_block_response
+        beacon_block = self._parse_block_response(response=best_block_response)
+        return beacon_block, best_block_response
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:

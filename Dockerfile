@@ -9,6 +9,10 @@ FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
 WORKDIR /vero
 
+# Install native build tools needed by Rust crates with C/asm deps
+# hadolint ignore=DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
+
 # Install and compile dependencies
 RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \

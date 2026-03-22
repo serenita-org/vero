@@ -14,6 +14,8 @@ from typing import Any, Protocol, Self
 
 import msgspec
 
+from providers._headers import ContentType
+
 
 class ExecutionOptimisticResponse(msgspec.Struct):
     execution_optimistic: bool
@@ -188,7 +190,8 @@ class ProduceBlockV3Response(msgspec.Struct):
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
-    data: dict[str, Any]
+    content_type: ContentType
+    data: bytes
 
 
 class SignedBeaconBlock(msgspec.Struct):

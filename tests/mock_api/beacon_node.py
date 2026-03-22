@@ -5,7 +5,7 @@ from typing import Any
 
 import msgspec
 import pytest
-from aiohttp.hdrs import CONTENT_TYPE
+from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
 from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
@@ -35,18 +35,12 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
-def response_content_type(request: pytest.FixtureRequest) -> ContentType:
-    return getattr(request, "param", ContentType.JSON)
-
-
-@pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
     spec: SpecFulu,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
-    response_content_type: ContentType,
 ) -> None:
     def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match("/eth/v1/config/spec", url.raw_path):
@@ -95,6 +89,7 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
             slot = int(url.raw_path.split("/")[-1])
+            headers = kwargs["headers"]
 
             block_cls_map = {
                 ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlockContents,
@@ -139,12 +134,19 @@ def _mocked_beacon_node_endpoints(
                     )
                 )
 
+            # Not correct parsing but sufficient for our purposes
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in headers[ACCEPT]
+                else ContentType.JSON
+            )
+
             exec_payload_value = random.randint(0, 10_000_000)
             consensus_block_value = random.randint(0, 10_000_000)
             headers = {
                 CONTENT_TYPE: response_content_type.value,
                 "Eth-Consensus-Version": fork_version.value,
-                "Eth-Execution-Payload-Blinded": str(execution_payload_blinded),
+                "Eth-Execution-Payload-Blinded": str(execution_payload_blinded).lower(),
                 "Eth-Execution-Payload-Value": str(exec_payload_value),
                 "Eth-Consensus-Block-Value": str(consensus_block_value),
             }
@@ -159,6 +161,7 @@ def _mocked_beacon_node_endpoints(
                         execution_payload_blinded=execution_payload_blinded,
                         execution_payload_value=str(exec_payload_value),
                         consensus_block_value=str(consensus_block_value),
+                        content_type=ContentType.JSON,
                         data=_data.to_obj(),
                     )
                 ),
@@ -307,7 +310,7 @@ def _mocked_beacon_node_endpoints(
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
                     _ = SpecBeaconBlock.ElectraBlockContentsSigned.from_obj(
-                        msgspec.json.decode(kwargs["data"].decode())
+                        msgspec.json.decode(kwargs["data"])
                     )
                 else:
                     _ = SpecBeaconBlock.ElectraBlockContentsSigned.decode_bytes(

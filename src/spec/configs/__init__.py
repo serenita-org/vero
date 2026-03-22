@@ -1,7 +1,7 @@
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, get_args
 
 from yaml import BaseLoader, load
 
@@ -69,9 +69,12 @@ def parse_yaml_file(fp: Path) -> dict[str, Any]:
         return parsed
 
 
+Preset = Literal["mainnet", "minimal", "gnosis"]
+
+
 def get_network_spec(
     network: Network, network_custom_config_path: str | None = None
-) -> SpecFulu:
+) -> tuple[SpecFulu, Preset]:
     spec_dict = {}
 
     if network == Network.CUSTOM:
@@ -85,9 +88,11 @@ def get_network_spec(
             parse_yaml_file(Path(__file__).parent / f"{network.value}.yaml")
         )
 
-    preset_files_dir = (
-        Path(__file__).parent / "presets" / f"{spec_dict['PRESET_BASE'].strip("'")}"
-    )
+    preset_name = spec_dict["PRESET_BASE"].strip("'")
+    if preset_name not in get_args(Preset):
+        raise ValueError(f"Unknown preset: {preset_name}")
+
+    preset_files_dir = Path(__file__).parent / "presets" / preset_name
     for fname in preset_files_dir.iterdir():
         spec_dict.update(
             parse_yaml_file(
@@ -95,4 +100,4 @@ def get_network_spec(
             )
         )
 
-    return parse_spec(data=spec_dict)
+    return parse_spec(data=spec_dict), preset_name

@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from providers import BeaconChain, Keymanager, Vero
-from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
@@ -73,10 +72,20 @@ async def test_register_validators(
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "response_content_type",
-    [
-        pytest.param(ContentType.JSON, id="JSON"),
-        pytest.param(ContentType.OCTET_STREAM, id="SSZ"),
+    argnames="cli_args",
+    argvalues=[
+        pytest.param(
+            {
+                "force_json_wire_format": False,
+            },
+            id="Prefer SSZ",
+        ),
+        pytest.param(
+            {
+                "force_json_wire_format": True,
+            },
+            id="Force JSON",
+        ),
     ],
     indirect=True,
 )
@@ -101,16 +110,12 @@ async def test_publish_block(
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
     execution_payload_blinded: bool,
-    response_content_type: ContentType,
     fork_version: ForkVersion,
     enable_keymanager_api: bool,
     keymanager: Keymanager,
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    if response_content_type == ContentType.OCTET_STREAM:
-        pytest.skip("SSZ not supported yet")
-
     if keymanager.enabled:
         keymanager.set_graffiti(random_active_validator.pubkey, "overridden")
 
