@@ -226,7 +226,7 @@ googleapis-common-protos==1.72.0 \
     --hash=sha256:4299c5a82d5ae1a9702ada957347726b167f9f8d1fc352477702a1e851ff4038 \
     --hash=sha256:e55a601c1b32b52d7a3e65f43563e2aa61bcd737998ee672ac9b951cd49319f5
     # via opentelemetry-exporter-otlp-proto-grpc
-grandine-py @ git+https://github.com/eth2353/grandine-py@d7abb054221de620299af2fc34c497720350e784
+grandine-py @ git+https://github.com/eth2353/grandine-py@fdf5c8241c3530c9e69f1255e2bc171095864b64
     # via vero
 grpcio==1.76.0 \
     --hash=sha256:04bbe1bfe3a68bbfd4e52402ab7d4eb59d72d02647ae2042204326cf4bbad280 \
