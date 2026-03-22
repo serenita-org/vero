@@ -712,7 +712,7 @@ class BeaconNode:
                     data=resp_bytes,
                 )
             else:
-                raise ValueError(f"Unsupported content type: {content_type}")
+                raise NotImplementedError(f"Unsupported content type: {content_type}")
 
             tracer_span.add_event(
                 "ProduceBlockV3Response",
