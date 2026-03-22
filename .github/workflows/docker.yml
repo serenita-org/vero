@@ -5,7 +5,7 @@ permissions:
 
 on:
   push:
-    branches: [ "master", "docker-build-caching" ]
+    branches: [ "master" ]
     tags: [ v* ]
 
 jobs:
