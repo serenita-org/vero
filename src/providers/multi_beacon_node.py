@@ -122,13 +122,6 @@ class MultiBeaconNode:
             self.logger.warning(_init_error_message())
             await asyncio.sleep(0.1)
 
-        # Check the connected beacon nodes spec
-        if not len({bn.spec for bn in self.initialized_beacon_nodes}) == 1:
-            raise RuntimeError(
-                f"Beacon nodes provided different specs:"
-                f" {[bn.spec for bn in self.initialized_beacon_nodes]}",
-            )
-
         self.logger.info(
             f"Successfully initialized"
             f" {len(self.initialized_beacon_nodes)}"

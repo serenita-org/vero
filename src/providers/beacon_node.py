@@ -121,7 +121,7 @@ class BeaconNode:
         # Raise if the spec returned by the beacon node differs
         bn_spec = await self.get_spec()
         if self.spec != bn_spec and not self._ignore_spec_mismatch:
-            msg = f"Spec values returned by beacon node {self.host} not equal to hardcoded spec values:"
+            msg = f"Spec values returned by beacon node {self.host} not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
             for field in self.spec.fields():
                 if getattr(self.spec, field) != getattr(bn_spec, field):
                     msg += (
