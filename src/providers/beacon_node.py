@@ -228,8 +228,9 @@ class BeaconNode:
                 if content_type is not None:
                     # Use aiohttp's parsed value only if a value was
                     # present in the Content-Type response header
-                    # (aiohttp confusingly sets its parsed value to
-                    # application/octet-stream if no value was present)
+                    # (aiohttp confusingly returns the `application/octet-stream`
+                    # value even if the header was not provided):
+                    # https://github.com/aio-libs/aiohttp/blob/2602b711710dfe20131ec74d0753db746e56808a/aiohttp/helpers.py#L762
                     content_type = resp.content_type
 
                     if content_type not in (
