@@ -58,6 +58,7 @@ def _register_event_handlers(
 
     for reorg_handler_service in (
         attestation_service,
+        attestation_service.attestation_data_provider,
         block_proposal_service,
         sync_committee_service,
     ):
