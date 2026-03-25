@@ -36,6 +36,7 @@ class AttestationService(ValidatorDutyService):
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
             scheduler=self.scheduler,
+            spec=self.spec,
         )
 
         # Attester duties by epoch
