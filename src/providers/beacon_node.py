@@ -799,7 +799,7 @@ class BeaconNode:
 
     async def get_liveness(
         self, epoch: int, validator_indices: list[int]
-    ) -> SchemaBeaconAPI.PostLivenessResponseBody:
+    ) -> tuple[str, list[SchemaBeaconAPI.ValidatorLiveness]]:
         resp_bytes, _, _ = await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/liveness/{epoch}",
@@ -810,10 +810,10 @@ class BeaconNode:
             data=self.json_encoder.encode([str(i) for i in validator_indices]),
         )
 
-        return msgspec.json.decode(
+        return self.host, msgspec.json.decode(
             resp_bytes,
             type=SchemaBeaconAPI.PostLivenessResponseBody,
-        )
+        ).data
 
     async def subscribe_to_events(
         self,

@@ -157,7 +157,7 @@ async def run_services(vero: Vero) -> None:
             try:
                 await DoppelgangerDetector(
                     beacon_chain=vero.beacon_chain,
-                    beacon_node=multi_beacon_node.best_beacon_node,
+                    beacon_nodes=multi_beacon_node.beacon_nodes,
                     validator_status_tracker_service=validator_status_tracker_service,
                 ).detect()
             except DoppelgangersDetected:
