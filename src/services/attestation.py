@@ -634,11 +634,9 @@ class AttestationService(ValidatorDutyService):
                 )
                 continue
 
-            self.attester_duties[epoch] = set()
-
             # For large amounts of validators, the `_get_duties_with_selection_proofs`
             # can take quite a while.
-            # Run `_get_duties_with_selection_proofs` for the next couple of slots
+            # Run `_get_duties_with_selection_proofs` for the next few slots
             # first, and only worry about the rest of the duties once we are ready to
             # perform the duties that are due soon.
             current_slot = self.beacon_chain.current_slot
@@ -649,16 +647,29 @@ class AttestationService(ValidatorDutyService):
                 duty_slot = int(duty.slot)
                 if duty_slot < current_slot:
                     continue
-                if duty_slot <= current_slot + 1:
+                if duty_slot <= current_slot + 2:
                     duties_due_soon.append(duty)
                 else:
                     duties_due_later.append(duty)
 
-            for list_of_duties in (duties_due_soon, duties_due_later):
-                for duty_with_proof in await self._get_duties_with_selection_proofs(
-                    duties=list_of_duties,
-                ):
-                    self.attester_duties[epoch].add(duty_with_proof)
+            refreshed_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof] = (
+                set()
+            )
+            if duties_due_soon:
+                refreshed_duties = set(
+                    await self._get_duties_with_selection_proofs(
+                        duties=duties_due_soon,
+                    )
+                )
+                self.attester_duties[epoch] = refreshed_duties
+
+            refreshed_duties.update(
+                await self._get_duties_with_selection_proofs(
+                    duties=duties_due_later,
+                )
+            )
+
+            self.attester_duties[epoch] = refreshed_duties
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])} duties",
