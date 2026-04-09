@@ -64,6 +64,7 @@ class Keymanager(SignatureProvider):
 
         # Create an AsyncExitStack for dynamically managed signers
         self._exit_stack = contextlib.AsyncExitStack()
+        self._pubkey_to_remote_signer_lock = asyncio.Lock()
 
         if self.enabled:
             self.pubkey_to_fee_recipient_override = self._load_fee_recipient_override()
@@ -107,45 +108,55 @@ class Keymanager(SignatureProvider):
         - If another pubkey's RemoteSigner (same URL) can be reused, do so.
         - Otherwise, a new RemoteSigner is instantiated.
         """
-        # Fetch all (pubkey, url) pairs from the DB
-        rows = self.db.fetch_all("SELECT pubkey, url FROM keymanager_data;")
+        retired_signers: set[RemoteSigner] = set()
 
-        # Keep a quick-lookup dict from URL -> RemoteSigner so we can easily
-        # reuse any existing signers without scanning pubkey_to_remote_signer.
-        signers_by_url = {
-            signer.url: signer for signer in self.pubkey_to_remote_signer.values()
-        }
+        async with self._pubkey_to_remote_signer_lock:
+            # Fetch all (pubkey, url) pairs from the DB
+            rows = self.db.fetch_all("SELECT pubkey, url FROM keymanager_data;")
 
-        # Build a new mapping for pubkey -> RemoteSigner
-        new_mapping = {}
+            # Keep a quick-lookup dict from URL -> RemoteSigner so we can easily
+            # reuse any existing signers without scanning pubkey_to_remote_signer.
+            signers_by_url = {
+                signer.url: signer for signer in self.pubkey_to_remote_signer.values()
+            }
+            old_signers = set(signers_by_url.values())
 
-        for pubkey, url in rows:
-            # If the pubkey already has a matching signer, just reuse it
-            existing_signer = self.pubkey_to_remote_signer.get(pubkey)
-            if existing_signer and existing_signer.url == url:
-                new_mapping[pubkey] = existing_signer
-                continue
+            # Build a new mapping for pubkey -> RemoteSigner
+            new_mapping = {}
 
-            # Otherwise, see if we can reuse a signer from signers_by_url
-            signer = signers_by_url.get(url)
-            if signer is not None:
-                new_mapping[pubkey] = signer
-                continue
+            for pubkey, url in rows:
+                # If the pubkey already has a matching signer, just reuse it
+                existing_signer = self.pubkey_to_remote_signer.get(pubkey)
+                if existing_signer and existing_signer.url == url:
+                    new_mapping[pubkey] = existing_signer
+                    continue
 
-            # If we still don't have a signer, create a new one
-            signer = await self._exit_stack.enter_async_context(
-                RemoteSigner(
-                    url,
-                    vero=self.vero,
-                    process_pool_executor=self.process_pool_executor,
+                # Otherwise, see if we can reuse a signer from signers_by_url
+                signer = signers_by_url.get(url)
+                if signer is not None:
+                    new_mapping[pubkey] = signer
+                    continue
+
+                # If we still don't have a signer, create a new one
+                signer = await self._exit_stack.enter_async_context(
+                    RemoteSigner(
+                        url,
+                        vero=self.vero,
+                        process_pool_executor=self.process_pool_executor,
+                    )
                 )
-            )
-            signers_by_url[url] = signer
-            new_mapping[pubkey] = signer
+                signers_by_url[url] = signer
+                new_mapping[pubkey] = signer
 
-        # Overwrite the old mapping with the new one
-        # This automatically drops any pubkey not present in the DB anymore
-        self.pubkey_to_remote_signer = new_mapping
+            # Overwrite the old mapping with the new one
+            # This automatically drops any pubkey not present in the DB anymore
+            self.pubkey_to_remote_signer = new_mapping
+
+            # Compute retired signers while the mapping transition is still atomic.
+            retired_signers = old_signers - set(new_mapping.values())
+
+        for signer in retired_signers:
+            await signer.__aexit__(None, None, None)
 
     def _load_fee_recipient_override(self) -> dict[str, str]:
         return {

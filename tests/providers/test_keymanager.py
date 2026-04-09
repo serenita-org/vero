@@ -48,3 +48,24 @@ async def test_keymanager_memory_usage(
     # Every key with all of its metadata and instantiated remote signer
     # should use about 15KiB of memory
     assert per_key_memory / 1024 < 20
+
+
+async def test_retired_signer_is_closed(
+    keymanager: Keymanager,
+) -> None:
+    pubkey = "0x" + "1" * 96
+    await keymanager.import_remote_keys(
+        remote_keys=[RemoteKey(pubkey=pubkey, url="http://signer-1")]
+    )
+
+    signer = keymanager.pubkey_to_remote_signer[pubkey]
+    assert signer.low_priority_client_session is not None
+    assert signer.high_priority_client_session is not None
+    assert not signer.low_priority_client_session.closed
+    assert not signer.high_priority_client_session.closed
+
+    await keymanager.delete_remote_keys(pubkeys=[pubkey])
+
+    assert pubkey not in keymanager.pubkey_to_remote_signer
+    assert signer.low_priority_client_session.closed
+    assert signer.high_priority_client_session.closed

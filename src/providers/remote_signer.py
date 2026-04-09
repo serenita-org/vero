@@ -1,6 +1,7 @@
 """Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api)."""
 
 import asyncio
+import contextlib
 import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
@@ -71,12 +72,17 @@ class RemoteSigner(SignatureProvider):
             raise ValueError(f"Failed to parse hostname from {self.url}")
 
         self._score = RemoteSigner.MAX_SCORE
-        # Regularly poll the health status of the remote signer
-        if vero is not None:
-            vero.task_manager.create_task(self.poll_health_periodically())
+        self._run_health_poll = vero is not None
+        self._health_poll_task: asyncio.Task[None] | None = None
+        self._task_manager = vero.task_manager if vero is not None else None
+        self._is_closed = False
         self.metrics = vero.metrics if vero else None
 
         self.process_pool_executor = process_pool_executor
+
+        self.low_priority_client_session: aiohttp.ClientSession | None = None
+        self.high_priority_client_session: aiohttp.ClientSession | None = None
+        self._json_encoder = msgspec.json.Encoder()
 
     async def __aenter__(self) -> Self:
         headers = {
@@ -128,7 +134,14 @@ class RemoteSigner(SignatureProvider):
             read_bufsize=2**19,
         )
 
-        self.json_encoder = msgspec.json.Encoder()
+        if self._run_health_poll:
+            self._health_poll_task = asyncio.create_task(
+                self.poll_health_periodically(),
+                name=f"remote-signer-healthcheck-{self.host}",
+            )
+            if self._task_manager is not None:
+                self._task_manager.add_existing_task(self._health_poll_task)
+        self._is_closed = False
 
         return self
 
@@ -138,11 +151,20 @@ class RemoteSigner(SignatureProvider):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if self._is_closed:
+            return
+        self._is_closed = True
+
+        if self._health_poll_task is not None:
+            self._health_poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._health_poll_task
+
         for session in (
             self.low_priority_client_session,
             self.high_priority_client_session,
         ):
-            if not session.closed:
+            if session is not None and not session.closed:
                 await session.close()
 
     @property
@@ -157,8 +179,11 @@ class RemoteSigner(SignatureProvider):
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
+        session = self.low_priority_client_session
+        if session is None:
+            raise RuntimeError("RemoteSigner low_priority_client_session is not set")
 
-        async with self.low_priority_client_session.get(_endpoint) as resp:
+        async with session.get(_endpoint) as resp:
             if not resp.ok:
                 raise ValueError(
                     f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
@@ -177,11 +202,14 @@ class RemoteSigner(SignatureProvider):
             SchemaRemoteSigner.AttestationSignableMessage,
             SchemaRemoteSigner.SyncCommitteeMessageSignableMessage,
         )
-        return (
+        session = (
             self.high_priority_client_session
             if isinstance(message, high_priority_types)
             else self.low_priority_client_session
         )
+        if session is None:
+            raise RuntimeError("RemoteSigner client session is not set")
+        return session
 
     async def sign(
         self,
@@ -197,7 +225,7 @@ class RemoteSigner(SignatureProvider):
         async with self._get_session_for_message(message).post(
             _endpoint.format(identifier=identifier),
             headers={ACCEPT: ContentType.TEXT_PLAIN.value},
-            data=self.json_encoder.encode(message),
+            data=self._json_encoder.encode(message),
             trace_request_ctx=dict(
                 path=_endpoint,
                 request_type=message.__class__.__name__,
@@ -265,8 +293,11 @@ class RemoteSigner(SignatureProvider):
 
     async def get_healthcheck_status(self) -> None:
         _endpoint = "/healthcheck"
+        session = self.low_priority_client_session
+        if session is None:
+            raise RuntimeError("RemoteSigner low_priority_client_session is not set")
 
-        async with self.low_priority_client_session.get(
+        async with session.get(
             _endpoint,
             timeout=ClientTimeout(total=1.0),
             raise_for_status=True,
