@@ -107,6 +107,7 @@ class RemoteSigner(SignatureProvider):
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            timeout=ClientTimeout(total=10.0),
             # Default aiohttp read buffer is only 64KB which is not always enough,
             # resulting in ValueError("Chunk too big")
             read_bufsize=2**19,
@@ -121,6 +122,7 @@ class RemoteSigner(SignatureProvider):
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            timeout=ClientTimeout(total=5.0),
             # Default aiohttp read buffer is only 64KB which is not always enough,
             # resulting in ValueError("Chunk too big")
             read_bufsize=2**19,
