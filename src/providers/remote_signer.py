@@ -144,8 +144,6 @@ class RemoteSigner(SignatureProvider):
         ):
             if not session.closed:
                 await session.close()
-        if self.process_pool_executor is not None:
-            self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
     @property
     def score(self) -> int:

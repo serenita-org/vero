@@ -113,6 +113,9 @@ async def run_services(vero: Vero) -> None:
         process_pool_executor = ProcessPoolExecutor(
             max_workers=int(os.getenv("PYTHON_CPU_COUNT", "1"))
         )
+        exit_stack.callback(
+            process_pool_executor.shutdown, wait=False, cancel_futures=True
+        )
         keymanager = Keymanager(
             db=db,
             multi_beacon_node=multi_beacon_node,
