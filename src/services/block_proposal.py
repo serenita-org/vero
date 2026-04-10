@@ -135,14 +135,17 @@ class BlockProposalService(ValidatorDutyService):
             await self._fetch_randao_reveal(
                 slot=slot + 1, pubkey=duty_for_next_slot.pubkey
             )
-            # Call the `prepare_beacon_proposer` endpoint one more time
+            # Call `prepare_beacon_proposer` and `register_validators` one more time
             # just before a block proposal is scheduled to decrease
             # the chances of the fee recipient being set incorrectly,
             # e.g., due to a beacon node restarting.
             await self.prepare_beacon_proposer()
+            await self.register_validators(
+                current_slot=slot,
+                pubkeys_to_register=[duty_for_next_slot.pubkey],
+            )
 
-        if self.cli_args.use_external_builder:
-            self.task_manager.create_task(self.register_validators(current_slot=slot))
+        self.task_manager.create_task(self.register_validators(current_slot=slot))
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -243,7 +246,14 @@ class BlockProposalService(ValidatorDutyService):
             ],
         )
 
-    async def register_validators(self, current_slot: int) -> None:
+    async def register_validators(
+        self,
+        current_slot: int,
+        pubkeys_to_register: list[str] | None = None,
+    ) -> None:
+        if not self.cli_args.use_external_builder:
+            return
+
         _batch_size = 512
 
         active_and_pending_validators = (
@@ -251,15 +261,16 @@ class BlockProposalService(ValidatorDutyService):
             + self.validator_status_tracker_service.pending_validators
         )
 
-        # Registers a subset of validators every slot
-        # based on their index to spread the
-        # registrations across the epoch
-        slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
-        validators_to_register = [
-            v
-            for v in active_and_pending_validators
-            if v.index % slots_per_epoch == current_slot % slots_per_epoch
-        ]
+        if pubkeys_to_register is None:
+            # Registers a subset of validators every slot
+            # based on their index to spread the
+            # registrations across the epoch
+            slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
+            pubkeys_to_register = [
+                v.pubkey
+                for v in active_and_pending_validators
+                if v.index % slots_per_epoch == current_slot % slots_per_epoch
+            ]
 
         _timestamp = int(time.time())
 
@@ -268,8 +279,8 @@ class BlockProposalService(ValidatorDutyService):
         default_fee_recipient = self.cli_args.fee_recipient
         default_gas_limit = str(self.cli_args.gas_limit)
 
-        for i in range(0, len(validators_to_register), _batch_size):
-            validator_batch = validators_to_register[i : i + _batch_size]
+        for i in range(0, len(pubkeys_to_register), _batch_size):
+            pubkey_batch = pubkeys_to_register[i : i + _batch_size]
 
             try:
                 responses = await asyncio.gather(
@@ -280,20 +291,20 @@ class BlockProposalService(ValidatorDutyService):
                                     fee_recipient=default_fee_recipient
                                     if not self.keymanager.enabled
                                     else self.keymanager.pubkey_to_fee_recipient_override.get(
-                                        v.pubkey, default_fee_recipient
+                                        pubkey, default_fee_recipient
                                     ),
                                     gas_limit=default_gas_limit
                                     if not self.keymanager.enabled
                                     else self.keymanager.pubkey_to_gas_limit_override.get(
-                                        v.pubkey, default_gas_limit
+                                        pubkey, default_gas_limit
                                     ),
                                     timestamp=str(_timestamp),
-                                    pubkey=v.pubkey,
+                                    pubkey=pubkey,
                                 ),
                             ),
-                            identifier=v.pubkey,
+                            identifier=pubkey,
                         )
-                        for v in validator_batch
+                        for pubkey in pubkey_batch
                     ],
                 )
             except Exception as e:
@@ -310,7 +321,7 @@ class BlockProposalService(ValidatorDutyService):
             )
 
             self.logger.info(
-                f"Published validator registrations, count: {len(validator_batch)}"
+                f"Published validator registrations, count: {len(pubkey_batch)}"
             )
 
     async def _fetch_randao_reveal(self, slot: int, pubkey: str) -> None:
