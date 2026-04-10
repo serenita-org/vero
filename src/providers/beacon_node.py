@@ -26,6 +26,7 @@ from observability import (
 )
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
+from providers._response import raise_for_response_size
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
 from spec.base import SpecFulu, parse_spec
@@ -36,6 +37,9 @@ if TYPE_CHECKING:
 
 _TIMEOUT_DEFAULT_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10
+_MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
+_MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
+_MAX_SSE_EVENT_BYTES = 16 * 2**20  # 16 MiB
 
 
 class BeaconNodeNotReady(Exception):
@@ -163,7 +167,7 @@ class BeaconNode:
         if response.ok:
             return
 
-        resp_text = await response.text()
+        resp_text = await BeaconNode._read_error_text(response)
 
         if response.status == 503:
             raise BeaconNodeNotReady(response.request_info.url, resp_text)
@@ -176,6 +180,16 @@ class BeaconNode:
             f"Received status code {response.status} for request to {response.request_info.url}"
             f" Full response text: {resp_text}",
         )
+
+    @staticmethod
+    async def _read_error_text(response: aiohttp.ClientResponse) -> str:
+        raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
+        return await response.text()
+
+    @staticmethod
+    async def _read_response_bytes(response: aiohttp.ClientResponse) -> bytes:
+        raise_for_response_size(response, _MAX_RESPONSE_BYTES)
+        return await response.read()
 
     async def _make_request(
         self,
@@ -241,7 +255,7 @@ class BeaconNode:
                             f"Content type in response unsupported: {content_type}"
                         )
 
-                return await resp.read(), content_type, resp.headers
+                return await self._read_response_bytes(resp), content_type, resp.headers
         except BeaconNodeNotReady:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
@@ -854,8 +868,15 @@ class BeaconNode:
                     continue
 
                 event_data = []
+                event_data_bytes = 0
                 next_line = (await anext(events_iter)).decode()
                 while next_line not in ("\n", "\r\n"):
+                    event_data_bytes += len(next_line.encode())
+                    if event_data_bytes > _MAX_SSE_EVENT_BYTES:
+                        raise ValueError(
+                            "Beacon node SSE event too large: "
+                            f"more than {_MAX_SSE_EVENT_BYTES} bytes for event {event_name}",
+                        )
                     event_data.append(next_line)
                     next_line = (await anext(events_iter)).decode()
 

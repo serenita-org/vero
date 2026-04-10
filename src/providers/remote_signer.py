@@ -6,7 +6,7 @@ import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 from urllib.parse import urlparse
 
 import aiohttp
@@ -17,10 +17,14 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
+from providers._response import raise_for_response_size
 from schemas import SchemaRemoteSigner
 
 from .signature_provider import SignatureProvider
 from .vero import Vero
+
+_MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
+_MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
 
 def _sign_messages_in_separate_process(
@@ -186,10 +190,12 @@ class RemoteSigner(SignatureProvider):
         async with session.get(_endpoint) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
+                    "NOK status code received "
+                    f"({resp.status}) from remote signer: "
+                    f"{await self._read_error_text(resp)}",
                 )
 
-            pubkeys: list[str] = await resp.json()
+            pubkeys: list[str] = await self._read_json(resp)
             return pubkeys
 
     def _get_session_for_message(
@@ -210,6 +216,21 @@ class RemoteSigner(SignatureProvider):
         if session is None:
             raise RuntimeError("RemoteSigner client session is not set")
         return session
+
+    @staticmethod
+    async def _read_error_text(response: aiohttp.ClientResponse) -> str:
+        raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
+        return await response.text()
+
+    @staticmethod
+    async def _read_json(response: aiohttp.ClientResponse) -> Any:
+        raise_for_response_size(response, _MAX_RESPONSE_BYTES)
+        return await response.json()
+
+    @staticmethod
+    async def _read_bytes(response: aiohttp.ClientResponse) -> bytes:
+        raise_for_response_size(response, _MAX_RESPONSE_BYTES)
+        return await response.read()
 
     async def sign(
         self,
@@ -233,14 +254,20 @@ class RemoteSigner(SignatureProvider):
         ) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
+                    "NOK status code received "
+                    f"({resp.status}) from remote signer: "
+                    f"{await self._read_error_text(resp)}",
                 )
 
             if self.metrics:
                 self.metrics.signed_messages_c.labels(
                     signable_message_type=type(message).__name__
                 ).inc()
-            return message, (await resp.read()).decode(), identifier
+            return (
+                message,
+                (await self._read_bytes(resp)).decode(),
+                identifier,
+            )
 
     async def sign_in_batches(
         self,
@@ -306,7 +333,8 @@ class RemoteSigner(SignatureProvider):
             ),
         ) as resp:
             decoded_response = msgspec.json.decode(
-                await resp.read(), type=SchemaRemoteSigner.HealthCheckResponse
+                await self._read_bytes(resp),
+                type=SchemaRemoteSigner.HealthCheckResponse,
             )
             if decoded_response.status == "UP" and decoded_response.outcome == "UP":
                 self.score += RemoteSigner.SCORE_DELTA_SUCCESS
