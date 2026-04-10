@@ -81,7 +81,7 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
 
     # Get its gas limit value
     resp = await test_client.get(f"/eth/v1/validator/{nonexistent_pubkey}/gas_limit")
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
@@ -95,12 +95,12 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
             )
         ),
     )
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
     # Delete its gas limit value
     resp = await test_client.delete(f"/eth/v1/validator/{nonexistent_pubkey}/gas_limit")
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"

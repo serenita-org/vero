@@ -52,7 +52,7 @@ async def test_bearer_auth(
     assert resp.status == 200
 
 
-async def test_bad_request(
+async def test_bad_request_data_format(
     test_client: TestClient[Any, Application],
     keymanager: Keymanager,
     cli_args: CLIArgs,
@@ -72,6 +72,20 @@ async def test_bad_request(
         response.message
         == "ValidationError(\"Expected `str` matching regex '^0x[a-fA-F0-9]{96}$' - at `$.remote_keys[0].pubkey`\")"
     )
+
+
+async def test_bad_request_malformed_json(
+    test_client: TestClient[Any, Application],
+) -> None:
+    resp = await test_client.post(
+        "/eth/v1/remotekeys",
+        data='{"remote_keys": [',
+    )
+    assert resp.status == 400
+    response = msgspec.json.decode(
+        await resp.text(), type=SchemaKeymanagerAPI.ErrorResponse
+    )
+    assert response.message == "DecodeError('Input data was truncated')"
 
 
 def test_get_bearer_token_value_creates_owner_only_token_file(

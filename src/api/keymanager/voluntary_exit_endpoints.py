@@ -20,6 +20,8 @@ routes = web.RouteTableDef()
 async def voluntary_exit_post(request: web.Request) -> web.Response:
     # Minimum epoch for processing exit. Defaults to the current epoch if not set.
     epoch = request.query.get("epoch")
+    if epoch and int(epoch) < 0:
+        raise ValueError(f"Invalid epoch: {epoch}")
 
     pubkey = request.match_info["pubkey"]
     keymanager: Keymanager = request.app["keymanager"]

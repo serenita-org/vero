@@ -84,7 +84,7 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
 
     # Get its fee recipient
     resp = await test_client.get(f"/eth/v1/validator/{nonexistent_pubkey}/feerecipient")
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
@@ -98,7 +98,7 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
             )
         ),
     )
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
@@ -106,19 +106,19 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
     resp = await test_client.delete(
         f"/eth/v1/validator/{nonexistent_pubkey}/feerecipient"
     )
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
 
-async def test_bad_request(test_client: TestClient[Any, Application]) -> None:
+async def test_invalid_pubkey(test_client: TestClient[Any, Application]) -> None:
     invalid_pubkey = "0x" + "x" * 96
 
     # Get its fee recipient
     resp = await test_client.get(f"/eth/v1/validator/{invalid_pubkey}/feerecipient")
-    assert resp.status == 500
+    assert resp.status == 400
     data = await resp.json()
-    assert data["message"] == f"PubkeyNotFound('{invalid_pubkey}')"
+    assert data["message"] == f"ValueError('Invalid pubkey: {invalid_pubkey}')"
 
 
 async def test_zero_address_as_fr(test_client: TestClient[Any, Application]) -> None:

@@ -74,7 +74,7 @@ async def test_pubkey_inactive(test_client: TestClient[Any, Application]) -> Non
     resp = await test_client.post(
         f"/eth/v1/validator/{nonexistent_pubkey}/voluntary_exit"
     )
-    assert resp.status == 500
+    assert resp.status == 400
     data = await resp.json()
     assert (
         data["message"]
@@ -93,6 +93,20 @@ async def test_pubkey_not_registered(
     resp = await test_client.post(
         f"/eth/v1/validator/{random_active_validator.pubkey}/voluntary_exit"
     )
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{random_active_validator.pubkey}')"
+
+
+async def test_invalid_epoch(
+    random_active_validator: ValidatorIndexPubkey,
+    test_client: TestClient[Any, Application],
+) -> None:
+    resp = await test_client.post(
+        f"/eth/v1/validator/{random_active_validator.pubkey}/voluntary_exit",
+        # Negative epoch number is invalid
+        params=dict(epoch=-20),
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert data["message"] == "ValueError('Invalid epoch: -20')"

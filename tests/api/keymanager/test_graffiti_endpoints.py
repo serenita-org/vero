@@ -81,7 +81,7 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
 
     # Get its graffiti
     resp = await test_client.get(f"/eth/v1/validator/{nonexistent_pubkey}/graffiti")
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
@@ -93,13 +93,13 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
             SchemaKeymanagerAPI.SetGraffitiRequest(graffiti=graffiti)
         ),
     )
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
     # Delete its graffiti
     resp = await test_client.delete(f"/eth/v1/validator/{nonexistent_pubkey}/graffiti")
-    assert resp.status == 500
+    assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
@@ -163,7 +163,7 @@ async def test_set_graffiti_too_long(
             SchemaKeymanagerAPI.SetGraffitiRequest(graffiti=graffiti_value)
         ),
     )
-    assert resp.status == 500
+    assert resp.status == 400
     response = msgspec.json.decode(await resp.text())
     assert (
         "Encoded graffiti exceeds the maximum length of 32 bytes" in response["message"]
