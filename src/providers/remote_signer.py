@@ -22,6 +22,10 @@ from .signature_provider import SignatureProvider
 from .vero import Vero
 
 
+class HealthcheckEndpointNotSupported(Exception):
+    pass
+
+
 def _sign_messages_in_separate_process(
     remote_signer_url: str,
     messages: list[SchemaRemoteSigner.SignableMessageT],
@@ -73,7 +77,9 @@ class RemoteSigner(SignatureProvider):
         self._score = RemoteSigner.MAX_SCORE
         # Regularly poll the health status of the remote signer
         if vero is not None:
-            vero.task_manager.create_task(self.poll_health_periodically())
+            vero.task_manager.create_task(
+                self.poll_health_periodically(), name=f"poll_health_{self.url}"
+            )
         self.metrics = vero.metrics if vero else None
 
         self.process_pool_executor = process_pool_executor
@@ -269,11 +275,19 @@ class RemoteSigner(SignatureProvider):
         async with self.low_priority_client_session.get(
             _endpoint,
             timeout=ClientTimeout(total=1.0),
-            raise_for_status=True,
             trace_request_ctx=dict(
                 path=_endpoint,
             ),
         ) as resp:
+            if resp.status == 404:
+                # Healthcheck endpoint not supported
+                self.logger.warning(
+                    f"Healthcheck endpoint returned 404 status code - disabling healthcheck polling for {self.host}"
+                )
+                raise HealthcheckEndpointNotSupported
+
+            resp.raise_for_status()
+
             decoded_response = msgspec.json.decode(
                 await resp.read(), type=SchemaRemoteSigner.HealthCheckResponse
             )
@@ -294,9 +308,11 @@ class RemoteSigner(SignatureProvider):
         while True:
             try:
                 await self.get_healthcheck_status()
+            except HealthcheckEndpointNotSupported:
+                break
             except Exception as e:
                 self.score -= RemoteSigner.SCORE_DELTA_FAILURE
-                self.logger.exception(f"Failed to get health check response: {e!r}")
+                self.logger.exception(f"Failed to get healthcheck response: {e!r}")
 
             next_run += interval
             await asyncio.sleep(max(0.0, next_run - loop.time()))
