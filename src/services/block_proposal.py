@@ -407,7 +407,7 @@ class BlockProposalService(ValidatorDutyService):
         slot: int,
         duty: SchemaBeaconAPI.ProposerDuty,
         block_header: SchemaRemoteSigner.BeaconBlockHeader,
-        block_version: SchemaRemoteSigner.BeaconBlockVersion,
+        block_version: str,
     ) -> str:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._sign_block",
@@ -527,9 +527,7 @@ class BlockProposalService(ValidatorDutyService):
                 slot=slot,
                 duty=duty,
                 block_header=block_header,
-                block_version=SchemaRemoteSigner.BeaconBlockVersion[
-                    full_response.version.value.upper()
-                ],
+                block_version=full_response.version.value.upper(),
             )
 
             await self._publish_block(

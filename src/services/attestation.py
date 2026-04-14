@@ -405,7 +405,7 @@ class AttestationService(ValidatorDutyService):
             messages=messages,
             identifiers=identifiers,
         ):
-            signed_aggregate_and_proofs.append((msg.aggregate_and_proof, sig))
+            signed_aggregate_and_proofs.append((msg.aggregate_and_proof.data, sig))
 
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
@@ -474,11 +474,14 @@ class AttestationService(ValidatorDutyService):
                     messages.append(
                         SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
                             fork_info=_fork_info,
-                            aggregate_and_proof=SpecAttestation.AggregateAndProofElectra(
-                                aggregator_index=int(duty.validator_index),
-                                aggregate=aggregate,
-                                selection_proof=duty.selection_proof,
-                            ).to_obj(),
+                            aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
+                                version=self.beacon_chain.current_fork_version.value.upper(),
+                                data=SpecAttestation.AggregateAndProofElectra(
+                                    aggregator_index=int(duty.validator_index),
+                                    aggregate=aggregate,
+                                    selection_proof=duty.selection_proof,
+                                ).to_obj(),
+                            ),
                         )
                     )
                     identifiers.append(duty.pubkey)
