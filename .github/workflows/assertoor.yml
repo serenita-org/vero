@@ -11,12 +11,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Build Docker image
         run: docker build -t vero:custom .
 
       - name: Kurtosis Assertoor GitHub Action
-        uses: ethpandaops/kurtosis-assertoor-github-action@c78bc0981cb4f7c4ac609046a971a8d448dfa7be # v1 + pinned hashes
+        uses: ethpandaops/kurtosis-assertoor-github-action@f64942cbc780df731a731ea9f45765b161d2c8df # v1.0.1
         with:
           ethereum_package_args: .github/assertoor/vero.yml
