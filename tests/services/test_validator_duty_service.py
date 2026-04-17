@@ -23,7 +23,7 @@ def mock_validator_duty_service(
     argnames=("task_delays", "expected_batches"),
     argvalues=[
         pytest.param(
-            (0.001, 0.002),
+            (0.001, 0.010),
             [
                 (False, ["task1", "task2"]),
             ],

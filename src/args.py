@@ -2,7 +2,6 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
-from logging import getLevelNamesMapping
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -265,7 +264,7 @@ def get_parser() -> argparse.ArgumentParser:
         "--log-level",
         type=str,
         default="INFO",
-        choices=getLevelNamesMapping().keys(),
+        choices=logging.getLevelNamesMapping().keys(),
         help="The logging level to use. Defaults to INFO.",
     )
     parser.add_argument(

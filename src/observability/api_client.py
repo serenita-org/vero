@@ -1,7 +1,6 @@
 """Helper that provides observability into API requests - request count and duration."""
 
 import asyncio
-import logging
 from enum import Enum
 from functools import partial
 from types import SimpleNamespace
@@ -40,8 +39,6 @@ _RECEIVE_BYTES = Counter(
     "Total bytes received",
     labelnames=["service_type", "host"],
 )
-
-_logger = logging.getLogger(__name__)
 
 
 async def _on_request_start(
