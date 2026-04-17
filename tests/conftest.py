@@ -1,8 +1,5 @@
-import asyncio
 import logging
 import random
-import time
-from asyncio import AbstractEventLoop
 from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
@@ -10,7 +7,6 @@ from unittest import mock
 
 import prometheus_client
 import pytest
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
@@ -28,11 +24,8 @@ from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
-from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.base import SpecFulu, Fork, Genesis, Version
-from spec.common import Epoch
-from spec.configs import Network, get_network_spec, get_genesis_for_network
-from tasks import TaskManager
+from spec.base import SpecFulu
+from spec.configs import Network
 
 # A few more global fixtures defined separately
 from tests.mock_api.base import *

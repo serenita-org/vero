@@ -63,6 +63,7 @@ async def test_initialize_spec_mismatch(
         if not spec_mismatch or vero.cli_args.ignore_spec_mismatch:
             # No mismatch, or mismatch explicitly ignored -> init should not raise
             await bn._initialize_full()
+            assert bn.initialized is True
         else:
             with pytest.raises(
                 ValueError,
