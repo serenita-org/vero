@@ -112,7 +112,7 @@ def log_cli_arg_values(validated_args: CLIArgs) -> None:
     logger = logging.getLogger(__name__)
 
     for action in get_parser()._actions:  # noqa: SLF001
-        if action.dest in ("help",):
+        if action.dest == "help":
             continue
 
         validated_arg_value = getattr(
