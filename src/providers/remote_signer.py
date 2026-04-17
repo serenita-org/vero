@@ -27,6 +27,10 @@ _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
 
+class HealthcheckEndpointNotSupported(Exception):
+    pass
+
+
 def _sign_messages_in_separate_process(
     remote_signer_url: str,
     messages: list[SchemaRemoteSigner.SignableMessageT],
@@ -141,7 +145,7 @@ class RemoteSigner(SignatureProvider):
         if self._run_health_poll:
             self._health_poll_task = asyncio.create_task(
                 self.poll_health_periodically(),
-                name=f"remote-signer-healthcheck-{self.host}",
+                name=f"remote-signer-poll-health-{self.url}",
             )
             if self._task_manager is not None:
                 self._task_manager.add_existing_task(self._health_poll_task)
@@ -327,11 +331,19 @@ class RemoteSigner(SignatureProvider):
         async with session.get(
             _endpoint,
             timeout=ClientTimeout(total=1.0),
-            raise_for_status=True,
             trace_request_ctx=dict(
                 path=_endpoint,
             ),
         ) as resp:
+            if resp.status == 404:
+                # Healthcheck endpoint not supported
+                self.logger.warning(
+                    f"Healthcheck endpoint returned 404 status code - disabling healthcheck polling for {self.host}"
+                )
+                raise HealthcheckEndpointNotSupported
+
+            resp.raise_for_status()
+
             decoded_response = msgspec.json.decode(
                 await self._read_bytes(resp),
                 type=SchemaRemoteSigner.HealthCheckResponse,
@@ -353,9 +365,11 @@ class RemoteSigner(SignatureProvider):
         while True:
             try:
                 await self.get_healthcheck_status()
+            except HealthcheckEndpointNotSupported:
+                break
             except Exception as e:
                 self.score -= RemoteSigner.SCORE_DELTA_FAILURE
-                self.logger.exception(f"Failed to get health check response: {e!r}")
+                self.logger.exception(f"Failed to get healthcheck response: {e!r}")
 
             next_run += interval
             await asyncio.sleep(max(0.0, next_run - loop.time()))

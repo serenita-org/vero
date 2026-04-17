@@ -53,9 +53,14 @@ class AggregationSlotSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     aggregation_slot: Slot
 
 
+class AggregateAndProofV2(msgspec.Struct, kw_only=True):
+    version: str
+    data: dict  # type: ignore[type-arg]
+
+
 class AggregateAndProofV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.AGGREGATE_AND_PROOF_V2
-    aggregate_and_proof: dict  # type: ignore[type-arg]
+    aggregate_and_proof: AggregateAndProofV2
 
 
 class RandaoReveal(msgspec.Struct):
@@ -75,13 +80,8 @@ class BeaconBlockHeader(msgspec.Struct):
     body_root: str
 
 
-class BeaconBlockVersion(Enum):
-    ELECTRA = "ELECTRA"
-    FULU = "FULU"
-
-
 class BeaconBlock(msgspec.Struct):
-    version: BeaconBlockVersion
+    version: str
     block_header: BeaconBlockHeader
 
 
