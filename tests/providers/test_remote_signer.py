@@ -7,7 +7,7 @@ from aioresponses import aioresponses
 from providers import RemoteSigner, Vero
 
 
-async def test_remote_signer_healtcheck_not_supported(
+async def test_remote_signer_healthcheck_not_supported(
     vero: Vero, caplog: pytest.LogCaptureFixture
 ) -> None:
     signer_url = "http://signer:9000"
