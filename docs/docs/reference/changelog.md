@@ -7,7 +7,12 @@
 - Default to SSZ encoding during block proposal flow
 - Add `--force-json-wire-format` flag
 - Add `--ignore-spec-mismatch` flag
+- Use all beacon nodes during doppelganger detection
+- Enforce Keymanager API token file owner-only file permissions
 
+#### Bugfixes
+
+- Fix Keymanager API spec deviations and add more input validation
 
 ## v1.3.3 { id="v1.3.3" }
 
