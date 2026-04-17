@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import time
 from collections import defaultdict
 from types import TracebackType
@@ -41,7 +42,7 @@ class BlockProposalService(ValidatorDutyService):
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
-        self.randao_reveal_cache: dict[int, str] = dict()
+        self.randao_reveal_cache: dict[tuple[int, str], str] = dict()
 
     async def __aenter__(self) -> Self:
         try:
@@ -131,15 +132,20 @@ class BlockProposalService(ValidatorDutyService):
         # Prepare for block proposals due in the next slot
         duty_for_next_slot = self.duty_for_slot(slot + 1)
         if duty_for_next_slot:
-            await self._fetch_randao_reveal(duty=duty_for_next_slot)
-            # Call the `prepare_beacon_proposer` endpoint one more time
+            await self._fetch_randao_reveal(
+                slot=slot + 1, pubkey=duty_for_next_slot.pubkey
+            )
+            # Call `prepare_beacon_proposer` and `register_validators` one more time
             # just before a block proposal is scheduled to decrease
             # the chances of the fee recipient being set incorrectly,
             # e.g., due to a beacon node restarting.
             await self.prepare_beacon_proposer()
+            await self.register_validators(
+                current_slot=slot,
+                pubkeys_to_register=[duty_for_next_slot.pubkey],
+            )
 
-        if self.cli_args.use_external_builder:
-            self.task_manager.create_task(self.register_validators(current_slot=slot))
+        self.task_manager.create_task(self.register_validators(current_slot=slot))
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -240,7 +246,14 @@ class BlockProposalService(ValidatorDutyService):
             ],
         )
 
-    async def register_validators(self, current_slot: int) -> None:
+    async def register_validators(
+        self,
+        current_slot: int,
+        pubkeys_to_register: list[str] | None = None,
+    ) -> None:
+        if not self.cli_args.use_external_builder:
+            return
+
         _batch_size = 512
 
         active_and_pending_validators = (
@@ -248,15 +261,16 @@ class BlockProposalService(ValidatorDutyService):
             + self.validator_status_tracker_service.pending_validators
         )
 
-        # Registers a subset of validators every slot
-        # based on their index to spread the
-        # registrations across the epoch
-        slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
-        validators_to_register = [
-            v
-            for v in active_and_pending_validators
-            if v.index % slots_per_epoch == current_slot % slots_per_epoch
-        ]
+        if pubkeys_to_register is None:
+            # Registers a subset of validators every slot
+            # based on their index to spread the
+            # registrations across the epoch
+            slots_per_epoch = self.beacon_chain.SLOTS_PER_EPOCH
+            pubkeys_to_register = [
+                v.pubkey
+                for v in active_and_pending_validators
+                if v.index % slots_per_epoch == current_slot % slots_per_epoch
+            ]
 
         _timestamp = int(time.time())
 
@@ -265,8 +279,8 @@ class BlockProposalService(ValidatorDutyService):
         default_fee_recipient = self.cli_args.fee_recipient
         default_gas_limit = str(self.cli_args.gas_limit)
 
-        for i in range(0, len(validators_to_register), _batch_size):
-            validator_batch = validators_to_register[i : i + _batch_size]
+        for i in range(0, len(pubkeys_to_register), _batch_size):
+            pubkey_batch = pubkeys_to_register[i : i + _batch_size]
 
             try:
                 responses = await asyncio.gather(
@@ -277,20 +291,20 @@ class BlockProposalService(ValidatorDutyService):
                                     fee_recipient=default_fee_recipient
                                     if not self.keymanager.enabled
                                     else self.keymanager.pubkey_to_fee_recipient_override.get(
-                                        v.pubkey, default_fee_recipient
+                                        pubkey, default_fee_recipient
                                     ),
                                     gas_limit=default_gas_limit
                                     if not self.keymanager.enabled
                                     else self.keymanager.pubkey_to_gas_limit_override.get(
-                                        v.pubkey, default_gas_limit
+                                        pubkey, default_gas_limit
                                     ),
                                     timestamp=str(_timestamp),
-                                    pubkey=v.pubkey,
+                                    pubkey=pubkey,
                                 ),
                             ),
-                            identifier=v.pubkey,
+                            identifier=pubkey,
                         )
-                        for v in validator_batch
+                        for pubkey in pubkey_batch
                     ],
                 )
             except Exception as e:
@@ -307,13 +321,12 @@ class BlockProposalService(ValidatorDutyService):
             )
 
             self.logger.info(
-                f"Published validator registrations, count: {len(validator_batch)}"
+                f"Published validator registrations, count: {len(pubkey_batch)}"
             )
 
-    async def _fetch_randao_reveal(self, duty: SchemaBeaconAPI.ProposerDuty) -> None:
-        self.logger.debug(f"Fetching RANDAO reveal for slot {duty.slot}")
+    async def _fetch_randao_reveal(self, slot: int, pubkey: str) -> None:
+        self.logger.debug(f"Fetching RANDAO reveal for slot {slot}")
 
-        slot = int(duty.slot)
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
 
         _, randao_reveal, _ = await self.signature_provider.sign(
@@ -323,29 +336,31 @@ class BlockProposalService(ValidatorDutyService):
                     epoch=str(epoch),
                 ),
             ),
-            identifier=duty.pubkey,
+            identifier=pubkey,
         )
-        self.randao_reveal_cache[slot] = randao_reveal
+        self.randao_reveal_cache[(slot, pubkey)] = randao_reveal
 
     async def _get_randao_reveal(
-        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
+        self,
+        slot: int,
+        pubkey: str,
     ) -> str:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._get_randao_reveal",
         ):
             # Try to get it from the cache - it should be pre-populated
             # in the slot before a proposal is due
-            if slot in self.randao_reveal_cache:
-                return self.randao_reveal_cache.pop(slot)
-
-            self.logger.warning(
-                f"Failed to get RANDAO reveal for slot {slot} from cache"
-            )
+            cache_key = (slot, pubkey)
+            with contextlib.suppress(KeyError):
+                return self.randao_reveal_cache.pop(cache_key)
 
             # We failed to retrieve the value from the cache, fall back to
             # fetching it on-demand
+            self.logger.warning(
+                f"Failed to get RANDAO reveal from cache. Cache key: {cache_key}"
+            )
             try:
-                await self._fetch_randao_reveal(duty=duty)
+                await self._fetch_randao_reveal(slot=slot, pubkey=pubkey)
             except Exception as e:
                 self.logger.exception(
                     f"Failed to get RANDAO reveal: {e!r}",
@@ -355,7 +370,7 @@ class BlockProposalService(ValidatorDutyService):
                     error_type=ErrorType.BLOCK_PRODUCE,
                 ) from None
             else:
-                return self.randao_reveal_cache.pop(slot)
+                return self.randao_reveal_cache.pop(cache_key)
 
     async def _produce_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str
@@ -513,7 +528,7 @@ class BlockProposalService(ValidatorDutyService):
             context=trace.set_span_in_context(span=NonRecordingSpan(span_ctx)),
             attributes={"beacon_chain.slot": slot},
         ):
-            randao_reveal = await self._get_randao_reveal(slot=slot, duty=duty)
+            randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
             (
                 block_contents_or_blinded_block,

@@ -4,7 +4,6 @@ import time
 from typing import TYPE_CHECKING
 
 from providers import BeaconChain, BeaconNode
-from schemas import SchemaBeaconAPI
 
 if TYPE_CHECKING:
     from services import ValidatorStatusTrackerService
@@ -18,43 +17,55 @@ class DoppelgangerDetector:
     def __init__(
         self,
         beacon_chain: BeaconChain,
-        beacon_node: BeaconNode,
+        beacon_nodes: list[BeaconNode],
         validator_status_tracker_service: "ValidatorStatusTrackerService",
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.beacon_chain = beacon_chain
-        self.beacon_node = beacon_node
+        self.beacon_nodes = beacon_nodes
         self.validator_status_tracker_service = validator_status_tracker_service
 
     async def _fetch_liveness_data(
         self, epoch: int, validator_indices: list[int]
-    ) -> list[SchemaBeaconAPI.ValidatorLiveness]:
-        try:
-            liveness_response = await self.beacon_node.get_liveness(
-                epoch=epoch,
-                validator_indices=validator_indices,
-            )
-        except Exception:
-            self.logger.error(
-                f"Failed to query beacon node for liveness data for epoch {epoch} - did you enable liveness tracking?"
-            )
-            raise
-        else:
-            self.logger.debug(f"Liveness response: {liveness_response}")
-            return liveness_response.data
+    ) -> set[int]:
+        results = await asyncio.gather(
+            *[
+                beacon_node.get_liveness(
+                    epoch=epoch,
+                    validator_indices=validator_indices,
+                )
+                for beacon_node in self.beacon_nodes
+            ],
+            return_exceptions=True,
+        )
 
-    def _process_liveness_data(
-        self, liveness_data: list[SchemaBeaconAPI.ValidatorLiveness]
-    ) -> None:
-        if any(v.is_live for v in liveness_data):
-            doppelganger_indices = [v.index for v in liveness_data if v.is_live]
+        live_indices: set[int] = set()
+        for result in results:
+            if isinstance(result, BaseException):
+                self.logger.error(
+                    f"Failed to query beacon node for liveness data for epoch {epoch}"
+                    f" - did you enable liveness tracking?"
+                    f"\n{result!r}"
+                )
+                raise result
+
+            bn_host, liveness_data = result
+            self.logger.debug(
+                f"Liveness response from {bn_host}: {liveness_data}",
+            )
+            live_indices.update([int(v.index) for v in liveness_data if v.is_live])
+
+        return live_indices
+
+    def _process_liveness_data(self, live_indices: set[int]) -> None:
+        if live_indices:
             self.logger.critical(
-                f"Doppelgangers detected, validator indices: {doppelganger_indices}"
+                f"Doppelgangers detected by beacon nodes: {live_indices}"
             )
             raise DoppelgangersDetected
 
-        self.logger.debug("No doppelgangers detected")
+        self.logger.debug("No doppelgangers detected across beacon nodes")
 
     async def _raise_if_doppelganger_detected(
         self, epoch: int, validator_indices: list[int]
@@ -119,7 +130,8 @@ class DoppelgangerDetector:
             slot=last_slot_in_next_epoch,
         ) + (self.beacon_chain.SECONDS_PER_SLOT / 2)
         self.logger.info(
-            f"Waiting for last slot in epoch {epoch_to_monitor_for_attestations + 1}: {last_slot_in_next_epoch}"
+            "Waiting for last slot in epoch "
+            f"{epoch_to_monitor_for_attestations + 1}: {last_slot_in_next_epoch}"
         )
         await asyncio.sleep(ts_to_wait_for - time.time())
 

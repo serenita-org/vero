@@ -10,6 +10,36 @@ from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 
 
+def _base_attester_duty(
+    validator: ValidatorIndexPubkey,
+    slot: int,
+    committee_index: int = 14,
+) -> SchemaBeaconAPI.AttesterDuty:
+    return SchemaBeaconAPI.AttesterDuty(
+        pubkey=validator.pubkey,
+        validator_index=str(validator.index),
+        committee_index=str(committee_index),
+        committee_length=str(16),
+        committees_at_slot=str(20),
+        validator_committee_index=str(9),
+        slot=str(slot),
+    )
+
+
+def _attester_duty_with_proof(
+    validator: ValidatorIndexPubkey,
+    slot: int,
+    committee_index: int = 14,
+) -> SchemaBeaconAPI.AttesterDutyWithSelectionProof:
+    duty = _base_attester_duty(validator, slot, committee_index)
+
+    return SchemaBeaconAPI.AttesterDutyWithSelectionProof.from_duty(
+        duty=duty,
+        is_aggregator=False,
+        selection_proof=os.urandom(96),
+    )
+
+
 @pytest.mark.parametrize(
     "enable_keymanager_api",
     [
@@ -23,6 +53,92 @@ async def test_update_duties(attestation_service: AttestationService) -> None:
     assert len(attestation_service.attester_duties) == 0
     await attestation_service._update_duties()
     assert len(attestation_service.attester_duties) > 0
+
+
+async def test_update_duties_refreshes_due_soon_first_without_emptying_slot(
+    attestation_service: AttestationService,
+    beacon_chain: BeaconChain,
+    validators: list[ValidatorIndexPubkey],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    duty_epoch = beacon_chain.current_epoch
+    existing_slot = beacon_chain.current_slot + 1
+    due_soon_slot = beacon_chain.current_slot + 2
+    later_slot = beacon_chain.current_slot + 3
+    active_validators = [
+        v for v in validators if v.status == ValidatorStatus.ACTIVE_ONGOING
+    ]
+    existing_duty = _attester_duty_with_proof(active_validators[0], existing_slot)
+    attestation_service.attester_duties[duty_epoch].add(existing_duty)
+    attestation_service.attester_duties_dependent_roots[duty_epoch] = "0xold"
+
+    new_due_soon = _base_attester_duty(active_validators[0], due_soon_slot)
+    new_due_soon_with_proof = _attester_duty_with_proof(
+        active_validators[0], due_soon_slot
+    )
+    new_later = _base_attester_duty(
+        active_validators[1], later_slot, committee_index=15
+    )
+    new_later_with_proof = _attester_duty_with_proof(
+        active_validators[1], later_slot, committee_index=15
+    )
+
+    due_soon_refresh_started = asyncio.Event()
+    later_refresh_started = asyncio.Event()
+    allow_due_soon_refresh_to_finish = asyncio.Event()
+    allow_later_refresh_to_finish = asyncio.Event()
+
+    async def mock_get_attester_duties(
+        epoch: int,
+        indices: set[int],
+    ) -> SchemaBeaconAPI.GetAttesterDutiesResponse:
+        data = [new_due_soon, new_later] if epoch == duty_epoch else []
+
+        return SchemaBeaconAPI.GetAttesterDutiesResponse(
+            dependent_root=f"0xnew-{epoch}",
+            data=data,
+            execution_optimistic=False,
+        )
+
+    async def mock_get_duties_with_selection_proofs(
+        duties: list[SchemaBeaconAPI.AttesterDuty],
+    ) -> list[SchemaBeaconAPI.AttesterDutyWithSelectionProof]:
+        if duties == [new_due_soon]:
+            due_soon_refresh_started.set()
+            await allow_due_soon_refresh_to_finish.wait()
+            return [new_due_soon_with_proof]
+        if duties == [new_later]:
+            later_refresh_started.set()
+            await allow_later_refresh_to_finish.wait()
+            return [new_later_with_proof]
+        return []
+
+    monkeypatch.setattr(
+        attestation_service.multi_beacon_node,
+        "get_attester_duties",
+        mock_get_attester_duties,
+    )
+    monkeypatch.setattr(
+        attestation_service,
+        "_get_duties_with_selection_proofs",
+        mock_get_duties_with_selection_proofs,
+    )
+
+    update_task = asyncio.create_task(attestation_service._update_duties())
+    await due_soon_refresh_started.wait()
+
+    assert attestation_service._get_duties_for_slot(existing_slot) == {existing_duty}
+
+    allow_due_soon_refresh_to_finish.set()
+    await later_refresh_started.wait()
+
+    assert attestation_service.has_duty_for_slot(due_soon_slot)
+    assert not attestation_service.has_duty_for_slot(later_slot)
+
+    allow_later_refresh_to_finish.set()
+    await update_task
+
+    assert attestation_service.has_duty_for_slot(later_slot)
 
 
 @pytest.mark.parametrize(

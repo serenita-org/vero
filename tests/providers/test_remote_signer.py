@@ -16,7 +16,10 @@ async def test_remote_signer_healtcheck_not_supported(
         async with RemoteSigner(url=signer_url, vero=vero, process_pool_executor=None):
             assert len(vero.task_manager._tasks) == 1
             poll_health_task = next(t for t in vero.task_manager._tasks)
-            assert poll_health_task.get_name() == "poll_health_http://signer:9000"
+            assert (
+                poll_health_task.get_name()
+                == "remote-signer-poll-health-http://signer:9000"
+            )
             assert not poll_health_task.done()
 
             # Yield to event loop to allow the healthcheck task to start running

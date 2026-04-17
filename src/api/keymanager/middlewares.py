@@ -1,11 +1,12 @@
 import logging
+import re
 from collections.abc import Awaitable, Callable
 
 import msgspec
 from aiohttp import hdrs, web
 
 from providers.keymanager import PubkeyNotFound
-from schemas.keymanager_api import ErrorResponse
+from schemas.keymanager_api import PUBKEY_PATTERN, ErrorResponse
 
 
 @web.middleware
@@ -26,6 +27,18 @@ async def bearer_authentication(
 
 
 @web.middleware
+async def path_param_validation(
+    request: web.Request,
+    handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
+    pubkey = request.match_info.get("pubkey")
+    if pubkey and not re.match(pattern=PUBKEY_PATTERN, string=pubkey):
+        raise ValueError(f"Invalid pubkey: {pubkey}")
+
+    return await handler(request)
+
+
+@web.middleware
 async def exception_handler(
     request: web.Request,
     handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
@@ -39,14 +52,14 @@ async def exception_handler(
     except web.HTTPException as e:
         status_code = e.status_code
         msg = e.reason
-    except msgspec.ValidationError as e:
-        status_code = 400
+    except (msgspec.ValidationError, msgspec.DecodeError, ValueError) as e:
+        status_code = web.HTTPBadRequest.status_code
         msg = repr(e)
     except PubkeyNotFound as e:
-        status_code = 500
+        status_code = web.HTTPNotFound.status_code
         msg = repr(e)
     except Exception as e:
-        status_code = 500
+        status_code = web.HTTPInternalServerError.status_code
         msg = repr(e)
         logger = logging.getLogger("api.keymanager.middlewares.exception_handler")
         logger.exception(

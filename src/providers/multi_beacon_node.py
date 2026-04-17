@@ -161,12 +161,12 @@ class MultiBeaconNode:
 
     @property
     def best_beacon_node(self) -> BeaconNode:
-        return next(
-            bn
-            for bn in sorted(
-                self.initialized_beacon_nodes, key=lambda bn: bn.score, reverse=True
+        best = max(self.initialized_beacon_nodes, key=lambda bn: bn.score)
+        if best != self.initialized_beacon_nodes[0]:
+            self.logger.warning(
+                f"Using {best.host} as `best` beacon node (duty fetching, MEV registrations)"
             )
-        )
+        return best
 
     @property
     def initialized_beacon_nodes(self) -> list[BeaconNode]:

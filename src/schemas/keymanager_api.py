@@ -3,7 +3,8 @@ from typing import Annotated
 
 import msgspec
 
-Pubkey = Annotated[str, msgspec.Meta(pattern="^0x[a-fA-F0-9]{96}$")]
+PUBKEY_PATTERN = "^0x[a-fA-F0-9]{96}$"
+Pubkey = Annotated[str, msgspec.Meta(pattern=PUBKEY_PATTERN)]
 EthAddress = Annotated[str, msgspec.Meta(pattern="^0x[a-fA-F0-9]{40}$")]
 UInt64String = Annotated[str, msgspec.Meta(pattern="^(0|[1-9][0-9]{0,19})$")]
 BLSSignature = Annotated[str, msgspec.Meta(pattern="^0x[a-fA-F0-9]{192}$")]

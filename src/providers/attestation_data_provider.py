@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 import logging
+from typing import TYPE_CHECKING
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -8,16 +9,21 @@ from schemas import SchemaBeaconAPI
 
 from .multi_beacon_node import MultiBeaconNode
 
+if TYPE_CHECKING:
+    from spec.base import SpecFulu
+
 
 class AttestationDataProvider:
     def __init__(
         self,
         multi_beacon_node: MultiBeaconNode,
         scheduler: AsyncIOScheduler,
+        spec: "SpecFulu",
     ):
         self.logger = logging.getLogger("AttestationData")
 
         self.multi_beacon_node = multi_beacon_node
+        self.spec = spec
 
         self._timeout_head_event_att_data = 0.5
         self._timeout_head_event_checkpoint_confirmation = 1.0
@@ -36,6 +42,23 @@ class AttestationDataProvider:
         self.target_checkpoint_confirmation_cache: dict[
             str, SchemaBeaconAPI.Checkpoint
         ] = dict()
+
+    async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:
+        # Check if the reorg crossed an epoch boundary.
+        # If the epoch boundary is crossed, we need to invalidate the checkpoint cache.
+        #
+        # Without the invalidation it's possible we would attest to
+        # a non-canonical (but NOT invalid) fork of the chain if a head event for
+        # that fork arrives. The head event triggers `wait_for_attestation_data` with
+        # an `expected_head_block_root` which can use cached pre-reorg FFG checkpoints
+        # that may be different from post-reorg canonical FFG checkpoints.
+        new_head_slot = int(event.slot)
+        slot_into_epoch = new_head_slot % self.spec.SLOTS_PER_EPOCH
+        epoch_boundary_crossed = int(event.depth) > slot_into_epoch
+
+        if epoch_boundary_crossed:
+            self.source_checkpoint_confirmation_cache.clear()
+            self.target_checkpoint_confirmation_cache.clear()
 
     def _cache_checkpoints(
         self, source: SchemaBeaconAPI.Checkpoint, target: SchemaBeaconAPI.Checkpoint

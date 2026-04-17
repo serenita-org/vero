@@ -58,6 +58,7 @@ def _register_event_handlers(
 
     for reorg_handler_service in (
         attestation_service,
+        attestation_service.attestation_data_provider,
         block_proposal_service,
         sync_committee_service,
     ):
@@ -113,6 +114,9 @@ async def run_services(vero: Vero) -> None:
         process_pool_executor = ProcessPoolExecutor(
             max_workers=int(os.getenv("PYTHON_CPU_COUNT", "1"))
         )
+        exit_stack.callback(
+            process_pool_executor.shutdown, wait=False, cancel_futures=True
+        )
         keymanager = Keymanager(
             db=db,
             multi_beacon_node=multi_beacon_node,
@@ -153,7 +157,7 @@ async def run_services(vero: Vero) -> None:
             try:
                 await DoppelgangerDetector(
                     beacon_chain=vero.beacon_chain,
-                    beacon_node=multi_beacon_node.best_beacon_node,
+                    beacon_nodes=multi_beacon_node.beacon_nodes,
                     validator_status_tracker_service=validator_status_tracker_service,
                 ).detect()
             except DoppelgangersDetected:

@@ -1,8 +1,9 @@
 import asyncio
 import logging
+from collections.abc import AsyncIterator, Iterable
 from enum import Enum
 from types import TracebackType
-from typing import TYPE_CHECKING, Self, TypedDict, Unpack
+from typing import TYPE_CHECKING, Self, TypedDict, TypeVar, Unpack
 
 import msgspec
 from opentelemetry import trace
@@ -38,6 +39,9 @@ class ValidatorDutyServiceOptions(TypedDict):
     vero: Vero
 
 
+TaskResultT = TypeVar("TaskResultT")
+
+
 class ValidatorDutyService:
     def __init__(
         self,
@@ -56,6 +60,7 @@ class ValidatorDutyService:
         self.task_manager = vero.task_manager
         self.metrics = vero.metrics
         self.cli_args = vero.cli_args
+        self.spec = vero.spec
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
@@ -176,3 +181,42 @@ class ValidatorDutyService:
                 current_delay = min(current_delay * 2, max_delay)
 
         self._update_duties_lock.release()
+
+    async def _iter_fast_then_slow_task_batches(
+        self,
+        tasks: Iterable[asyncio.Task[TaskResultT]],
+        fast_wait_s: float,
+    ) -> AsyncIterator[tuple[bool, list[asyncio.Future[TaskResultT]]]]:
+        pending: set[asyncio.Task[TaskResultT]] = set(tasks)
+        if len(pending) == 0:
+            return
+
+        fast_batch: list[asyncio.Future[TaskResultT]] = []
+        loop = asyncio.get_running_loop()
+        fast_batch_deadline = loop.time() + fast_wait_s
+        try:
+            while pending:
+                remaining = fast_batch_deadline - loop.time()
+                if remaining <= 0.0:
+                    break
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=remaining,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                if len(done) == 0:
+                    break
+
+                fast_batch.extend(done)
+
+            if len(fast_batch) > 0:
+                yield False, fast_batch
+
+            if len(pending) > 0:
+                slow_batch = list(asyncio.as_completed(pending))
+                yield True, slow_batch
+        finally:
+            for task in pending:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)

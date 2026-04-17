@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import datetime
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Self, Unpack
 from uuid import uuid4
@@ -33,6 +34,11 @@ class SyncCommitteeService(ValidatorDutyService):
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
             defaultdict(list)
         )
+
+        # We can publish an initial batch of signed sync messages
+        # quickly even if we are still waiting for others to be
+        # signed
+        self._initial_sync_message_publish_wait_s = 0.5
 
     async def __aenter__(self) -> Self:
         try:
@@ -108,52 +114,69 @@ class SyncCommitteeService(ValidatorDutyService):
                 error_type=ErrorType.SYNC_COMMITTEE_MESSAGE_PRODUCE,
             ) from None
 
-    async def _get_signed_sync_messages(
+    async def _iter_signed_sync_message_batches(
         self,
         duty_slot: int,
         sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
         beacon_block_root: str,
-    ) -> list[SchemaBeaconAPI.SyncCommitteeSignature]:
+    ) -> AsyncIterator[list[SchemaBeaconAPI.SyncCommitteeSignature]]:
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
-        coroutines = [
-            self.signature_provider.sign(
-                message=SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
-                    fork_info=_fork_info,
-                    sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
-                        beacon_block_root=beacon_block_root,
-                        slot=str(duty_slot),
-                    ),
-                ),
-                identifier=validator.pubkey,
+        pubkey_to_validator_index = {
+            member.pubkey: str(member.index) for member in sync_committee_members
+        }
+        msg = SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
+            fork_info=_fork_info,
+            sync_committee_message=SchemaRemoteSigner.SyncCommitteeMessage(
+                beacon_block_root=beacon_block_root,
+                slot=str(duty_slot),
+            ),
+        )
+        signing_tasks = [
+            asyncio.create_task(
+                self.signature_provider.sign(
+                    message=msg,
+                    identifier=validator.pubkey,
+                )
             )
             for validator in sync_committee_members
         ]
-
-        signed_messages: list[SchemaBeaconAPI.SyncCommitteeSignature] = []
-        for coro in asyncio.as_completed(coroutines):
-            try:
-                msg, sig, pubkey = await coro
-            except Exception as e:
-                self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.exception(
-                    f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
+        async for (
+            is_slow_batch,
+            signed_results_batch,
+        ) in self._iter_fast_then_slow_task_batches(
+            tasks=signing_tasks,
+            fast_wait_s=self._initial_sync_message_publish_wait_s,
+        ):
+            if is_slow_batch:
+                self.logger.warning(
+                    f"Still waiting for {len(signed_results_batch)} sync committee messages "
+                    f"to be signed for slot {duty_slot}",
                 )
-                continue
 
-            signed_messages.append(
-                SchemaBeaconAPI.SyncCommitteeSignature(
-                    beacon_block_root=msg.sync_committee_message.beacon_block_root,
-                    slot=str(msg.sync_committee_message.slot),
-                    validator_index=next(
-                        str(v.index)
-                        for v in sync_committee_members
-                        if v.pubkey == pubkey
+            signed_messages_batch = []
+            for signed_result_future in signed_results_batch:
+                try:
+                    msg, sig, pubkey = await signed_result_future
+                except Exception as e:
+                    self.metrics.errors_c.labels(
+                        error_type=ErrorType.SIGNATURE.value
+                    ).inc()
+                    self.logger.exception(
+                        f"Failed to get signature for sync committee message for slot {duty_slot}: {e!r}",
+                    )
+                    continue
+
+                signed_messages_batch.append(
+                    SchemaBeaconAPI.SyncCommitteeSignature(
+                        beacon_block_root=msg.sync_committee_message.beacon_block_root,
+                        slot=str(msg.sync_committee_message.slot),
+                        validator_index=pubkey_to_validator_index[pubkey],
+                        signature=sig,
                     ),
-                    signature=sig,
-                ),
-            )
+                )
 
-        return signed_messages
+            if len(signed_messages_batch) > 0:
+                yield signed_messages_batch
 
     async def _publish_sync_messages(
         self,
@@ -215,17 +238,16 @@ class SyncCommitteeService(ValidatorDutyService):
             ),
         )
 
-        # Sign the sync messages
-        signed_sync_messages = await self._get_signed_sync_messages(
+        # Sign and publish as signed messages become available.
+        async for signed_sync_messages in self._iter_signed_sync_message_batches(
             duty_slot=duty_slot,
             sync_committee_members=sync_committee_members,
             beacon_block_root=beacon_block_root,
-        )
-
-        # Publish the messages
-        await self._publish_sync_messages(
-            duty_slot=duty_slot, signed_sync_messages=signed_sync_messages
-        )
+        ):
+            await self._publish_sync_messages(
+                duty_slot=duty_slot,
+                signed_sync_messages=signed_sync_messages,
+            )
 
     async def produce_sync_message(
         self,

@@ -3,6 +3,7 @@ import contextlib
 import datetime
 import time
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import Self, Unpack
 from uuid import uuid4
@@ -35,6 +36,7 @@ class AttestationService(ValidatorDutyService):
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
             scheduler=self.scheduler,
+            spec=self.spec,
         )
 
         # Attester duties by epoch
@@ -43,6 +45,11 @@ class AttestationService(ValidatorDutyService):
             set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
         ] = defaultdict(set)
         self.attester_duties_dependent_roots: dict[int, str] = dict()
+
+        # We can publish an initial batch of signed attestations
+        # quickly even if we are still waiting for others to be
+        # signed
+        self._initial_attestation_publish_wait_s = 0.5
 
     async def __aenter__(self) -> Self:
         try:
@@ -180,53 +187,64 @@ class AttestationService(ValidatorDutyService):
 
         return att_data
 
-    async def _get_signed_attestations(
+    async def _iter_signed_attestation_batches(
         self,
         slot: int,
         att_data: SchemaBeaconAPI.AttestationData,
         duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
-    ) -> list[SchemaBeaconAPI.SingleAttestation]:
-        signed_attestations: list[SchemaBeaconAPI.SingleAttestation] = []
-
+    ) -> AsyncIterator[list[SchemaBeaconAPI.SingleAttestation]]:
         pubkey_to_duty = {d.pubkey: d for d in duties}
         message = SchemaRemoteSigner.AttestationSignableMessage(
             fork_info=self.beacon_chain.get_fork_info(slot=slot),
             attestation=msgspec.to_builtins(att_data),
         )
-
-        for coro in asyncio.as_completed(
-            [
+        signing_tasks = [
+            asyncio.create_task(
                 self.signature_provider.sign(
                     message=message,
                     identifier=duty.pubkey,
                 )
-                for duty in duties
-            ],
-        ):
-            try:
-                message, signature, pubkey = await coro
-            except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.SIGNATURE.value,
-                ).inc()
-                self.logger.exception(
-                    f"Failed to get signature for attestation for slot {slot}: {e!r}",
-                )
-                continue
-
-            duty = pubkey_to_duty[pubkey]
-
-            # SingleAttestation object from the CL spec
-            signed_attestations.append(
-                SchemaBeaconAPI.SingleAttestation(
-                    committee_index=duty.committee_index,
-                    attester_index=duty.validator_index,
-                    data=att_data,
-                    signature=signature,
-                ),
             )
+            for duty in duties
+        ]
+        async for (
+            is_slow_batch,
+            signed_results_batch,
+        ) in self._iter_fast_then_slow_task_batches(
+            tasks=signing_tasks,
+            fast_wait_s=self._initial_attestation_publish_wait_s,
+        ):
+            if is_slow_batch:
+                self.logger.warning(
+                    f"Still waiting for {len(signed_results_batch)} attestations "
+                    f"to be signed for slot {slot}",
+                )
 
-        return signed_attestations
+            signed_attestations_batch = []
+            for signed_result_future in signed_results_batch:
+                try:
+                    _, signature, pubkey = await signed_result_future
+                except Exception as e:
+                    self.metrics.errors_c.labels(
+                        error_type=ErrorType.SIGNATURE.value,
+                    ).inc()
+                    self.logger.exception(
+                        f"Failed to get signature for attestation for slot {slot}: {e!r}",
+                    )
+                    continue
+
+                duty = pubkey_to_duty[pubkey]
+                signed_attestations_batch.append(
+                    SchemaBeaconAPI.SingleAttestation(
+                        committee_index=duty.committee_index,
+                        attester_index=duty.validator_index,
+                        data=att_data,
+                        signature=signature,
+                    ),
+                )
+
+            if len(signed_attestations_batch) > 0:
+                yield signed_attestations_batch
 
     async def _publish_attestations(
         self,
@@ -289,17 +307,17 @@ class AttestationService(ValidatorDutyService):
             )
         )
 
-        # Sign the AttestationData
-        signed_attestations = await self._get_signed_attestations(
+        # Sign and publish as signed messages become available.
+        async for signed_attestations in self._iter_signed_attestation_batches(
             slot=slot,
             att_data=att_data,
             duties=duties,
-        )
-
-        # Published the signed attestations
-        await self._publish_attestations(
-            slot=slot, att_data=att_data, signed_attestations=signed_attestations
-        )
+        ):
+            await self._publish_attestations(
+                slot=slot,
+                att_data=att_data,
+                signed_attestations=signed_attestations,
+            )
 
     async def attest_if_not_yet_attested(
         self,
@@ -314,12 +332,6 @@ class AttestationService(ValidatorDutyService):
         If we see a head event in time, we cancel the scheduled function call
         at the attestation deadline.
         """
-        if head_event is not None:
-            with contextlib.suppress(JobLookupError):
-                self.scheduler.remove_job(
-                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
-                )
-
         if (
             self.validator_status_tracker_service.slashing_detected
             and not self.cli_args.disable_slashing_detection
@@ -335,6 +347,12 @@ class AttestationService(ValidatorDutyService):
             raise RuntimeError(
                 f"Invalid slot for attestation: {slot}. Current slot: {self.beacon_chain.current_slot}"
             )
+
+        if head_event is not None:
+            with contextlib.suppress(JobLookupError):
+                self.scheduler.remove_job(
+                    job_id=_PRODUCE_JOB_ID.format(duty_slot=slot),
+                )
 
         duties = self._get_duties_for_slot(slot)
 
@@ -620,11 +638,9 @@ class AttestationService(ValidatorDutyService):
                 )
                 continue
 
-            self.attester_duties[epoch] = set()
-
             # For large amounts of validators, the `_get_duties_with_selection_proofs`
             # can take quite a while.
-            # Run `_get_duties_with_selection_proofs` for the next couple of slots
+            # Run `_get_duties_with_selection_proofs` for the next few slots
             # first, and only worry about the rest of the duties once we are ready to
             # perform the duties that are due soon.
             current_slot = self.beacon_chain.current_slot
@@ -635,16 +651,29 @@ class AttestationService(ValidatorDutyService):
                 duty_slot = int(duty.slot)
                 if duty_slot < current_slot:
                     continue
-                if duty_slot <= current_slot + 1:
+                if duty_slot <= current_slot + 2:
                     duties_due_soon.append(duty)
                 else:
                     duties_due_later.append(duty)
 
-            for list_of_duties in (duties_due_soon, duties_due_later):
-                for duty_with_proof in await self._get_duties_with_selection_proofs(
-                    duties=list_of_duties,
-                ):
-                    self.attester_duties[epoch].add(duty_with_proof)
+            refreshed_duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof] = (
+                set()
+            )
+            if duties_due_soon:
+                refreshed_duties = set(
+                    await self._get_duties_with_selection_proofs(
+                        duties=duties_due_soon,
+                    )
+                )
+                self.attester_duties[epoch] = refreshed_duties
+
+            refreshed_duties.update(
+                await self._get_duties_with_selection_proofs(
+                    duties=duties_due_later,
+                )
+            )
+
+            self.attester_duties[epoch] = refreshed_duties
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.attester_duties[epoch])} duties",

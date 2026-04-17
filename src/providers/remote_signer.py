@@ -1,11 +1,12 @@
 """Provides methods for interacting with a remote signer through the [Remote Signing API](https://github.com/ethereum/remote-signing-api)."""
 
 import asyncio
+import contextlib
 import functools
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 from urllib.parse import urlparse
 
 import aiohttp
@@ -16,10 +17,14 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
+from providers._response import raise_for_response_size
 from schemas import SchemaRemoteSigner
 
 from .signature_provider import SignatureProvider
 from .vero import Vero
+
+_MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
+_MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
 
 class HealthcheckEndpointNotSupported(Exception):
@@ -75,14 +80,17 @@ class RemoteSigner(SignatureProvider):
             raise ValueError(f"Failed to parse hostname from {self.url}")
 
         self._score = RemoteSigner.MAX_SCORE
-        # Regularly poll the health status of the remote signer
-        if vero is not None:
-            vero.task_manager.create_task(
-                self.poll_health_periodically(), name=f"poll_health_{self.url}"
-            )
+        self._run_health_poll = vero is not None
+        self._health_poll_task: asyncio.Task[None] | None = None
+        self._task_manager = vero.task_manager if vero is not None else None
+        self._is_closed = False
         self.metrics = vero.metrics if vero else None
 
         self.process_pool_executor = process_pool_executor
+
+        self.low_priority_client_session: aiohttp.ClientSession | None = None
+        self.high_priority_client_session: aiohttp.ClientSession | None = None
+        self._json_encoder = msgspec.json.Encoder()
 
     async def __aenter__(self) -> Self:
         headers = {
@@ -113,6 +121,7 @@ class RemoteSigner(SignatureProvider):
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            timeout=ClientTimeout(total=10.0),
             # Default aiohttp read buffer is only 64KB which is not always enough,
             # resulting in ValueError("Chunk too big")
             read_bufsize=2**19,
@@ -127,12 +136,20 @@ class RemoteSigner(SignatureProvider):
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
+            timeout=ClientTimeout(total=5.0),
             # Default aiohttp read buffer is only 64KB which is not always enough,
             # resulting in ValueError("Chunk too big")
             read_bufsize=2**19,
         )
 
-        self.json_encoder = msgspec.json.Encoder()
+        if self._run_health_poll:
+            self._health_poll_task = asyncio.create_task(
+                self.poll_health_periodically(),
+                name=f"remote-signer-poll-health-{self.url}",
+            )
+            if self._task_manager is not None:
+                self._task_manager.add_existing_task(self._health_poll_task)
+        self._is_closed = False
 
         return self
 
@@ -142,14 +159,21 @@ class RemoteSigner(SignatureProvider):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        if self._is_closed:
+            return
+        self._is_closed = True
+
+        if self._health_poll_task is not None:
+            self._health_poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._health_poll_task
+
         for session in (
             self.low_priority_client_session,
             self.high_priority_client_session,
         ):
-            if not session.closed:
+            if session is not None and not session.closed:
                 await session.close()
-        if self.process_pool_executor is not None:
-            self.process_pool_executor.shutdown(wait=False, cancel_futures=True)
 
     @property
     def score(self) -> int:
@@ -163,14 +187,19 @@ class RemoteSigner(SignatureProvider):
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
+        session = self.low_priority_client_session
+        if session is None:
+            raise RuntimeError("RemoteSigner low_priority_client_session is not set")
 
-        async with self.low_priority_client_session.get(_endpoint) as resp:
+        async with session.get(_endpoint) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
+                    "NOK status code received "
+                    f"({resp.status}) from remote signer: "
+                    f"{await self._read_error_text(resp)}",
                 )
 
-            pubkeys: list[str] = await resp.json()
+            pubkeys: list[str] = await self._read_json(resp)
             return pubkeys
 
     def _get_session_for_message(
@@ -183,11 +212,29 @@ class RemoteSigner(SignatureProvider):
             SchemaRemoteSigner.AttestationSignableMessage,
             SchemaRemoteSigner.SyncCommitteeMessageSignableMessage,
         )
-        return (
+        session = (
             self.high_priority_client_session
             if isinstance(message, high_priority_types)
             else self.low_priority_client_session
         )
+        if session is None:
+            raise RuntimeError("RemoteSigner client session is not set")
+        return session
+
+    @staticmethod
+    async def _read_error_text(response: aiohttp.ClientResponse) -> str:
+        raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
+        return await response.text()
+
+    @staticmethod
+    async def _read_json(response: aiohttp.ClientResponse) -> Any:
+        raise_for_response_size(response, _MAX_RESPONSE_BYTES)
+        return await response.json()
+
+    @staticmethod
+    async def _read_bytes(response: aiohttp.ClientResponse) -> bytes:
+        raise_for_response_size(response, _MAX_RESPONSE_BYTES)
+        return await response.read()
 
     async def sign(
         self,
@@ -203,7 +250,7 @@ class RemoteSigner(SignatureProvider):
         async with self._get_session_for_message(message).post(
             _endpoint.format(identifier=identifier),
             headers={ACCEPT: ContentType.TEXT_PLAIN.value},
-            data=self.json_encoder.encode(message),
+            data=self._json_encoder.encode(message),
             trace_request_ctx=dict(
                 path=_endpoint,
                 request_type=message.__class__.__name__,
@@ -211,14 +258,20 @@ class RemoteSigner(SignatureProvider):
         ) as resp:
             if not resp.ok:
                 raise ValueError(
-                    f"NOK status code received ({resp.status}) from remote signer: {await resp.text()}",
+                    "NOK status code received "
+                    f"({resp.status}) from remote signer: "
+                    f"{await self._read_error_text(resp)}",
                 )
 
             if self.metrics:
                 self.metrics.signed_messages_c.labels(
                     signable_message_type=type(message).__name__
                 ).inc()
-            return message, (await resp.read()).decode(), identifier
+            return (
+                message,
+                (await self._read_bytes(resp)).decode(),
+                identifier,
+            )
 
     async def sign_in_batches(
         self,
@@ -271,8 +324,11 @@ class RemoteSigner(SignatureProvider):
 
     async def get_healthcheck_status(self) -> None:
         _endpoint = "/healthcheck"
+        session = self.low_priority_client_session
+        if session is None:
+            raise RuntimeError("RemoteSigner low_priority_client_session is not set")
 
-        async with self.low_priority_client_session.get(
+        async with session.get(
             _endpoint,
             timeout=ClientTimeout(total=1.0),
             trace_request_ctx=dict(
@@ -289,7 +345,8 @@ class RemoteSigner(SignatureProvider):
             resp.raise_for_status()
 
             decoded_response = msgspec.json.decode(
-                await resp.read(), type=SchemaRemoteSigner.HealthCheckResponse
+                await self._read_bytes(resp),
+                type=SchemaRemoteSigner.HealthCheckResponse,
             )
             if decoded_response.status == "UP" and decoded_response.outcome == "UP":
                 self.score += RemoteSigner.SCORE_DELTA_SUCCESS

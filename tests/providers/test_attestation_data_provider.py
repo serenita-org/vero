@@ -22,6 +22,7 @@ async def attestation_data_provider(
     adp = AttestationDataProvider(
         multi_beacon_node=multi_beacon_node,
         scheduler=vero.scheduler,
+        spec=vero.spec,
     )
     # Default timeout is 1000 ms which doesn't work well for tests
     # where the slot time is 1000 ms - it doesn't leave any room for
@@ -658,3 +659,41 @@ async def test_checkpoint_cache_pruning(
         e in attestation_data_provider.target_checkpoint_confirmation_cache
         for e in ("16", "17", "18")
     )
+
+
+@pytest.mark.parametrize(
+    argnames=("slot_into_epoch", "depth", "expected_to_invalidate"),
+    argvalues=[
+        pytest.param(
+            10, 2, False, id="does not cross epoch boundary - no invalidation"
+        ),
+        pytest.param(2, 5, True, id="crosses epoch boundary - invalidation expected"),
+    ],
+)
+async def test_reorg_checkpoint_invalidation(
+    slot_into_epoch: int,
+    depth: int,
+    expected_to_invalidate: bool,
+    attestation_data_provider: AttestationDataProvider,
+) -> None:
+    epoch = 123
+    new_head_slot = (
+        epoch * attestation_data_provider.spec.SLOTS_PER_EPOCH + slot_into_epoch
+    )
+
+    attestation_data_provider.source_checkpoint_confirmation_cache = {
+        str(epoch): SchemaBeaconAPI.Checkpoint(epoch=str(epoch), root="0x_root"),
+    }
+    await attestation_data_provider.handle_reorg_event(
+        event=SchemaBeaconAPI.ChainReorgEvent(
+            slot=str(new_head_slot),
+            depth=str(depth),
+            old_head_block="0x_old_head",
+            new_head_block="0x_new_head",
+            execution_optimistic=False,
+        )
+    )
+    if expected_to_invalidate:
+        assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 0
+    else:
+        assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 1
