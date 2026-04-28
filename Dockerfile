@@ -1,5 +1,5 @@
-ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm@sha256:123be5684f39d8476e64f47a5fddf38f5e9d839baff5c023c815ae5bdfae0df7"
-ARG UV_IMAGE_TAG="0.8.15@sha256:a5727064a0de127bdb7c9d3c1383f3a9ac307d9f2d8a391edc7896c54289ced0"
+ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm@sha256:58525e1a8dada8e72d6f8a11a0ddff8d981fd888549108db52455d577f927f77"
+ARG UV_IMAGE_TAG="0.11.8@sha256:de254da1c9abae7926e5cf29a6ab4a5ea65d3290682d88aa416445fa3de681bf"
 
 # uv image
 FROM ghcr.io/astral-sh/uv:${UV_IMAGE_TAG} AS uv-image
@@ -14,7 +14,7 @@ WORKDIR /vero
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 
 # Install and compile dependencies
-RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
+RUN --mount=from=uv-image,source=/usr/local/bin/uv,target=/usr/local/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
