@@ -1,6 +1,8 @@
 # Changelog
 
-## Upcoming release
+## v1.4.0 { id="v1.4.0" }
+
+<small>May 4, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.4.0){:target="_blank"}
 
 #### Features
 - Use Python bindings for Grandine's SSZ crates
@@ -13,6 +15,8 @@
 #### Bugfixes
 
 - Fix Keymanager API spec deviations and add more input validation
+
+___
 
 ## v1.3.3 { id="v1.3.3" }
 

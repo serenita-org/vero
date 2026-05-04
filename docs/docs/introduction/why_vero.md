@@ -155,7 +155,7 @@ switch back from— in case any issue were to occur.
 | Gnosis Chain support                                        |       ✅        |   ❌   |            ❌             |            🟠             |
 
 
-<sub>1) Exclusive feature for Vero Sponsors.</sub>
+<sub>1) Exclusive feature for [Vero Sponsors](../sponsorship/index.md).</sub>
 
 <sub>2) Please reach out if the lack of this feature is blocking you from adopting Vero. We
 are considering adding support for it.</sub>
