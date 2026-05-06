@@ -25,6 +25,18 @@
     choice when a single operator is responsible for running
     validator infrastructure.
 
+??? question "Has Vero been audited?"
+
+    Yes! Thanks to the Ethereum Foundation and Lido, Vero
+    underwent a security assessment in early 2026,
+    conducted by Sigma Prime.
+
+    No high or critical severity issues were identified,
+    and all lower severity findings were addressed as of Vero&nbsp;v1.4.0.
+
+    You can find the report
+    [here](https://github.com/sigp/public-audits/tree/master/reports/serenita-vero){:target="_blank"}.
+
 ??? question "Will my validators go offline if one of the connected beacon nodes goes offline?"
 
     Vero can keep running for some amount of time even if only a single connected beacon node
@@ -36,10 +48,20 @@
 
 ??? question "Is Vero compatible with Dirk remote signers?"
 
-    No. Dirk does not implement the
+    In short – no. Dirk does not implement the
     [Ethereum Remote Signing API](https://github.com/ethereum/remote-signing-api){:target="_blank"}
     and instead uses a different API. Compatibility for Dirk remote signers is under consideration.
     Let us know if this is something that would be interesting to you.
+
+    !!! example "Experimental"
+
+        There is an open-source project that translates signing
+        requests between the two API formats, allowing Vero to talk to Dirk
+        remote signers. The project is not officially affiliated with
+        Serenita or Vero, nor is it recommended for production usage
+        at this point.
+
+        More information is available [here](https://github.com/jshufro/remote-signer-dirk-interop){:target="_blank"}.
 
 ??? question "I notice Vero is written in Python. Should I be worried about performance?"
 

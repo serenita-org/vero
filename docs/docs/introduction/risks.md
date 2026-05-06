@@ -1,11 +1,19 @@
 # Risks
 
+Various risks inherently exist in the design space of
+a validator client. That said, Vero was designed to minimize operational,
+security, and slashing risk wherever possible.
+
+Vero also underwent an
+[independent security review](https://github.com/sigp/public-audits/tree/master/reports/serenita-vero){:target="_blank"}
+conducted by Sigma Prime in early 2026.
+
 ## Slashing Risk
 
 Vero can only be used in combination with a remote signer.
 
 The remote signer, with its battle-tested slashing protection
-database, prevents your validators from committing a slashable
+database, prevents validators from committing a slashable
 offense – no matter what data Vero requests to sign.
 
 As long as your validator keys are active in only one place,
@@ -16,7 +24,7 @@ through its proactive
 
 ## Key Security
 
-Vero, by design, **never** has direct access to validator private keys.
+By design, Vero **never** has direct access to validator private keys.
 
 ## Bugs
 
@@ -36,7 +44,7 @@ complicated – and switching back is equally difficult
 if something were to go wrong with those.
 
 By contrast, switching to —and back from—
-Vero is much easier.
-If you're already using a remote signer (e.g. Web3Signer),
+Vero is straightforward.
+If you are already using a remote signer such as Web3Signer,
 you can switch between your current validator client and Vero
-in just minutes.
+within minutes.
