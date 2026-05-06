@@ -29,15 +29,14 @@ ___
 
 ## Step-by-step Migration Example
 
-Let's assume you're a professional node operator, running validator
-clients developed by CL client teams, connected to a 50% mix of
+Let's assume you're a professional node operator, running
+a traditional validator client (e.g. Lighthouse) connected to a mix of
 Geth-Prysm (5 servers) and Nethermind-Lighthouse (5 servers).
 Let's also assume you already have a remote signer set up
 with an enabled slashing protection database.
 
-This setup is safer than only running a single client
-implementation but it still exposes your
-validators to risks such as:
+The above setup offers better protection against downtime than a single
+client pair does, but it still exposes validators to risks such as:
 
 - [33% consensus client bugs](https://x.com/potuz_eth/status/1768418899111113125){:target="_blank"}
 - fallback behavior bugs – for example, if your Nethermind nodes
@@ -51,7 +50,7 @@ To migrate to a more resilient setup using Vero, you would:
 
     This step should be easy to perform if you're already using
     a remote signer. You only switch a single component
-    within your setup, the validator client, _without any slashing risk_.
+    within your setup –the validator client– _without any slashing risk_.
     In case of need, switching back to the validator client you used
     previously is equally easy.
 
@@ -72,8 +71,8 @@ To migrate to a more resilient setup using Vero, you would:
     the three other clients will keep things going without any
     action required on your part!
 
-    If you want to be extra conservative around network upgrades,
-    when client bugs are more likely to surface, you can temporarily
+    If you want to be extra conservative around network upgrades
+    (when client bugs are more likely to surface) you can temporarily
     increase Vero's attestation consensus threshold. You could require four,
     or even all five of the connected clients to agree on the state of
     the chain before your validators vote for it.
@@ -107,5 +106,5 @@ clients that may not be completely battle-tested yet, like
 [Reth](https://github.com/paradigmxyz/reth){:target="_blank"}.
 
 If you're a professional node operator not yet running
-a multi-node setup, do yourself —and the network— a favor
+a multi-node setup, do yourself –and the network– a favor
 and start using Vero.

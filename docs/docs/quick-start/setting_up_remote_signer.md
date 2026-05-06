@@ -62,6 +62,9 @@ Vero on:
     the IP address or hostname and API port of the CL client you set up
     earlier.
 
+You should now have an eth-docker directory that is ready to
+run Vero and web3signer.
+
 ___
 
 !!! tip "Let's check everything is set up correctly"
@@ -70,7 +73,7 @@ We still haven't imported any validator keys. However, we can check
 if everything is set up correctly so far.
 
 Run `./ethd up` to start Vero and the remote signer.
-Then, run `/ethd logs validator` to view Vero's logs.
+Then, run `./ethd logs validator` to view Vero's logs.
 
 If you've set everything up correctly, you should see lines
 like these in the logs:

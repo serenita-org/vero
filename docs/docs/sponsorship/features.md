@@ -61,6 +61,8 @@ sequenceDiagram
 
 ## Automatic Failover
 
+!!! example "This feature is considered experimental at this stage."
+
 Automatic failover is a Vero high-availability mode where one Vero instance acts as
 the primary and another acts as the secondary. During normal operation, the primary
 instance performs validator duties and exposes a healthcheck endpoint. The secondary
