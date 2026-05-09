@@ -10,6 +10,8 @@ from aiohttp import web
 
 from schemas import SchemaKeymanagerAPI
 
+from ._app_keys import APP_KEY_KEYMANAGER
+
 if TYPE_CHECKING:
     from providers import Keymanager
 
@@ -18,7 +20,7 @@ routes = web.RouteTableDef()
 
 @routes.get("/eth/v1/remotekeys")
 async def remote_keys_get(request: web.Request) -> web.Response:
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     remote_keys = SchemaKeymanagerAPI.ListRemoteKeysResponse(
         data=[
@@ -41,7 +43,7 @@ async def remote_keys_post(request: web.Request) -> web.Response:
         type=SchemaKeymanagerAPI.ImportRemoteKeysRequest,
     )
 
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
     import_status_messages = await keymanager.import_remote_keys(
         remote_keys=request_data.remote_keys
     )
@@ -62,7 +64,7 @@ async def remote_keys_delete(request: web.Request) -> web.Response:
         type=SchemaKeymanagerAPI.DeleteRemoteKeysRequest,
     )
 
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
     delete_status_messages = await keymanager.delete_remote_keys(
         pubkeys=request_data.pubkeys
     )

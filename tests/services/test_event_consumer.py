@@ -92,13 +92,15 @@ async def test_handle_event(
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    bn = BeaconNode(
+        base_url="http://bn-test",
+        vero=vero,
+    )
     event_consumer._handle_event(
         event=event,
-        beacon_node=BeaconNode(
-            base_url="http://bn-test",
-            vero=vero,
-        ),
+        beacon_node=bn,
     )
+    await bn.client_session.close()
 
     for log_message in expected_log_messages:
         assert any(log_message in m for m in caplog.messages)
@@ -110,6 +112,10 @@ async def test_recent_event_keys(
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    bn = BeaconNode(
+        base_url="http://bn-test",
+        vero=vero,
+    )
     for i in range(100):
         event_consumer._handle_event(
             event=SchemaBeaconAPI.HeadEvent(
@@ -119,11 +125,9 @@ async def test_recent_event_keys(
                 previous_duty_dependent_root="0xprevious",
                 current_duty_dependent_root="0xcurrent",
             ),
-            beacon_node=BeaconNode(
-                base_url="http://bn-test",
-                vero=vero,
-            ),
+            beacon_node=bn,
         )
+    await bn.client_session.close()
 
     # The last 10 event keys should be cached
     assert len(event_consumer._recent_event_keys) == 10

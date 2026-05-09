@@ -10,6 +10,8 @@ from aiohttp import web
 
 from schemas import SchemaKeymanagerAPI
 
+from ._app_keys import APP_KEY_KEYMANAGER
+
 if TYPE_CHECKING:
     from providers import Keymanager
 
@@ -19,7 +21,7 @@ routes = web.RouteTableDef()
 @routes.get("/eth/v1/validator/{pubkey}/feerecipient")
 async def fee_recipient_get(request: web.Request) -> web.Response:
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     resp = SchemaKeymanagerAPI.ListFeeRecipientResponse(
         data=keymanager.get_fee_recipient(pubkey)
@@ -41,7 +43,7 @@ async def fee_recipient_post(request: web.Request) -> web.Response:
         )
 
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     keymanager.set_fee_recipient(pubkey=pubkey, fee_recipient=request_data.ethaddress)
 
@@ -51,7 +53,7 @@ async def fee_recipient_post(request: web.Request) -> web.Response:
 @routes.delete("/eth/v1/validator/{pubkey}/feerecipient")
 async def fee_recipient_delete(request: web.Request) -> web.Response:
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     keymanager.delete_configured_fee_recipient(pubkey=pubkey)
 

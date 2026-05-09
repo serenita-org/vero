@@ -5,6 +5,7 @@ import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
+from api.keymanager._app_keys import APP_KEY_BEARER_TOKEN
 from api.keymanager.api import _create_app
 from args import CLIArgs
 from providers import Keymanager
@@ -18,5 +19,5 @@ async def test_client(
 ) -> TestClient[Any, Application]:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     return await aiohttp_client(
-        app, headers={"Authorization": f"Bearer {app['bearer_token']}"}
+        app, headers={"Authorization": f"Bearer {app[APP_KEY_BEARER_TOKEN]}"}
     )

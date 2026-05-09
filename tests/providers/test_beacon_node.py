@@ -72,3 +72,5 @@ async def test_initialize_spec_mismatch(
                 ),
             ):
                 await bn._initialize_full()
+
+        await bn.client_session.close()

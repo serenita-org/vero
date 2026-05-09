@@ -1,3 +1,4 @@
+import asyncio
 import re
 from contextlib import AbstractContextManager
 from contextlib import nullcontext as does_not_raise
@@ -122,3 +123,5 @@ async def test_fetch_liveness_data(
                 validator_indices=[1, 2, 3],
             )
             assert expected_return_value == return_value
+
+    await asyncio.gather(*[bn.client_session.close() for bn in detector.beacon_nodes])
