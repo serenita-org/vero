@@ -139,8 +139,22 @@ class MultiBeaconNode:
             f" beacon nodes",
         )
 
+    async def _close_client_sessions(self) -> None:
+        all_beacon_nodes = self.beacon_nodes + self.beacon_nodes_proposal
+        await asyncio.gather(
+            *[
+                bn.client_session.close()
+                for bn in all_beacon_nodes
+                if not bn.client_session.closed
+            ],
+        )
+
     async def __aenter__(self) -> Self:
-        await self.initialize()
+        try:
+            await self.initialize()
+        except Exception:
+            await self._close_client_sessions()
+            raise
         return self
 
     async def __aexit__(
@@ -149,15 +163,7 @@ class MultiBeaconNode:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
-        all_beacon_nodes = self.beacon_nodes + self.beacon_nodes_proposal
-
-        await asyncio.gather(
-            *[
-                bn.client_session.close()
-                for bn in all_beacon_nodes
-                if not bn.client_session.closed
-            ],
-        )
+        await self._close_client_sessions()
 
     @property
     def best_beacon_node(self) -> BeaconNode:
