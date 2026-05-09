@@ -7,7 +7,11 @@ import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
-from api.keymanager.api import _create_app, _get_bearer_token_value
+from api.keymanager._app_keys import APP_KEY_BEARER_TOKEN
+from api.keymanager.api import (
+    _create_app,
+    _get_bearer_token_value,
+)
 from args import CLIArgs
 from providers import Keymanager
 from schemas import SchemaKeymanagerAPI
@@ -20,7 +24,7 @@ async def test_bearer_auth(
 ) -> None:
     app = _create_app(keymanager=keymanager, cli_args=cli_args)
     test_client = await aiohttp_client(app)
-    assert len(test_client.app["bearer_token"]) == 64
+    assert len(test_client.app[APP_KEY_BEARER_TOKEN]) == 64
 
     # Make a request without a value for the Authorization header
     resp = await test_client.get(
@@ -47,7 +51,7 @@ async def test_bearer_auth(
     # Make a request with the correct value for the Authorization header
     resp = await test_client.get(
         "/eth/v1/remotekeys",
-        headers={"Authorization": f"Bearer {test_client.app['bearer_token']}"},
+        headers={"Authorization": f"Bearer {test_client.app[APP_KEY_BEARER_TOKEN]}"},
     )
     assert resp.status == 200
 

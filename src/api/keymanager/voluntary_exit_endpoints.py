@@ -10,6 +10,8 @@ from aiohttp import web
 
 from schemas import SchemaKeymanagerAPI
 
+from ._app_keys import APP_KEY_KEYMANAGER
+
 if TYPE_CHECKING:
     from providers import Keymanager
 
@@ -24,7 +26,7 @@ async def voluntary_exit_post(request: web.Request) -> web.Response:
         raise ValueError(f"Invalid epoch: {epoch}")
 
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     signed_voluntary_exit = await keymanager.sign_voluntary_exit_message(
         pubkey=pubkey,

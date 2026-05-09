@@ -5,6 +5,7 @@ from collections.abc import Awaitable, Callable
 import msgspec
 from aiohttp import hdrs, web
 
+from api.keymanager._app_keys import APP_KEY_BEARER_TOKEN
 from providers.keymanager import PubkeyNotFound
 from schemas.keymanager_api import PUBKEY_PATTERN, ErrorResponse
 
@@ -18,7 +19,7 @@ async def bearer_authentication(
     if not auth_header_value:
         raise web.HTTPUnauthorized(reason="No value provided for Authorization header")
 
-    if auth_header_value != f"Bearer {request.app['bearer_token']}":
+    if auth_header_value != f"Bearer {request.app[APP_KEY_BEARER_TOKEN]}":
         raise web.HTTPForbidden(
             reason="Invalid value provided for Authorization header"
         )

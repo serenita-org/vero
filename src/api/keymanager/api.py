@@ -10,6 +10,7 @@ from aiohttp import web
 
 from args import CLIArgs
 
+from ._app_keys import APP_KEY_BEARER_TOKEN, APP_KEY_KEYMANAGER
 from .fee_recipient_endpoints import routes as fee_recipient_routes
 from .gas_limit_endpoints import routes as gas_limit_routes
 from .graffiti_endpoints import routes as graffiti_routes
@@ -64,8 +65,8 @@ def _create_app(keymanager: "Keymanager", cli_args: CLIArgs) -> web.Application:
         middlewares=[exception_handler, path_param_validation, bearer_authentication]
     )
 
-    app["bearer_token"] = _get_bearer_token_value(cli_args=cli_args)
-    app["keymanager"] = keymanager
+    app[APP_KEY_BEARER_TOKEN] = _get_bearer_token_value(cli_args=cli_args)
+    app[APP_KEY_KEYMANAGER] = keymanager
 
     app.add_routes(fee_recipient_routes)
     app.add_routes(gas_limit_routes)

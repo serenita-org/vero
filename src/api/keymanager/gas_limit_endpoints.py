@@ -10,6 +10,8 @@ from aiohttp import web
 
 from schemas import SchemaKeymanagerAPI
 
+from ._app_keys import APP_KEY_KEYMANAGER
+
 if TYPE_CHECKING:
     from providers import Keymanager
 
@@ -19,7 +21,7 @@ routes = web.RouteTableDef()
 @routes.get("/eth/v1/validator/{pubkey}/gas_limit")
 async def gas_limit_get(request: web.Request) -> web.Response:
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     resp = SchemaKeymanagerAPI.ListGasLimitResponse(
         data=keymanager.get_gas_limit(pubkey)
@@ -35,7 +37,7 @@ async def gas_limit_post(request: web.Request) -> web.Response:
     )
 
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     keymanager.set_gas_limit(pubkey=pubkey, gas_limit=request_data.gas_limit)
 
@@ -45,7 +47,7 @@ async def gas_limit_post(request: web.Request) -> web.Response:
 @routes.delete("/eth/v1/validator/{pubkey}/gas_limit")
 async def gas_limit_delete(request: web.Request) -> web.Response:
     pubkey = request.match_info["pubkey"]
-    keymanager: Keymanager = request.app["keymanager"]
+    keymanager: Keymanager = request.app[APP_KEY_KEYMANAGER]
 
     keymanager.delete_configured_gas_limit(pubkey=pubkey)
 
