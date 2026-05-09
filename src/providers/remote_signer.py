@@ -25,6 +25,8 @@ from .vero import Vero
 
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
+_SIGN_ENDPOINT_PATH = "/api/v1/eth2/sign/{identifier}"
+_SIGN_ACCEPT_HEADERS = {ACCEPT: ContentType.TEXT_PLAIN.value}
 
 
 class HealthcheckEndpointNotSupported(Exception):
@@ -65,6 +67,12 @@ class RemoteSigner(SignatureProvider):
     MAX_SCORE = 100
     SCORE_DELTA_SUCCESS = 1
     SCORE_DELTA_FAILURE = 20
+    HIGH_PRIORITY_MESSAGE_TYPES = (
+        SchemaRemoteSigner.BeaconBlockV2SignableMessage,
+        SchemaRemoteSigner.RandaoRevealSignableMessage,
+        SchemaRemoteSigner.AttestationSignableMessage,
+        SchemaRemoteSigner.SyncCommitteeMessageSignableMessage,
+    )
 
     def __init__(
         self,
@@ -202,25 +210,6 @@ class RemoteSigner(SignatureProvider):
             pubkeys: list[str] = await self._read_json(resp)
             return pubkeys
 
-    def _get_session_for_message(
-        self,
-        message: SchemaRemoteSigner.SignableMessage,
-    ) -> aiohttp.ClientSession:
-        high_priority_types = (
-            SchemaRemoteSigner.BeaconBlockV2SignableMessage,
-            SchemaRemoteSigner.RandaoRevealSignableMessage,
-            SchemaRemoteSigner.AttestationSignableMessage,
-            SchemaRemoteSigner.SyncCommitteeMessageSignableMessage,
-        )
-        session = (
-            self.high_priority_client_session
-            if isinstance(message, high_priority_types)
-            else self.low_priority_client_session
-        )
-        if session is None:
-            raise RuntimeError("RemoteSigner client session is not set")
-        return session
-
     @staticmethod
     async def _read_error_text(response: aiohttp.ClientResponse) -> str:
         raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
@@ -245,15 +234,22 @@ class RemoteSigner(SignatureProvider):
         :param identifier: BLS public key in hex format for which data to sign
         :
         """
-        _endpoint = "/api/v1/eth2/sign/{identifier}"
+        session = (
+            self.high_priority_client_session
+            if isinstance(message, RemoteSigner.HIGH_PRIORITY_MESSAGE_TYPES)
+            else self.low_priority_client_session
+        )
+        if session is None:
+            raise RuntimeError("RemoteSigner client session is not set")
 
-        async with self._get_session_for_message(message).post(
-            _endpoint.format(identifier=identifier),
-            headers={ACCEPT: ContentType.TEXT_PLAIN.value},
+        request_type = message.__class__.__name__
+        async with session.post(
+            _SIGN_ENDPOINT_PATH.format(identifier=identifier),
+            headers=_SIGN_ACCEPT_HEADERS,
             data=self._json_encoder.encode(message),
             trace_request_ctx=dict(
-                path=_endpoint,
-                request_type=message.__class__.__name__,
+                path=_SIGN_ENDPOINT_PATH,
+                request_type=request_type,
             ),
         ) as resp:
             if not resp.ok:
@@ -265,7 +261,7 @@ class RemoteSigner(SignatureProvider):
 
             if self.metrics:
                 self.metrics.signed_messages_c.labels(
-                    signable_message_type=type(message).__name__
+                    signable_message_type=request_type,
                 ).inc()
             return (
                 message,
