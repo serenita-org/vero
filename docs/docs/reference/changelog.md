@@ -1,5 +1,10 @@
 # Changelog
 
+## Upcoming release
+
+#### Features
+- Add support for the Gloas fork
+
 ## v1.4.0 { id="v1.4.0" }
 
 <small>May 4, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.4.0){:target="_blank"}

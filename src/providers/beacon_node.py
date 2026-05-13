@@ -29,8 +29,8 @@ from providers._headers import ContentType
 from providers._response import raise_for_response_size
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import SpecAttestation, SpecSyncCommittee
-from spec.base import SpecFulu, parse_spec
-from spec.constants import INTERVALS_PER_SLOT
+from spec.base import SpecGloas, parse_spec
+from spec.common import get_slot_component_duration_ms
 
 if TYPE_CHECKING:
     from .vero import Vero
@@ -74,7 +74,20 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self._timeout_request_aggregate = (
+            int(self.spec.SLOT_DURATION_MS)
+            - get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+        ) / 1_000
+        self._timeout_request_contribution = (
+            int(self.spec.SLOT_DURATION_MS)
+            - get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+        ) / 1_000
         self._ignore_spec_mismatch = vero.cli_args.ignore_spec_mismatch
         self._force_json_wire_format = vero.cli_args.force_json_wire_format
 
@@ -273,7 +286,7 @@ class BeaconNode:
         if response.execution_optimistic:
             raise ValueError(f"Execution optimistic on {self.host}")
 
-    async def get_spec(self) -> SpecFulu:
+    async def get_spec(self) -> SpecGloas:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
@@ -551,7 +564,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_aggregate,
             ),
         )
 
@@ -599,7 +612,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_contribution,
             ),
         )
 

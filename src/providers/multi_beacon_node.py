@@ -47,7 +47,6 @@ from remerkleable.complex import Container
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
 from spec.configs import Network
-from spec.constants import INTERVALS_PER_SLOT
 from spec.rust_ssz import (
     rust_ssz_types,
 )
@@ -91,9 +90,6 @@ class MultiBeaconNode:
             for base_url in vero.cli_args.beacon_node_urls_proposal
         ]
 
-        self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(vero.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
-
         self.cli_args = vero.cli_args
 
         self._attestation_consensus_threshold = (
@@ -129,7 +125,7 @@ class MultiBeaconNode:
             if time.monotonic() >= deadline:
                 raise RuntimeError(_init_error_message())
 
-            self.logger.warning(_init_error_message())
+            self.logger.debug(_init_error_message())
             await asyncio.sleep(0.1)
 
         self.logger.info(
@@ -313,18 +309,17 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        soft_timeout: float,
     ) -> SchemaBeaconAPI.ProduceBlockV3Response:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
 
         Most of the logic in here makes sure we don't wait too long for a block to be
         produced by an unresponsive beacon node.
+
+        If no block has been returned within the soft timeout, we wait indefinitely
+        for the first block to be returned by any beacon node and use that.
         """
-        # Times out at 1/2 of the SECONDS_PER_INTERVAL spec value into the slot
-        # (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
-        # If no block has been returned by that point, it waits indefinitely for the
-        # first block to be returned by any beacon node.
-        timeout = (1 / 2) * self.SECONDS_PER_INTERVAL
 
         beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
@@ -349,7 +344,7 @@ class MultiBeaconNode:
         best_block_value = -1
         best_block_response = None
         start_time = asyncio.get_running_loop().time()
-        remaining_timeout = timeout
+        remaining_soft_timeout = soft_timeout
 
         # Only compare consensus block value on Gnosis Chain / Chiado
         # since the execution payload value is in a different
@@ -359,10 +354,10 @@ class MultiBeaconNode:
             Network.CHIADO,
         ]
 
-        while pending and remaining_timeout > 0:
+        while pending and remaining_soft_timeout > 0:
             done, pending = await asyncio.wait(
                 pending,
-                timeout=remaining_timeout,
+                timeout=remaining_soft_timeout,
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -388,9 +383,9 @@ class MultiBeaconNode:
 
             # Calculate remaining timeout
             elapsed_time = asyncio.get_running_loop().time() - start_time
-            remaining_timeout = max(timeout - elapsed_time, 0)
+            remaining_soft_timeout = max(soft_timeout - elapsed_time, 0)
 
-        if remaining_timeout <= 0:
+        if remaining_soft_timeout <= 0:
             self.logger.warning("Block production timeout reached.")
 
         # If no block has been returned yet, wait for the first one and return it
@@ -432,6 +427,7 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        soft_timeout: float,
     ) -> tuple[
         "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
         SchemaBeaconAPI.ProduceBlockV3Response,
@@ -447,6 +443,7 @@ class MultiBeaconNode:
             graffiti=graffiti,
             builder_boost_factor=builder_boost_factor,
             randao_reveal=randao_reveal,
+            soft_timeout=soft_timeout,
         )
 
         # Parse block

@@ -146,6 +146,7 @@ async def test_update_duties_refreshes_due_soon_first_without_emptying_slot(
     [
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
         pytest.param(ForkVersion.FULU, id="Fulu"),
+        pytest.param(ForkVersion.GLOAS, id="Gloas"),
     ],
     indirect=True,
 )

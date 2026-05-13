@@ -384,6 +384,7 @@ async def test_produce_best_block(
                 graffiti=b"test_produce_best_block",
                 builder_boost_factor=90,
                 randao_reveal="randao",
+                soft_timeout=0.1666,
             )
             assert (
                 int(full_response.consensus_block_value)
@@ -400,4 +401,5 @@ async def test_produce_best_block(
                     graffiti=b"test_produce_best_block",
                     builder_boost_factor=90,
                     randao_reveal="randao",
+                    soft_timeout=0.1666,
                 )

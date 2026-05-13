@@ -17,7 +17,7 @@ from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
 from spec.attestation import AttestationData, Checkpoint
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import (
     TARGET_AGGREGATORS_PER_COMMITTEE,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
@@ -37,7 +37,7 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecFulu,
+    spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
@@ -183,6 +183,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version not in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
@@ -402,6 +403,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 attestations = msgspec.json.decode(
                     kwargs["data"].decode(),
@@ -431,6 +433,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 assert aggregate["committee_bits"] == "0x0040000000000000"
                 assert aggregate["aggregation_bits"] == "0x7507"
