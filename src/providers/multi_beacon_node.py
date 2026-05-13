@@ -567,14 +567,11 @@ class MultiBeaconNode:
 
         try:
             for coro in asyncio.as_completed(tasks):
-                att_data = await coro
-                for task in tasks:
-                    task.cancel()
-                return att_data
-        except asyncio.CancelledError:
+                return await coro
+        finally:
             for task in tasks:
                 task.cancel()
-            raise
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         raise RuntimeError(
             f"Failed waiting for attestation data with block root {expected_head_block_root}"
@@ -603,13 +600,11 @@ class MultiBeaconNode:
             ):
                 await coro
                 if total_confirmations >= self._attestation_consensus_threshold:
-                    for task in tasks:
-                        task.cancel()
                     return
-        except asyncio.CancelledError:
+        finally:
             for task in tasks:
                 task.cancel()
-            raise
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def publish_attestations(
         self,
