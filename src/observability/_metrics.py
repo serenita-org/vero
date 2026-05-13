@@ -261,7 +261,12 @@ class Metrics:
         self.beacon_node_version_g = Gauge(
             "beacon_node_version",
             "Beacon node version",
-            labelnames=["host", "version"],
+            labelnames=["host", "name", "version"],
+        )
+        self.beacon_node_execution_client_version_g = Gauge(
+            "beacon_node_execution_client_version",
+            "Execution client version attached to the beacon node",
+            labelnames=["host", "name", "version"],
         )
         self.beacon_node_aggregate_attestation_participant_count_h = Histogram(
             "beacon_node_aggregate_attestation_participant_count",

@@ -93,9 +93,24 @@ async def test_initialize(
                     ),
                 )
                 m.get(
-                    url=re.compile(rf"{bn_url}/eth/v1/node/version"),
+                    url=re.compile(rf"{bn_url}/eth/v2/node/version"),
                     callback=lambda *args, **kwargs: CallbackResult(
-                        payload=dict(data=dict(version="beacon-node/test")),
+                        payload=dict(
+                            data=dict(
+                                beacon_node=dict(
+                                    code="LH",
+                                    name="Lighthouse",
+                                    version="beacon-node/test",
+                                    commit="0x12345678",
+                                ),
+                                execution_client=dict(
+                                    code="NM",
+                                    name="Nethermind",
+                                    version="execution-client/test",
+                                    commit="0x87654321",
+                                ),
+                            ),
+                        ),
                     ),
                 )
             else:
@@ -171,9 +186,24 @@ async def test_initialize_retry_logic(
                 repeat=True,
             )
             m.get(
-                url=re.compile(rf"{_url}/eth/v1/node/version"),
+                url=re.compile(rf"{_url}/eth/v2/node/version"),
                 callback=lambda *args, **kwargs: CallbackResult(
-                    payload=dict(data=dict(version="vero/test")),
+                    payload=dict(
+                        data=dict(
+                            beacon_node=dict(
+                                code="LH",
+                                name="Lighthouse",
+                                version="vero/test",
+                                commit="0x12345678",
+                            ),
+                            execution_client=dict(
+                                code="NM",
+                                name="Nethermind",
+                                version="execution-client/test",
+                                commit="0x87654321",
+                            ),
+                        ),
+                    ),
                 ),
                 repeat=True,
             )
@@ -194,9 +224,24 @@ async def test_initialize_retry_logic(
                 repeat=True,
             )
             m.get(
-                url=re.compile(rf"{_url}/eth/v1/node/version"),
+                url=re.compile(rf"{_url}/eth/v2/node/version"),
                 callback=lambda *args, **kwargs: CallbackResult(
-                    payload=dict(data=dict(version="vero/test")),
+                    payload=dict(
+                        data=dict(
+                            beacon_node=dict(
+                                code="LH",
+                                name="Lighthouse",
+                                version="vero/test",
+                                commit="0x12345678",
+                            ),
+                            execution_client=dict(
+                                code="NM",
+                                name="Nethermind",
+                                version="execution-client/test",
+                                commit="0x87654321",
+                            ),
+                        ),
+                    ),
                 ),
                 repeat=True,
             )
