@@ -6,7 +6,7 @@ import datetime
 import logging
 import warnings
 from collections.abc import AsyncIterable
-from typing import TYPE_CHECKING, Literal, Unpack
+from typing import TYPE_CHECKING, Any, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
@@ -99,7 +99,8 @@ class BeaconNode:
         self._score = 0
         self.metrics.beacon_node_score_g.labels(host=self.host).set(0)
         self.metrics.checkpoint_confirmations_c.labels(host=self.host).reset()
-        self.node_version = ""
+        self.version: SchemaBeaconAPI.ClientVersion | None = None
+        self.execution_client_version: SchemaBeaconAPI.ClientVersion | None = None
 
         self._trace_default_request_ctx = dict(
             host=self.host,
@@ -294,37 +295,89 @@ class BeaconNode:
 
         return parse_spec(msgspec.json.decode(resp_bytes)["data"])
 
+    @staticmethod
+    def _client_version_str(version: SchemaBeaconAPI.ClientVersion | None) -> str:
+        if version is None:
+            return "unknown"
+        return f"{version.name}/{version.version}"
+
+    @staticmethod
+    def _remove_client_version_metric(
+        metric: Any,
+        host: str,
+        version: SchemaBeaconAPI.ClientVersion | None,
+    ) -> None:
+        # Used to remove an old metric value in order not to report multiple values
+        # for the same host
+        if version is None:
+            return
+
+        with contextlib.suppress(KeyError), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            metric.remove(
+                host,
+                version.name,
+                version.version,
+            )
+
+    @staticmethod
+    def _set_client_version_metric(
+        metric: Any,
+        host: str,
+        version: SchemaBeaconAPI.ClientVersion,
+    ) -> None:
+        metric.labels(
+            host=host,
+            name=version.name,
+            version=version.version,
+        ).set(1)
+
     async def update_node_version(self) -> None:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
-            endpoint="/eth/v1/node/version",
+            endpoint="/eth/v2/node/version",
         )
 
         try:
-            resp_version = msgspec.json.decode(resp_bytes)["data"]["version"]
+            resp_version = msgspec.json.decode(
+                resp_bytes, type=SchemaBeaconAPI.GetNodeVersionV2Response
+            ).data
         except Exception as e:
             self.logger.warning(f"Failed to parse beacon node version: {e}")
-            resp_version = "unknown"
+            return
 
-        if not isinstance(resp_version, str):
-            raise TypeError(
-                f"Beacon node did not return a string version: {type(resp_version)} : {resp_version}",
-            )
-
-        if resp_version != self.node_version:
+        if resp_version.beacon_node != self.version:
             self.logger.info(
-                f"Beacon node version changed on {self.host}: {self.node_version} -> {resp_version}"
+                f"Beacon node version changed on {self.host}: "
+                f"{self._client_version_str(self.version)} -> "
+                f"{self._client_version_str(resp_version.beacon_node)}"
             )
-            # Remove old metric value in order not to report multiple values
-            # for the same host
-            with contextlib.suppress(KeyError), warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                self.metrics.beacon_node_version_g.remove(self.host, self.node_version)
+            self._remove_client_version_metric(
+                self.metrics.beacon_node_version_g, self.host, self.version
+            )
+            self.version = resp_version.beacon_node
+            self._set_client_version_metric(
+                self.metrics.beacon_node_version_g, self.host, resp_version.beacon_node
+            )
 
-        self.node_version = resp_version
-        self.metrics.beacon_node_version_g.labels(
-            host=self.host, version=self.node_version
-        ).set(1)
+        if resp_version.execution_client != self.execution_client_version:
+            self.logger.info(
+                f"Execution client version changed on {self.host}: "
+                f"{self._client_version_str(self.execution_client_version)} -> "
+                f"{self._client_version_str(resp_version.execution_client)}"
+            )
+            self._remove_client_version_metric(
+                self.metrics.beacon_node_execution_client_version_g,
+                self.host,
+                self.execution_client_version,
+            )
+            self.execution_client_version = resp_version.execution_client
+            if resp_version.execution_client is not None:
+                self._set_client_version_metric(
+                    self.metrics.beacon_node_execution_client_version_g,
+                    self.host,
+                    resp_version.execution_client,
+                )
 
     async def produce_attestation_data(
         self,

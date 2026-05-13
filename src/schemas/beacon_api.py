@@ -66,6 +66,22 @@ class ForkVersion(Enum):
     GLOAS = "gloas"
 
 
+class ClientVersion(msgspec.Struct, frozen=True):
+    code: str
+    name: str
+    version: str
+    commit: str
+
+
+class GetNodeVersionV2Data(msgspec.Struct):
+    beacon_node: ClientVersion
+    execution_client: ClientVersion | None = None
+
+
+class GetNodeVersionV2Response(msgspec.Struct):
+    data: GetNodeVersionV2Data
+
+
 class AttestationData(msgspec.Struct, frozen=True):
     slot: str
     index: str

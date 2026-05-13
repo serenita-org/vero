@@ -46,8 +46,25 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/config/spec", url.raw_path):
             return CallbackResult(payload=dict(data=spec.to_obj()))
 
-        if re.match("/eth/v1/node/version", url.raw_path):
-            return CallbackResult(payload=dict(data=dict(version="beacon-node/test")))
+        if re.match("/eth/v2/node/version", url.raw_path):
+            return CallbackResult(
+                payload=dict(
+                    data=dict(
+                        beacon_node=dict(
+                            code="LH",
+                            name="Lighthouse",
+                            version="beacon-node/test",
+                            commit="0x12345678",
+                        ),
+                        execution_client=dict(
+                            code="NM",
+                            name="Nethermind",
+                            version="execution-client/test",
+                            commit="0x87654321",
+                        ),
+                    ),
+                ),
+            )
 
         if re.match(r"/eth/v1/validator/duties/proposer/\d+", url.raw_path):
             # This endpoint returns all proposer duties for the epoch
