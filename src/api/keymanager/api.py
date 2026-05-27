@@ -2,7 +2,6 @@ import asyncio
 import logging
 import os
 import stat
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -106,4 +105,4 @@ async def start_server(keymanager: "Keymanager", cli_args: CLIArgs) -> None:
         logger.exception(
             f"Unexpected error occurred - exiting... {e!r}",
         )
-        sys.exit(1)
+        raise SystemExit(1) from e

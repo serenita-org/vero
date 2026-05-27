@@ -129,7 +129,7 @@ def log_cli_arg_values(validated_args: CLIArgs) -> None:
 
 
 def get_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Vero validator client.")
+    parser = argparse.ArgumentParser(prog="Vero", description="Vero validator client.")
 
     mutually_exclusive_group_key_source = parser.add_mutually_exclusive_group(
         required=True
@@ -301,7 +301,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
         from observability import get_service_version
 
         print(f"Vero {get_service_version()}")  # noqa: T201
-        sys.exit(0)
+        raise SystemExit(0)
 
     parser = get_parser()
     parsed_args = parser.parse_args(args=args)
@@ -372,7 +372,9 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             disable_slashing_detection=parsed_args.DANGER____disable_slashing_detection,
         )
     except ValueError as e:
-        parser.error(repr(e))
+        parser.print_usage(sys.stderr)
+        sys.stderr.write(repr(e))
+        raise SystemExit(2) from e
     else:
         # For test_parse_cli_args
         if "pytest" in sys.modules:
