@@ -103,6 +103,7 @@ class MultiBeaconNode:
         # before raising an Exception.
         self._skip_init = skip_init
         self._init_timeout = 300
+        self._shutdown_event = vero.shutdown_event
 
     async def initialize(self) -> None:
         if self._skip_init:
@@ -128,6 +129,9 @@ class MultiBeaconNode:
         ):
             if time.monotonic() >= deadline:
                 raise RuntimeError(_init_error_message())
+
+            if self._shutdown_event.is_set():
+                raise RuntimeError("Shutting down -> cancelling initialization")
 
             self.logger.warning(_init_error_message())
             await asyncio.sleep(0.1)
