@@ -299,7 +299,7 @@ class RemoteSigner(SignatureProvider):
             return await asyncio.gather(
                 *(
                     self.sign(message, identifier)
-                    for message, identifier in zip(messages, identifiers, strict=False)
+                    for message, identifier in zip(messages, identifiers, strict=True)
                 ),
             )
 

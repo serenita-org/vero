@@ -409,11 +409,16 @@ class Keymanager(SignatureProvider):
         identifiers: list[str],
         batch_size: int = 100,
     ) -> list[tuple[SchemaRemoteSigner.SignableMessageT, str, str]]:
+        if len(messages) != len(identifiers):
+            raise ValueError(
+                "Number of messages does not match the number of identifiers",
+            )
+
         signer_inputs: defaultdict[
             RemoteSigner, tuple[list[SchemaRemoteSigner.SignableMessageT], list[str]]
         ] = defaultdict(lambda: ([], []))
 
-        for message, identifier in zip(messages, identifiers, strict=False):
+        for message, identifier in zip(messages, identifiers, strict=True):
             signer = self.pubkey_to_remote_signer.get(identifier)
             if signer is None:
                 # This can happen when a key is deleted but a duty had already been
@@ -424,8 +429,9 @@ class Keymanager(SignatureProvider):
                 )
                 continue
 
-            signer_inputs[signer][0].append(message)
-            signer_inputs[signer][1].append(identifier)
+            signer_messages, signer_identifiers = signer_inputs[signer]
+            signer_messages.append(message)
+            signer_identifiers.append(identifier)
 
         tasks = [
             signer.sign_in_batches(messages, identifiers, batch_size)
