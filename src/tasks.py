@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from collections.abc import Coroutine
-from functools import partial
 from typing import Any
 
 from observability import ErrorType, HandledRuntimeError, Metrics
@@ -33,7 +32,7 @@ class TaskManager:
             )
             self.metrics.errors_c.labels(error_type=ErrorType.OTHER.value).inc()
 
-    def task_done_callback(self, task: asyncio.Task[Any]) -> None:
+    def _task_done_callback(self, task: asyncio.Task[Any]) -> None:
         try:
             exc = task.exception()
         except asyncio.CancelledError:
@@ -85,7 +84,7 @@ class TaskManager:
             task.cancel()
             return
 
-        task.add_done_callback(partial(self.task_done_callback))
+        task.add_done_callback(self._task_done_callback)
         self._tasks.add(task)
 
     def cancel_all(self) -> None:
