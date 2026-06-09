@@ -153,34 +153,32 @@ class ValidatorDutyService:
             self.logger.debug("Duties already being updated, returning...")
             return
 
-        await self._update_duties_lock.acquire()
-        self.logger.info("Updating duties")
-        epoch_at_start = self.beacon_chain.current_epoch
+        async with self._update_duties_lock:
+            self.logger.info("Updating duties")
+            epoch_at_start = self.beacon_chain.current_epoch
 
-        # Backoff parameters
-        initial_delay = 1.0  # Starting delay between API calls
-        max_delay = 10.0  # Maximum delay between API calls
-        current_delay = initial_delay
+            # Backoff parameters
+            initial_delay = 1.0  # Starting delay between API calls
+            max_delay = 10.0  # Maximum delay between API calls
+            current_delay = initial_delay
 
-        while self.beacon_chain.current_epoch == epoch_at_start:
-            try:
-                await self._update_duties()
-                break
-            except Exception as e:
-                self.metrics.errors_c.labels(
-                    error_type=ErrorType.DUTIES_UPDATE.value
-                ).inc()
-                self.logger.exception(
-                    f"Failed to update duties: {e!r}",
-                )
+            while self.beacon_chain.current_epoch == epoch_at_start:
+                try:
+                    await self._update_duties()
+                    break
+                except Exception as e:
+                    self.metrics.errors_c.labels(
+                        error_type=ErrorType.DUTIES_UPDATE.value
+                    ).inc()
+                    self.logger.exception(
+                        f"Failed to update duties: {e!r}",
+                    )
 
-                # Wait for the current delay before retrying again
-                await asyncio.sleep(current_delay)
+                    # Wait for the current delay before retrying again
+                    await asyncio.sleep(current_delay)
 
-                # Increase the delay for the next iteration, up to the max
-                current_delay = min(current_delay * 2, max_delay)
-
-        self._update_duties_lock.release()
+                    # Increase the delay for the next iteration, up to the max
+                    current_delay = min(current_delay * 2, max_delay)
 
     async def _iter_fast_then_slow_task_batches(
         self,
