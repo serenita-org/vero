@@ -49,9 +49,11 @@ async def shut_down(
     _logger.info("Waiting for next slot to start")
     await beacon_chain.wait_for_next_slot()
     _logger.info("Waiting for duty completion")
-    async with asyncio.TaskGroup() as tg:
-        for service in vero.validator_duty_services:
-            tg.create_task(service.wait_for_duty_completion())
+    wait_tasks = [
+        asyncio.create_task(s.wait_for_duty_completion())
+        for s in vero.validator_duty_services
+    ]
+    await asyncio.gather(*wait_tasks)
 
     _logger.info("Shutting down...")
     vero.shutdown_event.set()
