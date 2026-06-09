@@ -460,46 +460,43 @@ class SyncCommitteeService(ValidatorDutyService):
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
-        _sign_and_publish_tasks = []
-        async for (
-            contribution
-        ) in self.multi_beacon_node.get_sync_committee_contributions(
-            slot=duty_slot,
-            subcommittee_indices=unique_subcommittee_indices,
-            beacon_block_root=beacon_block_root,
-        ):
-            messages = []
-            identifiers = []
-            for duty in slot_sync_aggregate_duties:
-                for duty_sp in duty.selection_proofs:
-                    if (
-                        duty_sp.subcommittee_index == contribution.subcommittee_index
-                        and duty_sp.is_aggregator
-                    ):
-                        contribution_count += 1
-                        messages.append(
-                            SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
-                                fork_info=_fork_info,
-                                contribution_and_proof=SpecSyncCommittee.ContributionAndProof(
-                                    aggregator_index=int(duty.validator_index),
-                                    contribution=contribution,
-                                    selection_proof=duty_sp.selection_proof,
-                                ).to_obj(),
+        async with asyncio.TaskGroup() as tg:
+            async for (
+                contribution
+            ) in self.multi_beacon_node.get_sync_committee_contributions(
+                slot=duty_slot,
+                subcommittee_indices=unique_subcommittee_indices,
+                beacon_block_root=beacon_block_root,
+            ):
+                messages = []
+                identifiers = []
+                for duty in slot_sync_aggregate_duties:
+                    for duty_sp in duty.selection_proofs:
+                        if (
+                            duty_sp.subcommittee_index
+                            == contribution.subcommittee_index
+                            and duty_sp.is_aggregator
+                        ):
+                            contribution_count += 1
+                            messages.append(
+                                SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
+                                    fork_info=_fork_info,
+                                    contribution_and_proof=SpecSyncCommittee.ContributionAndProof(
+                                        aggregator_index=int(duty.validator_index),
+                                        contribution=contribution,
+                                        selection_proof=duty_sp.selection_proof,
+                                    ).to_obj(),
+                                )
                             )
-                        )
-                        identifiers.append(duty.pubkey)
+                            identifiers.append(duty.pubkey)
 
-            _sign_and_publish_tasks.append(
-                asyncio.create_task(
+                tg.create_task(
                     self._sign_and_publish_contributions(
                         duty_slot=duty_slot,
                         messages=messages,
                         identifiers=identifiers,
                     )
                 )
-            )
-
-        await asyncio.gather(*_sign_and_publish_tasks)
         self.logger.info(
             f"Published sync committee contribution and proofs for slot {duty_slot}, count: {contribution_count}"
         )

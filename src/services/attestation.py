@@ -477,35 +477,35 @@ class AttestationService(ValidatorDutyService):
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
         _fork_version = self.beacon_chain.current_fork_version
-        _sign_and_publish_tasks = []
-
-        async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
-            attestation_data_root=attestation_data_root,
-            slot=slot,
-            committee_indices=committee_indices,
-        ):
-            messages: list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage] = []
-            identifiers = []
-            for duty in aggregator_duties:
-                if aggregate.committee_bits[int(duty.committee_index)]:
-                    aggregate_count += 1
-                    messages.append(
-                        SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
-                            fork_info=_fork_info,
-                            aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
-                                version=self.beacon_chain.current_fork_version.value.upper(),
-                                data=SpecAttestation.AggregateAndProofElectra(
-                                    aggregator_index=int(duty.validator_index),
-                                    aggregate=aggregate,
-                                    selection_proof=duty.selection_proof,
-                                ).to_obj(),
-                            ),
+        async with asyncio.TaskGroup() as tg:
+            async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
+                attestation_data_root=attestation_data_root,
+                slot=slot,
+                committee_indices=committee_indices,
+            ):
+                messages: list[
+                    SchemaRemoteSigner.AggregateAndProofV2SignableMessage
+                ] = []
+                identifiers = []
+                for duty in aggregator_duties:
+                    if aggregate.committee_bits[int(duty.committee_index)]:
+                        aggregate_count += 1
+                        messages.append(
+                            SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
+                                fork_info=_fork_info,
+                                aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
+                                    version=self.beacon_chain.current_fork_version.value.upper(),
+                                    data=SpecAttestation.AggregateAndProofElectra(
+                                        aggregator_index=int(duty.validator_index),
+                                        aggregate=aggregate,
+                                        selection_proof=duty.selection_proof,
+                                    ).to_obj(),
+                                ),
+                            )
                         )
-                    )
-                    identifiers.append(duty.pubkey)
+                        identifiers.append(duty.pubkey)
 
-            _sign_and_publish_tasks.append(
-                asyncio.create_task(
+                tg.create_task(
                     self._sign_and_publish_aggregates(
                         slot=slot,
                         messages=messages,
@@ -513,9 +513,6 @@ class AttestationService(ValidatorDutyService):
                         fork_version=_fork_version,
                     )
                 )
-            )
-
-        await asyncio.gather(*_sign_and_publish_tasks)
         self.logger.info(
             f"Published aggregate and proofs for slot {slot}, count: {aggregate_count}",
         )
