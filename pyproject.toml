@@ -65,6 +65,11 @@ exclude-newer = "7 days"
 
 [tool.uv.sources]
 grandine-py = { git = "https://github.com/eth2353/grandine-py", rev = "v0.1.3" }
+# aioresponses is not well-maintained anymore, consider moving to aiointercept
+# which is also conceptually much simpler, though less stable.
+# My fork only contains a very minimal patch that makes aioresponses compatible with
+# aiohttp>3.14
+aioresponses = { git = "https://github.com/eth2353/aioresponses", rev = "b3e8f869b1da9901144988d3bc41f9bc03d6e395" }
 
 [tool.uv.pip]
 generate-hashes = true
