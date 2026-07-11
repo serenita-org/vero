@@ -193,6 +193,8 @@ class AttestationService(ValidatorDutyService):
     ) -> AttestationData:
         consensus_start = asyncio.get_running_loop().time()
         try:
+            # TODO Note - in Gloas the meaning of the AttestationData.index field
+            #  changes to indicate payload availability
             att_data = await asyncio.wait_for(
                 self.attestation_data_provider.produce_attestation_data(
                     slot=slot,

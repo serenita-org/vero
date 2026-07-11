@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from remerkleable.bitfields import Bitlist, Bitvector
 from remerkleable.complex import Container
+from remerkleable.progressive import ProgressiveContainer, ProgressiveBitlist
 
 from spec.common import (
     BLSSignature,
@@ -34,13 +35,16 @@ class AttestationData(Container):
     source: Checkpoint
     target: Checkpoint
 
+class AggregationBits(ProgressiveBitlist):
+    pass
+
 
 # Dynamic spec class creation
 # to account for differing spec values across chains
 class SpecAttestation:
     AttestationElectra: Container
-    IndexedAttestationElectra: Container
     AggregateAndProofElectra: Container
+    AttestationGloas: Container
 
     @classmethod
     def initialize(
@@ -60,5 +64,13 @@ class SpecAttestation:
             aggregate: AttestationElectra
             selection_proof: BLSSignature
 
+        # [Modified in Gloas:EIP7688]
+        class AttestationGloas(ProgressiveContainer(active_fields=[1] * 4)):
+            aggregation_bits: AggregationBits
+            data: AttestationData
+            signature: BLSSignature
+            committee_bits: Bitvector[spec.MAX_COMMITTEES_PER_SLOT]
+
         cls.AttestationElectra = AttestationElectra
         cls.AggregateAndProofElectra = AggregateAndProofElectra
+        cls.AttestationGloas = AttestationGloas

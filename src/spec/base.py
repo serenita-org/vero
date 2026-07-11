@@ -113,6 +113,7 @@ class SpecGloas:
     SYNC_MESSAGE_DUE_BPS_GLOAS: UInt64SerializedAsString
     CONTRIBUTION_DUE_BPS_GLOAS: UInt64SerializedAsString
     PAYLOAD_ATTESTATION_DUE_BPS: UInt64SerializedAsString
+    PTC_SIZE: UInt64SerializedAsString
 
     @classmethod
     def from_obj(cls, obj: dict[str, Any]) -> Self:

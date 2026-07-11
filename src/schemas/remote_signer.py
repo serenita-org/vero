@@ -9,6 +9,7 @@ class SigningRequestType(Enum):
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
     BLOCK_V2 = "BLOCK_V2"
+    PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES"
     RANDAO_REVEAL = "RANDAO_REVEAL"
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
     SYNC_COMMITTEE_MESSAGE = "SYNC_COMMITTEE_MESSAGE"
@@ -71,6 +72,17 @@ class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.RANDAO_REVEAL
     randao_reveal: RandaoReveal
 
+
+class ProposerPreferences(msgspec.Struct):
+    dependent_root: str
+    proposal_slot: str
+    validator_index: str
+    fee_recipient: str
+    target_gas_limit: str
+
+class ProposerPreferencesSignableMessage(SignableMessage, kw_only=True):
+    type: SigningRequestType = SigningRequestType.PROPOSER_PREFERENCES
+    proposer_preferences: ProposerPreferences
 
 class BeaconBlockHeader(msgspec.Struct):
     slot: str
