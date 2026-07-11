@@ -273,6 +273,12 @@ class MultiBeaconNode:
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
         return await self.best_beacon_node.get_proposer_duties(**kwargs)
 
+    async def get_proposer_duties_v2(
+        self,
+        **kwargs: Any,
+    ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
+        return await self.best_beacon_node.get_proposer_duties_v2(**kwargs)
+
     async def prepare_beacon_proposer(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
             func_name="prepare_beacon_proposer",
@@ -287,7 +293,9 @@ class MultiBeaconNode:
     async def submit_proposer_preferences(self, **kwargs: Any) -> None:
         # Only ask one of the beacon nodes to register the validators with
         # MEV relays - no need to overwhelm them with duplicate registrations
-        await self._get_all_beacon_node_responses(func_name="submit_proposer_preferences", **kwargs)
+        await self._get_all_beacon_node_responses(
+            func_name="submit_proposer_preferences", **kwargs
+        )
 
     @staticmethod
     def _parse_block_response(

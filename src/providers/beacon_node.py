@@ -485,6 +485,23 @@ class BeaconNode:
 
         return response
 
+    async def get_proposer_duties_v2(
+        self,
+        epoch: int,
+    ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
+        resp_bytes, _, _ = await self._make_request(
+            method="GET",
+            endpoint="/eth/v2/validator/duties/proposer/{epoch}",
+            formatted_endpoint_string_params=dict(epoch=epoch),
+        )
+
+        response = msgspec.json.decode(
+            resp_bytes, type=SchemaBeaconAPI.GetProposerDutiesResponse
+        )
+        self._raise_if_optimistic(response)
+
+        return response
+
     async def get_sync_duties(
         self,
         epoch: int,
@@ -780,8 +797,7 @@ class BeaconNode:
         builder_boost_factor: int,
         randao_reveal: str,
     ) -> SchemaBeaconAPI.ProduceBlockV3Response:
-        """Requests a beacon node to produce a valid block, which can then be signed by a validator.
-        """
+        """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         params = dict(
             randao_reveal=randao_reveal,
             builder_boost_factor=str(builder_boost_factor),
@@ -826,13 +842,13 @@ class BeaconNode:
             fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
             # TODO Lodestar is not including this header?
             execution_payload_included = True
-            #execution_payload_included = (
+            # execution_payload_included = (
             #    headers["Eth-Execution-Payload-Included"].lower() == "true"
-            #)
+            # )
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            #execution_payload_value = int(headers["Eth-Execution-Payload-Value"] or 0)
-            #consensus_block_value = int(headers["Eth-Consensus-Block-Value"] or 0)
+            # execution_payload_value = int(headers["Eth-Execution-Payload-Value"] or 0)
+            # consensus_block_value = int(headers["Eth-Consensus-Block-Value"] or 0)
             # TODO Lodestar not returning these either...
             execution_payload_value = 0
             consensus_block_value = 0

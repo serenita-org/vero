@@ -86,7 +86,7 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/node/version", url.raw_path):
             return CallbackResult(payload=dict(data=dict(version="beacon-node/test")))
 
-        if re.match(r"/eth/v1/validator/duties/proposer/\d+", url.raw_path):
+        if re.match(r"/eth/v[12]/validator/duties/proposer/\d+", url.raw_path):
             # This endpoint returns all proposer duties for the epoch
             epoch_no = int(url.raw_path.split("/")[-1])
 
