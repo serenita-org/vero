@@ -376,20 +376,10 @@ class BlockProposalService(ValidatorDutyService):
                         ),
                     )
                 )
-                # TODO wait for web3signer glamsterdam image
-                # signed_preferences.append(
-                #    await self.signature_provider.sign(
-                #        message=msg,
-                #        identifier=duty.pubkey,
-                #    )
-                # )
-
                 signed_preferences.append(
-                    (
-                        msg,
-                        # fake signature value for now
-                        "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505",
-                        duty.pubkey,
+                    await self.signature_provider.sign(
+                        message=msg,
+                        identifier=duty.pubkey,
                     )
                 )
 
