@@ -284,6 +284,11 @@ class MultiBeaconNode:
         # MEV relays - no need to overwhelm them with duplicate registrations
         await self.best_beacon_node.register_validator(**kwargs)
 
+    async def submit_proposer_preferences(self, **kwargs: Any) -> None:
+        # Only ask one of the beacon nodes to register the validators with
+        # MEV relays - no need to overwhelm them with duplicate registrations
+        await self._get_all_beacon_node_responses(func_name="submit_proposer_preferences", **kwargs)
+
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
@@ -344,7 +349,7 @@ class MultiBeaconNode:
 
         tasks = {
             asyncio.create_task(
-                bn.produce_block_v3(
+                bn.produce_block_v4(
                     slot=slot,
                     graffiti=graffiti,
                     builder_boost_factor=builder_boost_factor,
@@ -367,6 +372,8 @@ class MultiBeaconNode:
             Network.GNOSIS,
             Network.CHIADO,
         ]
+        # TODO use value from bid post-Gloas - there is no execution_payload_value
+        _compare_consensus_block_value_only = True
 
         while pending and remaining_soft_timeout > 0:
             done, pending = await asyncio.wait(

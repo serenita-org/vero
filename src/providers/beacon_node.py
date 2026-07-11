@@ -649,6 +649,25 @@ class BeaconNode:
             ),
         )
 
+    async def submit_proposer_preferences(
+        self,
+        signed_proposer_preferences: list[
+            tuple[SchemaRemoteSigner.ProposerPreferences, str]
+        ],
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
+        await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/validator/proposer_preferences",
+            headers={"Eth-Consensus-Version": fork_version.value},
+            data=self.json_encoder.encode(
+                [
+                    dict(message=preferences, signature=sig)
+                    for preferences, sig in signed_proposer_preferences
+                ]
+            ),
+        )
+
     async def produce_block_v3(
         self,
         slot: int,
@@ -753,6 +772,104 @@ class BeaconNode:
             ).observe(execution_payload_value)
 
             return response, response_content_type
+
+    async def produce_block_v4(
+        self,
+        slot: int,
+        graffiti: bytes,
+        builder_boost_factor: int,
+        randao_reveal: str,
+    ) -> SchemaBeaconAPI.ProduceBlockV3Response:
+        """Requests a beacon node to produce a valid block, which can then be signed by a validator.
+        """
+        params = dict(
+            randao_reveal=randao_reveal,
+            builder_boost_factor=str(builder_boost_factor),
+            # TODO include_payload param
+            include_payload="true",
+        )
+        if graffiti:
+            params["graffiti"] = f"0x{graffiti.hex()}"
+
+        accept_header = (
+            ContentType.JSON.value
+            if self._force_json_wire_format
+            # Prefer SSZ over JSON
+            else f"{ContentType.OCTET_STREAM.value};q=1.0,{ContentType.JSON.value};q=0.9"
+        )
+
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.produce_block_v3",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ) as tracer_span:
+            resp_bytes, content_type, headers = await self._make_request(
+                method="GET",
+                endpoint="/eth/v4/validator/blocks/{slot}",
+                formatted_endpoint_string_params=dict(slot=slot),
+                params=params,
+                timeout=ClientTimeout(
+                    connect=self.client_session.timeout.connect,
+                ),
+                headers={ACCEPT: accept_header},
+            )
+            if (
+                content_type == ContentType.JSON.value
+                and not self._force_json_wire_format
+            ):
+                self.logger.warning(
+                    f"{self.host} returned block as JSON but Vero requested SSZ"
+                )
+
+            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
+            # TODO Lodestar is not including this header?
+            execution_payload_included = True
+            #execution_payload_included = (
+            #    headers["Eth-Execution-Payload-Included"].lower() == "true"
+            #)
+            # Prysm may return an empty string for the block value
+            # https://github.com/OffchainLabs/prysm/issues/15174
+            #execution_payload_value = int(headers["Eth-Execution-Payload-Value"] or 0)
+            #consensus_block_value = int(headers["Eth-Consensus-Block-Value"] or 0)
+            # TODO Lodestar not returning these either...
+            execution_payload_value = 0
+            consensus_block_value = 0
+
+            if content_type in (ContentType.OCTET_STREAM.value, ContentType.JSON.value):
+                response = SchemaBeaconAPI.ProduceBlockV4Response(
+                    version=fork_version,
+                    consensus_block_value=str(consensus_block_value),
+                    execution_payload_included=execution_payload_included,
+                    content_type=ContentType(content_type),
+                    data=resp_bytes,
+                )
+            else:
+                raise NotImplementedError(f"Unsupported content type: {content_type}")
+
+            tracer_span.add_event(
+                "ProduceBlockV4Response",
+                attributes=dict(
+                    execution_payload_included=response.execution_payload_included,
+                    execution_payload_value=execution_payload_value,
+                    consensus_block_value=consensus_block_value,
+                ),
+            )
+
+            self.logger.info(
+                f"{self.host} returned block with"
+                f" consensus block value {consensus_block_value},"
+                f" execution payload value {execution_payload_value}."
+            )
+            self.metrics.beacon_node_consensus_block_value_h.labels(
+                host=self.host
+            ).observe(consensus_block_value)
+            self.metrics.beacon_node_execution_payload_value_h.labels(
+                host=self.host
+            ).observe(execution_payload_value)
+
+            return response
 
     async def publish_block_v2(
         self,

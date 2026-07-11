@@ -5,6 +5,7 @@ from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
 
+import msgspec.json
 from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
@@ -21,6 +22,7 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
+from spec import SpecBeaconBlock
 from spec.common import get_slot_component_duration_ms
 from spec import BeaconBlock
 from spec.utils import encode_graffiti
@@ -152,8 +154,12 @@ class BlockProposalService(ValidatorDutyService):
                 current_slot=slot,
                 pubkeys_to_register=[duty_for_next_slot.pubkey],
             )
+            # TODO
+            await self.submit_proposer_preferences()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
+        # TODO?
+        #self.task_manager.create_task(self.submit_proposer_preferences())
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -332,6 +338,70 @@ class BlockProposalService(ValidatorDutyService):
                 f"Published validator registrations, count: {len(pubkey_batch)}"
             )
 
+    async def submit_proposer_preferences(self) -> None:
+        # TODO Ok this needs some reworking, it seems we should only send these
+        # when expecting to propose soonish? so different from validator registrations
+
+        # Default to values provided via the CLI arguments unless overridden
+        # via the Keymanager API
+        default_fee_recipient = self.cli_args.fee_recipient
+        # TODO consider adding deprecating gas-limit CLI flag and replacing it with target-gas-limit
+        default_target_gas_limit = str(self.cli_args.gas_limit)
+
+        for epoch, proposer_duties in self.proposer_duties.items():
+            signed_preferences = []
+            for duty in proposer_duties:
+                self.proposer_duties_dependent_roots
+                # TODO parallelize + error-handling (might want to retry here)
+                msg = SchemaRemoteSigner.ProposerPreferencesSignableMessage(
+                    proposer_preferences=SchemaRemoteSigner.ProposerPreferences(
+                        # Lodestar is throwing "PROPOSER_PREFERENCES_ERROR_UNKNOWN_DEPENDENT_ROOT"
+                        # ... dependent roots changed a bit in Gloas so may have sth to do with that
+                        dependent_root=self.proposer_duties_dependent_roots[epoch],
+                        proposal_slot=duty.slot,
+                        validator_index=duty.validator_index,
+                        fee_recipient=default_fee_recipient
+                        if not self.keymanager.enabled
+                        else self.keymanager.pubkey_to_fee_recipient_override.get(
+                            duty.pubkey, default_fee_recipient
+                        ),
+                        target_gas_limit=default_target_gas_limit
+                        if not self.keymanager.enabled
+                        else self.keymanager.pubkey_to_gas_limit_override.get(
+                            duty.pubkey, default_target_gas_limit
+                        ),
+                    )
+                )
+                # TODO wait for web3signer glamsterdam image
+                #signed_preferences.append(
+                #    await self.signature_provider.sign(
+                #        message=msg,
+                #        identifier=duty.pubkey,
+                #    )
+                #)
+
+                signed_preferences.append(
+                    (msg,
+                    # fake signature value for now
+                    "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505",
+                    duty.pubkey,)
+                )
+
+            if len(signed_preferences) == 0:
+                continue
+
+            # TODO unhardcode
+            _fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+
+            await self.multi_beacon_node.submit_proposer_preferences(
+                signed_proposer_preferences=[(msg.proposer_preferences, sig) for (msg, sig, _) in signed_preferences],
+                fork_version=_fork_version
+            )
+
+            self.logger.info(
+                f"Submitted proposer preferences for epoch {epoch}, count: {len(signed_preferences)}"
+            )
+
     async def _fetch_randao_reveal(self, slot: int, pubkey: str) -> None:
         self.logger.debug(f"Fetching RANDAO reveal for slot {slot}")
 
@@ -420,7 +490,12 @@ class BlockProposalService(ValidatorDutyService):
                 ) from None
             else:
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
-                    **block_contents_or_blinded_block.header_dict()
+                # TODO    **block_contents_or_blinded_block.header_dict()
+                    slot=str(block_contents_or_blinded_block.slot),
+                    proposer_index=str(block_contents_or_blinded_block.proposer_index),
+                    parent_root=str(block_contents_or_blinded_block.parent_root),
+                    state_root=str(block_contents_or_blinded_block.state_root),
+                    body_root="0x" + block_contents_or_blinded_block.body.hash_tree_root().hex(),
                 )
                 return block_contents_or_blinded_block, block_header
 
@@ -471,6 +546,20 @@ class BlockProposalService(ValidatorDutyService):
             name=f"{self.__class__.__name__}._publish_block",
         ):
             try:
+                if fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+                    signed_beacon_block=SchemaBeaconAPI.SignedBeaconBlock(
+                        message=block_contents_or_blinded_block.to_obj(),
+                        signature=signature,
+                    )
+                    encoded = msgspec.json.encode(signed_beacon_block)
+                    self.logger.debug(f"Encoded signed beacon block: {encoded}")
+                    await self.multi_beacon_node.publish_block_v2(
+                        fork_version=fork_version,
+                        signed_block_contents=encoded,
+                        content_type=ContentType.JSON,
+                    )
+                    raise NotImplementedError("Not errored, just temporary early return")
+
                 with block_contents_or_blinded_block.sign(
                     signature=signature
                 ) as signed_object:
@@ -497,6 +586,12 @@ class BlockProposalService(ValidatorDutyService):
                         content_type=content_type,
                     )
 
+            # TODO
+            except NotImplementedError:
+                self.logger.info(f"!!!Published block!!!")
+                if True: # if self-building
+                    # const isSelfBuild = block.body.signedExecutionPayloadBid.message.builderIndex === BUILDER_INDEX_SELF_BUILD;
+                    self.task_manager.create_task(self._publish_payload_envelope())
             except Exception as e:
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
@@ -511,6 +606,14 @@ class BlockProposalService(ValidatorDutyService):
                     f"Published block for slot {slot}, root {block_root}",
                 )
                 self.metrics.vc_published_blocks_c.inc()
+
+    async def _publish_payload_envelope(self):
+        # step 1 - get envelope by slot + beacon block root
+        #  (if we add the include_payload query param we would not need to query for
+        #  this payload separately)
+        # step 2 sign envelope
+        # step 3 publish signed envelope
+        self.logger.info(f"Publishing payload envelope (not implemented)")
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
@@ -591,4 +694,6 @@ class BlockProposalService(ValidatorDutyService):
         try:
             await self._propose_block(slot=slot, duty=duty)
         finally:
+            # TODO take into account we also need to publish the envelope
+            #  when self-building
             self._last_slot_duty_completed_for = slot
