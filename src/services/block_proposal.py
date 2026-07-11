@@ -22,7 +22,6 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec import SpecBeaconBlock
 from spec.common import get_slot_component_duration_ms
 from spec import BeaconBlock
 from spec.utils import encode_graffiti
@@ -159,7 +158,7 @@ class BlockProposalService(ValidatorDutyService):
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
         # TODO?
-        #self.task_manager.create_task(self.submit_proposer_preferences())
+        # self.task_manager.create_task(self.submit_proposer_preferences())
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -202,9 +201,14 @@ class BlockProposalService(ValidatorDutyService):
         for epoch in (current_epoch, current_epoch + 1):
             self.logger.debug(f"Updating proposer duties for epoch {epoch}")
 
-            response = await self.multi_beacon_node.get_proposer_duties(
-                epoch=epoch,
-            )
+            if epoch >= self.beacon_chain.GLOAS_FORK_EPOCH:
+                response = await self.multi_beacon_node.get_proposer_duties_v2(
+                    epoch=epoch,
+                )
+            else:
+                response = await self.multi_beacon_node.get_proposer_duties(
+                    epoch=epoch,
+                )
             fetched_duties = response.data
 
             self.proposer_duties_dependent_roots[epoch] = response.dependent_root
@@ -373,18 +377,20 @@ class BlockProposalService(ValidatorDutyService):
                     )
                 )
                 # TODO wait for web3signer glamsterdam image
-                #signed_preferences.append(
+                # signed_preferences.append(
                 #    await self.signature_provider.sign(
                 #        message=msg,
                 #        identifier=duty.pubkey,
                 #    )
-                #)
+                # )
 
                 signed_preferences.append(
-                    (msg,
-                    # fake signature value for now
-                    "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505",
-                    duty.pubkey,)
+                    (
+                        msg,
+                        # fake signature value for now
+                        "0x1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505cc411d61252fb6cb3fa0017b679f8bb2305b26a285fa2737f175668d0dff91cc1b66ac1fb663c9bc59509846d6ec05345bd908eda73e670af888da41af171505",
+                        duty.pubkey,
+                    )
                 )
 
             if len(signed_preferences) == 0:
@@ -394,8 +400,11 @@ class BlockProposalService(ValidatorDutyService):
             _fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
 
             await self.multi_beacon_node.submit_proposer_preferences(
-                signed_proposer_preferences=[(msg.proposer_preferences, sig) for (msg, sig, _) in signed_preferences],
-                fork_version=_fork_version
+                signed_proposer_preferences=[
+                    (msg.proposer_preferences, sig)
+                    for (msg, sig, _) in signed_preferences
+                ],
+                fork_version=_fork_version,
             )
 
             self.logger.info(
@@ -490,12 +499,13 @@ class BlockProposalService(ValidatorDutyService):
                 ) from None
             else:
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
-                # TODO    **block_contents_or_blinded_block.header_dict()
+                    # TODO    **block_contents_or_blinded_block.header_dict()
                     slot=str(block_contents_or_blinded_block.slot),
                     proposer_index=str(block_contents_or_blinded_block.proposer_index),
                     parent_root=str(block_contents_or_blinded_block.parent_root),
                     state_root=str(block_contents_or_blinded_block.state_root),
-                    body_root="0x" + block_contents_or_blinded_block.body.hash_tree_root().hex(),
+                    body_root="0x"
+                    + block_contents_or_blinded_block.body.hash_tree_root().hex(),
                 )
                 return block_contents_or_blinded_block, block_header
 
@@ -547,7 +557,7 @@ class BlockProposalService(ValidatorDutyService):
         ):
             try:
                 if fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
-                    signed_beacon_block=SchemaBeaconAPI.SignedBeaconBlock(
+                    signed_beacon_block = SchemaBeaconAPI.SignedBeaconBlock(
                         message=block_contents_or_blinded_block.to_obj(),
                         signature=signature,
                     )
@@ -558,7 +568,9 @@ class BlockProposalService(ValidatorDutyService):
                         signed_block_contents=encoded,
                         content_type=ContentType.JSON,
                     )
-                    raise NotImplementedError("Not errored, just temporary early return")
+                    raise NotImplementedError(
+                        "Not errored, just temporary early return"
+                    )
 
                 with block_contents_or_blinded_block.sign(
                     signature=signature
@@ -588,8 +600,8 @@ class BlockProposalService(ValidatorDutyService):
 
             # TODO
             except NotImplementedError:
-                self.logger.info(f"!!!Published block!!!")
-                if True: # if self-building
+                self.logger.info("!!!Published block!!!")
+                if True:  # if self-building
                     # const isSelfBuild = block.body.signedExecutionPayloadBid.message.builderIndex === BUILDER_INDEX_SELF_BUILD;
                     self.task_manager.create_task(self._publish_payload_envelope())
             except Exception as e:
@@ -613,7 +625,7 @@ class BlockProposalService(ValidatorDutyService):
         #  this payload separately)
         # step 2 sign envelope
         # step 3 publish signed envelope
-        self.logger.info(f"Publishing payload envelope (not implemented)")
+        self.logger.info("Publishing payload envelope (not implemented)")
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
