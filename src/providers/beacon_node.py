@@ -933,6 +933,66 @@ class BeaconNode:
                 },
             )
 
+    async def get_execution_payload_envelope(
+        self,
+        slot: int,
+        beacon_block_root: str,
+    ) -> tuple[SchemaBeaconAPI.ForkVersion, dict]:
+        # TODO we can do JSON and SSZ here
+
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_payload_envelope",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            resp_bytes, content_type, headers = await self._make_request(
+                method="GET",
+                endpoint="/eth/v1/validator/execution_payload_envelopes/{slot}/{beacon_block_root}",
+                formatted_endpoint_string_params=dict(
+                    slot=slot,
+                    beacon_block_root=beacon_block_root,
+                ),
+            )
+            # TODO remove
+            assert content_type == ContentType.JSON.value
+            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
+
+            decoded = msgspec.json.decode(resp_bytes)
+            return fork_version, decoded["data"]
+
+    async def publish_execution_payload_envelope(
+        self,
+        envelope: dict,
+        signature: str,
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_execution_payload_envelope",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            # TODO again SSZ/JSON
+            _, _, _ = await self._make_request(
+                method="POST",
+                endpoint="/eth/v1/beacon/execution_payload_envelopes",
+                headers={
+                    "Eth-Consensus-Version": fork_version.value,
+                    # TODO
+                    "Eth-Execution-Payload-Blinded": "true",
+                    CONTENT_TYPE: ContentType.JSON.value,
+                },
+                data=self.json_encoder.encode(
+                    dict(
+                        message=envelope,
+                        signature=signature,
+                    )
+                ),
+            )
+
     async def get_liveness(
         self, epoch: int, validator_indices: list[int]
     ) -> tuple[str, list[SchemaBeaconAPI.ValidatorLiveness]]:

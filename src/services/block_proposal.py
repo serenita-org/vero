@@ -26,6 +26,8 @@ from spec.common import get_slot_component_duration_ms
 from spec import BeaconBlock
 from spec.utils import encode_graffiti
 
+# BUILDER_INDEX_SELF_BUILD = UINT64_MAX
+BUILDER_INDEX_SELF_BUILD = 2**64 - 1
 
 class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
@@ -352,10 +354,16 @@ class BlockProposalService(ValidatorDutyService):
         # TODO consider adding deprecating gas-limit CLI flag and replacing it with target-gas-limit
         default_target_gas_limit = str(self.cli_args.gas_limit)
 
+        current_slot = self.beacon_chain.current_slot
+
         for epoch, proposer_duties in self.proposer_duties.items():
             signed_preferences = []
+            _fork_info = self.beacon_chain.get_fork_info(
+                slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
+            )
             for duty in proposer_duties:
-                self.proposer_duties_dependent_roots
+                if int(duty.slot) < current_slot:
+                    continue
                 # TODO parallelize + error-handling (might want to retry here)
                 msg = SchemaRemoteSigner.ProposerPreferencesSignableMessage(
                     proposer_preferences=SchemaRemoteSigner.ProposerPreferences(
@@ -374,7 +382,8 @@ class BlockProposalService(ValidatorDutyService):
                         else self.keymanager.pubkey_to_gas_limit_override.get(
                             duty.pubkey, default_target_gas_limit
                         ),
-                    )
+                    ),
+                    fork_info=_fork_info,
                 )
                 signed_preferences.append(
                     await self.signature_provider.sign(
@@ -533,6 +542,7 @@ class BlockProposalService(ValidatorDutyService):
     async def _publish_block(
         self,
         slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
         fork_version: SchemaBeaconAPI.ForkVersion,
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
@@ -591,9 +601,19 @@ class BlockProposalService(ValidatorDutyService):
             # TODO
             except NotImplementedError:
                 self.logger.info("!!!Published block!!!")
-                if True:  # if self-building
-                    # const isSelfBuild = block.body.signedExecutionPayloadBid.message.builderIndex === BUILDER_INDEX_SELF_BUILD;
-                    self.task_manager.create_task(self._publish_payload_envelope())
+                # If self-building, published payload envelope too
+                if (
+                    block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
+                    == BUILDER_INDEX_SELF_BUILD
+                ):
+                    self.task_manager.create_task(
+                        self._publish_payload_envelope(
+                            slot=slot,
+                            duty=duty,
+                            beacon_block_root="0x"
+                            + block_contents_or_blinded_block.hash_tree_root().hex(),
+                        )
+                    )
             except Exception as e:
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
@@ -609,13 +629,59 @@ class BlockProposalService(ValidatorDutyService):
                 )
                 self.metrics.vc_published_blocks_c.inc()
 
-    async def _publish_payload_envelope(self):
+    async def _publish_payload_envelope(
+        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, beacon_block_root: str
+    ) -> None:
         # step 1 - get envelope by slot + beacon block root
         #  (if we add the include_payload query param we would not need to query for
         #  this payload separately)
         # step 2 sign envelope
         # step 3 publish signed envelope
-        self.logger.info("Publishing payload envelope (not implemented)")
+        self.logger.info("Publishing payload envelope")
+        # TODO should we use first response here?
+        #  or only ask the one specific beacon node that
+        #  produced the beacon block we proposed?
+        (
+            fork_version,
+            blinded_envelope_dict,
+        ) = await self.multi_beacon_node._get_first_beacon_node_response(
+            func_name="get_execution_payload_envelope",
+            slot=slot,
+            beacon_block_root=beacon_block_root,
+        )
+
+        # TODO Beacon API should return this root directly!!! ( blinded_envelope_dict["payload_root"], )
+        # payload_root =
+
+        _, signature, _ = await self.signature_provider.sign(
+            message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
+                fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                execution_payload_envelope=SchemaRemoteSigner.ExecutionPayloadEnvelope(
+                    payload=blinded_envelope_dict["payload"],
+                    execution_requests=blinded_envelope_dict["execution_requests"],
+                    builder_index=blinded_envelope_dict["builder_index"],
+                    beacon_block_root=blinded_envelope_dict["beacon_block_root"],
+                    parent_beacon_block_root=blinded_envelope_dict[
+                        "parent_beacon_block_root"
+                    ],
+                ),
+            ),
+            identifier=duty.pubkey,
+        )
+
+        # TODO should we use first response here?
+        #  we should (?) only send this to the beacon node that returned the
+        #  envelope since the other ones won't have the rest of the data.
+        #  Or, we could keep track of the beacon node that returned the
+        #  envelope
+        await self.multi_beacon_node._get_first_beacon_node_response(
+            func_name="publish_execution_payload_envelope",
+            envelope=blinded_envelope_dict,
+            signature=signature,
+            fork_version=fork_version,
+        )
+
+        self.logger.info("Published payload envelope")
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
@@ -661,6 +727,7 @@ class BlockProposalService(ValidatorDutyService):
 
                 await self._publish_block(
                     slot=slot,
+                    duty=duty,
                     fork_version=fork_version,
                     signature=signature,
                     block_contents_or_blinded_block=block_contents_or_blinded_block,
