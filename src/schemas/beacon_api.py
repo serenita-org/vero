@@ -172,11 +172,17 @@ class ProduceBlockV3Response(msgspec.Struct):
     consensus_block_value: str
     data: bytes
 
+
 class ProduceBlockV4Response(msgspec.Struct):
     version: ForkVersion
     consensus_block_value: str
     execution_payload_included: bool
     content_type: ContentType
+    data: bytes
+
+
+class GetExecutionPayloadEnvelopeResponse(msgspec.Struct):
+    version: ForkVersion
     data: bytes
 
 
