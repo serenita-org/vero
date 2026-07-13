@@ -1,11 +1,12 @@
 import time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Any, get_args
 
 from yaml import BaseLoader, load
 
 from spec.base import Genesis, SpecFulu, parse_spec
+from spec.preset import Preset
 
 
 class Network(Enum):
@@ -67,9 +68,6 @@ def parse_yaml_file(fp: Path) -> dict[str, Any]:
         if not isinstance(parsed, dict):
             raise TypeError(f"Expected a dict, got {type(parsed)}")
         return parsed
-
-
-Preset = Literal["mainnet", "minimal", "gnosis"]
 
 
 def get_network_spec(

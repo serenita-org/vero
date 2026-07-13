@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import re
 import time
 from collections.abc import Callable, Coroutine
@@ -12,6 +13,25 @@ from aioresponses import CallbackResult, aioresponses
 from args import CLIArgs
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
+from spec import Checkpoint
+from tests.ssz_objects import make_attestation_data
+
+
+def _valid_root(value: str) -> str:
+    try:
+        raw = bytes.fromhex(value.removeprefix("0x"))
+    except ValueError:
+        raw = b""
+    if len(raw) == 32:
+        return f"0x{raw.hex()}"
+    return f"0x{hashlib.sha256(value.encode()).hexdigest()}"
+
+
+def _checkpoint(epoch: str | int, root: str) -> Checkpoint:
+    return Checkpoint(
+        epoch=int(epoch),
+        root=bytes.fromhex(_valid_root(root).removeprefix("0x")),
+    )
 
 
 @pytest.fixture
@@ -35,24 +55,22 @@ async def attestation_data_provider(
 
 def _create_att_data_callback(
     block_root: str,
-    source: SchemaBeaconAPI.Checkpoint,
-    target: SchemaBeaconAPI.Checkpoint,
+    source: Checkpoint,
+    target: Checkpoint,
     delay: float = 0.0,
 ) -> Callable[..., Coroutine[Any, Any, CallbackResult]]:
     async def _f(*args: Any, **kwargs: Any) -> CallbackResult:
         await asyncio.sleep(delay)
         if block_root:
+            attestation_data = make_attestation_data(
+                slot=123,
+                beacon_block_root=_valid_root(block_root),
+                source={"epoch": source.epoch, "root": f"0x{source.root.hex()}"},
+                target={"epoch": target.epoch, "root": f"0x{target.root.hex()}"},
+            )
             return CallbackResult(
                 body=msgspec.json.encode(
-                    SchemaBeaconAPI.ProduceAttestationDataResponse(
-                        data=SchemaBeaconAPI.AttestationData(
-                            slot="123",
-                            index="0",
-                            beacon_block_root=block_root,
-                            source=source,
-                            target=target,
-                        )
-                    )
+                    {"data": msgspec.Raw(attestation_data.to_json())}
                 )
             )
         raise ValueError("No exception or response to return")
@@ -75,29 +93,29 @@ def _create_att_data_callback(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-            SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+            _checkpoint(epoch="0", root="0x0000"),
+            _checkpoint(epoch="1", root="0x0001"),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
@@ -108,24 +126,24 @@ def _create_att_data_callback(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(50)
                 ],
@@ -142,40 +160,40 @@ def _create_att_data_callback(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x0000000000000000000000000000000000000000000000000000000000000new",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(10)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x0000000000000000000000000000000000000000000000000000000000000old",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(5)
                 ]
                 + [
                     _create_att_data_callback(
                         block_root="0x0000000000000000000000000000000000000000000000000000000000000new",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(5)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x00000000000000000000000000000000000000000000000000000000very-old",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(10)
                 ],
             },
             False,
             "0x0000000000000000000000000000000000000000000000000000000000000new",
-            SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-            SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+            _checkpoint(epoch="0", root="0x0000"),
+            _checkpoint(epoch="1", root="0x0001"),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
@@ -186,8 +204,8 @@ def _create_att_data_callback(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="2", root="0x0002"),
                         delay=0.01,
                     )
                     for _ in range(100)
@@ -195,16 +213,16 @@ def _create_att_data_callback(
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(100)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="0", root="0x0000"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
+                        source=_checkpoint(epoch="0", root="0x0000"),
+                        target=_checkpoint(epoch="1", root="0x0001"),
                     )
                     for _ in range(100)
                 ],
@@ -221,35 +239,29 @@ def _create_att_data_callback(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0xepoch-2-first-slot",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(
-                            epoch="2", root="0xepoch-2-first-slot"
-                        ),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="2", root="0xepoch-2-first-slot"),
                     )
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0xepoch-1-last-slot",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(
-                            epoch="2", root="0xepoch-1-last-slot"
-                        ),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="2", root="0xepoch-1-last-slot"),
                     )
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0xepoch-1-last-slot",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(
-                            epoch="2", root="0xepoch-1-last-slot"
-                        ),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="2", root="0xepoch-1-last-slot"),
                     )
                 ],
             },
             False,
             "0xepoch-1-last-slot",
-            SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-            SchemaBeaconAPI.Checkpoint(epoch="2", root="0xepoch-1-last-slot"),
+            _checkpoint(epoch="1", root="0x0001"),
+            _checkpoint(epoch="2", root="0xepoch-1-last-slot"),
             [
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
             ],
@@ -281,8 +293,8 @@ async def test_produce_attestation_data_without_head_event(
     ],
     timeout_expected: bool,
     expected_att_data_block_root: str,
-    expected_att_data_source: SchemaBeaconAPI.Checkpoint,
-    expected_att_data_target: SchemaBeaconAPI.Checkpoint,
+    expected_att_data_source: Checkpoint,
+    expected_att_data_target: Checkpoint,
     expected_log_messages: list[str],
     cli_args: CLIArgs,
     caplog: pytest.LogCaptureFixture,
@@ -312,7 +324,9 @@ async def test_produce_attestation_data_without_head_event(
                 ),
                 timeout=next_slot_start_ts - time.time(),
             )
-            assert str(att_data.beacon_block_root) == expected_att_data_block_root
+            assert f"0x{att_data.beacon_block_root.hex()}" == _valid_root(
+                expected_att_data_block_root
+            )
             assert att_data.source == expected_att_data_source
             assert att_data.target == expected_att_data_target
 
@@ -339,32 +353,32 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-            SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+            _checkpoint(epoch="2", root="0x0002"),
+            _checkpoint(epoch="3", root="0x0003"),
             [],
             id="success: identical head, source, target",
         ),
@@ -374,35 +388,37 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-            SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+            _checkpoint(epoch="2", root="0x0002"),
+            _checkpoint(epoch="3", root="0x0003"),
             [
                 "Got matching AttestationData from beacon-node-a",
-                "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
+                "Confirming finality checkpoints "
+                f"source={_checkpoint(epoch=2, root='0x0002')} => "
+                f"target={_checkpoint(epoch=3, root='0x0003')}",
             ],
             id="success: unconfirmed head, same source and target",
         ),
@@ -412,34 +428,36 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(2)
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-            SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+            _checkpoint(epoch="2", root="0x0002"),
+            _checkpoint(epoch="3", root="0x0003"),
             [
-                "Confirming finality checkpoints source=Checkpoint(epoch='2', root='0x0002') => target=Checkpoint(epoch='3', root='0x0003')",
+                "Confirming finality checkpoints "
+                f"source={_checkpoint(epoch=2, root='0x0002')} => "
+                f"target={_checkpoint(epoch=3, root='0x0003')}",
             ],
             id="success: unconfirmed head, 2/3 source and target",
         ),
@@ -449,42 +467,44 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-a": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(100)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(10)
                 ]
                 + [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="2", root="0x0002"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(100)
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            SchemaBeaconAPI.Checkpoint(epoch="2", root="0x0002"),
-            SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+            _checkpoint(epoch="2", root="0x0002"),
+            _checkpoint(epoch="3", root="0x0003"),
             [
-                "Timed out confirming finality checkpoints att_data.source=Checkpoint(epoch='2', root='0x0002'), att_data.target=Checkpoint(epoch='3', root='0x0003')",
+                "Timed out confirming finality checkpoints "
+                f"att_data.source={_checkpoint(epoch=2, root='0x0002')}, "
+                f"att_data.target={_checkpoint(epoch=3, root='0x0003')}",
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
             id="success: delayed consensus - slow head processing",
@@ -496,24 +516,24 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(30)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(30)
                 ],
             },
             False,
             "0x000000000000000000000000000000000000000000000000000000000000bbbb",
-            SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-            SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+            _checkpoint(epoch="1", root="0x0001"),
+            _checkpoint(epoch="3", root="0x0003"),
             [
                 "Timed out waiting for AttestationData matching head block root: 0x000000000000000000000000000000000000000000000000000000000000aaaa",
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
@@ -527,16 +547,16 @@ async def test_produce_attestation_data_without_head_event(
                 "beacon-node-b": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(30)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
                         block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=SchemaBeaconAPI.Checkpoint(epoch="1", root="0x0001"),
-                        target=SchemaBeaconAPI.Checkpoint(epoch="3", root="0x0003"),
+                        source=_checkpoint(epoch="1", root="0x0001"),
+                        target=_checkpoint(epoch="3", root="0x0003"),
                     )
                     for _ in range(30)
                 ],
@@ -577,8 +597,8 @@ async def test_produce_attestation_data_with_head_event(
     ],
     timeout_expected: bool,
     expected_att_data_block_root: str,
-    expected_att_data_source: SchemaBeaconAPI.Checkpoint,
-    expected_att_data_target: SchemaBeaconAPI.Checkpoint,
+    expected_att_data_source: Checkpoint,
+    expected_att_data_target: Checkpoint,
     expected_log_messages: list[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -601,11 +621,14 @@ async def test_produce_attestation_data_with_head_event(
         with ctx:
             att_data = await asyncio.wait_for(
                 attestation_data_provider.produce_attestation_data(
-                    slot=slot, head_event_block_root=initial_head_event_block_root
+                    slot=slot,
+                    head_event_block_root=_valid_root(initial_head_event_block_root),
                 ),
                 timeout=next_slot_start_ts - time.time(),
             )
-            assert str(att_data.beacon_block_root) == expected_att_data_block_root
+            assert f"0x{att_data.beacon_block_root.hex()}" == _valid_root(
+                expected_att_data_block_root
+            )
             assert att_data.source == expected_att_data_source
             assert att_data.target == expected_att_data_target
 
@@ -621,8 +644,8 @@ async def test_checkpoint_confirmed_from_cache(
     assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 0
     assert len(attestation_data_provider.target_checkpoint_confirmation_cache) == 0
 
-    s = SchemaBeaconAPI.Checkpoint(epoch="123", root="0x000123")
-    t = SchemaBeaconAPI.Checkpoint(epoch="124", root="0x000124")
+    s = _checkpoint(epoch="123", root="0x000123")
+    t = _checkpoint(epoch="124", root="0x000124")
 
     attestation_data_provider._cache_checkpoints(source=s, target=t)
 
@@ -630,8 +653,10 @@ async def test_checkpoint_confirmed_from_cache(
         source=s, target=t, slot=3940
     )
 
-    expected_log_message = "Finality checkpoints confirmed from cache (source=Checkpoint(epoch='123', root='0x000123'), target=Checkpoint(epoch='124', root='0x000124'))"
-    assert expected_log_message in caplog.messages
+    assert (
+        f"Finality checkpoints confirmed from cache (source={s}, target={t})"
+        in caplog.messages
+    )
 
 
 async def test_checkpoint_cache_pruning(
@@ -639,8 +664,8 @@ async def test_checkpoint_cache_pruning(
 ) -> None:
     for i in range(20):
         attestation_data_provider._cache_checkpoints(
-            source=SchemaBeaconAPI.Checkpoint(epoch=str(i), root=f"0x000{i}"),
-            target=SchemaBeaconAPI.Checkpoint(epoch=str(i - 1), root=f"0x000{i - 1}"),
+            source=_checkpoint(epoch=i, root=f"0x000{i}"),
+            target=_checkpoint(epoch=i - 1, root=f"0x000{i - 1}"),
         )
 
     assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 20
@@ -653,11 +678,11 @@ async def test_checkpoint_cache_pruning(
 
     assert all(
         e in attestation_data_provider.source_checkpoint_confirmation_cache
-        for e in ("17", "18", "19")
+        for e in (17, 18, 19)
     )
     assert all(
         e in attestation_data_provider.target_checkpoint_confirmation_cache
-        for e in ("16", "17", "18")
+        for e in (16, 17, 18)
     )
 
 
@@ -682,7 +707,7 @@ async def test_reorg_checkpoint_invalidation(
     )
 
     attestation_data_provider.source_checkpoint_confirmation_cache = {
-        str(epoch): SchemaBeaconAPI.Checkpoint(epoch=str(epoch), root="0x_root"),
+        epoch: _checkpoint(epoch=epoch, root="0x_root"),
     }
     await attestation_data_provider.handle_reorg_event(
         event=SchemaBeaconAPI.ChainReorgEvent(

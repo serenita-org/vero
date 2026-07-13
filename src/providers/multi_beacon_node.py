@@ -39,31 +39,39 @@ import time
 from collections import Counter
 from collections.abc import AsyncIterator
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, cast
 
 import msgspec
 from opentelemetry import trace
-from remerkleable.complex import Container
+from spy_ssz import (
+    Attestation,
+    Fork,
+    ObjectKind,
+    Preset,
+    SyncCommitteeContribution,
+    encode_json_array,
+    get_ssz_type,
+)
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaValidator
+from spec import (
+    AttestationData,
+    BeaconBlock,
+    Checkpoint,
+    SignedAggregateAndProof,
+    SignedContributionAndProof,
+    SingleAttestation,
+    SyncCommitteeMessage,
+    preset_types,
+)
 from spec.configs import Network
 from spec.constants import INTERVALS_PER_SLOT
-from spec.rust_ssz import (
-    rust_ssz_types,
-)
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
-    from grandine_py import (
-        ElectraBeaconBlockContentsType,
-        ElectraBlindedBeaconBlockType,
-    )
-
-    from spec import SpecAttestation, SpecSyncCommittee
-
     from .vero import Vero
 
 
@@ -282,7 +290,8 @@ class MultiBeaconNode:
     @staticmethod
     def _parse_block_response(
         response: SchemaBeaconAPI.ProduceBlockV3Response,
-    ) -> "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType":
+        content_type: ContentType,
+    ) -> BeaconBlock:
         # TODO perf
         #  profiling indicates this function takes a bit of time
         #  Maybe we don't need to actually fully parse the full block though?
@@ -295,31 +304,18 @@ class MultiBeaconNode:
         #  That would help a bit since we wouldn't be deserializing
         #  the execution payload - transactions.
 
-        # Decide decode function based on encoding indicated in Content-Type header
-        decode_function = (
-            "from_json" if response.content_type == ContentType.JSON else "from_ssz"
-        )
-
-        _types = rust_ssz_types()
-
-        block_map = {
-            SchemaBeaconAPI.ForkVersion.ELECTRA: (
-                _types.ElectraBlindedBeaconBlock
-                if response.execution_payload_blinded
-                else _types.ElectraBeaconBlockContents
-            ),
-            # Block containers unchanged in Fulu => reusing Electra containers
-            SchemaBeaconAPI.ForkVersion.FULU: (
-                _types.ElectraBlindedBeaconBlock
-                if response.execution_payload_blinded
-                else _types.ElectraBeaconBlockContents
-            ),
-        }
-
         try:
-            block_cls = block_map[response.version]
-            return getattr(block_cls, decode_function)(response.data)
-        except KeyError:
+            block_cls = get_ssz_type(
+                Fork[response.version.name],
+                ObjectKind.BLINDED_BEACON_BLOCK
+                if response.execution_payload_blinded
+                else ObjectKind.BEACON_BLOCK_CONTENTS,
+                Preset[preset_types().preset.upper()],
+            )
+            if content_type == ContentType.JSON:
+                return cast("BeaconBlock", block_cls.from_json(response.data))
+            return cast("BeaconBlock", block_cls.from_ssz(response.data))
+        except (KeyError, NotImplementedError):
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"
             ) from None
@@ -330,7 +326,7 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-    ) -> SchemaBeaconAPI.ProduceBlockV3Response:
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
 
@@ -364,14 +360,14 @@ class MultiBeaconNode:
         pending = tasks
 
         best_block_value = -1
-        best_block_response = None
+        best_block_result = None
         start_time = asyncio.get_running_loop().time()
         remaining_timeout = timeout
 
         # Only compare consensus block value on Gnosis Chain / Chiado
         # since the execution payload value is in a different
         # currency (xDAI) and not easily comparable
-        _compare_consensus_block_value_only = self.cli_args.network in [
+        _use_payload_value_for_comparison = self.cli_args.network not in [
             Network.GNOSIS,
             Network.CHIADO,
         ]
@@ -385,23 +381,21 @@ class MultiBeaconNode:
 
             for coro in done:
                 try:
-                    response = await coro
+                    result = await coro
                 except Exception as e:
                     self.logger.warning(
                         f"Failed to get a response from beacon node: {e!r}"
                     )
                     continue
 
-                if _compare_consensus_block_value_only:
-                    block_value = int(response.consensus_block_value)
-                else:
-                    block_value = int(response.consensus_block_value) + int(
-                        response.execution_payload_value
-                    )
+                response, _ = result
+                block_value = int(response.consensus_block_value)
+                if _use_payload_value_for_comparison:
+                    block_value += int(response.execution_payload_value)
 
                 if block_value > best_block_value:
                     best_block_value = block_value
-                    best_block_response = response
+                    best_block_result = result
 
             # Calculate remaining timeout
             elapsed_time = asyncio.get_running_loop().time() - start_time
@@ -412,7 +406,7 @@ class MultiBeaconNode:
 
         # If no block has been returned yet, wait for the first one and return it
         # immediately.
-        if best_block_response is None and pending:
+        if best_block_result is None and pending:
             self.logger.warning(
                 "No blocks received yet but tasks are pending - waiting"
                 " for first block",
@@ -420,10 +414,15 @@ class MultiBeaconNode:
 
             for coro_first in asyncio.as_completed(pending):
                 try:
-                    best_block_response = await coro_first
-                    best_block_value = int(
-                        best_block_response.consensus_block_value
-                    ) + int(best_block_response.execution_payload_value)
+                    best_block_result = await coro_first
+                    best_block_response, _ = best_block_result
+
+                    best_block_value = int(best_block_response.consensus_block_value)
+                    if _use_payload_value_for_comparison:
+                        best_block_value += int(
+                            best_block_response.execution_payload_value
+                        )
+
                     # Exit loop
                     break
                 except Exception as e:
@@ -436,12 +435,12 @@ class MultiBeaconNode:
         for task in pending:
             task.cancel()
 
-        if best_block_response is None:
+        if best_block_result is None:
             # We have exhausted all tasks and have not received a block response
             raise RuntimeError("Failed to get a response from all beacon nodes")
 
         self.logger.info(f"Proceeding with best block by value: {best_block_value}")
-        return best_block_response
+        return best_block_result
 
     async def produce_block_v3(
         self,
@@ -450,7 +449,7 @@ class MultiBeaconNode:
         builder_boost_factor: int,
         randao_reveal: str,
     ) -> tuple[
-        "ElectraBeaconBlockContentsType | ElectraBlindedBeaconBlockType",
+        BeaconBlock,
         SchemaBeaconAPI.ProduceBlockV3Response,
     ]:
         # TODO small room for improvement here.
@@ -459,7 +458,7 @@ class MultiBeaconNode:
         #  We could however take the best beacon block
         #  and combine it with the best execution payload.
         #  That would take up some extra processing time though.
-        best_block_response = await self._produce_best_block(
+        best_block_response, content_type = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
             builder_boost_factor=builder_boost_factor,
@@ -467,7 +466,10 @@ class MultiBeaconNode:
         )
 
         # Parse block
-        beacon_block = self._parse_block_response(response=best_block_response)
+        beacon_block = self._parse_block_response(
+            response=best_block_response,
+            content_type=content_type,
+        )
         return beacon_block, best_block_response
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
@@ -503,10 +505,10 @@ class MultiBeaconNode:
     async def produce_attestation_data_without_head_event(
         self,
         slot: int,
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         # Maps beacon node hosts to their last returned AttestationData
-        host_to_att_data: dict[str, SchemaBeaconAPI.AttestationData] = dict()
-        att_data_counter: Counter[SchemaBeaconAPI.AttestationData] = Counter()
+        host_to_att_data: dict[str, AttestationData] = {}
+        att_data_counter: Counter[AttestationData] = Counter()
 
         while True:
             _round_start = asyncio.get_running_loop().time()
@@ -571,7 +573,7 @@ class MultiBeaconNode:
         self,
         expected_head_block_root: str,
         slot: int,
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         tasks = [
             asyncio.create_task(
                 bn.wait_for_attestation_data(
@@ -597,8 +599,8 @@ class MultiBeaconNode:
     async def wait_for_checkpoints(
         self,
         slot: int,
-        expected_source_cp: SchemaBeaconAPI.Checkpoint,
-        expected_target_cp: SchemaBeaconAPI.Checkpoint,
+        expected_source_cp: Checkpoint,
+        expected_target_cp: Checkpoint,
     ) -> None:
         tasks = [
             asyncio.create_task(
@@ -625,12 +627,12 @@ class MultiBeaconNode:
 
     async def publish_attestations(
         self,
-        attestations: list[SchemaBeaconAPI.SingleAttestation],
+        attestations: list[SingleAttestation],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
-            encoded_attestations=self._json_encoder.encode(attestations),
+            encoded_attestations=encode_json_array(attestations),
             fork_version=fork_version,
         )
 
@@ -639,10 +641,8 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
-        aggregates: list[
-            SpecAttestation.AttestationElectra
-        ] = await self._get_all_beacon_node_responses(
+    ) -> Attestation:
+        aggregates: list[Attestation] = await self._get_all_beacon_node_responses(
             func_name="get_aggregate_attestation_v2",
             attestation_data_root=attestation_data_root,
             slot=slot,
@@ -673,7 +673,7 @@ class MultiBeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_indices: set[int],
-    ) -> AsyncIterator["SpecAttestation.AttestationElectra"]:
+    ) -> AsyncIterator[Attestation]:
         tasks = [
             self.get_aggregate_attestation_v2(
                 attestation_data_root=attestation_data_root,
@@ -696,15 +696,10 @@ class MultiBeaconNode:
 
     async def publish_aggregate_and_proofs(
         self,
-        signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        signed_aggregate_and_proofs: list[SignedAggregateAndProof],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
-        encoded = self._json_encoder.encode(
-            [
-                dict(message=msg, signature=sig)
-                for msg, sig in signed_aggregate_and_proofs
-            ]
-        )
+        encoded = encode_json_array(signed_aggregate_and_proofs)
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
             encoded_signed_aggregate_and_proofs=encoded,
@@ -727,9 +722,9 @@ class MultiBeaconNode:
         return await self.best_beacon_node.get_block_root(block_id=block_id)
 
     async def publish_sync_committee_messages(
-        self, messages: list[SchemaBeaconAPI.SyncCommitteeSignature]
+        self, messages: list[SyncCommitteeMessage]
     ) -> None:
-        encoded = self._json_encoder.encode(messages)
+        encoded = encode_json_array(messages)
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_messages",
             encoded_messages=encoded,
@@ -740,9 +735,9 @@ class MultiBeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SyncCommitteeContribution:
         contributions: list[
-            SpecSyncCommittee.Contribution
+            SyncCommitteeContribution
         ] = await self._get_all_beacon_node_responses(
             func_name="get_sync_committee_contribution",
             slot=slot,
@@ -776,7 +771,7 @@ class MultiBeaconNode:
         slot: int,
         subcommittee_indices: set[int],
         beacon_block_root: str,
-    ) -> AsyncIterator[Container]:
+    ) -> AsyncIterator[SyncCommitteeContribution]:
         tasks = [
             self.get_sync_committee_contribution(
                 slot=slot,
@@ -796,14 +791,9 @@ class MultiBeaconNode:
 
     async def publish_sync_committee_contribution_and_proofs(
         self,
-        signed_contribution_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        signed_contribution_and_proofs: list[SignedContributionAndProof],
     ) -> None:
-        encoded = self._json_encoder.encode(
-            [
-                dict(message=contribution, signature=sig)
-                for contribution, sig in signed_contribution_and_proofs
-            ]
-        )
+        encoded = encode_json_array(signed_contribution_and_proofs)
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs",
             encoded_signed_contribution_and_proofs=encoded,

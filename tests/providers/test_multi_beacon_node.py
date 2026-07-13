@@ -10,18 +10,22 @@ import os
 import re
 from functools import partial
 
+import msgspec
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
-from remerkleable.bitfields import Bitlist, Bitvector
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
-from spec.attestation import AttestationData, SpecAttestation
 from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
-from spec.sync_committee import SpecSyncCommittee
+from tests.ssz_bitfields import Bitlist, Bitvector
+from tests.ssz_objects import (
+    make_attestation,
+    make_attestation_data,
+    make_contribution,
+)
 
 
 @pytest.mark.parametrize(
@@ -296,16 +300,22 @@ async def test_get_aggregate_attestation(
                     beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
                     * beacon_chain.MAX_COMMITTEES_PER_SLOT
                 )
-                agg_bits_to_return = Bitlist[bitlist_length](False for _ in range(10))
+                agg_bits_to_return = Bitlist[bitlist_length](  # type: ignore[misc]
+                    False for _ in range(10)
+                )
                 for idx in range(number_of_attesting_indices):
                     agg_bits_to_return[idx] = True
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
-                        payload=dict(
-                            version=SchemaBeaconAPI.ForkVersion.FULU.value,
-                            data=SpecAttestation.AttestationElectra(
-                                aggregation_bits=_bits,
-                            ).to_obj(),
+                        body=msgspec.json.encode(
+                            {
+                                "version": SchemaBeaconAPI.ForkVersion.FULU,
+                                "data": msgspec.Raw(
+                                    make_attestation(
+                                        aggregation_bits=_bits,
+                                    ).to_json()
+                                ),
+                            }
                         ),
                     ),
                     agg_bits_to_return,
@@ -333,13 +343,14 @@ async def test_get_aggregate_attestation(
             ):
                 _ = await multi_beacon_node.get_aggregate_attestation_v2(
                     attestation_data_root="0x"
-                    + AttestationData().hash_tree_root().hex(),
+                    + make_attestation_data().hash_tree_root().hex(),
                     slot=beacon_chain.current_slot,
                     committee_index=3,
                 )
         else:
             returned_aggregate = await multi_beacon_node.get_aggregate_attestation_v2(
-                attestation_data_root="0x" + AttestationData().hash_tree_root().hex(),
+                attestation_data_root="0x"
+                + make_attestation_data().hash_tree_root().hex(),
                 slot=beacon_chain.current_slot,
                 committee_index=3,
             )
@@ -409,17 +420,21 @@ async def test_get_sync_committee_contribution(
         for number_of_root_matching_indices in numbers_of_root_matching_indices:
             if isinstance(number_of_root_matching_indices, int):
                 bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
-                agg_bits_to_return = Bitvector[bitlist_size](
+                agg_bits_to_return = Bitvector[bitlist_size](  # type: ignore[misc]
                     False for _ in range(bitlist_size)
                 )
                 for idx in range(number_of_root_matching_indices):
                     agg_bits_to_return[idx] = True
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
-                        payload=dict(
-                            data=SpecSyncCommittee.Contribution(
-                                aggregation_bits=_bits,
-                            ).to_obj(),
+                        body=msgspec.json.encode(
+                            {
+                                "data": msgspec.Raw(
+                                    make_contribution(
+                                        aggregation_bits=_bits,
+                                    ).to_json()
+                                )
+                            }
                         ),
                     ),
                     agg_bits_to_return,

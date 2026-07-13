@@ -7,6 +7,7 @@ from types import TracebackType
 from typing import Self, Unpack
 from uuid import uuid4
 
+import msgspec
 from apscheduler.jobstores.base import JobLookupError
 
 from observability import ErrorType, HandledRuntimeError
@@ -16,12 +17,16 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
+from spec import (
+    SignedContributionAndProof,
+    SyncCommitteeMessage,
+    preset_types,
+)
 from spec.common import bytes_to_uint64, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
-from spec.sync_committee import SpecSyncCommittee
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
@@ -119,7 +124,7 @@ class SyncCommitteeService(ValidatorDutyService):
         duty_slot: int,
         sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
         beacon_block_root: str,
-    ) -> AsyncIterator[list[SchemaBeaconAPI.SyncCommitteeSignature]]:
+    ) -> AsyncIterator[list[SyncCommitteeMessage]]:
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         pubkey_to_validator_index = {
             member.pubkey: str(member.index) for member in sync_committee_members
@@ -167,10 +172,14 @@ class SyncCommitteeService(ValidatorDutyService):
                     continue
 
                 signed_messages_batch.append(
-                    SchemaBeaconAPI.SyncCommitteeSignature(
-                        beacon_block_root=msg.sync_committee_message.beacon_block_root,
-                        slot=str(msg.sync_committee_message.slot),
-                        validator_index=pubkey_to_validator_index[pubkey],
+                    preset_types().sync_committee_message(
+                        beacon_block_root=bytes.fromhex(
+                            msg.sync_committee_message.beacon_block_root.removeprefix(
+                                "0x"
+                            )
+                        ),
+                        slot=int(msg.sync_committee_message.slot),
+                        validator_index=int(pubkey_to_validator_index[pubkey]),
                         signature=sig,
                     ),
                 )
@@ -181,7 +190,7 @@ class SyncCommitteeService(ValidatorDutyService):
     async def _publish_sync_messages(
         self,
         duty_slot: int,
-        signed_sync_messages: list[SchemaBeaconAPI.SyncCommitteeSignature],
+        signed_sync_messages: list[SyncCommitteeMessage],
     ) -> None:
         self.logger.debug(
             f"Publishing sync committee messages for slot {duty_slot}, count: {len(signed_sync_messages)}",
@@ -397,12 +406,19 @@ class SyncCommitteeService(ValidatorDutyService):
         ],
         identifiers: list[str],
     ) -> None:
-        signed_contribution_and_proofs = []
+        signed_contribution_and_proofs: list[SignedContributionAndProof] = []
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
-            signed_contribution_and_proofs.append((msg.contribution_and_proof, sig))
+            signed_contribution_and_proofs.append(
+                preset_types().signed_contribution_and_proof(
+                    message=preset_types().contribution_and_proof.from_json(
+                        msg.contribution_and_proof
+                    ),
+                    signature=sig,
+                )
+            )
 
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.SYNC_COMMITTEE_CONTRIBUTION.value,
@@ -480,11 +496,15 @@ class SyncCommitteeService(ValidatorDutyService):
                         messages.append(
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
-                                contribution_and_proof=SpecSyncCommittee.ContributionAndProof(
-                                    aggregator_index=int(duty.validator_index),
-                                    contribution=contribution,
-                                    selection_proof=duty_sp.selection_proof,
-                                ).to_obj(),
+                                contribution_and_proof=msgspec.Raw(
+                                    preset_types()
+                                    .contribution_and_proof(
+                                        aggregator_index=int(duty.validator_index),
+                                        contribution=contribution,
+                                        selection_proof=duty_sp.selection_proof,
+                                    )
+                                    .to_json()
+                                ),
                             )
                         )
                         identifiers.append(duty.pubkey)
@@ -527,7 +547,7 @@ class SyncCommitteeService(ValidatorDutyService):
             // SYNC_COMMITTEE_SUBNET_COUNT
             // TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
-        return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0  # type: ignore[no-any-return]
+        return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch

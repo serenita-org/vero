@@ -7,7 +7,6 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
-from remerkleable.bitfields import Bitlist, Bitvector
 from yarl import URL
 
 from providers import BeaconChain
@@ -15,13 +14,25 @@ from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
-from spec import SpecAttestation, SpecBeaconBlock, SpecSyncCommittee
-from spec.attestation import AttestationData, Checkpoint
+from spec import preset_types
 from spec.base import SpecFulu
 from spec.constants import (
+    SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
-    TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
+from tests.ssz_bitfields import Bitlist, Bitvector
+from tests.ssz_objects import (
+    BYTES_PER_BLS_SIGNATURE,
+    ZERO_ROOT,
+    make_attestation,
+    make_attestation_data,
+    make_block,
+    make_contribution,
+)
+
+
+def _data_response(data: bytes, **metadata: Any) -> bytes:
+    return msgspec.json.encode({**metadata, "data": msgspec.Raw(data)})
 
 
 @pytest.fixture(scope="session")
@@ -91,48 +102,8 @@ def _mocked_beacon_node_endpoints(
             slot = int(url.raw_path.split("/")[-1])
             headers = kwargs["headers"]
 
-            block_cls_map = {
-                ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlockContents,
-                ForkVersion.FULU: SpecBeaconBlock.ElectraBlockContents,
-            }
-            blinded_block_cls_map = {
-                ForkVersion.ELECTRA: SpecBeaconBlock.ElectraBlindedBlock,
-                ForkVersion.FULU: SpecBeaconBlock.ElectraBlindedBlock,
-            }
-
             fork_version = beacon_chain.current_fork_version
-            if execution_payload_blinded:
-                if fork_version not in blinded_block_cls_map:
-                    raise NotImplementedError(
-                        f"Unsupported fork version {fork_version}"
-                    )
-
-                _data = blinded_block_cls_map[fork_version](
-                    slot=slot,
-                    proposer_index=123,
-                    parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                    state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                    # body=...
-                )
-            else:
-                if fork_version not in block_cls_map:
-                    raise NotImplementedError(
-                        f"Unsupported fork version {fork_version}"
-                    )
-
-                _data = block_cls_map[fork_version].from_obj(
-                    dict(
-                        block=dict(
-                            slot=slot,
-                            proposer_index=123,
-                            parent_root="0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
-                            state_root="0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-                            # body=...
-                        ),
-                        kzg_proofs=[],
-                        blobs=[],
-                    )
-                )
+            _data = make_block(slot=slot, blinded=execution_payload_blinded)
 
             # Not correct parsing but sufficient for our purposes
             response_content_type = (
@@ -152,32 +123,30 @@ def _mocked_beacon_node_endpoints(
             }
 
             if response_content_type == ContentType.OCTET_STREAM:
-                return CallbackResult(body=_data.encode_bytes(), headers=headers)
+                return CallbackResult(body=_data.to_ssz(), headers=headers)
 
             return CallbackResult(
-                body=msgspec.json.encode(
-                    SchemaBeaconAPI.ProduceBlockV3Response(
-                        version=fork_version,
-                        execution_payload_blinded=execution_payload_blinded,
-                        execution_payload_value=str(exec_payload_value),
-                        consensus_block_value=str(consensus_block_value),
-                        content_type=ContentType.JSON,
-                        data=_data.to_obj(),
-                    )
+                body=_data_response(
+                    _data.to_json(),
+                    version=fork_version,
+                    execution_payload_blinded=execution_payload_blinded,
+                    execution_payload_value=str(exec_payload_value),
+                    consensus_block_value=str(consensus_block_value),
                 ),
                 headers=headers,
             )
 
         if re.match("/eth/v1/validator/attestation_data", url.raw_path):
-            att_data = AttestationData(
+            att_data = make_attestation_data(
                 slot=int(url.query["slot"]),
                 index=int(url.query["committee_index"]),
                 beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
-                source=Checkpoint(
-                    epoch=beacon_chain.current_epoch,
-                ),
+                source={
+                    "epoch": str(beacon_chain.current_epoch),
+                    "root": ZERO_ROOT,
+                },
             )
-            return CallbackResult(payload=dict(data=att_data.to_obj()))
+            return CallbackResult(body=_data_response(att_data.to_json()))
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
             if beacon_chain.current_fork_version not in (
@@ -190,7 +159,7 @@ def _mocked_beacon_node_endpoints(
 
             fork_version = beacon_chain.current_fork_version
 
-            _committee_bits = Bitvector[spec.MAX_COMMITTEES_PER_SLOT](
+            _committee_bits = Bitvector[spec.MAX_COMMITTEES_PER_SLOT](  # type: ignore[misc]
                 False for _ in range(spec.MAX_COMMITTEES_PER_SLOT)
             )
             _committee_bits[int(url.query["committee_index"])] = True
@@ -200,20 +169,22 @@ def _mocked_beacon_node_endpoints(
             # Populating the full bitlist is expensive
             # -> a smaller agg bits bitlist is fine for testing purposes too
             _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
-            aggregate_attestation = SpecAttestation.AttestationElectra(
-                aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),
-                data=AttestationData(
-                    slot=int(url.query["slot"]),
-                    index=0,
-                    beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
-                    source=Checkpoint(
-                        epoch=5,
-                        root="0xfd87176458a22999a87872fc9cbbba38bdeeb37847091875fb4ff82dd3d05abf",
-                    ),
-                    target=Checkpoint(
-                        epoch=6,
-                        root="0x62e8fb27f17e5fb962503a56f07d14b5bf8710fb6b53bc9ef78f04c82d46a460",
-                    ),
+            aggregate_attestation = make_attestation(
+                aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),  # type: ignore[misc]
+                data=msgspec.Raw(
+                    make_attestation_data(
+                        slot=int(url.query["slot"]),
+                        index=0,
+                        beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
+                        source={
+                            "epoch": "5",
+                            "root": "0xfd87176458a22999a87872fc9cbbba38bdeeb37847091875fb4ff82dd3d05abf",
+                        },
+                        target={
+                            "epoch": "6",
+                            "root": "0x62e8fb27f17e5fb962503a56f07d14b5bf8710fb6b53bc9ef78f04c82d46a460",
+                        },
+                    ).to_json()
                 ),
                 signature="0x4992b42d8d9b7827accbc94523fb1f98f866bd53105155907179238e00dfec8ab4618de8ff0361c818e5703a191ad16beedeff4c4341ac3fe3c935e01ffbc2199b7212d371f0dcf5bd2db993c51d9554609235a4a86d1f0e85074d014f8e494b",
                 committee_bits=_committee_bits,
@@ -223,7 +194,7 @@ def _mocked_beacon_node_endpoints(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetAggregatedAttestationV2Response(
                         version=fork_version,
-                        data=aggregate_attestation.to_obj(),
+                        data=msgspec.Raw(aggregate_attestation.to_json()),
                     )
                 )
             )
@@ -241,18 +212,20 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/validator/sync_committee_contribution", url.raw_path):
-            contribution = SpecSyncCommittee.Contribution(
+            sync_subcommittee_size = (
+                spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
+            )
+            contribution = make_contribution(
                 slot=int(url.query["slot"]),
                 beacon_block_root=url.query["beacon_block_root"],
                 subcommittee_index=int(url.query["subcommittee_index"]),
-                aggregation_bits=Bitlist[TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE](
-                    random.choice([0, 1])
-                    for _ in range(TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE)
+                aggregation_bits=Bitvector[sync_subcommittee_size](  # type: ignore[misc]
+                    random.choice([0, 1]) for _ in range(sync_subcommittee_size)
                 ),
-                signature="0x" + os.urandom(96).hex(),
+                signature="0x" + os.urandom(BYTES_PER_BLS_SIGNATURE).hex(),
             )
 
-            return CallbackResult(payload=dict(data=contribution.to_obj()))
+            return CallbackResult(body=_data_response(contribution.to_json()))
 
         raise NotImplementedError(
             f"Beacon API response for GET {url} does not have a mock handler",
@@ -309,13 +282,11 @@ def _mocked_beacon_node_endpoints(
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = SpecBeaconBlock.ElectraBlockContentsSigned.from_obj(
-                        msgspec.json.decode(kwargs["data"])
+                    _ = preset_types().signed_block_contents.from_json(
+                        _data_response(kwargs["data"])
                     )
                 else:
-                    _ = SpecBeaconBlock.ElectraBlockContentsSigned.decode_bytes(
-                        kwargs["data"]
-                    )
+                    _ = preset_types().signed_block_contents.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -333,13 +304,11 @@ def _mocked_beacon_node_endpoints(
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = SpecBeaconBlock.ElectraBlindedBlockSigned.from_obj(
-                        msgspec.json.decode(kwargs["data"].decode())
+                    _ = preset_types().signed_blinded_block.from_json(
+                        _data_response(kwargs["data"])
                     )
                 else:
-                    _ = SpecBeaconBlock.ElectraBlindedBlockSigned.decode_bytes(
-                        kwargs["data"]
-                    )
+                    _ = preset_types().signed_blinded_block.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -404,18 +373,18 @@ def _mocked_beacon_node_endpoints(
                 ForkVersion.FULU,
             ):
                 attestations = msgspec.json.decode(
-                    kwargs["data"].decode(),
-                    type=list[SchemaBeaconAPI.SingleAttestation],
+                    kwargs["data"], type=list[msgspec.Raw]
                 )
-                attestation = attestations[0]
+                attestation = preset_types().single_attestation.from_json(
+                    attestations[0]
+                )
             else:
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
                 )
 
-            assert (
-                attestation.data.beacon_block_root
-                == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
+            assert attestation.data.beacon_block_root == bytes.fromhex(
+                "9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
             )
 
             return CallbackResult(status=200)
