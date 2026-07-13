@@ -24,6 +24,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     graffiti: bytes
     gas_limit: int
     use_external_builder: bool
+    builder_urls: list[str]
     builder_boost_factor: int
     enable_doppelganger_detection: bool
     enable_keymanager_api: bool
@@ -209,6 +210,13 @@ def get_parser() -> argparse.ArgumentParser:
         help="Provide this flag to submit validator registrations to external builders.",
     )
     parser.add_argument(
+        "--builder-urls",
+        type=str,
+        required=False,
+        default="",
+        help="A comma-separated list of external builder URLs.",
+    )
+    parser.add_argument(
         "--builder-boost-factor",
         type=int,
         required=False,
@@ -332,6 +340,16 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             {urlparse(bn_url).hostname for bn_url in beacon_node_urls_proposal}
         ) != len(beacon_node_urls_proposal):
             parser.error("Proposal beacon node URLs must have unique hostnames.")
+
+        builder_urls = [
+            _validate_url(url)
+            for url in _validate_comma_separated_strings(
+                input_string=parsed_args.builder_urls,
+                entity_name="builder url",
+                min_values_required=0,
+            )
+        ]
+
         network = Network(parsed_args.network)
 
         keymanager_api_token_file_path = (
@@ -358,6 +376,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 input_value=parsed_args.gas_limit, network=network
             ),
             use_external_builder=parsed_args.use_external_builder,
+            builder_urls=builder_urls,
             builder_boost_factor=parsed_args.builder_boost_factor,
             enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,

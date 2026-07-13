@@ -106,14 +106,14 @@ class SpecGloas:
     FULU_FORK_VERSION: Version
 
     # Gloas
-    GLOAS_FORK_EPOCH: UInt64SerializedAsString
+    GLOAS_FORK_EPOCH: Uint64
     GLOAS_FORK_VERSION: Version
-    ATTESTATION_DUE_BPS_GLOAS: UInt64SerializedAsString
-    AGGREGATE_DUE_BPS_GLOAS: UInt64SerializedAsString
-    SYNC_MESSAGE_DUE_BPS_GLOAS: UInt64SerializedAsString
-    CONTRIBUTION_DUE_BPS_GLOAS: UInt64SerializedAsString
-    PAYLOAD_ATTESTATION_DUE_BPS: UInt64SerializedAsString
-    PTC_SIZE: UInt64SerializedAsString
+    ATTESTATION_DUE_BPS_GLOAS: Uint64
+    AGGREGATE_DUE_BPS_GLOAS: Uint64
+    SYNC_MESSAGE_DUE_BPS_GLOAS: Uint64
+    CONTRIBUTION_DUE_BPS_GLOAS: Uint64
+    PAYLOAD_ATTESTATION_DUE_BPS: Uint64
+    PTC_SIZE: Uint64
 
     @classmethod
     def from_obj(cls, obj: dict[str, Any]) -> Self:
