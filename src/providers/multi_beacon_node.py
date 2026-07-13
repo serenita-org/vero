@@ -54,7 +54,7 @@ from spy_ssz import (
 )
 
 from observability import ErrorType
-from schemas import SchemaBeaconAPI, SchemaValidator
+from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaValidator
 from spec import (
     AttestationData,
     BeaconBlock,
@@ -66,9 +66,6 @@ from spec import (
     preset_types,
 )
 from spec.configs import Network
-from spec.rust_ssz import (
-    rust_ssz_types,
-)
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
@@ -336,6 +333,8 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         soft_timeout: float,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
         """Gets the produce block response from all beacon nodes and returns the
@@ -362,6 +361,8 @@ class MultiBeaconNode:
                     graffiti=graffiti,
                     builder_boost_factor=builder_boost_factor,
                     randao_reveal=randao_reveal,
+                    signed_payload_bid=signed_payload_bid,
+                    fork_version=fork_version,
                 ),
             )
             for bn in beacon_nodes_to_use
@@ -459,6 +460,8 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
+        fork_version: SchemaBeaconAPI.ForkVersion,
         soft_timeout: float,
     ) -> BeaconBlock:
         # TODO small room for improvement here.
@@ -472,6 +475,8 @@ class MultiBeaconNode:
             graffiti=graffiti,
             builder_boost_factor=builder_boost_factor,
             randao_reveal=randao_reveal,
+            signed_payload_bid=signed_payload_bid,
+            fork_version=fork_version,
             soft_timeout=soft_timeout,
         )
 

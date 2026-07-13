@@ -66,6 +66,10 @@ def _register_event_handlers(
             event_handler=reorg_handler_service.handle_reorg_event,
         )
 
+    event_consumer_service.add_payload_attributes_event_handler(
+        event_handler=block_proposal_service.handle_payload_attributes_event
+    )
+
     event_consumer_service.add_slashing_event_handler(
         event_handler=validator_status_tracker_service.handle_slashing_event,
     )

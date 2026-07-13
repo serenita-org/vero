@@ -29,7 +29,7 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from providers._response import raise_for_response_size
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
+from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner, SchemaValidator
 from spec import (
     AttestationData,
     Checkpoint,
@@ -279,7 +279,7 @@ class BeaconNode:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
-            self.logger.debug(
+            self.logger.exception(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -796,6 +796,8 @@ class BeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
+        fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> SchemaBeaconAPI.ProduceBlockV3Response:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         params = dict(
@@ -806,6 +808,15 @@ class BeaconNode:
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
+
+        if signed_payload_bid:
+            self.logger.info(f"Setting body for block production, bid: {signed_payload_bid}")
+            data = self.json_encoder.encode(dict(signed_execution_payload_bid=signed_payload_bid))
+        else:
+            # empty dict
+            # lodestar complains otherwise about getting a content-type header application/json
+            # and an empty body
+            data = b"{}"
 
         accept_header = (
             ContentType.JSON.value
@@ -822,14 +833,18 @@ class BeaconNode:
             },
         ) as tracer_span:
             resp_bytes, content_type, headers = await self._make_request(
-                method="GET",
+                method="POST",
                 endpoint="/eth/v4/validator/blocks/{slot}",
                 formatted_endpoint_string_params=dict(slot=slot),
                 params=params,
+                data=data,
                 timeout=ClientTimeout(
                     connect=self.client_session.timeout.connect,
                 ),
-                headers={ACCEPT: accept_header},
+                headers={
+                    ACCEPT: accept_header,
+                    "Eth-Consensus-Version": fork_version.value,
+                },
             )
             if (
                 content_type == ContentType.JSON.value
@@ -1022,6 +1037,7 @@ class BeaconNode:
             chain_reorg=SchemaBeaconAPI.ChainReorgEvent,
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
+            payload_attributes=SchemaBeaconAPI.PayloadAttributesEvent,
         )
 
         async with self.client_session.get(
