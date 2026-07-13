@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import TYPE_CHECKING
 
 from observability import ErrorType
-from providers import MultiBeaconNode, SignatureProvider, Vero
-from schemas import SchemaBeaconAPI, SchemaValidator
+from schemas import SchemaBeaconAPI
 from schemas.validator import (
     ACTIVE_STATUSES,
     EXITED_STATUSES,
@@ -11,6 +13,10 @@ from schemas.validator import (
     SLASHED_STATUSES,
     WITHDRAWAL_STATUSES,
 )
+
+if TYPE_CHECKING:
+    from providers import MultiBeaconNode, SignatureProvider, Vero
+    from schemas import SchemaValidator
 
 
 class ValidatorStatusTrackerService:

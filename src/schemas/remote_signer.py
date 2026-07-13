@@ -41,7 +41,7 @@ class SignableMessageWithForkInfo(SignableMessage, kw_only=True):
 
 class AttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.ATTESTATION
-    attestation: dict  # type: ignore[type-arg]
+    attestation: msgspec.Raw
 
 
 class Slot(msgspec.Struct):
@@ -55,7 +55,7 @@ class AggregationSlotSignableMessage(SignableMessageWithForkInfo, kw_only=True):
 
 class AggregateAndProofV2(msgspec.Struct, kw_only=True):
     version: str
-    data: dict  # type: ignore[type-arg]
+    data: msgspec.Raw
 
 
 class AggregateAndProofV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
@@ -116,7 +116,7 @@ class SyncCommitteeContributionAndProofSignableMessage(
     SignableMessageWithForkInfo, kw_only=True
 ):
     type: SigningRequestType = SigningRequestType.SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF
-    contribution_and_proof: dict  # type: ignore[type-arg]
+    contribution_and_proof: msgspec.Raw
 
 
 class ValidatorRegistration(msgspec.Struct):

@@ -169,7 +169,9 @@ cffi==2.0.0 \
     --hash=sha256:dd4f05f54a52fb558f1ba9f528228066954fee3ebe629fc1660d874d040ae5a3 \
     --hash=sha256:f93fd8e5c8c0a4aa1f424d6173f14a892044054871c771f8566e4008eaa359d2 \
     --hash=sha256:fc33c5141b55ed366cfaad382df24fe7dcbc686de5be719b207bb248e3053dc5
-    # via pyroscope-io
+    # via
+    #   pyroscope-io
+    #   spy-ssz
 cfgv==3.5.0 \
     --hash=sha256:a8dc6b26ad22ff227d2634a65cb388215ce6cc96bbcc5cfde7641ae87e8dacc0 \
     --hash=sha256:d5b1034354820651caa73ede66a6294d6e95c1b00acc5e9b098e917404669132
@@ -437,8 +439,6 @@ googleapis-common-protos==1.75.0 \
     --hash=sha256:53a062ff3c32552fbd62c11fe23768b78e4ddf0494d5e5fd97d3f4689c75fbbd \
     --hash=sha256:961ed60399c457ceb0ee8f285a84c870aabc9c6a832b9d37bb281b5bebde43ed
     # via opentelemetry-exporter-otlp-proto-grpc
-grandine-py @ git+https://github.com/eth2353/grandine-py@fdf5c8241c3530c9e69f1255e2bc171095864b64
-    # via vero
 grpcio==1.80.0 \
     --hash=sha256:0cb517eb1d0d0aaf1d87af7cc5b801d686557c1d88b2619f5e31fab3c2315921 \
     --hash=sha256:256507e2f524092f1473071a05e65a5b10d84b82e3ff24c5b571513cfaa61e2f \
@@ -618,7 +618,9 @@ msgspec==0.21.1 \
     --hash=sha256:f60800e6299b798142dc40b0644da77ceac5ea0568be58228417eae14135c847 \
     --hash=sha256:f7b27d1a8ead2b6f5b0c4f2d07b8be1ccfcc041c8a0e704781edebe3ae13c484 \
     --hash=sha256:fab48eb45fdbfbdb2c0edfec00ffc53b6b6085beefc6b50b61e01659f9f8757f
-    # via vero
+    # via
+    #   spy-ssz
+    #   vero
 multidict==6.7.1 \
     --hash=sha256:03ede2a6ffbe8ef936b92cb4529f27f42be7f56afcdab5ab739cd5f27fb1cbf9 \
     --hash=sha256:0458c978acd8e6ea53c81eefaddbbee9c6c5e591f41b3f5e8e194780fe026581 \
@@ -990,15 +992,12 @@ pyyaml==6.0.3 \
     #   pre-commit
     #   pymdown-extensions
     #   pyyaml-env-tag
+    #   spy-ssz
     #   vero
 pyyaml-env-tag==1.1 \
     --hash=sha256:17109e1a528561e32f026364712fee1264bc2ea6715120891174ed1b980d2e04 \
     --hash=sha256:2eb38b75a2d21ee0475d6d97ec19c63287a7e140231e4214969d0eac923cd7ff
     # via mkdocs
-remerkleable==0.1.28 \
-    --hash=sha256:133cb1283f1d6fd2a020f47ee3653e93385acf2aa4ddc30f3d00eb9404751bda \
-    --hash=sha256:1e19e9a927961b29c4efa210795bfad5d20a28545a6f78f7552b1e4449c24890
-    # via vero
 requests==2.34.2 \
     --hash=sha256:2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0 \
     --hash=sha256:f288924cae4e29463698d6d60bc6a4da69c89185ad1e0bcc4104f584e960b9ed
@@ -1007,6 +1006,8 @@ six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
     # via python-dateutil
+spy-ssz @ git+https://github.com/eth2353/spy-ssz@eeee194459912e012aee23b818d9dd8ae0e417c0
+    # via vero
 typing-extensions==4.15.0 \
     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466 \
     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548

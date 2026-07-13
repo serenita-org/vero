@@ -35,7 +35,7 @@ repos:
           msgspec==0.21.1,
           prometheus-client==0.25.0,
           pytest==9.0.3,
-          remerkleable==0.1.28,
+          "spy-ssz @ git+https://github.com/eth2353/spy-ssz.git@eeee194459912e012aee23b818d9dd8ae0e417c0",
           types-PyYAML==6.0.12.20260408,
           ]
 

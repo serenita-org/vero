@@ -31,8 +31,7 @@ class BeaconChain:
         self.genesis_validators_root = genesis.genesis_validators_root.to_obj()
 
         # Store the spec values we need
-        # (accessing the attributes of the remerkleable-based Spec object directly
-        # wastes a noticeable amount of CPU)
+        # Cache the spec values used in hot paths.
         self.SLOTS_PER_EPOCH = int(spec.SLOTS_PER_EPOCH)
         self.SECONDS_PER_SLOT = int(spec.SECONDS_PER_SLOT)
         self.SECONDS_PER_INTERVAL = self.SECONDS_PER_SLOT / INTERVALS_PER_SLOT
