@@ -69,6 +69,8 @@ async def test_iter_fast_then_slow_task_batches_yields_two_batches(
         ],
         fast_wait_s=fast_wait_time_s,
     ):
-        observed_batches.append((is_slow_batch, [await future for future in batch]))
+        observed_batches.append(
+            (is_slow_batch, sorted([await future for future in batch]))
+        )
 
     assert observed_batches == expected_batches
