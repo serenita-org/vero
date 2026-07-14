@@ -409,23 +409,14 @@ class BeaconNode:
 
     async def get_validators(
         self,
-        ids: list[str],
-        statuses: list[SchemaBeaconAPI.ValidatorStatus] | None = None,
+        request_data: bytes,
         state_id: str = "head",
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
-        if len(ids) == 0:
-            return []
-
         resp_bytes, _, _ = await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/states/{state_id}/validators",
             formatted_endpoint_string_params=dict(state_id=state_id),
-            data=self.json_encoder.encode(
-                {
-                    "ids": ids,
-                    "statuses": [s.value for s in statuses] if statuses else None,
-                }
-            ),
+            data=request_data,
         )
 
         resp_decoded = msgspec.json.decode(
@@ -497,23 +488,23 @@ class BeaconNode:
 
     async def publish_sync_committee_messages(
         self,
-        messages: list[dict[str, str]],
+        encoded_messages: bytes,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/pool/sync_committees",
-            data=self.json_encoder.encode(messages),
+            data=encoded_messages,
         )
 
     async def publish_attestations(
         self,
-        attestations: list[SchemaBeaconAPI.SingleAttestation],
+        encoded_attestations: bytes,
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/pool/attestations",
-            data=self.json_encoder.encode(attestations),
+            data=encoded_attestations,
             headers={"Eth-Consensus-Version": fork_version.value},
         )
 
@@ -568,18 +559,13 @@ class BeaconNode:
 
     async def publish_aggregate_and_proofs(
         self,
-        signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        encoded_signed_aggregate_and_proofs: bytes,
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/validator/aggregate_and_proofs",
-            data=self.json_encoder.encode(
-                [
-                    dict(message=msg, signature=sig)
-                    for msg, sig in signed_aggregate_and_proofs
-                ]
-            ),
+            data=encoded_signed_aggregate_and_proofs,
             headers={"Eth-Consensus-Version": fork_version.value},
         )
 
@@ -613,17 +599,12 @@ class BeaconNode:
 
     async def publish_sync_committee_contribution_and_proofs(
         self,
-        signed_contribution_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
+        encoded_signed_contribution_and_proofs: bytes,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/contribution_and_proofs",
-            data=self.json_encoder.encode(
-                [
-                    dict(message=contribution, signature=sig)
-                    for contribution, sig in signed_contribution_and_proofs
-                ]
-            ),
+            data=encoded_signed_contribution_and_proofs,
         )
 
     async def prepare_beacon_proposer(self, data: list[dict[str, str]]) -> None:
