@@ -448,10 +448,7 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-    ) -> tuple[
-        BeaconBlock,
-        SchemaBeaconAPI.ProduceBlockV3Response,
-    ]:
+    ) -> BeaconBlock:
         # TODO small room for improvement here.
         #  We are currently choosing the best block based on total
         #  block value (consensus+exec).
@@ -465,12 +462,10 @@ class MultiBeaconNode:
             randao_reveal=randao_reveal,
         )
 
-        # Parse block
-        beacon_block = self._parse_block_response(
+        return self._parse_block_response(
             response=best_block_response,
             content_type=content_type,
         )
-        return beacon_block, best_block_response
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:
