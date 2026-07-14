@@ -370,7 +370,6 @@ class BlockProposalService(ValidatorDutyService):
     ) -> tuple[
         BeaconBlock,
         SchemaRemoteSigner.BeaconBlockHeader,
-        SchemaBeaconAPI.ProduceBlockV3Response,
     ]:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._produce_block",
@@ -387,14 +386,13 @@ class BlockProposalService(ValidatorDutyService):
                     graffiti = encode_graffiti(kmgr_graffiti_str)
 
             try:
-                (
-                    block_contents_or_blinded_block,
-                    full_response,
-                ) = await self.multi_beacon_node.produce_block_v3(
-                    slot=slot,
-                    graffiti=graffiti,
-                    builder_boost_factor=self.cli_args.builder_boost_factor,
-                    randao_reveal=randao_reveal,
+                block_contents_or_blinded_block = (
+                    await self.multi_beacon_node.produce_block_v3(
+                        slot=slot,
+                        graffiti=graffiti,
+                        builder_boost_factor=self.cli_args.builder_boost_factor,
+                        randao_reveal=randao_reveal,
+                    )
                 )
             except Exception as e:
                 self.logger.exception(
@@ -408,7 +406,7 @@ class BlockProposalService(ValidatorDutyService):
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
                     **block_contents_or_blinded_block.header_dict()
                 )
-                return block_contents_or_blinded_block, block_header, full_response
+                return block_contents_or_blinded_block, block_header
 
     async def _sign_block(
         self,
@@ -526,21 +524,23 @@ class BlockProposalService(ValidatorDutyService):
             (
                 block_contents_or_blinded_block,
                 block_header,
-                full_response,
             ) = await self._produce_block(
                 slot=slot, duty=duty, randao_reveal=randao_reveal
             )
             try:
+                fork_version = SchemaBeaconAPI.ForkVersion[
+                    block_contents_or_blinded_block.fork.name
+                ]
                 signature = await self._sign_block(
                     slot=slot,
                     duty=duty,
                     block_header=block_header,
-                    block_version=full_response.version.value.upper(),
+                    block_version=fork_version.value.upper(),
                 )
 
                 await self._publish_block(
                     slot=slot,
-                    fork_version=full_response.version,
+                    fork_version=fork_version,
                     signature=signature,
                     block_contents_or_blinded_block=block_contents_or_blinded_block,
                 )
