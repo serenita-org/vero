@@ -41,6 +41,7 @@ from collections.abc import AsyncIterator
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
+import msgspec
 from opentelemetry import trace
 from remerkleable.complex import Container
 
@@ -104,6 +105,8 @@ class MultiBeaconNode:
         self._skip_init = skip_init
         self._init_timeout = 300
         self._shutdown_event = vero.shutdown_event
+
+        self._json_encoder = msgspec.json.Encoder()
 
     async def initialize(self) -> None:
         if self._skip_init:
@@ -239,13 +242,23 @@ class MultiBeaconNode:
 
     async def get_validators(
         self,
-        **kwargs: Any,
+        ids: list[str],
+        statuses: list[SchemaBeaconAPI.ValidatorStatus] | None = None,
     ) -> list[SchemaValidator.ValidatorIndexPubkey]:
+        if len(ids) == 0:
+            return []
+
+        request_data = self._json_encoder.encode(
+            {
+                "ids": ids,
+                "statuses": [s.value for s in statuses] if statuses else None,
+            }
+        )
         resp: list[
             SchemaValidator.ValidatorIndexPubkey
         ] = await self._get_first_beacon_node_response(
             func_name="get_validators",
-            **kwargs,
+            request_data=request_data,
         )
         return resp
 
@@ -617,7 +630,7 @@ class MultiBeaconNode:
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
-            attestations=attestations,
+            encoded_attestations=self._json_encoder.encode(attestations),
             fork_version=fork_version,
         )
 
@@ -686,9 +699,15 @@ class MultiBeaconNode:
         signed_aggregate_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
+        encoded = self._json_encoder.encode(
+            [
+                dict(message=msg, signature=sig)
+                for msg, sig in signed_aggregate_and_proofs
+            ]
+        )
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
-            signed_aggregate_and_proofs=signed_aggregate_and_proofs,
+            encoded_signed_aggregate_and_proofs=encoded,
             fork_version=fork_version,
         )
 
@@ -707,10 +726,13 @@ class MultiBeaconNode:
     async def get_block_root(self, block_id: str) -> str:
         return await self.best_beacon_node.get_block_root(block_id=block_id)
 
-    async def publish_sync_committee_messages(self, **kwargs: Any) -> None:
+    async def publish_sync_committee_messages(
+        self, messages: list[SchemaBeaconAPI.SyncCommitteeSignature]
+    ) -> None:
+        encoded = self._json_encoder.encode(messages)
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_messages",
-            **kwargs,
+            encoded_messages=encoded,
         )
 
     async def get_sync_committee_contribution(
@@ -776,7 +798,13 @@ class MultiBeaconNode:
         self,
         signed_contribution_and_proofs: list[tuple[dict, str]],  # type: ignore[type-arg]
     ) -> None:
+        encoded = self._json_encoder.encode(
+            [
+                dict(message=contribution, signature=sig)
+                for contribution, sig in signed_contribution_and_proofs
+            ]
+        )
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs",
-            signed_contribution_and_proofs=signed_contribution_and_proofs,
+            encoded_signed_contribution_and_proofs=encoded,
         )
