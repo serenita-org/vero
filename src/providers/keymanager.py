@@ -368,8 +368,17 @@ class Keymanager(SignatureProvider):
 
         _, sig, _ = await self.sign(
             message=SchemaRemoteSigner.VoluntaryExitSignableMessage(
-                fork_info=self.beacon_chain.get_fork_info(
-                    slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
+                # Per EIP-7044 - lock validator voluntary exit signature domain
+                # on Capella for perpetual validity.
+                # Vero doesn't support pre-Capella forks so we don't need to
+                # determine it dynamically and can hardcode it here.
+                fork_info=SchemaRemoteSigner.ForkInfo(
+                    fork=SchemaRemoteSigner.Fork(
+                        previous_version=spec.BELLATRIX_FORK_VERSION.to_obj(),
+                        current_version=spec.CAPELLA_FORK_VERSION.to_obj(),
+                        epoch=str(self.vero.spec.CAPELLA_FORK_EPOCH)
+                    )
+                    genesis_validators_root=self.beacon_chain.genesis_validators_root,
                 ),
                 voluntary_exit=SchemaRemoteSigner.VoluntaryExit(
                     epoch=str(epoch), validator_index=str(validator_index)
