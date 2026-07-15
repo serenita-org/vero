@@ -5,6 +5,7 @@
 #### Bugfixes
 
 - Fix race condition in duties update logic ([#339](https://github.com/serenita-org/vero/pull/339))
+- Fix voluntary exit signature domain in Keymanager API ([#336](https://github.com/serenita-org/vero/pull/336))
 
 ___
 
