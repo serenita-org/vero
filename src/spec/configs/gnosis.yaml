@@ -2,8 +2,8 @@ PRESET_BASE: 'gnosis'
 
 # Free-form short name of the network that this configuration applies to - known
 # canonical network names include:
-# * 'mainnet' - there can be only one
-# * 'prater' - testnet
+# * 'gnosis' - there can be only one
+# * 'chiado' - testnet
 # Must match the regex: [a-z0-9\-]
 CONFIG_NAME: 'gnosis'
 
