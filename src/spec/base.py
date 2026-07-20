@@ -34,34 +34,45 @@ class Genesis:
 
 @dataclass
 class SpecFulu:
+    # Phase 0
+    GENESIS_FORK_VERSION: Version
     SECONDS_PER_SLOT: UInt64SerializedAsString
     SLOTS_PER_EPOCH: UInt64SerializedAsString
     MAX_VALIDATORS_PER_COMMITTEE: UInt64SerializedAsString
     MAX_COMMITTEES_PER_SLOT: UInt64SerializedAsString
-    GENESIS_FORK_VERSION: Version
     MAX_PROPOSER_SLASHINGS: UInt64SerializedAsString
     MAX_ATTESTER_SLASHINGS: UInt64SerializedAsString
     MAX_ATTESTATIONS: UInt64SerializedAsString
     MAX_DEPOSITS: UInt64SerializedAsString
     MAX_VOLUNTARY_EXITS: UInt64SerializedAsString
-    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: UInt64SerializedAsString
-    SYNC_COMMITTEE_SIZE: UInt64SerializedAsString
+
+    # Altair
     ALTAIR_FORK_EPOCH: UInt64SerializedAsString
     ALTAIR_FORK_VERSION: Version
+    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: UInt64SerializedAsString
+    SYNC_COMMITTEE_SIZE: UInt64SerializedAsString
+
+    # Bellatrix
     BELLATRIX_FORK_EPOCH: UInt64SerializedAsString
     BELLATRIX_FORK_VERSION: Version
     BYTES_PER_LOGS_BLOOM: UInt64SerializedAsString
     MAX_EXTRA_DATA_BYTES: UInt64SerializedAsString
     MAX_TRANSACTIONS_PER_PAYLOAD: UInt64SerializedAsString
     MAX_BYTES_PER_TRANSACTION: UInt64SerializedAsString
-    MAX_WITHDRAWALS_PER_PAYLOAD: UInt64SerializedAsString
+
+    # Capella
     CAPELLA_FORK_EPOCH: UInt64SerializedAsString
     CAPELLA_FORK_VERSION: Version
+    MAX_WITHDRAWALS_PER_PAYLOAD: UInt64SerializedAsString
     MAX_BLS_TO_EXECUTION_CHANGES: UInt64SerializedAsString
-    MAX_BLOB_COMMITMENTS_PER_BLOCK: UInt64SerializedAsString
+
+    # Deneb
     DENEB_FORK_EPOCH: UInt64SerializedAsString
     DENEB_FORK_VERSION: Version
+    MAX_BLOB_COMMITMENTS_PER_BLOCK: UInt64SerializedAsString
     FIELD_ELEMENTS_PER_BLOB: UInt64SerializedAsString
+
+    # Electra
     ELECTRA_FORK_EPOCH: UInt64SerializedAsString
     ELECTRA_FORK_VERSION: Version
     MAX_DEPOSIT_REQUESTS_PER_PAYLOAD: UInt64SerializedAsString
@@ -69,6 +80,8 @@ class SpecFulu:
     MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD: UInt64SerializedAsString
     MAX_ATTESTATIONS_ELECTRA: UInt64SerializedAsString
     MAX_ATTESTER_SLASHINGS_ELECTRA: UInt64SerializedAsString
+
+    # Fulu
     FULU_FORK_EPOCH: UInt64SerializedAsString
     FULU_FORK_VERSION: Version
 
