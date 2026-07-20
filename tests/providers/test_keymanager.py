@@ -38,6 +38,7 @@ async def test_keymanager_memory_usage(
         keymanager.set_graffiti(pubkey=pk, graffiti=graffiti)
 
     end_snapshot = tracemalloc.take_snapshot()
+    tracemalloc.stop()
 
     # Compare memory usage
     diff = end_snapshot.compare_to(start_snapshot, "lineno")
