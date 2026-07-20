@@ -127,7 +127,7 @@ class SyncCommitteeService(ValidatorDutyService):
     ) -> AsyncIterator[list[SyncCommitteeMessage]]:
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         pubkey_to_validator_index = {
-            member.pubkey: str(member.index) for member in sync_committee_members
+            member.pubkey: member.index for member in sync_committee_members
         }
         msg = SchemaRemoteSigner.SyncCommitteeMessageSignableMessage(
             fork_info=_fork_info,
@@ -136,6 +136,7 @@ class SyncCommitteeService(ValidatorDutyService):
                 slot=str(duty_slot),
             ),
         )
+        beacon_block_root_bytes = bytes.fromhex(beacon_block_root[2:])
         signing_tasks = [
             asyncio.create_task(
                 self.signature_provider.sign(
@@ -173,13 +174,9 @@ class SyncCommitteeService(ValidatorDutyService):
 
                 signed_messages_batch.append(
                     preset_types().sync_committee_message(
-                        beacon_block_root=bytes.fromhex(
-                            msg.sync_committee_message.beacon_block_root.removeprefix(
-                                "0x"
-                            )
-                        ),
-                        slot=int(msg.sync_committee_message.slot),
-                        validator_index=int(pubkey_to_validator_index[pubkey]),
+                        beacon_block_root=beacon_block_root_bytes,
+                        slot=duty_slot,
+                        validator_index=pubkey_to_validator_index[pubkey],
                         signature=sig,
                     ),
                 )
