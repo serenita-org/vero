@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from schemas import SchemaBeaconAPI
+from spec import AttestationData, Checkpoint
 
 from .multi_beacon_node import MultiBeaconNode
 
@@ -36,12 +37,8 @@ class AttestationDataProvider:
             id=f"{self.__class__.__name__}.prune",
         )
 
-        self.source_checkpoint_confirmation_cache: dict[
-            str, SchemaBeaconAPI.Checkpoint
-        ] = dict()
-        self.target_checkpoint_confirmation_cache: dict[
-            str, SchemaBeaconAPI.Checkpoint
-        ] = dict()
+        self.source_checkpoint_confirmation_cache: dict[int, Checkpoint] = {}
+        self.target_checkpoint_confirmation_cache: dict[int, Checkpoint] = {}
 
     async def handle_reorg_event(self, event: SchemaBeaconAPI.ChainReorgEvent) -> None:
         # Check if the reorg crossed an epoch boundary.
@@ -60,16 +57,14 @@ class AttestationDataProvider:
             self.source_checkpoint_confirmation_cache.clear()
             self.target_checkpoint_confirmation_cache.clear()
 
-    def _cache_checkpoints(
-        self, source: SchemaBeaconAPI.Checkpoint, target: SchemaBeaconAPI.Checkpoint
-    ) -> None:
+    def _cache_checkpoints(self, source: Checkpoint, target: Checkpoint) -> None:
         self.source_checkpoint_confirmation_cache[source.epoch] = source
         self.target_checkpoint_confirmation_cache[target.epoch] = target
 
     async def _confirm_finality_checkpoints(
         self,
-        source: SchemaBeaconAPI.Checkpoint,
-        target: SchemaBeaconAPI.Checkpoint,
+        source: Checkpoint,
+        target: Checkpoint,
         slot: int,
     ) -> None:
         if source == self.source_checkpoint_confirmation_cache.get(
@@ -91,7 +86,7 @@ class AttestationDataProvider:
 
     async def _produce_attestation_data_without_expected_head_block_root(
         self, slot: int
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         # We ask all beacon nodes to produce AttestationData,
         # requiring a threshold of them to agree on it.
         att_data = (
@@ -109,7 +104,7 @@ class AttestationDataProvider:
         self,
         slot: int,
         head_event_block_root: str | None,
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         """
         Produces AttestationData for the given slot.
 

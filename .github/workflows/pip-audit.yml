@@ -22,9 +22,9 @@ jobs:
     - name: Run pip-audit
       run: |
         # pip-audit installs requirements in a temporary env; pip hash-checking fails
-        # on VCS requirements (like grandine-py @ git+...). Exclude those entries
+        # on VCS requirements (like spy-ssz @ git+...). Exclude those entries
         # from the audit input: they are not published on PyPI anyway.
-        # Exclude only our pinned grandine-py VCS source from eth2353/grandine-py.
-        # If grandine-py is sourced from a different owner/repo, keep it in audit input.
-        grep -v 'grandine-py @ git+https://github.com/eth2353/grandine-py@' requirements.txt > requirements-pip-audit.txt
+        # Exclude only our pinned spy-ssz VCS source from eth2353/spy-ssz.
+        # If spy-ssz is sourced from a different owner/repo, keep it in audit input.
+        grep -v 'spy-ssz @ git+https://github.com/eth2353/spy-ssz@' requirements.txt > requirements-pip-audit.txt
         uvx pip-audit -r requirements-pip-audit.txt --disable-pip

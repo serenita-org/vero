@@ -1,9 +1,29 @@
-from .attestation import SpecAttestation
-from .block import SpecBeaconBlock
-from .sync_committee import SpecSyncCommittee
+from .preset import (
+    AttestationData,
+    BeaconBlock,
+    Checkpoint,
+    Preset,
+    PresetTypes,
+    SignedAggregateAndProof,
+    SignedBeaconBlock,
+    SignedContributionAndProof,
+    SingleAttestation,
+    SyncCommitteeMessage,
+    initialize_preset,
+    preset_types,
+)
 
 __all__ = [
-    "SpecAttestation",
-    "SpecBeaconBlock",
-    "SpecSyncCommittee",
+    "AttestationData",
+    "BeaconBlock",
+    "Checkpoint",
+    "Preset",
+    "PresetTypes",
+    "SignedAggregateAndProof",
+    "SignedBeaconBlock",
+    "SignedContributionAndProof",
+    "SingleAttestation",
+    "SyncCommitteeMessage",
+    "initialize_preset",
+    "preset_types",
 ]

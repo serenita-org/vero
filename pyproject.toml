@@ -14,8 +14,7 @@ dependencies = [
     "pyroscope-io>=0.8.8",
     "pyroscope-otel>=0.4.0",
     "pyyaml>=6.0.2",
-    "remerkleable>=0.1.28",
-    "grandine-py",
+    "spy-ssz",
 ]
 
 [dependency-groups]
@@ -32,15 +31,6 @@ dev = [
 [tool.mypy]
 python_version = "3.12"
 strict = true
-
-
-[[tool.mypy.overrides]]
-module = 'spec.*'
-# Subclassing from remerkleable results in mypy errors:
-# > Class cannot subclass "Container" (has type "Any")
-# Possibly because the exports are not in the
-# module's `__all__`
-disallow_subclassing_any = false
 
 [tool.pytest]
 strict = true
@@ -64,12 +54,12 @@ required-version = "~=0.11.8"
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-grandine-py = { git = "https://github.com/eth2353/grandine-py", rev = "v0.1.3" }
 # aioresponses is not well-maintained anymore, consider moving to aiointercept
 # which is also conceptually much simpler, though less stable.
 # My fork only contains a very minimal patch that makes aioresponses compatible with
 # aiohttp>3.14
 aioresponses = { git = "https://github.com/eth2353/aioresponses", rev = "b3e8f869b1da9901144988d3bc41f9bc03d6e395" }
+spy-ssz = { git = "https://github.com/eth2353/spy-ssz", rev = "eeee194459912e012aee23b818d9dd8ae0e417c0" }
 
 [tool.uv.pip]
 generate-hashes = true

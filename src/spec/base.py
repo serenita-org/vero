@@ -1,36 +1,45 @@
-import copy
-from typing import Self
+from dataclasses import dataclass, fields
+from typing import Any, Self
 
-from remerkleable.byte_arrays import Bytes4
-from remerkleable.complex import Container
-from remerkleable.core import ObjParseException, ObjType
-
-from spec.common import Root, UInt64SerializedAsString
+from spec.common import Bytes4, Root, UInt64SerializedAsString, to_obj
 
 
 class Version(Bytes4):
     pass
 
 
-class Fork(Container):
-    previous_version: Version
-    current_version: Version
-    epoch: UInt64SerializedAsString
-
-
-class Genesis(Container):
+@dataclass(init=False)
+class Genesis:
     genesis_time: UInt64SerializedAsString
     genesis_validators_root: Root
     genesis_fork_version: Version
 
+    def __init__(
+        self,
+        genesis_time: int | str,
+        genesis_validators_root: bytes | str,
+        genesis_fork_version: bytes | str,
+    ) -> None:
+        self.genesis_time = UInt64SerializedAsString(genesis_time)
+        self.genesis_validators_root = Root(genesis_validators_root)
+        self.genesis_fork_version = Version(genesis_fork_version)
 
-class SpecFulu(Container):
+    @classmethod
+    def from_obj(cls, obj: dict[str, Any]) -> Self:
+        return cls(**obj)
+
+    def to_obj(self) -> dict[str, Any]:
+        return {field.name: to_obj(getattr(self, field.name)) for field in fields(self)}
+
+
+@dataclass
+class SpecFulu:
     # Phase 0
+    GENESIS_FORK_VERSION: Version
     SECONDS_PER_SLOT: UInt64SerializedAsString
     SLOTS_PER_EPOCH: UInt64SerializedAsString
     MAX_VALIDATORS_PER_COMMITTEE: UInt64SerializedAsString
     MAX_COMMITTEES_PER_SLOT: UInt64SerializedAsString
-    GENESIS_FORK_VERSION: Version
     MAX_PROPOSER_SLASHINGS: UInt64SerializedAsString
     MAX_ATTESTER_SLASHINGS: UInt64SerializedAsString
     MAX_ATTESTATIONS: UInt64SerializedAsString
@@ -38,30 +47,29 @@ class SpecFulu(Container):
     MAX_VOLUNTARY_EXITS: UInt64SerializedAsString
 
     # Altair
-    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: UInt64SerializedAsString
-    SYNC_COMMITTEE_SIZE: UInt64SerializedAsString
     ALTAIR_FORK_EPOCH: UInt64SerializedAsString
     ALTAIR_FORK_VERSION: Version
+    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: UInt64SerializedAsString
+    SYNC_COMMITTEE_SIZE: UInt64SerializedAsString
 
     # Bellatrix
     BELLATRIX_FORK_EPOCH: UInt64SerializedAsString
     BELLATRIX_FORK_VERSION: Version
-
     BYTES_PER_LOGS_BLOOM: UInt64SerializedAsString
     MAX_EXTRA_DATA_BYTES: UInt64SerializedAsString
     MAX_TRANSACTIONS_PER_PAYLOAD: UInt64SerializedAsString
     MAX_BYTES_PER_TRANSACTION: UInt64SerializedAsString
 
     # Capella
-    MAX_WITHDRAWALS_PER_PAYLOAD: UInt64SerializedAsString
     CAPELLA_FORK_EPOCH: UInt64SerializedAsString
     CAPELLA_FORK_VERSION: Version
+    MAX_WITHDRAWALS_PER_PAYLOAD: UInt64SerializedAsString
     MAX_BLS_TO_EXECUTION_CHANGES: UInt64SerializedAsString
 
     # Deneb
-    MAX_BLOB_COMMITMENTS_PER_BLOCK: UInt64SerializedAsString
     DENEB_FORK_EPOCH: UInt64SerializedAsString
     DENEB_FORK_VERSION: Version
+    MAX_BLOB_COMMITMENTS_PER_BLOCK: UInt64SerializedAsString
     FIELD_ELEMENTS_PER_BLOB: UInt64SerializedAsString
 
     # Electra
@@ -78,27 +86,21 @@ class SpecFulu(Container):
     FULU_FORK_VERSION: Version
 
     @classmethod
-    def from_obj(cls, obj: ObjType) -> Self:
-        if not isinstance(obj, dict):
-            raise ObjParseException(f"obj '{obj}' is not a dict")
-
-        # Create a copy since we manipulate the dict
-        _obj = copy.deepcopy(obj)
-
-        # Remove extra keys/fields
-        fields = cls.fields()
-        for k in list(_obj.keys()):
-            if k not in fields:
-                del _obj[k]
-
-        # Check if all required fields have a value
-        if any(field not in _obj for field in fields):
-            missing = set(fields.keys()) - set(_obj.keys())
-            raise ObjParseException(
-                f"Required field(s) ({missing}) missing from {_obj}"
+    def from_obj(cls, obj: dict[str, Any]) -> Self:
+        values: dict[str, Any] = {}
+        for field in fields(cls):
+            if field.name not in obj:
+                raise ValueError(f"Required field {field.name!r} missing from spec")
+            converter = (
+                Version
+                if field.name.endswith("FORK_VERSION")
+                else UInt64SerializedAsString
             )
+            values[field.name] = converter(obj[field.name])
+        return cls(**values)
 
-        return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
+    def to_obj(self) -> dict[str, Any]:
+        return {field.name: to_obj(getattr(self, field.name)) for field in fields(self)}
 
 
 def parse_spec(data: dict[str, str]) -> SpecFulu:

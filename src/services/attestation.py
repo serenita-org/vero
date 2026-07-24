@@ -19,7 +19,12 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.attestation import AttestationData, SpecAttestation
+from spec import (
+    AttestationData,
+    SignedAggregateAndProof,
+    SingleAttestation,
+    preset_types,
+)
 from spec.common import (
     bytes_to_uint64,
     hash_function,
@@ -147,7 +152,7 @@ class AttestationService(ValidatorDutyService):
 
     async def _produce_attestation_data(
         self, slot: int, head_event: SchemaBeaconAPI.HeadEvent | None
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         consensus_start = asyncio.get_running_loop().time()
         try:
             att_data = await asyncio.wait_for(
@@ -176,9 +181,7 @@ class AttestationService(ValidatorDutyService):
 
         # Ensure attestation data checkpoints are not in the future
         current_epoch = self.beacon_chain.current_epoch
-        if any(
-            int(cp.epoch) > current_epoch for cp in (att_data.source, att_data.target)
-        ):
+        if any(cp.epoch > current_epoch for cp in (att_data.source, att_data.target)):
             raise RuntimeError(
                 f"Checkpoint in returned attestation data is in the future:"
                 f"\nCurrent epoch: {current_epoch}"
@@ -190,13 +193,14 @@ class AttestationService(ValidatorDutyService):
     async def _iter_signed_attestation_batches(
         self,
         slot: int,
-        att_data: SchemaBeaconAPI.AttestationData,
+        att_data: AttestationData,
         duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
-    ) -> AsyncIterator[list[SchemaBeaconAPI.SingleAttestation]]:
+    ) -> AsyncIterator[list[SingleAttestation]]:
         pubkey_to_duty = {d.pubkey: d for d in duties}
+        attestation_data_json = att_data.to_json()
         message = SchemaRemoteSigner.AttestationSignableMessage(
             fork_info=self.beacon_chain.get_fork_info(slot=slot),
-            attestation=msgspec.to_builtins(att_data),
+            attestation=msgspec.Raw(attestation_data_json),
         )
         signing_tasks = [
             asyncio.create_task(
@@ -235,9 +239,9 @@ class AttestationService(ValidatorDutyService):
 
                 duty = pubkey_to_duty[pubkey]
                 signed_attestations_batch.append(
-                    SchemaBeaconAPI.SingleAttestation(
-                        committee_index=duty.committee_index,
-                        attester_index=duty.validator_index,
+                    preset_types().single_attestation(
+                        committee_index=int(duty.committee_index),
+                        attester_index=int(duty.validator_index),
                         data=att_data,
                         signature=signature,
                     ),
@@ -249,11 +253,11 @@ class AttestationService(ValidatorDutyService):
     async def _publish_attestations(
         self,
         slot: int,
-        att_data: SchemaBeaconAPI.AttestationData,
-        signed_attestations: list[SchemaBeaconAPI.SingleAttestation],
+        att_data: AttestationData,
+        signed_attestations: list[SingleAttestation],
     ) -> None:
         self.logger.debug(
-            f"Publishing attestations for slot {slot}, count: {len(signed_attestations)}, head root: {att_data.beacon_block_root}",
+            f"Publishing attestations for slot {slot}, count: {len(signed_attestations)}, head root: 0x{att_data.beacon_block_root.hex()}",
         )
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.ATTESTATION.value,
@@ -274,7 +278,7 @@ class AttestationService(ValidatorDutyService):
             ) from None
         else:
             self.logger.info(
-                f"Published attestations for slot {slot}, count: {len(signed_attestations)}, head root: {att_data.beacon_block_root}",
+                f"Published attestations for slot {slot}, count: {len(signed_attestations)}, head root: 0x{att_data.beacon_block_root.hex()}",
             )
             self.metrics.vc_published_attestations_c.inc(
                 amount=len(signed_attestations),
@@ -380,7 +384,7 @@ class AttestationService(ValidatorDutyService):
     async def prepare_and_aggregate_attestations(
         self,
         slot: int,
-        att_data: SchemaBeaconAPI.AttestationData,
+        att_data: AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation at 2/3 of the slot
@@ -409,7 +413,7 @@ class AttestationService(ValidatorDutyService):
             1,
             committee_length // TARGET_AGGREGATORS_PER_COMMITTEE,
         )
-        return bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0  # type: ignore[no-any-return]
+        return bytes_to_uint64(hash_function(slot_signature)[0:8]) % modulo == 0
 
     async def _sign_and_publish_aggregates(
         self,
@@ -418,12 +422,19 @@ class AttestationService(ValidatorDutyService):
         identifiers: list[str],
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:
-        signed_aggregate_and_proofs = []
+        signed_aggregate_and_proofs: list[SignedAggregateAndProof] = []
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
-            signed_aggregate_and_proofs.append((msg.aggregate_and_proof.data, sig))
+            signed_aggregate_and_proofs.append(
+                preset_types().signed_aggregate_and_proof(
+                    message=preset_types().aggregate_and_proof.from_json(
+                        msg.aggregate_and_proof.data
+                    ),
+                    signature=sig,
+                )
+            )
 
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
@@ -449,7 +460,7 @@ class AttestationService(ValidatorDutyService):
     async def aggregate_attestations(
         self,
         slot: int,
-        att_data: SchemaBeaconAPI.AttestationData,
+        att_data: AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         if len(aggregator_duties) == 0:
@@ -458,12 +469,7 @@ class AttestationService(ValidatorDutyService):
         self.logger.debug(
             f"Aggregating attestations for slot {slot}, {len(aggregator_duties)} duties",
         )
-        attestation_data_root = (
-            "0x"
-            + AttestationData.from_obj(msgspec.to_builtins(att_data))
-            .hash_tree_root()
-            .hex()
-        )
+        attestation_data_root = f"0x{att_data.hash_tree_root().hex()}"
         self.metrics.duty_start_time_h.labels(
             duty=ValidatorDuty.ATTESTATION_AGGREGATION.value,
         ).observe(self.beacon_chain.time_since_slot_start(slot=slot))
@@ -494,11 +500,15 @@ class AttestationService(ValidatorDutyService):
                             fork_info=_fork_info,
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
                                 version=self.beacon_chain.current_fork_version.value.upper(),
-                                data=SpecAttestation.AggregateAndProofElectra(
-                                    aggregator_index=int(duty.validator_index),
-                                    aggregate=aggregate,
-                                    selection_proof=duty.selection_proof,
-                                ).to_obj(),
+                                data=msgspec.Raw(
+                                    preset_types()
+                                    .aggregate_and_proof(
+                                        aggregator_index=int(duty.validator_index),
+                                        aggregate=aggregate,
+                                        selection_proof=duty.selection_proof,
+                                    )
+                                    .to_json()
+                                ),
                             ),
                         )
                     )

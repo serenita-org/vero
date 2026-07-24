@@ -10,11 +10,9 @@ https://docs.nodereal.io/reference/eventstream
 
 from collections.abc import Hashable
 from enum import Enum
-from typing import Any, Protocol, Self
+from typing import Self
 
 import msgspec
-
-from providers._headers import ContentType
 
 
 class ExecutionOptimisticResponse(msgspec.Struct):
@@ -55,35 +53,9 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
-class Checkpoint(msgspec.Struct, frozen=True):
-    epoch: str
-    root: str
-
-
 class ForkVersion(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
-
-
-class AttestationData(msgspec.Struct, frozen=True):
-    slot: str
-    index: str
-    # LMD GHOST vote
-    beacon_block_root: str
-    # FFG vote
-    source: Checkpoint
-    target: Checkpoint
-
-
-class SingleAttestation(msgspec.Struct):
-    committee_index: str
-    attester_index: str
-    data: AttestationData
-    signature: str
-
-
-class ProduceAttestationDataResponse(msgspec.Struct):
-    data: AttestationData
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
@@ -94,13 +66,6 @@ class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
     is_aggregator: bool
 
 
-class SyncCommitteeSignature(msgspec.Struct):
-    slot: str
-    beacon_block_root: str
-    validator_index: str
-    signature: str
-
-
 class SubscribeToSyncCommitteeSubnetRequestBody(msgspec.Struct):
     validator_index: str
     sync_committee_indices: list[str]
@@ -109,7 +74,11 @@ class SubscribeToSyncCommitteeSubnetRequestBody(msgspec.Struct):
 
 class GetAggregatedAttestationV2Response(msgspec.Struct):
     version: ForkVersion
-    data: dict  # type: ignore[type-arg]
+    data: msgspec.Raw
+
+
+class RawDataResponse(msgspec.Struct):
+    data: msgspec.Raw
 
 
 # Duty endpoints responses
@@ -190,19 +159,7 @@ class ProduceBlockV3Response(msgspec.Struct):
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
-    content_type: ContentType
     data: bytes
-
-
-class SignedBeaconBlock(msgspec.Struct):
-    message: dict[str, Any]
-    signature: str
-
-
-class BlockContentsSigned(msgspec.Struct):
-    signed_block: SignedBeaconBlock
-    kzg_proofs: list[str]
-    blobs: list[str]
 
 
 # Liveness endpoint
@@ -216,11 +173,6 @@ class PostLivenessResponseBody(msgspec.Struct):
 
 
 # Events
-class DeduplicableEvent(Protocol):
-    @property
-    def dedup_key(self) -> Hashable: ...
-
-
 class BeaconNodeEvent(msgspec.Struct):
     @property
     def dedup_key(self) -> Hashable:
@@ -254,12 +206,10 @@ class AttesterSlashingEventAttestation(msgspec.Struct):
     attesting_indices: list[str]
 
 
-class AttesterSlashing(msgspec.Struct):
+class AttesterSlashingEvent(BeaconNodeEvent):
     attestation_1: AttesterSlashingEventAttestation
     attestation_2: AttesterSlashingEventAttestation
 
-
-class AttesterSlashingEvent(BeaconNodeEvent, AttesterSlashing):
     @property
     def dedup_key(self) -> Hashable:
         return str(
@@ -276,12 +226,10 @@ class ProposerSlashingEventData(msgspec.Struct):
     message: ProposerSlashingEventMessage
 
 
-class ProposerSlashing(msgspec.Struct):
+class ProposerSlashingEvent(BeaconNodeEvent):
     signed_header_1: ProposerSlashingEventData
     signed_header_2: ProposerSlashingEventData
 
-
-class ProposerSlashingEvent(BeaconNodeEvent, ProposerSlashing):
     @property
     def dedup_key(self) -> Hashable:
         return self.signed_header_1.message.proposer_index
