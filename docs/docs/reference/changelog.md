@@ -1,5 +1,13 @@
 # Changelog
 
+## Upcoming release
+
+#### Bugfixes
+
+- Fix race condition in duties update logic ([#339](https://github.com/serenita-org/vero/pull/339))
+
+___
+
 ## v1.4.1 { id="v1.4.1" }
 
 <small>July 14, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.4.1){:target="_blank"}
