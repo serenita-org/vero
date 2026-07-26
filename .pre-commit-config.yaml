@@ -16,7 +16,7 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
+    rev: v0.16.0
     hooks:
       - id: ruff-format
       - id: ruff-check
@@ -24,13 +24,13 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.1
+    rev: v2.3.0
     hooks:
     -   id: mypy
         exclude: "scripts/.*\\.py$"
         additional_dependencies:
           [
-          aiohttp==3.13.5,
+          aiohttp==3.14.1,
           aiosignal==1.4.0,
           msgspec==0.21.1,
           prometheus-client==0.25.0,
