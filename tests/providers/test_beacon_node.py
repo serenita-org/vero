@@ -11,7 +11,7 @@ from providers import BeaconNode, MultiBeaconNode, Vero
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI
 from spec.base import Version
-from spec.common import UInt64SerializedAsString
+from spec.common import Uint64
 from tests.ssz_objects import ZERO_SIGNATURE, make_block
 
 
@@ -128,7 +128,7 @@ async def test_initialize_spec_mismatch(
         spec_to_return = vero.spec
         if spec_mismatch:
             spec_to_return = copy(vero.spec)
-            spec_to_return.SLOTS_PER_EPOCH = UInt64SerializedAsString(5)
+            spec_to_return.SLOTS_PER_EPOCH = Uint64(5)
             spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
 
         m.get(

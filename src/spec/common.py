@@ -9,6 +9,14 @@ class Uint64(int):
             raise ValueError(f"uint64 value out of range: {parsed}")
         return int.__new__(cls, parsed)
 
+    @classmethod
+    def from_obj(cls, value: str) -> Self:
+        if not isinstance(value, str):
+            raise TypeError(
+                f"uint64 JSON value must be a string, got {type(value).__name__}"
+            )
+        return cls(value)
+
     def to_obj(self) -> str:
         return str(self)
 
@@ -50,10 +58,6 @@ def bytes_to_uint64(
 
 def hash_function(x: bytes | bytearray | memoryview) -> Bytes32:
     return Bytes32(sha256(x).digest())
-
-
-class UInt64SerializedAsString(Uint64):
-    pass
 
 
 class Root(Bytes32):
