@@ -29,7 +29,12 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from providers._response import raise_for_response_size
-from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner, SchemaValidator
+from schemas import (
+    SchemaBeaconAPI,
+    SchemaBuilderAPI,
+    SchemaRemoteSigner,
+    SchemaValidator,
+)
 from spec import (
     AttestationData,
     Checkpoint,
@@ -798,8 +803,9 @@ class BeaconNode:
         randao_reveal: str,
         signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
         fork_version: SchemaBeaconAPI.ForkVersion,
-    ) -> SchemaBeaconAPI.ProduceBlockV3Response:
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
+        # TODO deduplicate with produce_block_v3, it's near to a copy-paste
         params = dict(
             randao_reveal=randao_reveal,
             builder_boost_factor=str(builder_boost_factor),
@@ -809,9 +815,14 @@ class BeaconNode:
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
 
-        if signed_payload_bid:
-            self.logger.info(f"Setting body for block production, bid: {signed_payload_bid}")
-            data = self.json_encoder.encode(dict(signed_execution_payload_bid=signed_payload_bid))
+        # TODO BYOB not yet implemented - possibly in separate endpoint!
+        if False and signed_payload_bid:
+            self.logger.info(
+                f"Setting body for block production, bid: {signed_payload_bid}"
+            )
+            data = self.json_encoder.encode(
+                dict(signed_execution_payload_bid=signed_payload_bid)
+            )
         else:
             # empty dict
             # lodestar complains otherwise about getting a content-type header application/json
@@ -826,18 +837,20 @@ class BeaconNode:
         )
 
         with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.produce_block_v3",
+            name=f"{self.__class__.__name__}.produce_block_v4",
             kind=SpanKind.CLIENT,
             attributes={
                 "server.address": self.host,
             },
         ) as tracer_span:
             resp_bytes, content_type, headers = await self._make_request(
-                method="POST",
+                # TODO switch to POST once discussions are finished
+                method="GET",
                 endpoint="/eth/v4/validator/blocks/{slot}",
                 formatted_endpoint_string_params=dict(slot=slot),
                 params=params,
-                data=data,
+                # TODO uncomment when adding POST
+                # data=data,
                 timeout=ClientTimeout(
                     connect=self.client_session.timeout.connect,
                 ),
@@ -854,30 +867,33 @@ class BeaconNode:
                     f"{self.host} returned block as JSON but Vero requested SSZ"
                 )
 
-            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
-            # TODO Lodestar is not including this header?
-            execution_payload_included = True
-            # execution_payload_included = (
-            #    headers["Eth-Execution-Payload-Included"].lower() == "true"
-            # )
+            try:
+                response_content_type = ContentType(content_type)
+            except ValueError:
+                raise NotImplementedError(
+                    f"Unsupported content type: {content_type}"
+                ) from None
+
+            # TODO Lodestar is not providing this header right now
+            execution_payload_included = False
+            # execution_payload_included = headers["Eth-Execution-Payload-Included"].lower() == "true"
+            execution_payload_value = 0
+            # execution_payload_value = headers["Eth-Execution-Payload-Value"]
+
+            response = SchemaBeaconAPI.ProduceBlockV4Response(
+                version=SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"]),
+                execution_payload_included=execution_payload_included,
+                execution_payload_value=execution_payload_value,
+                consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                data=resp_bytes,
+            )
+
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            # execution_payload_value = int(headers["Eth-Execution-Payload-Value"] or 0)
-            # consensus_block_value = int(headers["Eth-Consensus-Block-Value"] or 0)
-            # TODO Lodestar not returning these either...
-            execution_payload_value = 0
-            consensus_block_value = 0
-
-            if content_type in (ContentType.OCTET_STREAM.value, ContentType.JSON.value):
-                response = SchemaBeaconAPI.ProduceBlockV4Response(
-                    version=fork_version,
-                    consensus_block_value=str(consensus_block_value),
-                    execution_payload_included=execution_payload_included,
-                    content_type=ContentType(content_type),
-                    data=resp_bytes,
-                )
-            else:
-                raise NotImplementedError(f"Unsupported content type: {content_type}")
+            execution_payload_value = int(response.execution_payload_value or 0)
+            consensus_block_value = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value)
+            response.consensus_block_value = str(consensus_block_value)
 
             tracer_span.add_event(
                 "ProduceBlockV4Response",
@@ -900,7 +916,7 @@ class BeaconNode:
                 host=self.host
             ).observe(execution_payload_value)
 
-            return response
+            return response, response_content_type
 
     async def publish_block_v2(
         self,
