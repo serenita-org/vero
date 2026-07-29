@@ -14,7 +14,7 @@ from args import CLIArgs
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from spec import Checkpoint
-from tests.ssz_objects import make_attestation_data
+from tests.ssz_objects import attestation_data_obj
 
 
 def _valid_root(value: str) -> str:
@@ -62,17 +62,13 @@ def _create_att_data_callback(
     async def _f(*args: Any, **kwargs: Any) -> CallbackResult:
         await asyncio.sleep(delay)
         if block_root:
-            attestation_data = make_attestation_data(
-                slot=123,
+            attestation_data = attestation_data_obj(
+                slot="123",
                 beacon_block_root=_valid_root(block_root),
-                source={"epoch": source.epoch, "root": f"0x{source.root.hex()}"},
-                target={"epoch": target.epoch, "root": f"0x{target.root.hex()}"},
+                source={"epoch": str(source.epoch), "root": f"0x{source.root.hex()}"},
+                target={"epoch": str(target.epoch), "root": f"0x{target.root.hex()}"},
             )
-            return CallbackResult(
-                body=msgspec.json.encode(
-                    {"data": msgspec.Raw(attestation_data.to_json())}
-                )
-            )
+            return CallbackResult(body=msgspec.json.encode({"data": attestation_data}))
         raise ValueError("No exception or response to return")
 
     return _f
