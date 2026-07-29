@@ -15,7 +15,6 @@ from opentelemetry.trace import (
 from spy_ssz import ObjectKind
 
 from observability import ErrorType, HandledRuntimeError
-from providers import Builder
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
@@ -23,12 +22,13 @@ from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
-from spec.common import get_slot_component_duration_ms
 from spec import BeaconBlock
+from spec.common import get_slot_component_duration_ms
 from spec.utils import encode_graffiti
 
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX
 BUILDER_INDEX_SELF_BUILD = 2**64 - 1
+
 
 class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
@@ -55,7 +55,9 @@ class BlockProposalService(ValidatorDutyService):
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
 
         # TODO prune
-        self.payload_attributes_events_store: list[SchemaBeaconAPI.PayloadAttributesEvent] = []
+        self.payload_attributes_events_store: list[
+            SchemaBeaconAPI.PayloadAttributesEvent
+        ] = []
 
         self.randao_reveal_cache: dict[tuple[int, str], str] = dict()
 
@@ -183,7 +185,9 @@ class BlockProposalService(ValidatorDutyService):
             )
             self.task_manager.create_task(super().update_duties())
 
-    async def handle_payload_attributes_event(self, event: SchemaBeaconAPI.PayloadAttributesEvent) -> None:
+    async def handle_payload_attributes_event(
+        self, event: SchemaBeaconAPI.PayloadAttributesEvent
+    ) -> None:
         self.logger.debug(f"Received payload attributes event: {event}")
         self.payload_attributes_events_store.append(event)
 
@@ -467,8 +471,11 @@ class BlockProposalService(ValidatorDutyService):
                 return self.randao_reveal_cache.pop(cache_key)
 
     async def _produce_block(
-        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str,
-            signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        randao_reveal: str,
+        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
     ) -> tuple[
         BeaconBlock,
         SchemaRemoteSigner.BeaconBlockHeader,
@@ -719,60 +726,37 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
-            builders = []
-            for url in  self.cli_args.builder_urls:
-                builders.append(Builder(
-                    base_url=url,
-                ))
-
             for payload_attributes_event in self.payload_attributes_events_store:
                 # TODO with the current implementation, there may be
-                # multiple events for the same slot -> we should probably
-                # only keep the latest event per slot
+                #  multiple events for the same slot -> we should probably
+                #  only keep the latest event per slot
                 if int(payload_attributes_event.data.proposal_slot) == slot:
                     payload_attributes_data = payload_attributes_event.data
-                    self.logger.info(f"Have payload attributes data")
+                    self.logger.info("Have payload attributes data")
                     break
             else:
-                self.logger.warning(f"Payload attributes unknown -> unable to fetch bids from builders")
+                self.logger.warning(
+                    "Payload attributes unknown -> unable to fetch bids from builders"
+                )
                 payload_attributes_data = None
 
             best_bid = None
             if payload_attributes_data:
-                results = await asyncio.gather(*[builder.get_execution_payload_bid(
+                best_bid = await self.multi_builder.get_execution_payload_bid(
                     slot=slot,
                     parent_hash=payload_attributes_data.parent_block_hash,
                     parent_root=payload_attributes_data.parent_block_root,
                     proposer_pubkey=duty.pubkey,
-                ) for builder in builders], return_exceptions=True)
-
-                best_bid_value = -1
-                for result in results:
-                    if isinstance(result, Exception):
-                        # TODO log warning and continue
-                        continue
-
-                    if result is None:
-                        # No bid from builder
-                        continue
-
-                    bid: SchemaBuilderAPI.SignedExecutionPayloadBid = result
-                    # TODO also account for bid execution payment I guess?
-                    if int(bid.message.value) > best_bid_value:
-                        best_bid = bid
-                        best_bid_value = int(bid.message.value)
-
-                if best_bid is not None:
-                    self.logger.info(f"Picked best bid with value {best_bid_value}")
-                    self.logger.debug(f"Best bid: {best_bid}")
-                else:
-                    self.logger.error(f"No bid retrieved from builders")
+                )
 
             (
                 block_contents_or_blinded_block,
                 block_header,
             ) = await self._produce_block(
-                slot=slot, duty=duty, randao_reveal=randao_reveal, signed_payload_bid=best_bid,
+                slot=slot,
+                duty=duty,
+                randao_reveal=randao_reveal,
+                signed_payload_bid=best_bid,
             )
             try:
                 fork_version = SchemaBeaconAPI.ForkVersion[
