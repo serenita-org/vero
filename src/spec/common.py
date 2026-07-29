@@ -1,5 +1,5 @@
 from hashlib import sha256
-from typing import Any, Literal, Self
+from typing import Any, Self
 
 
 class Uint64(int):
@@ -51,9 +51,8 @@ class Bytes32(FixedBytes):
 
 def bytes_to_uint64(
     data: bytes,
-    _endianness: Literal["little", "big"] = "little",
 ) -> Uint64:
-    return Uint64(int.from_bytes(data, _endianness))
+    return Uint64(int.from_bytes(data, byteorder="little"))
 
 
 def hash_function(x: bytes | bytearray | memoryview) -> Bytes32:
