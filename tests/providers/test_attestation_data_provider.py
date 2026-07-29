@@ -408,9 +408,11 @@ async def test_produce_attestation_data_without_head_event(
             Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Got matching AttestationData from beacon-node-a",
-                "Confirming finality checkpoints "
-                f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
-                f"target={Checkpoint(epoch=3, root=ROOT_3)}",
+                (
+                    "Confirming finality checkpoints "
+                    f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
+                    f"target={Checkpoint(epoch=3, root=ROOT_3)}"
+                ),
             ],
             id="success: unconfirmed head, same source and target",
         ),
@@ -447,9 +449,11 @@ async def test_produce_attestation_data_without_head_event(
             Checkpoint(epoch=2, root=ROOT_2),
             Checkpoint(epoch=3, root=ROOT_3),
             [
-                "Confirming finality checkpoints "
-                f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
-                f"target={Checkpoint(epoch=3, root=ROOT_3)}",
+                (
+                    "Confirming finality checkpoints "
+                    f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
+                    f"target={Checkpoint(epoch=3, root=ROOT_3)}"
+                ),
             ],
             id="success: unconfirmed head, 2/3 source and target",
         ),
@@ -494,9 +498,11 @@ async def test_produce_attestation_data_without_head_event(
             Checkpoint(epoch=2, root=ROOT_2),
             Checkpoint(epoch=3, root=ROOT_3),
             [
-                "Timed out confirming finality checkpoints "
-                f"att_data.source={Checkpoint(epoch=2, root=ROOT_2)}, "
-                f"att_data.target={Checkpoint(epoch=3, root=ROOT_3)}",
+                (
+                    "Timed out confirming finality checkpoints "
+                    f"att_data.source={Checkpoint(epoch=2, root=ROOT_2)}, "
+                    f"att_data.target={Checkpoint(epoch=3, root=ROOT_3)}"
+                ),
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
             id="success: delayed consensus - slow head processing",
