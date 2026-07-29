@@ -1,5 +1,4 @@
 import asyncio
-import hashlib
 import re
 import time
 from collections.abc import Callable, Coroutine
@@ -17,21 +16,22 @@ from spec import Checkpoint
 from tests.ssz_objects import attestation_data_obj
 
 
-def _valid_root(value: str) -> str:
-    try:
-        raw = bytes.fromhex(value.removeprefix("0x"))
-    except ValueError:
-        raw = b""
-    if len(raw) == 32:
-        return f"0x{raw.hex()}"
-    return f"0x{hashlib.sha256(value.encode()).hexdigest()}"
+def _root(value: int) -> bytes:
+    return value.to_bytes(32, byteorder="big")
 
 
-def _checkpoint(epoch: int, root: str) -> Checkpoint:
-    return Checkpoint(
-        epoch=epoch,
-        root=bytes.fromhex(_valid_root(root).removeprefix("0x")),
-    )
+ROOT_0 = _root(0)
+ROOT_1 = _root(1)
+ROOT_2 = _root(2)
+ROOT_3 = _root(3)
+ROOT_A = _root(0xAAAA)
+ROOT_B = _root(0xBBBB)
+ROOT_C = _root(0xCCCC)
+NEW_HEAD_ROOT = _root(0x1000)
+OLD_HEAD_ROOT = _root(0x1001)
+VERY_OLD_HEAD_ROOT = _root(0x1002)
+EPOCH_2_FIRST_SLOT_ROOT = _root(0x2000)
+EPOCH_1_LAST_SLOT_ROOT = _root(0x2001)
 
 
 @pytest.fixture
@@ -54,22 +54,20 @@ async def attestation_data_provider(
 
 
 def _create_att_data_callback(
-    block_root: str,
+    block_root: bytes,
     source: Checkpoint,
     target: Checkpoint,
     delay: float = 0.0,
 ) -> Callable[..., Coroutine[Any, Any, CallbackResult]]:
     async def _f(*args: Any, **kwargs: Any) -> CallbackResult:
         await asyncio.sleep(delay)
-        if block_root:
-            attestation_data = attestation_data_obj(
-                slot="123",
-                beacon_block_root=_valid_root(block_root),
-                source={"epoch": str(source.epoch), "root": f"0x{source.root.hex()}"},
-                target={"epoch": str(target.epoch), "root": f"0x{target.root.hex()}"},
-            )
-            return CallbackResult(body=msgspec.json.encode({"data": attestation_data}))
-        raise ValueError("No exception or response to return")
+        attestation_data = attestation_data_obj(
+            slot="123",
+            beacon_block_root=f"0x{block_root.hex()}",
+            source={"epoch": str(source.epoch), "root": f"0x{source.root.hex()}"},
+            target={"epoch": str(target.epoch), "root": f"0x{target.root.hex()}"},
+        )
+        return CallbackResult(body=msgspec.json.encode({"data": attestation_data}))
 
     return _f
 
@@ -88,30 +86,30 @@ def _create_att_data_callback(
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            _checkpoint(epoch=0, root="0x0000"),
-            _checkpoint(epoch=1, root="0x0001"),
+            ROOT_A,
+            Checkpoint(epoch=0, root=ROOT_0),
+            Checkpoint(epoch=1, root=ROOT_1),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
@@ -121,25 +119,25 @@ def _create_att_data_callback(
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(50)
                 ],
@@ -155,41 +153,41 @@ def _create_att_data_callback(
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x0000000000000000000000000000000000000000000000000000000000000new",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=NEW_HEAD_ROOT,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(10)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x0000000000000000000000000000000000000000000000000000000000000old",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=OLD_HEAD_ROOT,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(5)
                 ]
                 + [
                     _create_att_data_callback(
-                        block_root="0x0000000000000000000000000000000000000000000000000000000000000new",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=NEW_HEAD_ROOT,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(5)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x00000000000000000000000000000000000000000000000000000000very-old",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=VERY_OLD_HEAD_ROOT,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(10)
                 ],
             },
             False,
-            "0x0000000000000000000000000000000000000000000000000000000000000new",
-            _checkpoint(epoch=0, root="0x0000"),
-            _checkpoint(epoch=1, root="0x0001"),
+            NEW_HEAD_ROOT,
+            Checkpoint(epoch=0, root=ROOT_0),
+            Checkpoint(epoch=1, root=ROOT_1),
             [
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
@@ -199,26 +197,26 @@ def _create_att_data_callback(
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=2, root="0x0002"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=2, root=ROOT_2),
                         delay=0.01,
                     )
                     for _ in range(100)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(100)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=0, root="0x0000"),
-                        target=_checkpoint(epoch=1, root="0x0001"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=0, root=ROOT_0),
+                        target=Checkpoint(epoch=1, root=ROOT_1),
                     )
                     for _ in range(100)
                 ],
@@ -234,30 +232,30 @@ def _create_att_data_callback(
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0xepoch-2-first-slot",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=2, root="0xepoch-2-first-slot"),
+                        block_root=EPOCH_2_FIRST_SLOT_ROOT,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=2, root=EPOCH_2_FIRST_SLOT_ROOT),
                     )
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0xepoch-1-last-slot",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=2, root="0xepoch-1-last-slot"),
+                        block_root=EPOCH_1_LAST_SLOT_ROOT,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=2, root=EPOCH_1_LAST_SLOT_ROOT),
                     )
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0xepoch-1-last-slot",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=2, root="0xepoch-1-last-slot"),
+                        block_root=EPOCH_1_LAST_SLOT_ROOT,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=2, root=EPOCH_1_LAST_SLOT_ROOT),
                     )
                 ],
             },
             False,
-            "0xepoch-1-last-slot",
-            _checkpoint(epoch=1, root="0x0001"),
-            _checkpoint(epoch=2, root="0xepoch-1-last-slot"),
+            EPOCH_1_LAST_SLOT_ROOT,
+            Checkpoint(epoch=1, root=ROOT_1),
+            Checkpoint(epoch=2, root=EPOCH_1_LAST_SLOT_ROOT),
             [
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
             ],
@@ -288,7 +286,7 @@ async def test_produce_attestation_data_without_head_event(
         str, list[Coroutine[Any, Any, CallbackResult] | Exception]
     ],
     timeout_expected: bool,
-    expected_att_data_block_root: str,
+    expected_att_data_block_root: bytes | None,
     expected_att_data_source: Checkpoint,
     expected_att_data_target: Checkpoint,
     expected_log_messages: list[str],
@@ -320,9 +318,7 @@ async def test_produce_attestation_data_without_head_event(
                 ),
                 timeout=next_slot_start_ts - time.time(),
             )
-            assert f"0x{att_data.beacon_block_root.hex()}" == _valid_root(
-                expected_att_data_block_root
-            )
+            assert att_data.beacon_block_root == expected_att_data_block_root
             assert att_data.source == expected_att_data_source
             assert att_data.target == expected_att_data_target
 
@@ -344,192 +340,192 @@ async def test_produce_attestation_data_without_head_event(
     ),
     argvalues=[
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            _checkpoint(epoch=2, root="0x0002"),
-            _checkpoint(epoch=3, root="0x0003"),
+            ROOT_A,
+            Checkpoint(epoch=2, root=ROOT_2),
+            Checkpoint(epoch=3, root=ROOT_3),
             [],
             id="success: identical head, source, target",
         ),
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            _checkpoint(epoch=2, root="0x0002"),
-            _checkpoint(epoch=3, root="0x0003"),
+            ROOT_A,
+            Checkpoint(epoch=2, root=ROOT_2),
+            Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Got matching AttestationData from beacon-node-a",
                 "Confirming finality checkpoints "
-                f"source={_checkpoint(epoch=2, root='0x0002')} => "
-                f"target={_checkpoint(epoch=3, root='0x0003')}",
+                f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
+                f"target={Checkpoint(epoch=3, root=ROOT_3)}",
             ],
             id="success: unconfirmed head, same source and target",
         ),
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(2)
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            _checkpoint(epoch=2, root="0x0002"),
-            _checkpoint(epoch=3, root="0x0003"),
+            ROOT_A,
+            Checkpoint(epoch=2, root=ROOT_2),
+            Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Confirming finality checkpoints "
-                f"source={_checkpoint(epoch=2, root='0x0002')} => "
-                f"target={_checkpoint(epoch=3, root='0x0003')}",
+                f"source={Checkpoint(epoch=2, root=ROOT_2)} => "
+                f"target={Checkpoint(epoch=3, root=ROOT_3)}",
             ],
             id="success: unconfirmed head, 2/3 source and target",
         ),
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(100)
                 ],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(10)
                 ]
                 + [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                        source=_checkpoint(epoch=2, root="0x0002"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_A,
+                        source=Checkpoint(epoch=2, root=ROOT_2),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(50)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(100)
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
-            _checkpoint(epoch=2, root="0x0002"),
-            _checkpoint(epoch=3, root="0x0003"),
+            ROOT_A,
+            Checkpoint(epoch=2, root=ROOT_2),
+            Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Timed out confirming finality checkpoints "
-                f"att_data.source={_checkpoint(epoch=2, root='0x0002')}, "
-                f"att_data.target={_checkpoint(epoch=3, root='0x0003')}",
+                f"att_data.source={Checkpoint(epoch=2, root=ROOT_2)}, "
+                f"att_data.target={Checkpoint(epoch=3, root=ROOT_3)}",
                 "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
             ],
             id="success: delayed consensus - slow head processing",
         ),
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(30)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(30)
                 ],
             },
             False,
-            "0x000000000000000000000000000000000000000000000000000000000000bbbb",
-            _checkpoint(epoch=1, root="0x0001"),
-            _checkpoint(epoch=3, root="0x0003"),
+            ROOT_B,
+            Checkpoint(epoch=1, root=ROOT_1),
+            Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Timed out waiting for AttestationData matching head block root: 0x000000000000000000000000000000000000000000000000000000000000aaaa",
                 "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
@@ -537,22 +533,22 @@ async def test_produce_attestation_data_without_head_event(
             id="success: head-emitting node stops responding, no further confirmations, fallback succeeds",
         ),
         pytest.param(
-            "0x000000000000000000000000000000000000000000000000000000000000aaaa",
+            ROOT_A,
             {
                 "beacon-node-a": [],
                 "beacon-node-b": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000bbbb",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_B,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(30)
                 ],
                 "beacon-node-c": [
                     _create_att_data_callback(
-                        block_root="0x000000000000000000000000000000000000000000000000000000000000cccc",
-                        source=_checkpoint(epoch=1, root="0x0001"),
-                        target=_checkpoint(epoch=3, root="0x0003"),
+                        block_root=ROOT_C,
+                        source=Checkpoint(epoch=1, root=ROOT_1),
+                        target=Checkpoint(epoch=3, root=ROOT_3),
                     )
                     for _ in range(30)
                 ],
@@ -587,12 +583,12 @@ async def test_produce_attestation_data_without_head_event(
 async def test_produce_attestation_data_with_head_event(
     attestation_data_provider: AttestationDataProvider,
     beacon_chain: BeaconChain,
-    initial_head_event_block_root: str,
+    initial_head_event_block_root: bytes,
     att_data_callbacks_by_bn_host: dict[
         str, list[Callable[..., Coroutine[Any, Any, CallbackResult]]]
     ],
     timeout_expected: bool,
-    expected_att_data_block_root: str,
+    expected_att_data_block_root: bytes | None,
     expected_att_data_source: Checkpoint,
     expected_att_data_target: Checkpoint,
     expected_log_messages: list[str],
@@ -618,13 +614,11 @@ async def test_produce_attestation_data_with_head_event(
             att_data = await asyncio.wait_for(
                 attestation_data_provider.produce_attestation_data(
                     slot=slot,
-                    head_event_block_root=_valid_root(initial_head_event_block_root),
+                    head_event_block_root=f"0x{initial_head_event_block_root.hex()}",
                 ),
                 timeout=next_slot_start_ts - time.time(),
             )
-            assert f"0x{att_data.beacon_block_root.hex()}" == _valid_root(
-                expected_att_data_block_root
-            )
+            assert att_data.beacon_block_root == expected_att_data_block_root
             assert att_data.source == expected_att_data_source
             assert att_data.target == expected_att_data_target
 
@@ -640,8 +634,8 @@ async def test_checkpoint_confirmed_from_cache(
     assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 0
     assert len(attestation_data_provider.target_checkpoint_confirmation_cache) == 0
 
-    s = _checkpoint(epoch=123, root="0x000123")
-    t = _checkpoint(epoch=124, root="0x000124")
+    s = Checkpoint(epoch=123, root=_root(123))
+    t = Checkpoint(epoch=124, root=_root(124))
 
     attestation_data_provider._cache_checkpoints(source=s, target=t)
 
@@ -660,8 +654,8 @@ async def test_checkpoint_cache_pruning(
 ) -> None:
     for i in range(20):
         attestation_data_provider._cache_checkpoints(
-            source=_checkpoint(epoch=i, root=f"0x000{i}"),
-            target=_checkpoint(epoch=i - 1, root=f"0x000{i - 1}"),
+            source=Checkpoint(epoch=i, root=_root(i)),
+            target=Checkpoint(epoch=i - 1, root=_root(i)),
         )
 
     assert len(attestation_data_provider.source_checkpoint_confirmation_cache) == 20
@@ -703,7 +697,7 @@ async def test_reorg_checkpoint_invalidation(
     )
 
     attestation_data_provider.source_checkpoint_confirmation_cache = {
-        epoch: _checkpoint(epoch=epoch, root="0x_root"),
+        epoch: Checkpoint(epoch=epoch, root=_root(epoch)),
     }
     await attestation_data_provider.handle_reorg_event(
         event=SchemaBeaconAPI.ChainReorgEvent(
