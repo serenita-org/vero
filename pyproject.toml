@@ -62,7 +62,7 @@ exclude-newer = "7 days"
 # My fork only contains a very minimal patch that makes aioresponses compatible with
 # aiohttp>3.14
 aioresponses = { git = "https://github.com/eth2353/aioresponses", rev = "b3e8f869b1da9901144988d3bc41f9bc03d6e395" }
-spy-ssz = { git = "https://github.com/eth2353/spy-ssz", rev = "eeee194459912e012aee23b818d9dd8ae0e417c0" }
+spy-ssz = { git = "https://github.com/eth2353/spy-ssz", rev = "390c6947ce125be9c38e41ca38c9f3b6c7b2fe2e" }
 
 [tool.uv.pip]
 generate-hashes = true
