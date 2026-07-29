@@ -1,9 +1,11 @@
+from typing import get_args
+
 import pytest
 
 from spec import Preset, initialize_preset, preset_types
 
 
-@pytest.mark.parametrize("preset", ["mainnet", "minimal", "gnosis"])
+@pytest.mark.parametrize("preset", get_args(Preset))
 def test_initialize_preset_selects_one_coherent_type_bundle(preset: Preset) -> None:
     try:
         initialize_preset(preset)
