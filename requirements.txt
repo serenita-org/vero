@@ -642,7 +642,7 @@ pyyaml==6.0.3 \
     # via
     #   spy-ssz
     #   vero
-spy-ssz @ git+https://github.com/eth2353/spy-ssz@390c6947ce125be9c38e41ca38c9f3b6c7b2fe2e
+spy-ssz @ git+https://github.com/eth2353/spy-ssz@2e997c218915a641faa36b9673b96a316172c915
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
