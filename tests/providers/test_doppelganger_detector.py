@@ -1,7 +1,6 @@
 import asyncio
 import re
-from contextlib import AbstractContextManager
-from contextlib import nullcontext as does_not_raise
+from contextlib import AbstractContextManager, nullcontext as does_not_raise
 
 import msgspec.json
 import pytest

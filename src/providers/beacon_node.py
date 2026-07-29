@@ -6,6 +6,7 @@ import datetime
 import logging
 import warnings
 from collections.abc import AsyncIterable
+from dataclasses import fields
 from typing import TYPE_CHECKING, Literal, Unpack
 from urllib.parse import urlparse
 
@@ -17,6 +18,7 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from multidict import CIMultiDictProxy
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
+from spy_ssz import Attestation, SyncCommitteeContribution
 from yarl import URL
 
 from observability import (
@@ -28,7 +30,11 @@ from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ContentType
 from providers._response import raise_for_response_size
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
-from spec import SpecAttestation, SpecSyncCommittee
+from spec import (
+    AttestationData,
+    Checkpoint,
+    preset_types,
+)
 from spec.base import SpecFulu, parse_spec
 from spec.constants import INTERVALS_PER_SLOT
 
@@ -127,12 +133,12 @@ class BeaconNode:
         bn_spec = await self.get_spec()
         if self.spec != bn_spec and not self._ignore_spec_mismatch:
             msg = f"Spec values returned by beacon node {self.host} not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
-            for field in self.spec.fields():
-                if getattr(self.spec, field) != getattr(bn_spec, field):
+            for field in fields(self.spec):
+                if getattr(self.spec, field.name) != getattr(bn_spec, field.name):
                     msg += (
-                        f"\n{field}:"
-                        f"\n\tIncluded value: {getattr(self.spec, field)}"
-                        f"\n\tValue returned by beacon node: {getattr(bn_spec, field)}"
+                        f"\n{field.name}:"
+                        f"\n\tIncluded value: {getattr(self.spec, field.name)}"
+                        f"\n\tValue returned by beacon node: {getattr(bn_spec, field.name)}"
                     )
             raise ValueError(msg)
 
@@ -316,7 +322,7 @@ class BeaconNode:
     async def produce_attestation_data(
         self,
         slot: int,
-    ) -> tuple[str, SchemaBeaconAPI.AttestationData]:
+    ) -> tuple[str, AttestationData]:
         """Returns the beacon node host along with the produced attestation data."""
         resp_bytes, _, _ = await self._make_request(
             method="GET",
@@ -331,16 +337,14 @@ class BeaconNode:
             ),
         )
 
-        response = msgspec.json.decode(
-            resp_bytes, type=SchemaBeaconAPI.ProduceAttestationDataResponse
-        )
-        return self.host, response.data
+        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
+        return self.host, preset_types().attestation_data.from_json(response.data)
 
     async def wait_for_attestation_data(
         self,
         expected_head_block_root: str,
         slot: int,
-    ) -> SchemaBeaconAPI.AttestationData:
+    ) -> AttestationData:
         while True:
             _request_start_time = asyncio.get_running_loop().time()
 
@@ -348,7 +352,7 @@ class BeaconNode:
                 _, att_data = await self.produce_attestation_data(
                     slot=slot,
                 )
-                if att_data.beacon_block_root == expected_head_block_root:
+                if f"0x{att_data.beacon_block_root.hex()}" == expected_head_block_root:
                     self.logger.debug(f"Got matching AttestationData from {self.host}")
                     return att_data
             except Exception as e:
@@ -363,8 +367,8 @@ class BeaconNode:
     async def wait_for_checkpoints(
         self,
         slot: int,
-        expected_source_cp: SchemaBeaconAPI.Checkpoint,
-        expected_target_cp: SchemaBeaconAPI.Checkpoint,
+        expected_source_cp: Checkpoint,
+        expected_target_cp: Checkpoint,
     ) -> None:
         while True:
             _request_start_time = asyncio.get_running_loop().time()
@@ -531,7 +535,7 @@ class BeaconNode:
         attestation_data_root: str,
         slot: int,
         committee_index: int,
-    ) -> "SpecAttestation.AttestationElectra":
+    ) -> Attestation:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v2/validator/aggregate_attestation",
@@ -550,7 +554,7 @@ class BeaconNode:
             resp_bytes, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        att = SpecAttestation.AttestationElectra.from_obj(response.data)
+        att = preset_types().attestation.from_json(response.data)
 
         self.metrics.beacon_node_aggregate_attestation_participant_count_h.labels(
             host=self.host
@@ -574,7 +578,7 @@ class BeaconNode:
         slot: int,
         subcommittee_index: int,
         beacon_block_root: str,
-    ) -> "SpecSyncCommittee.Contribution":
+    ) -> SyncCommitteeContribution:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/validator/sync_committee_contribution",
@@ -589,8 +593,9 @@ class BeaconNode:
             ),
         )
 
-        contribution = SpecSyncCommittee.Contribution.from_obj(
-            msgspec.json.decode(resp_bytes)["data"]
+        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
+        contribution = preset_types().sync_committee_contribution.from_json(
+            response.data
         )
         self.metrics.beacon_node_sync_contribution_participant_count_h.labels(
             host=self.host
@@ -637,7 +642,7 @@ class BeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-    ) -> SchemaBeaconAPI.ProduceBlockV3Response:
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator.
         The returned block may be blinded or unblinded, depending on the current state of the network
         as decided by the execution and beacon nodes.
@@ -688,26 +693,30 @@ class BeaconNode:
                     f"{self.host} returned block as JSON but Vero requested SSZ"
                 )
 
-            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
-            execution_payload_blinded = (
-                headers["Eth-Execution-Payload-Blinded"].lower() == "true"
+            try:
+                response_content_type = ContentType(content_type)
+            except ValueError:
+                raise NotImplementedError(
+                    f"Unsupported content type: {content_type}"
+                ) from None
+
+            response = SchemaBeaconAPI.ProduceBlockV3Response(
+                version=SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"]),
+                execution_payload_blinded=headers[
+                    "Eth-Execution-Payload-Blinded"
+                ].lower()
+                == "true",
+                execution_payload_value=headers["Eth-Execution-Payload-Value"],
+                consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                data=resp_bytes,
             )
+
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            execution_payload_value = int(headers["Eth-Execution-Payload-Value"] or 0)
-            consensus_block_value = int(headers["Eth-Consensus-Block-Value"] or 0)
-
-            if content_type in (ContentType.OCTET_STREAM.value, ContentType.JSON.value):
-                response = SchemaBeaconAPI.ProduceBlockV3Response(
-                    version=fork_version,
-                    execution_payload_blinded=execution_payload_blinded,
-                    execution_payload_value=str(execution_payload_value),
-                    consensus_block_value=str(consensus_block_value),
-                    content_type=ContentType(content_type),
-                    data=resp_bytes,
-                )
-            else:
-                raise NotImplementedError(f"Unsupported content type: {content_type}")
+            execution_payload_value = int(response.execution_payload_value or 0)
+            consensus_block_value = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value)
+            response.consensus_block_value = str(consensus_block_value)
 
             tracer_span.add_event(
                 "ProduceBlockV3Response",
@@ -730,7 +739,7 @@ class BeaconNode:
                 host=self.host
             ).observe(execution_payload_value)
 
-            return response
+            return response, response_content_type
 
     async def publish_block_v2(
         self,

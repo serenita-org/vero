@@ -77,7 +77,7 @@ class EventConsumerService:
     ) -> None:
         self.slashing_event_handlers.append(event_handler)
 
-    def _has_seen_event(self, event: SchemaBeaconAPI.DeduplicableEvent) -> bool:
+    def _has_seen_event(self, event: SchemaBeaconAPI.BeaconNodeEvent) -> bool:
         key = event.dedup_key
 
         if key in self._recent_event_keys:

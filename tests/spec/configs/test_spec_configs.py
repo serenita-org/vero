@@ -11,4 +11,5 @@ from spec.configs import Network, get_network_spec
 def test_get_network_spec(network: Network) -> None:
     spec, preset = get_network_spec(network=network)
     assert isinstance(spec, SpecFulu)
+    # There are only two presets Vero supports
     assert preset in ("mainnet", "gnosis")

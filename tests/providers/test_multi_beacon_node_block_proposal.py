@@ -8,7 +8,6 @@ import re
 from functools import partial
 from typing import Any, TypedDict
 
-import msgspec.json
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
@@ -44,7 +43,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -61,7 +59,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -78,7 +75,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(120),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -101,7 +97,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -118,7 +113,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -151,7 +145,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -230,7 +223,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -247,7 +239,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(200),
                                 consensus_block_value=str(50),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -264,7 +255,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value=str(1000),
                                 consensus_block_value=str(500),
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -287,7 +277,6 @@ class BeaconNodeResponseSequence(TypedDict):
                                 execution_payload_blinded=False,
                                 execution_payload_value="",
                                 consensus_block_value="",
-                                content_type=ContentType.JSON,
                                 data=b"",
                             ),
                             exception=None,
@@ -349,7 +338,7 @@ async def test_produce_best_block(
                         raise _exception
                     if _response:
                         return CallbackResult(
-                            body=msgspec.json.encode(_response),
+                            body=_response.data,
                             headers={
                                 "Eth-Consensus-Version": _response.version.value.lower(),
                                 "Eth-Execution-Payload-Blinded": str(
@@ -379,12 +368,13 @@ async def test_produce_best_block(
         )
 
         if success_expected:
-            full_response = await multi_beacon_node._produce_best_block(
+            full_response, content_type = await multi_beacon_node._produce_best_block(
                 slot=1,
                 graffiti=b"test_produce_best_block",
                 builder_boost_factor=90,
                 randao_reveal="randao",
             )
+            assert content_type == ContentType.JSON
             assert (
                 int(full_response.consensus_block_value)
                 + int(full_response.execution_payload_value)

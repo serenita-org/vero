@@ -2,6 +2,10 @@
 
 ## Upcoming release
 
+#### Features
+
+- Replace the SSZ library with spy-ssz ([#333](https://github.com/serenita-org/vero/pull/333))
+
 #### Bugfixes
 
 - Fix race condition in duties update logic ([#339](https://github.com/serenita-org/vero/pull/339))

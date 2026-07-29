@@ -1,104 +1,123 @@
-import copy
-from typing import Self
+from dataclasses import dataclass, fields
+from typing import Any, Self
 
-from remerkleable.byte_arrays import Bytes4
-from remerkleable.complex import Container
-from remerkleable.core import ObjParseException, ObjType
+from spec.common import Bytes4, Root, Uint64
 
-from spec.common import Root, UInt64SerializedAsString
+
+def _to_obj(value: Any) -> Any:
+    if hasattr(value, "to_obj"):
+        return value.to_obj()
+    if isinstance(value, dict):
+        return {key: _to_obj(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_obj(item) for item in value]
+    return value
 
 
 class Version(Bytes4):
     pass
 
 
-class Fork(Container):
-    previous_version: Version
-    current_version: Version
-    epoch: UInt64SerializedAsString
-
-
-class Genesis(Container):
-    genesis_time: UInt64SerializedAsString
+@dataclass(init=False)
+class Genesis:
+    genesis_time: Uint64
     genesis_validators_root: Root
     genesis_fork_version: Version
 
+    def __init__(
+        self,
+        genesis_time: int | str,
+        genesis_validators_root: bytes | str,
+        genesis_fork_version: bytes | str,
+    ) -> None:
+        self.genesis_time = Uint64(genesis_time)
+        self.genesis_validators_root = Root(genesis_validators_root)
+        self.genesis_fork_version = Version(genesis_fork_version)
 
-class SpecFulu(Container):
+    @classmethod
+    def from_obj(cls, obj: dict[str, Any]) -> Self:
+        return cls(
+            genesis_time=Uint64.from_obj(obj["genesis_time"]),
+            genesis_validators_root=obj["genesis_validators_root"],
+            genesis_fork_version=obj["genesis_fork_version"],
+        )
+
+    def to_obj(self) -> dict[str, Any]:
+        return {
+            field.name: _to_obj(getattr(self, field.name)) for field in fields(self)
+        }
+
+
+@dataclass
+class SpecFulu:
     # Phase 0
-    SECONDS_PER_SLOT: UInt64SerializedAsString
-    SLOTS_PER_EPOCH: UInt64SerializedAsString
-    MAX_VALIDATORS_PER_COMMITTEE: UInt64SerializedAsString
-    MAX_COMMITTEES_PER_SLOT: UInt64SerializedAsString
     GENESIS_FORK_VERSION: Version
-    MAX_PROPOSER_SLASHINGS: UInt64SerializedAsString
-    MAX_ATTESTER_SLASHINGS: UInt64SerializedAsString
-    MAX_ATTESTATIONS: UInt64SerializedAsString
-    MAX_DEPOSITS: UInt64SerializedAsString
-    MAX_VOLUNTARY_EXITS: UInt64SerializedAsString
+    SECONDS_PER_SLOT: Uint64
+    SLOTS_PER_EPOCH: Uint64
+    MAX_VALIDATORS_PER_COMMITTEE: Uint64
+    MAX_COMMITTEES_PER_SLOT: Uint64
+    MAX_PROPOSER_SLASHINGS: Uint64
+    MAX_ATTESTER_SLASHINGS: Uint64
+    MAX_ATTESTATIONS: Uint64
+    MAX_DEPOSITS: Uint64
+    MAX_VOLUNTARY_EXITS: Uint64
 
     # Altair
-    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: UInt64SerializedAsString
-    SYNC_COMMITTEE_SIZE: UInt64SerializedAsString
-    ALTAIR_FORK_EPOCH: UInt64SerializedAsString
+    ALTAIR_FORK_EPOCH: Uint64
     ALTAIR_FORK_VERSION: Version
+    EPOCHS_PER_SYNC_COMMITTEE_PERIOD: Uint64
+    SYNC_COMMITTEE_SIZE: Uint64
 
     # Bellatrix
-    BELLATRIX_FORK_EPOCH: UInt64SerializedAsString
+    BELLATRIX_FORK_EPOCH: Uint64
     BELLATRIX_FORK_VERSION: Version
-
-    BYTES_PER_LOGS_BLOOM: UInt64SerializedAsString
-    MAX_EXTRA_DATA_BYTES: UInt64SerializedAsString
-    MAX_TRANSACTIONS_PER_PAYLOAD: UInt64SerializedAsString
-    MAX_BYTES_PER_TRANSACTION: UInt64SerializedAsString
+    BYTES_PER_LOGS_BLOOM: Uint64
+    MAX_EXTRA_DATA_BYTES: Uint64
+    MAX_TRANSACTIONS_PER_PAYLOAD: Uint64
+    MAX_BYTES_PER_TRANSACTION: Uint64
 
     # Capella
-    MAX_WITHDRAWALS_PER_PAYLOAD: UInt64SerializedAsString
-    CAPELLA_FORK_EPOCH: UInt64SerializedAsString
+    CAPELLA_FORK_EPOCH: Uint64
     CAPELLA_FORK_VERSION: Version
-    MAX_BLS_TO_EXECUTION_CHANGES: UInt64SerializedAsString
+    MAX_WITHDRAWALS_PER_PAYLOAD: Uint64
+    MAX_BLS_TO_EXECUTION_CHANGES: Uint64
 
     # Deneb
-    MAX_BLOB_COMMITMENTS_PER_BLOCK: UInt64SerializedAsString
-    DENEB_FORK_EPOCH: UInt64SerializedAsString
+    DENEB_FORK_EPOCH: Uint64
     DENEB_FORK_VERSION: Version
-    FIELD_ELEMENTS_PER_BLOB: UInt64SerializedAsString
+    MAX_BLOB_COMMITMENTS_PER_BLOCK: Uint64
+    FIELD_ELEMENTS_PER_BLOB: Uint64
 
     # Electra
-    ELECTRA_FORK_EPOCH: UInt64SerializedAsString
+    ELECTRA_FORK_EPOCH: Uint64
     ELECTRA_FORK_VERSION: Version
-    MAX_DEPOSIT_REQUESTS_PER_PAYLOAD: UInt64SerializedAsString
-    MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD: UInt64SerializedAsString
-    MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD: UInt64SerializedAsString
-    MAX_ATTESTATIONS_ELECTRA: UInt64SerializedAsString
-    MAX_ATTESTER_SLASHINGS_ELECTRA: UInt64SerializedAsString
+    MAX_DEPOSIT_REQUESTS_PER_PAYLOAD: Uint64
+    MAX_WITHDRAWAL_REQUESTS_PER_PAYLOAD: Uint64
+    MAX_CONSOLIDATION_REQUESTS_PER_PAYLOAD: Uint64
+    MAX_ATTESTATIONS_ELECTRA: Uint64
+    MAX_ATTESTER_SLASHINGS_ELECTRA: Uint64
 
     # Fulu
-    FULU_FORK_EPOCH: UInt64SerializedAsString
+    FULU_FORK_EPOCH: Uint64
     FULU_FORK_VERSION: Version
 
     @classmethod
-    def from_obj(cls, obj: ObjType) -> Self:
-        if not isinstance(obj, dict):
-            raise ObjParseException(f"obj '{obj}' is not a dict")
-
-        # Create a copy since we manipulate the dict
-        _obj = copy.deepcopy(obj)
-
-        # Remove extra keys/fields
-        fields = cls.fields()
-        for k in list(_obj.keys()):
-            if k not in fields:
-                del _obj[k]
-
-        # Check if all required fields have a value
-        if any(field not in _obj for field in fields):
-            missing = set(fields.keys()) - set(_obj.keys())
-            raise ObjParseException(
-                f"Required field(s) ({missing}) missing from {_obj}"
+    def from_obj(cls, obj: dict[str, Any]) -> Self:
+        values: dict[str, Any] = {}
+        for field in fields(cls):
+            if field.name not in obj:
+                raise ValueError(f"Required field {field.name!r} missing from spec")
+            values[field.name] = (
+                Version(obj[field.name])
+                if field.name.endswith("FORK_VERSION")
+                else Uint64.from_obj(obj[field.name])
             )
+        return cls(**values)
 
-        return cls(**{k: fields[k].from_obj(v) for k, v in _obj.items()})
+    def to_obj(self) -> dict[str, Any]:
+        return {
+            field.name: _to_obj(getattr(self, field.name)) for field in fields(self)
+        }
 
 
 def parse_spec(data: dict[str, str]) -> SpecFulu:

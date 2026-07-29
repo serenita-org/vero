@@ -8,6 +8,7 @@ from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion, ValidatorStatus
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
+from tests.ssz_objects import make_attestation_data
 
 
 def _base_attester_duty(
@@ -273,18 +274,17 @@ async def test_aggregate_attestations(
         ),
     }
 
-    att_data = SchemaBeaconAPI.AttestationData(
-        slot=str(duty_slot),
-        index="0",
+    att_data = make_attestation_data(
+        slot=duty_slot,
         beacon_block_root="0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3",
-        source=SchemaBeaconAPI.Checkpoint(
-            epoch="0",
-            root="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        ),
-        target=SchemaBeaconAPI.Checkpoint(
-            epoch="1",
-            root="0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        ),
+        source={
+            "epoch": "0",
+            "root": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+        target={
+            "epoch": "1",
+            "root": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        },
     )
 
     aggregates_produced_before = (
