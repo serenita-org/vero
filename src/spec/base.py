@@ -1,7 +1,17 @@
 from dataclasses import dataclass, fields
 from typing import Any, Self
 
-from spec.common import Bytes4, Root, Uint64, to_obj
+from spec.common import Bytes4, Root, Uint64
+
+
+def _to_obj(value: Any) -> Any:
+    if hasattr(value, "to_obj"):
+        return value.to_obj()
+    if isinstance(value, dict):
+        return {key: _to_obj(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_obj(item) for item in value]
+    return value
 
 
 class Version(Bytes4):
@@ -33,7 +43,9 @@ class Genesis:
         )
 
     def to_obj(self) -> dict[str, Any]:
-        return {field.name: to_obj(getattr(self, field.name)) for field in fields(self)}
+        return {
+            field.name: _to_obj(getattr(self, field.name)) for field in fields(self)
+        }
 
 
 @dataclass
@@ -103,7 +115,9 @@ class SpecFulu:
         return cls(**values)
 
     def to_obj(self) -> dict[str, Any]:
-        return {field.name: to_obj(getattr(self, field.name)) for field in fields(self)}
+        return {
+            field.name: _to_obj(getattr(self, field.name)) for field in fields(self)
+        }
 
 
 def parse_spec(data: dict[str, str]) -> SpecFulu:

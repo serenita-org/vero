@@ -30,4 +30,4 @@ def test_uint64_deserialization_requires_string() -> None:
         TypeError,
         match="uint64 JSON value must be a string, got int",
     ):
-        Uint64.from_obj(42)
+        Uint64.from_obj(42)  # type: ignore[arg-type]

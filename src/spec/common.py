@@ -1,5 +1,5 @@
 from hashlib import sha256
-from typing import Any, Self
+from typing import Self
 
 
 class Uint64(int):
@@ -61,13 +61,3 @@ def hash_function(x: bytes | bytearray | memoryview) -> Bytes32:
 
 class Root(Bytes32):
     pass
-
-
-def to_obj(value: Any) -> Any:
-    if hasattr(value, "to_obj"):
-        return value.to_obj()
-    if isinstance(value, dict):
-        return {key: to_obj(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [to_obj(item) for item in value]
-    return value
