@@ -7,6 +7,7 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
+from spy_ssz import Bitfield
 from yarl import URL
 
 from providers import BeaconChain
@@ -20,7 +21,6 @@ from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
 )
-from tests.ssz_bitfields import Bitlist, Bitvector
 from tests.ssz_objects import (
     BYTES_PER_BLS_SIGNATURE,
     ZERO_ROOT,
@@ -159,10 +159,11 @@ def _mocked_beacon_node_endpoints(
 
             fork_version = beacon_chain.current_fork_version
 
-            _committee_bits = Bitvector[spec.MAX_COMMITTEES_PER_SLOT](  # type: ignore[misc]
-                False for _ in range(spec.MAX_COMMITTEES_PER_SLOT)
+            committee_bits = [False] * spec.MAX_COMMITTEES_PER_SLOT
+            committee_bits[int(url.query["committee_index"])] = True
+            _committee_bits = Bitfield.bitvector(
+                spec.MAX_COMMITTEES_PER_SLOT, committee_bits
             )
-            _committee_bits[int(url.query["committee_index"])] = True
             _agg_bitlist_size = (
                 spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
             )
@@ -170,7 +171,7 @@ def _mocked_beacon_node_endpoints(
             # -> a smaller agg bits bitlist is fine for testing purposes too
             _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
             aggregate_attestation = make_attestation(
-                aggregation_bits=Bitlist[_agg_bitlist_size](_agg_bits),  # type: ignore[misc]
+                aggregation_bits=Bitfield.bitlist(_agg_bitlist_size, _agg_bits),
                 data=msgspec.Raw(
                     make_attestation_data(
                         slot=int(url.query["slot"]),
@@ -219,8 +220,9 @@ def _mocked_beacon_node_endpoints(
                 slot=int(url.query["slot"]),
                 beacon_block_root=url.query["beacon_block_root"],
                 subcommittee_index=int(url.query["subcommittee_index"]),
-                aggregation_bits=Bitvector[sync_subcommittee_size](  # type: ignore[misc]
-                    random.choice([0, 1]) for _ in range(sync_subcommittee_size)
+                aggregation_bits=Bitfield.bitvector(
+                    sync_subcommittee_size,
+                    (random.choice([0, 1]) for _ in range(sync_subcommittee_size)),
                 ),
                 signature="0x" + os.urandom(BYTES_PER_BLS_SIGNATURE).hex(),
             )

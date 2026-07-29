@@ -4,13 +4,13 @@ import msgspec
 from spy_ssz import (
     Attestation,
     AttestationData,
+    Bitfield,
     SyncCommitteeContribution,
     load_preset,
 )
 
 from spec import BeaconBlock, preset_types
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
-from tests.ssz_bitfields import Bitvector
 
 BYTES_PER_BLS_SIGNATURE = 96
 BYTES_PER_EXECUTION_ADDRESS = 20
@@ -47,12 +47,14 @@ def make_attestation(**overrides: Any) -> Attestation:
         "aggregation_bits": "0x01",
         "data": attestation_data_obj(),
         "signature": ZERO_SIGNATURE,
-        "committee_bits": Bitvector[preset_config.max_committees_per_slot]().to_obj(),  # type: ignore[misc]
+        "committee_bits": Bitfield.bitvector(
+            preset_config.max_committees_per_slot
+        ).to_hex(),
     }
     value.update(overrides)
     for field in ("aggregation_bits", "committee_bits"):
-        if not isinstance(value[field], str):
-            value[field] = value[field].to_obj()
+        if isinstance(value[field], Bitfield):
+            value[field] = value[field].to_hex()
     if isinstance(value["data"], AttestationData):
         value["data"] = msgspec.Raw(value["data"].to_json())
     return attestation_type.from_json(msgspec.json.encode(value))
@@ -67,14 +69,14 @@ def make_contribution(**overrides: Any) -> SyncCommitteeContribution:
         "slot": "0",
         "beacon_block_root": ZERO_ROOT,
         "subcommittee_index": "0",
-        "aggregation_bits": Bitvector[
+        "aggregation_bits": Bitfield.bitvector(
             preset_config.sync_committee_size // SYNC_COMMITTEE_SUBNET_COUNT
-        ]().to_obj(),  # type: ignore[misc]
+        ).to_hex(),
         "signature": ZERO_SIGNATURE,
     }
     value.update(overrides)
-    if not isinstance(value["aggregation_bits"], str):
-        value["aggregation_bits"] = value["aggregation_bits"].to_obj()
+    if isinstance(value["aggregation_bits"], Bitfield):
+        value["aggregation_bits"] = value["aggregation_bits"].to_hex()
     return contribution_type.from_json(msgspec.json.encode(value))
 
 
@@ -121,9 +123,9 @@ def _block_body(*, blinded: bool) -> dict[str, Any]:
         "deposits": [],
         "voluntary_exits": [],
         "sync_aggregate": {
-            "sync_committee_bits": Bitvector[
+            "sync_committee_bits": Bitfield.bitvector(
                 preset_config.sync_committee_size
-            ]().to_obj(),  # type: ignore[misc]
+            ).to_hex(),
             "sync_committee_signature": ZERO_SIGNATURE,
         },
         "execution_payload_header" if blinded else "execution_payload": execution,

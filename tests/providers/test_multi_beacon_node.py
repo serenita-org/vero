@@ -14,13 +14,13 @@ import msgspec
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
+from spy_ssz import Bitfield
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaBeaconAPI
 from spec.base import SpecFulu
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
-from tests.ssz_bitfields import Bitlist, Bitvector
 from tests.ssz_objects import (
     make_attestation,
     make_attestation_data,
@@ -300,11 +300,10 @@ async def test_get_aggregate_attestation(
                     beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
                     * beacon_chain.MAX_COMMITTEES_PER_SLOT
                 )
-                agg_bits_to_return = Bitlist[bitlist_length](  # type: ignore[misc]
-                    False for _ in range(10)
-                )
+                aggregation_bits = [False] * 10
                 for idx in range(number_of_attesting_indices):
-                    agg_bits_to_return[idx] = True
+                    aggregation_bits[idx] = True
+                agg_bits_to_return = Bitfield.bitlist(bitlist_length, aggregation_bits)
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
@@ -420,11 +419,10 @@ async def test_get_sync_committee_contribution(
         for number_of_root_matching_indices in numbers_of_root_matching_indices:
             if isinstance(number_of_root_matching_indices, int):
                 bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
-                agg_bits_to_return = Bitvector[bitlist_size](  # type: ignore[misc]
-                    False for _ in range(bitlist_size)
-                )
+                aggregation_bits = [False] * bitlist_size
                 for idx in range(number_of_root_matching_indices):
-                    agg_bits_to_return[idx] = True
+                    aggregation_bits[idx] = True
+                agg_bits_to_return = Bitfield.bitvector(bitlist_size, aggregation_bits)
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
