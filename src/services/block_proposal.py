@@ -496,7 +496,7 @@ class BlockProposalService(ValidatorDutyService):
 
             try:
                 block_contents_or_blinded_block = (
-                    await self.multi_beacon_node.produce_block_v3(
+                    await self.multi_beacon_node.produce_block(
                         slot=slot,
                         graffiti=graffiti,
                         builder_boost_factor=self.cli_args.builder_boost_factor,

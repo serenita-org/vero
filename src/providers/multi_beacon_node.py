@@ -55,6 +55,7 @@ from spy_ssz import (
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaValidator
+from schemas.beacon_api import ForkVersion
 from spec import (
     AttestationData,
     BeaconBlock,
@@ -322,10 +323,10 @@ class MultiBeaconNode:
             if content_type == ContentType.JSON:
                 return cast("BeaconBlock", block_cls.from_json(response.data))
             return cast("BeaconBlock", block_cls.from_ssz(response.data))
-        except (KeyError, NotImplementedError):
+        except (KeyError, NotImplementedError) as e:
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"
-            ) from None
+            ) from e
 
     async def _produce_best_block(
         self,
@@ -354,19 +355,32 @@ class MultiBeaconNode:
             )
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
-        tasks = {
-            asyncio.create_task(
-                bn.produce_block_v4(
-                    slot=slot,
-                    graffiti=graffiti,
-                    builder_boost_factor=builder_boost_factor,
-                    randao_reveal=randao_reveal,
-                    signed_payload_bid=signed_payload_bid,
-                    fork_version=fork_version,
-                ),
-            )
-            for bn in beacon_nodes_to_use
-        }
+        if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+            tasks = {
+                asyncio.create_task(
+                    bn.produce_block_v3(
+                        slot=slot,
+                        graffiti=graffiti,
+                        builder_boost_factor=builder_boost_factor,
+                        randao_reveal=randao_reveal,
+                    ),
+                )
+                for bn in beacon_nodes_to_use
+            }
+        elif fork_version in (ForkVersion.GLOAS,):
+            tasks = {
+                asyncio.create_task(
+                    bn.produce_block_v4(
+                        slot=slot,
+                        graffiti=graffiti,
+                        builder_boost_factor=builder_boost_factor,
+                        randao_reveal=randao_reveal,
+                        signed_payload_bid=signed_payload_bid,
+                        fork_version=fork_version,
+                    ),
+                )
+                for bn in beacon_nodes_to_use
+            }
         pending = tasks
 
         best_block_value = -1
@@ -454,7 +468,7 @@ class MultiBeaconNode:
         self.logger.info(f"Proceeding with best block by value: {best_block_value}")
         return best_block_result
 
-    async def produce_block_v3(
+    async def produce_block(
         self,
         slot: int,
         graffiti: bytes,
@@ -464,12 +478,6 @@ class MultiBeaconNode:
         fork_version: SchemaBeaconAPI.ForkVersion,
         soft_timeout: float,
     ) -> BeaconBlock:
-        # TODO small room for improvement here.
-        #  We are currently choosing the best block based on total
-        #  block value (consensus+exec).
-        #  We could however take the best beacon block
-        #  and combine it with the best execution payload.
-        #  That would take up some extra processing time though.
         best_block_response, content_type = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
