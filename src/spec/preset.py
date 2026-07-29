@@ -4,18 +4,16 @@ from typing import Literal
 from spy_ssz import (
     AggregateAndProof,
     Attestation,
-    AttestationData,
+    AttestationData as AttestationData,
     ContributionAndProof,
-    SignedAggregateAndProof,
-    SignedContributionAndProof,
-    SingleAttestation,
+    Preset as SpyPreset,
+    SignedAggregateAndProof as SignedAggregateAndProof,
+    SignedContributionAndProof as SignedContributionAndProof,
+    SingleAttestation as SingleAttestation,
     SszObject,
     SyncCommitteeContribution,
-    SyncCommitteeMessage,
+    SyncCommitteeMessage as SyncCommitteeMessage,
     get_ssz_type,
-)
-from spy_ssz import (
-    Preset as SpyPreset,
 )
 from spy_ssz.electra import (
     ElectraBeaconBlockContents,
@@ -29,7 +27,7 @@ from spy_ssz.fulu import (
     FuluSignedBeaconBlockContents,
     FuluSignedBlindedBeaconBlock,
 )
-from spy_ssz.projections import Checkpoint
+from spy_ssz.projections import Checkpoint as Checkpoint
 
 Preset = Literal["mainnet", "minimal", "gnosis"]
 BeaconBlock = (
@@ -125,19 +123,3 @@ def preset_types() -> PresetTypes:
     if _active_types is None:
         raise RuntimeError("initialize_preset was not called")
     return _active_types
-
-
-__all__ = [
-    "AttestationData",
-    "BeaconBlock",
-    "Checkpoint",
-    "Preset",
-    "PresetTypes",
-    "SignedAggregateAndProof",
-    "SignedBeaconBlock",
-    "SignedContributionAndProof",
-    "SingleAttestation",
-    "SyncCommitteeMessage",
-    "initialize_preset",
-    "preset_types",
-]
