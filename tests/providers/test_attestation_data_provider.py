@@ -17,7 +17,7 @@ from tests.ssz_objects import attestation_data_obj
 
 
 def _root(value: int) -> bytes:
-    return value.to_bytes(32, byteorder="big")
+    return bytes.fromhex(f"{value:064x}")
 
 
 ROOT_0 = _root(0)
