@@ -5,7 +5,6 @@ from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
 
-import msgspec.json
 from opentelemetry import trace
 from opentelemetry.trace import (
     NonRecordingSpan,
@@ -516,13 +515,7 @@ class BlockProposalService(ValidatorDutyService):
                 ) from None
             else:
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
-                    # TODO    **block_contents_or_blinded_block.header_dict()
-                    slot=str(block_contents_or_blinded_block.slot),
-                    proposer_index=str(block_contents_or_blinded_block.proposer_index),
-                    parent_root=str(block_contents_or_blinded_block.parent_root),
-                    state_root=str(block_contents_or_blinded_block.state_root),
-                    body_root="0x"
-                    + block_contents_or_blinded_block.body.hash_tree_root().hex(),
+                    **block_contents_or_blinded_block.header_dict()
                 )
                 return block_contents_or_blinded_block, block_header
 
@@ -574,22 +567,6 @@ class BlockProposalService(ValidatorDutyService):
             name=f"{self.__class__.__name__}._publish_block",
         ):
             try:
-                if fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
-                    signed_beacon_block = SchemaBeaconAPI.SignedBeaconBlock(
-                        message=block_contents_or_blinded_block.to_obj(),
-                        signature=signature,
-                    )
-                    encoded = msgspec.json.encode(signed_beacon_block)
-                    self.logger.debug(f"Encoded signed beacon block: {encoded}")
-                    await self.multi_beacon_node.publish_block_v2(
-                        fork_version=fork_version,
-                        signed_block_contents=encoded,
-                        content_type=ContentType.JSON,
-                    )
-                    raise NotImplementedError(
-                        "Not errored, just temporary early return"
-                    )
-
                 with block_contents_or_blinded_block.sign(
                     signature=signature
                 ) as signed_object:
@@ -602,7 +579,7 @@ class BlockProposalService(ValidatorDutyService):
 
                 if (
                     block_contents_or_blinded_block.object_kind
-                    is ObjectKind.BEACON_BLOCK_CONTENTS
+                    is not ObjectKind.BLINDED_BEACON_BLOCK
                 ):
                     await self.multi_beacon_node.publish_block_v2(
                         fork_version=fork_version,
@@ -616,9 +593,6 @@ class BlockProposalService(ValidatorDutyService):
                         content_type=content_type,
                     )
 
-            # TODO
-            except NotImplementedError:
-                self.logger.info("!!!Published block!!!")
                 # If self-building, published payload envelope too
                 if (
                     block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index

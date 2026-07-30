@@ -8,7 +8,7 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
-from spy_ssz import Bitfield
+from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
 from yarl import URL
 
 from providers import BeaconChain
@@ -323,12 +323,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                signed_block_type = get_ssz_type(
+                    Fork[fork_version.name],
+                    ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS,
+                    Preset[preset_types().preset.upper()],
+                )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_block_contents.from_json(
-                        _data_response(kwargs["data"])
-                    )
+                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
                 else:
-                    _ = preset_types().signed_block_contents.from_ssz(kwargs["data"])
+                    _ = signed_block_type.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -345,12 +348,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                signed_block_type = get_ssz_type(
+                    Fork[fork_version.name],
+                    ObjectKind.SIGNED_BLINDED_BEACON_BLOCK,
+                    Preset[preset_types().preset.upper()],
+                )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_blinded_block.from_json(
-                        _data_response(kwargs["data"])
-                    )
+                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
                 else:
-                    _ = preset_types().signed_blinded_block.from_ssz(kwargs["data"])
+                    _ = signed_block_type.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 

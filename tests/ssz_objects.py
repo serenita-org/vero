@@ -1,15 +1,22 @@
-from typing import Any
+from typing import Any, cast
 
 import msgspec
 from spy_ssz import (
-    Attestation,
-    AttestationData,
     Bitfield,
-    SyncCommitteeContribution,
+    Fork,
+    ObjectKind,
+    Preset,
+    get_ssz_type,
     load_preset,
 )
 
-from spec import BeaconBlock, preset_types
+from spec import (
+    Attestation,
+    AttestationData,
+    BeaconBlock,
+    SyncCommitteeContribution,
+    preset_types,
+)
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 
 BYTES_PER_BLS_SIGNATURE = 96
@@ -81,8 +88,7 @@ def make_contribution(**overrides: Any) -> SyncCommitteeContribution:
 
 
 def _block_body(*, blinded: bool) -> dict[str, Any]:
-    block_types = preset_types()
-    preset_config = load_preset(block_types.block_contents.expected_preset)
+    preset_config = load_preset(Preset[preset_types().preset.upper()])
     execution_common = {
         "parent_hash": ZERO_ROOT,
         "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
@@ -144,8 +150,23 @@ def make_block(*, slot: int, blinded: bool) -> BeaconBlock:
         "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
         "body": _block_body(blinded=blinded),
     }
+    block_type = get_ssz_type(
+        Fork.FULU,
+        ObjectKind.BLINDED_BEACON_BLOCK
+        if blinded
+        else ObjectKind.BEACON_BLOCK_CONTENTS,
+        Preset[block_types.preset.upper()],
+    )
     if blinded:
-        return block_types.blinded_block.from_json(msgspec.json.encode({"data": block}))
-    return block_types.block_contents.from_json(
-        msgspec.json.encode({"data": {"block": block, "kzg_proofs": [], "blobs": []}})
+        return cast(
+            "BeaconBlock",
+            block_type.from_json(msgspec.json.encode({"data": block})),
+        )
+    return cast(
+        "BeaconBlock",
+        block_type.from_json(
+            msgspec.json.encode(
+                {"data": {"block": block, "kzg_proofs": [], "blobs": []}}
+            )
+        ),
     )

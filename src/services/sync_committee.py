@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
+from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
@@ -125,10 +126,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Schedule sync message job at the deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to produce it 1/3 into the slot at the latest.
-        if (
-            self.beacon_chain.current_fork_version
-            == self.beacon_chain.GLOAS_FORK_VERSION
-        ):
+        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
             sync_message_due_s = self._sync_message_due_s_gloas
         else:
             sync_message_due_s = self._sync_message_due_s
@@ -226,7 +224,9 @@ class SyncCommitteeService(ValidatorDutyService):
                     continue
 
                 signed_messages_batch.append(
-                    preset_types().sync_committee_message(
+                    preset_types(
+                        Fork[self.beacon_chain.current_fork_version.name]
+                    ).sync_committee_message(
                         beacon_block_root=beacon_block_root_bytes,
                         slot=duty_slot,
                         validator_index=pubkey_to_validator_index[pubkey],
@@ -432,10 +432,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         # Sign and submit aggregated sync committee contributions
-        if (
-            self.beacon_chain.current_fork_version
-            == self.beacon_chain.GLOAS_FORK_VERSION
-        ):
+        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
             contribution_due_s = self._contribution_due_s_gloas
         else:
             contribution_due_s = self._contribution_due_s
@@ -470,10 +467,12 @@ class SyncCommitteeService(ValidatorDutyService):
             identifiers=identifiers,
         ):
             signed_contribution_and_proofs.append(
-                preset_types().signed_contribution_and_proof(
-                    message=preset_types().contribution_and_proof.from_json(
-                        msg.contribution_and_proof
-                    ),
+                preset_types(
+                    Fork[self.beacon_chain.current_fork_version.name]
+                ).signed_contribution_and_proof(
+                    message=preset_types(
+                        Fork[self.beacon_chain.current_fork_version.name]
+                    ).contribution_and_proof.from_json(msg.contribution_and_proof),
                     signature=sig,
                 )
             )
@@ -555,7 +554,11 @@ class SyncCommitteeService(ValidatorDutyService):
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
                                 contribution_and_proof=msgspec.Raw(
-                                    preset_types()
+                                    preset_types(
+                                        Fork[
+                                            self.beacon_chain.current_fork_version.name
+                                        ]
+                                    )
                                     .contribution_and_proof(
                                         aggregator_index=int(duty.validator_index),
                                         contribution=contribution,

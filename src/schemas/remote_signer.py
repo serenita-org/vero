@@ -106,8 +106,8 @@ class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
 
 
 class ExecutionPayloadEnvelope(msgspec.Struct):
-    payload: dict
-    execution_requests: dict
+    payload: dict[str, Any]
+    execution_requests: dict[str, Any]
     builder_index: str
     beacon_block_root: str
     parent_beacon_block_root: str

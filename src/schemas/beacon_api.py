@@ -10,7 +10,7 @@ https://docs.nodereal.io/reference/eventstream
 
 from collections.abc import Hashable
 from enum import Enum
-from typing import Self
+from typing import Any, Self
 
 import msgspec
 
@@ -258,17 +258,20 @@ class ProposerSlashingEvent(BeaconNodeEvent):
     def dedup_key(self) -> Hashable:
         return self.signed_header_1.message.proposer_index
 
+
 class PayloadAttributesData(msgspec.Struct):
     proposal_slot: str
     parent_block_root: str
-# to-be-removed I believe    parent_block_number: str
+    # to-be-removed I believe    parent_block_number: str
     parent_block_hash: str
     proposer_index: str
-    payload_attributes: dict
+    payload_attributes: dict[str, Any]
+
 
 class PayloadAttributes(msgspec.Struct):
     version: ForkVersion
     data: PayloadAttributesData
+
 
 class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
     @property

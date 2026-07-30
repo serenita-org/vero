@@ -68,7 +68,7 @@ class MultiBuilder:
         best_bid = None
         best_bid_value = -1
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 # TODO log warning and continue
                 continue
 
