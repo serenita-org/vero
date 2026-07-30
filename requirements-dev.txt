@@ -343,10 +343,6 @@ distlib==0.4.3 \
     --hash=sha256:4b0ce306c966eb73bc3a7b6abad017c556dadd92c44701562cd528ac7fde4d5b \
     --hash=sha256:f152097224a0ae24be5a0f6bae1b9359af82133bce63f98a95f86cae1aede9ed
     # via virtualenv
-eth-remerkleable==0.1.31 \
-    --hash=sha256:7e48ea1b80935977effc02300f3f9b1db19153ab87ffbcea14a6e6429bbdc56b \
-    --hash=sha256:94df4b18a50dfc46f55b2e790cfece384e64032e9cb82d185cff09224682ad1d
-    # via vero
 filelock==3.32.0 \
     --hash=sha256:7be2ad23a14607ccc71808e68fe30848aeace7058ace17852f68e2a68e310402 \
     --hash=sha256:d396bea984af47333ef05e50eae7eff88c84256de6112aea0ec48a233c064fe3
@@ -1116,7 +1112,7 @@ six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
     # via python-dateutil
-spy-ssz @ git+https://github.com/eth2353/spy-ssz@2e997c218915a641faa36b9673b96a316172c915
+spy-ssz @ git+https://github.com/eth2353/spy-ssz@56a889b4bcb25a2e471fccbd282c60cbc2e39529
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \

@@ -7,7 +7,7 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
-from typing import TYPE_CHECKING, Literal, Unpack
+from typing import TYPE_CHECKING, Any, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
@@ -18,7 +18,7 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from multidict import CIMultiDictProxy
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from spy_ssz import Attestation, SyncCommitteeContribution
+from spy_ssz import Fork
 from yarl import URL
 
 from observability import (
@@ -36,8 +36,10 @@ from schemas import (
     SchemaValidator,
 )
 from spec import (
+    Attestation,
     AttestationData,
     Checkpoint,
+    SyncCommitteeContribution,
     preset_types,
 )
 from spec.base import SpecGloas, parse_spec
@@ -136,6 +138,14 @@ class BeaconNode:
         )
 
         self.json_encoder = msgspec.json.Encoder()
+
+    def _fork_for_slot(self, slot: int) -> Fork:
+        epoch = slot // int(self.spec.SLOTS_PER_EPOCH)
+        if epoch >= int(self.spec.GLOAS_FORK_EPOCH):
+            return Fork.GLOAS
+        if epoch >= int(self.spec.FULU_FORK_EPOCH):
+            return Fork.FULU
+        return Fork.ELECTRA
 
     @property
     def score(self) -> int:
@@ -356,7 +366,12 @@ class BeaconNode:
         )
 
         response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
-        return self.host, preset_types().attestation_data.from_json(response.data)
+        return (
+            self.host,
+            preset_types(self._fork_for_slot(slot)).attestation_data.from_json(
+                response.data
+            ),
+        )
 
     async def wait_for_attestation_data(
         self,
@@ -589,7 +604,9 @@ class BeaconNode:
             resp_bytes, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        att = preset_types().attestation.from_json(response.data)
+        att = preset_types(self._fork_for_slot(slot)).attestation.from_json(
+            response.data
+        )
 
         self.metrics.beacon_node_aggregate_attestation_participant_count_h.labels(
             host=self.host
@@ -629,9 +646,9 @@ class BeaconNode:
         )
 
         response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
-        contribution = preset_types().sync_committee_contribution.from_json(
-            response.data
-        )
+        contribution = preset_types(
+            self._fork_for_slot(slot)
+        ).sync_committee_contribution.from_json(response.data)
         self.metrics.beacon_node_sync_contribution_participant_count_h.labels(
             host=self.host
         ).observe(sum(contribution.aggregation_bits))
@@ -767,31 +784,31 @@ class BeaconNode:
 
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            execution_payload_value = int(response.execution_payload_value or 0)
-            consensus_block_value = int(response.consensus_block_value or 0)
-            response.execution_payload_value = str(execution_payload_value)
-            response.consensus_block_value = str(consensus_block_value)
+            execution_payload_value_int = int(response.execution_payload_value or 0)
+            consensus_block_value_int = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value_int)
+            response.consensus_block_value = str(consensus_block_value_int)
 
             tracer_span.add_event(
                 "ProduceBlockV3Response",
                 attributes=dict(
                     blinded=response.execution_payload_blinded,
-                    execution_payload_value=execution_payload_value,
-                    consensus_block_value=consensus_block_value,
+                    execution_payload_value=execution_payload_value_int,
+                    consensus_block_value=consensus_block_value_int,
                 ),
             )
 
             self.logger.info(
                 f"{self.host} returned block with"
-                f" consensus block value {consensus_block_value},"
-                f" execution payload value {execution_payload_value}."
+                f" consensus block value {consensus_block_value_int},"
+                f" execution payload value {execution_payload_value_int}."
             )
             self.metrics.beacon_node_consensus_block_value_h.labels(
                 host=self.host
-            ).observe(consensus_block_value)
+            ).observe(consensus_block_value_int)
             self.metrics.beacon_node_execution_payload_value_h.labels(
                 host=self.host
-            ).observe(execution_payload_value)
+            ).observe(execution_payload_value_int)
 
             return response, response_content_type
 
@@ -877,7 +894,7 @@ class BeaconNode:
             # TODO Lodestar is not providing this header right now
             execution_payload_included = False
             # execution_payload_included = headers["Eth-Execution-Payload-Included"].lower() == "true"
-            execution_payload_value = 0
+            execution_payload_value = "0"
             # execution_payload_value = headers["Eth-Execution-Payload-Value"]
 
             response = SchemaBeaconAPI.ProduceBlockV4Response(
@@ -890,31 +907,31 @@ class BeaconNode:
 
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            execution_payload_value = int(response.execution_payload_value or 0)
-            consensus_block_value = int(response.consensus_block_value or 0)
-            response.execution_payload_value = str(execution_payload_value)
-            response.consensus_block_value = str(consensus_block_value)
+            execution_payload_value_int = int(response.execution_payload_value or 0)
+            consensus_block_value_int = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value_int)
+            response.consensus_block_value = str(consensus_block_value_int)
 
             tracer_span.add_event(
                 "ProduceBlockV4Response",
                 attributes=dict(
                     execution_payload_included=response.execution_payload_included,
-                    execution_payload_value=execution_payload_value,
-                    consensus_block_value=consensus_block_value,
+                    execution_payload_value=execution_payload_value_int,
+                    consensus_block_value=consensus_block_value_int,
                 ),
             )
 
             self.logger.info(
                 f"{self.host} returned block with"
-                f" consensus block value {consensus_block_value},"
-                f" execution payload value {execution_payload_value}."
+                f" consensus block value {consensus_block_value_int},"
+                f" execution payload value {execution_payload_value_int}."
             )
             self.metrics.beacon_node_consensus_block_value_h.labels(
                 host=self.host
-            ).observe(consensus_block_value)
+            ).observe(consensus_block_value_int)
             self.metrics.beacon_node_execution_payload_value_h.labels(
                 host=self.host
-            ).observe(execution_payload_value)
+            ).observe(execution_payload_value_int)
 
             return response, response_content_type
 
@@ -968,7 +985,7 @@ class BeaconNode:
         self,
         slot: int,
         beacon_block_root: str,
-    ) -> tuple[SchemaBeaconAPI.ForkVersion, dict]:
+    ) -> tuple[SchemaBeaconAPI.ForkVersion, dict[str, Any]]:
         # TODO we can do JSON and SSZ here
 
         with self.tracer.start_as_current_span(
@@ -995,7 +1012,7 @@ class BeaconNode:
 
     async def publish_execution_payload_envelope(
         self,
-        envelope: dict,
+        envelope: dict[str, Any],
         signature: str,
         fork_version: SchemaBeaconAPI.ForkVersion,
     ) -> None:

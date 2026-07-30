@@ -44,11 +44,9 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import msgspec
 from opentelemetry import trace
 from spy_ssz import (
-    Attestation,
     Fork,
     ObjectKind,
     Preset,
-    SyncCommitteeContribution,
     encode_json_array,
     get_ssz_type,
 )
@@ -57,12 +55,14 @@ from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaValidator
 from schemas.beacon_api import ForkVersion
 from spec import (
+    Attestation,
     AttestationData,
     BeaconBlock,
     Checkpoint,
     SignedAggregateAndProof,
     SignedContributionAndProof,
     SingleAttestation,
+    SyncCommitteeContribution,
     SyncCommitteeMessage,
     preset_types,
 )
@@ -297,7 +297,10 @@ class MultiBeaconNode:
 
     @staticmethod
     def _parse_block_response(
-        response: SchemaBeaconAPI.ProduceBlockV3Response,
+        response: (
+            SchemaBeaconAPI.ProduceBlockV3Response
+            | SchemaBeaconAPI.ProduceBlockV4Response
+        ),
         content_type: ContentType,
     ) -> BeaconBlock:
         # TODO perf
@@ -313,11 +316,16 @@ class MultiBeaconNode:
         #  the execution payload - transactions.
 
         try:
+            object_kind = ObjectKind.BEACON_BLOCK
+            if isinstance(response, SchemaBeaconAPI.ProduceBlockV3Response):
+                object_kind = (
+                    ObjectKind.BLINDED_BEACON_BLOCK
+                    if response.execution_payload_blinded
+                    else ObjectKind.BEACON_BLOCK_CONTENTS
+                )
             block_cls = get_ssz_type(
                 Fork[response.version.name],
-                ObjectKind.BLINDED_BEACON_BLOCK
-                if response.execution_payload_blinded
-                else ObjectKind.BEACON_BLOCK_CONTENTS,
+                object_kind,
                 Preset[preset_types().preset.upper()],
             )
             if content_type == ContentType.JSON:
@@ -337,7 +345,10 @@ class MultiBeaconNode:
         signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
         fork_version: SchemaBeaconAPI.ForkVersion,
         soft_timeout: float,
-    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
+    ) -> tuple[
+        SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response,
+        ContentType,
+    ]:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
 
@@ -355,6 +366,7 @@ class MultiBeaconNode:
             )
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
+        tasks: set[asyncio.Task[Any]]
         if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
             tasks = {
                 asyncio.create_task(
@@ -367,7 +379,7 @@ class MultiBeaconNode:
                 )
                 for bn in beacon_nodes_to_use
             }
-        elif fork_version in (ForkVersion.GLOAS,):
+        elif fork_version == ForkVersion.GLOAS:
             tasks = {
                 asyncio.create_task(
                     bn.produce_block_v4(
@@ -466,7 +478,10 @@ class MultiBeaconNode:
             raise RuntimeError("Failed to get a response from all beacon nodes")
 
         self.logger.info(f"Proceeding with best block by value: {best_block_value}")
-        return best_block_result
+        return cast(
+            "tuple[SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response, ContentType]",
+            best_block_result,
+        )
 
     async def produce_block(
         self,
