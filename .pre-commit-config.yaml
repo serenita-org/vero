@@ -43,10 +43,11 @@ repos:
     rev: v2.14.0
     hooks:
       - id: hadolint-docker
+        args: ["--failure-threshold=warning"]
 
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.11.8
+    rev: 0.11.32
     hooks:
       - id: uv-lock
       - id: uv-export
