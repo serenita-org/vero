@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import re
@@ -11,7 +12,7 @@ from spy_ssz import Bitfield
 from yarl import URL
 
 from providers import BeaconChain
-from providers._headers import ContentType
+from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
@@ -21,6 +22,7 @@ from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
 )
+from tests.beacon_api_spec import BeaconAPISpec
 from tests.ssz_objects import (
     BYTES_PER_BLS_SIGNATURE,
     ZERO_ROOT,
@@ -52,7 +54,31 @@ def _mocked_beacon_node_endpoints(
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
+    beacon_api_spec_validator: BeaconAPISpec | None,
 ) -> None:
+    def _validate_response(
+        method: str, url: URL, response: CallbackResult
+    ) -> CallbackResult:
+        if beacon_api_spec_validator is not None:
+            beacon_api_spec_validator.validate_response(
+                method,
+                url,
+                status=response.status,
+                headers=response.headers,
+                content_type=response.content_type,
+                body=response.body,
+                payload=response.payload,
+            )
+        return response
+
+    async def _mocked_event_stream(url: URL, **kwargs: Any) -> CallbackResult:
+        if beacon_api_spec_validator is not None:
+            beacon_api_spec_validator.validate_request("GET", url, kwargs)
+
+        # Mock open event stream without sending any data over it
+        await asyncio.Event().wait()
+        raise AssertionError("Unreachable")
+
     def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match("/eth/v1/config/spec", url.raw_path):
             return CallbackResult(payload=dict(data=spec.to_obj()))
@@ -116,7 +142,7 @@ def _mocked_beacon_node_endpoints(
             consensus_block_value = random.randint(0, 10_000_000)
             headers = {
                 CONTENT_TYPE: response_content_type.value,
-                "Eth-Consensus-Version": fork_version.value,
+                ETH_CONSENSUS_VERSION: fork_version.value,
                 "Eth-Execution-Payload-Blinded": str(execution_payload_blinded).lower(),
                 "Eth-Execution-Payload-Value": str(exec_payload_value),
                 "Eth-Consensus-Block-Value": str(consensus_block_value),
@@ -197,7 +223,8 @@ def _mocked_beacon_node_endpoints(
                         version=fork_version,
                         data=msgspec.Raw(aggregate_attestation.to_json()),
                     )
-                )
+                ),
+                headers={ETH_CONSENSUS_VERSION: fork_version.value},
             )
 
         if re.match("/eth/v1/beacon/blocks/head/root", url.raw_path):
@@ -205,6 +232,7 @@ def _mocked_beacon_node_endpoints(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetBlockRootResponse(
                         execution_optimistic=False,
+                        finalized=False,
                         data=SchemaBeaconAPI.BlockRoot(
                             root="0x" + os.urandom(32).hex()
                         ),
@@ -237,7 +265,7 @@ def _mocked_beacon_node_endpoints(
         if re.match(r"/eth/v1/beacon/states/\w*/validators", url.raw_path):
             data = msgspec.json.decode(kwargs["data"])
             ids = data["ids"]
-            statuses = data["statuses"]
+            statuses = data.get("statuses")
 
             return_list = []
             for validator in validators:
@@ -250,8 +278,18 @@ def _mocked_beacon_node_endpoints(
                 return_list.append(
                     SchemaBeaconAPI.ValidatorInfo(
                         index=str(validator.index),
+                        balance="32000000000",
                         status=validator.status,
-                        validator=SchemaBeaconAPI.Validator(pubkey=validator.pubkey),
+                        validator=SchemaBeaconAPI.Validator(
+                            pubkey=validator.pubkey,
+                            withdrawal_credentials=ZERO_ROOT,
+                            effective_balance="32000000000",
+                            slashed=False,
+                            activation_eligibility_epoch="0",
+                            activation_epoch="0",
+                            exit_epoch="123",
+                            withdrawable_epoch="234",
+                        ),
                     )
                 )
 
@@ -259,6 +297,7 @@ def _mocked_beacon_node_endpoints(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetStateValidatorsResponse(
                         execution_optimistic=False,
+                        finalized=False,
                         data=return_list,
                     )
                 )
@@ -272,7 +311,7 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = ForkVersion[headers["Eth-Consensus-Version"].upper()]
+            fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
 
             if fork_version not in (
                 ForkVersion.ELECTRA,
@@ -294,7 +333,7 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = ForkVersion[headers["Eth-Consensus-Version"].upper()]
+            fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
 
             if fork_version not in (
                 ForkVersion.ELECTRA,
@@ -418,7 +457,7 @@ def _mocked_beacon_node_endpoints(
                 SchemaBeaconAPI.SyncDuty(
                     pubkey=v.pubkey,
                     validator_index=str(v.index),
-                    validator_sync_committee_indices=[],
+                    validator_sync_committee_indices=["0"],
                 )
                 for v in validators
             ]
@@ -445,13 +484,38 @@ def _mocked_beacon_node_endpoints(
             f"Beacon API response for POST {url} does not have a mock handler",
         )
 
+    def _mocked_beacon_api_endpoints_get_validated(
+        url: URL, **kwargs: Any
+    ) -> CallbackResult:
+        if beacon_api_spec_validator is not None:
+            beacon_api_spec_validator.validate_request("GET", url, kwargs)
+        return _validate_response(
+            "GET", url, _mocked_beacon_api_endpoints_get(url, **kwargs)
+        )
+
+    def _mocked_beacon_api_endpoints_post_validated(
+        url: URL, **kwargs: Any
+    ) -> CallbackResult:
+        if beacon_api_spec_validator is not None:
+            beacon_api_spec_validator.validate_request("POST", url, kwargs)
+        return _validate_response(
+            "POST", url, _mocked_beacon_api_endpoints_post(url, **kwargs)
+        )
+
+    mocked_responses.get(
+        url=re.compile(
+            r"http://beacon-node-[\w\-]+:1234/eth/v1/events",
+        ),
+        callback=_mocked_event_stream,
+        repeat=True,
+    )
     mocked_responses.get(
         url=re.compile(r"http://beacon-node-[\w\-]+:1234/eth/"),
-        callback=_mocked_beacon_api_endpoints_get,
+        callback=_mocked_beacon_api_endpoints_get_validated,
         repeat=True,
     )
     mocked_responses.post(
         url=re.compile(r"http://beacon-node-[\w\-]+:1234/eth/"),
-        callback=_mocked_beacon_api_endpoints_post,
+        callback=_mocked_beacon_api_endpoints_post_validated,
         repeat=True,
     )

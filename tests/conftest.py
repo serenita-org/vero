@@ -1,4 +1,5 @@
 import logging
+import os
 import random
 from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ProcessPoolExecutor
@@ -26,6 +27,7 @@ from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec.base import SpecFulu
 from spec.configs import Network
+from spec.utils import encode_graffiti
 
 # A few more global fixtures defined separately
 from tests.mock_api.base import *
@@ -35,6 +37,13 @@ from tests.mock_api.beacon_node import (
 )
 from tests.mock_api.remote_signer import *
 from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
+from tests.beacon_api_spec import BeaconAPISpec
+
+
+@pytest.fixture(scope="session")
+def beacon_api_spec_validator() -> BeaconAPISpec | None:
+    spec_path = os.environ.get("BEACON_API_SPEC_PATH")
+    return BeaconAPISpec(Path(spec_path)) if spec_path is not None else None
 
 
 @pytest.fixture(scope="session")
@@ -77,7 +86,7 @@ def cli_args(
         ),
         fee_recipient="0xfee0000000000000000000000000000000000000",
         data_dir=str(tmp_path),
-        graffiti=b"graffiti-in-pytest",
+        graffiti=encode_graffiti("graffiti-in-pytest"),
         gas_limit=30_000_000,
         use_external_builder=False,
         builder_boost_factor=90,
