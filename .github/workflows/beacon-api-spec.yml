@@ -4,6 +4,8 @@ permissions:
   contents: read
 
 on:
+  push:
+    branches: [ "beacon-api-spec-tests" ]
   schedule:
     # Runs every 7 days at 02:34
     - cron: "34 2 */7 * *"
