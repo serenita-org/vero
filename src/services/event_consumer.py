@@ -145,7 +145,13 @@ class EventConsumerService:
     async def handle_events(self, beacon_node: BeaconNode) -> None:
         self.logger.debug(f"Subscribing to events from {beacon_node.host}")
 
-        topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
+        topics = [
+            "head",
+            "chain_reorg",
+            "attester_slashing",
+            "proposer_slashing",
+            "invalid_topic",
+        ]
 
         try:
             async for event in beacon_node.subscribe_to_events(topics=topics):
