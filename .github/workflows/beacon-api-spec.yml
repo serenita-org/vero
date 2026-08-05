@@ -33,8 +33,7 @@ jobs:
           sha256sum "${RUNNER_TEMP}/beacon-node-oapi.json"
 
       - name: Test Vero against the Beacon API spec
-        env:
-          BEACON_API_SPEC_PATH: ${{ runner.temp }}/beacon-node-oapi.json
         run: |
           uv sync
-          uv run pytest tests
+          uv run pytest tests \
+            --beacon-api-spec-path "${RUNNER_TEMP}/beacon-node-oapi.json"

@@ -1,12 +1,9 @@
 import ast
-import os
 from pathlib import Path
 
 import pytest
 
 from tests.beacon_api_spec import BeaconAPISpec
-
-_SPEC_PATH_ENV = "BEACON_API_SPEC_PATH"
 
 # These requests intentionally bypass BeaconNode._make_request: genesis uses a
 # temporary session during startup, while events keeps an SSE connection open.
@@ -14,15 +11,6 @@ _DIRECT_SESSION_OPERATIONS = {
     ("GET", "/eth/v1/beacon/genesis"),
     ("GET", "/eth/v1/events"),
 }
-
-
-@pytest.fixture(scope="module")
-def beacon_api_spec() -> BeaconAPISpec:
-    spec_path = os.environ.get(_SPEC_PATH_ENV)
-    if spec_path is None:
-        pytest.skip(f"{_SPEC_PATH_ENV} is not set")
-    assert spec_path is not None
-    return BeaconAPISpec(Path(spec_path))
 
 
 def _make_request_operations(tree: ast.AST) -> set[tuple[str, str]]:
@@ -57,7 +45,10 @@ def _provider_operations() -> set[tuple[str, str]]:
 
 
 def test_all_provider_operations_exist_in_spec(
-    beacon_api_spec: BeaconAPISpec,
+    beacon_api_spec: BeaconAPISpec | None,
 ) -> None:
+    if beacon_api_spec is None:
+        pytest.skip("--beacon-api-spec-path is not provided")
+
     for method, path in _provider_operations():
         beacon_api_spec.operation_for(method, path)

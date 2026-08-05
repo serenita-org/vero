@@ -54,13 +54,13 @@ def _mocked_beacon_node_endpoints(
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
-    beacon_api_spec_validator: BeaconAPISpec | None,
+    beacon_api_spec: BeaconAPISpec | None,
 ) -> None:
     def _validate_response(
         method: str, url: URL, response: CallbackResult
     ) -> CallbackResult:
-        if beacon_api_spec_validator is not None:
-            beacon_api_spec_validator.validate_response(
+        if beacon_api_spec is not None:
+            beacon_api_spec.validate_response(
                 method,
                 url,
                 status=response.status,
@@ -72,8 +72,8 @@ def _mocked_beacon_node_endpoints(
         return response
 
     async def _mocked_event_stream(url: URL, **kwargs: Any) -> CallbackResult:
-        if beacon_api_spec_validator is not None:
-            beacon_api_spec_validator.validate_request("GET", url, kwargs)
+        if beacon_api_spec is not None:
+            beacon_api_spec.validate_request("GET", url, kwargs)
 
         # Mock open event stream without sending any data over it
         await asyncio.Event().wait()
@@ -487,8 +487,8 @@ def _mocked_beacon_node_endpoints(
     def _mocked_beacon_api_endpoints_get_validated(
         url: URL, **kwargs: Any
     ) -> CallbackResult:
-        if beacon_api_spec_validator is not None:
-            beacon_api_spec_validator.validate_request("GET", url, kwargs)
+        if beacon_api_spec is not None:
+            beacon_api_spec.validate_request("GET", url, kwargs)
         return _validate_response(
             "GET", url, _mocked_beacon_api_endpoints_get(url, **kwargs)
         )
@@ -496,8 +496,8 @@ def _mocked_beacon_node_endpoints(
     def _mocked_beacon_api_endpoints_post_validated(
         url: URL, **kwargs: Any
     ) -> CallbackResult:
-        if beacon_api_spec_validator is not None:
-            beacon_api_spec_validator.validate_request("POST", url, kwargs)
+        if beacon_api_spec is not None:
+            beacon_api_spec.validate_request("POST", url, kwargs)
         return _validate_response(
             "POST", url, _mocked_beacon_api_endpoints_post(url, **kwargs)
         )

@@ -1,5 +1,4 @@
 import logging
-import os
 import random
 from collections.abc import AsyncGenerator, Generator
 from concurrent.futures import ProcessPoolExecutor
@@ -40,10 +39,18 @@ from tests.mock_api.remote_signer import _mocked_remote_signer_endpoints
 from tests.beacon_api_spec import BeaconAPISpec
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--beacon-api-spec-path",
+        type=Path,
+        help="Validate mocked Beacon API requests and responses against this spec",
+    )
+
+
 @pytest.fixture(scope="session")
-def beacon_api_spec_validator() -> BeaconAPISpec | None:
-    spec_path = os.environ.get("BEACON_API_SPEC_PATH")
-    return BeaconAPISpec(Path(spec_path)) if spec_path is not None else None
+def beacon_api_spec(pytestconfig: pytest.Config) -> BeaconAPISpec | None:
+    spec_path: Path | None = pytestconfig.getoption("--beacon-api-spec-path")
+    return BeaconAPISpec(spec_path) if spec_path is not None else None
 
 
 @pytest.fixture(scope="session")
