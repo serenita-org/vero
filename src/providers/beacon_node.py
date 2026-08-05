@@ -27,7 +27,7 @@ from observability import (
     get_service_version,
 )
 from observability.api_client import RequestLatency, ServiceType
-from providers._headers import ContentType
+from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from providers._response import raise_for_response_size
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
 from spec import (
@@ -509,7 +509,7 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/beacon/pool/attestations",
             data=encoded_attestations,
-            headers={"Eth-Consensus-Version": fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork_version.value},
         )
 
     async def prepare_beacon_committee_subscriptions(
@@ -570,7 +570,7 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v2/validator/aggregate_and_proofs",
             data=encoded_signed_aggregate_and_proofs,
-            headers={"Eth-Consensus-Version": fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork_version.value},
         )
 
     async def get_sync_committee_contribution(
@@ -701,7 +701,7 @@ class BeaconNode:
                 ) from None
 
             response = SchemaBeaconAPI.ProduceBlockV3Response(
-                version=SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"]),
+                version=SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_blinded=headers[
                     "Eth-Execution-Payload-Blinded"
                 ].lower()
@@ -759,7 +759,7 @@ class BeaconNode:
                 endpoint="/eth/v2/beacon/blocks",
                 data=signed_block_contents,
                 headers={
-                    "Eth-Consensus-Version": fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork_version.value,
                     CONTENT_TYPE: content_type.value,
                 },
             )
@@ -782,7 +782,7 @@ class BeaconNode:
                 endpoint="/eth/v2/beacon/blinded_blocks",
                 data=signed_blinded_beacon_block,
                 headers={
-                    "Eth-Consensus-Version": fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork_version.value,
                     CONTENT_TYPE: content_type.value,
                 },
             )

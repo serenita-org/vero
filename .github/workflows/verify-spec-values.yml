@@ -5,8 +5,8 @@ permissions:
 
 on:
   schedule:
-    # Runs every 7 days at 01:23
-    - cron: "23 1 */7 * *"
+    # Runs every Monday at 01:23
+    - cron: "23 1 * * 1"
   # Allows running the workflow manually in the Actions tab
   workflow_dispatch:
   # Allows the workflow to be called from another workflow (currently called from the docker workflow)

@@ -20,6 +20,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "aioresponses>=0.7.8",
+    "jsonschema>=4.25.1",
     "mkdocs-material>=9.6.20",
     "pre-commit>=4.1.0",
     "pytest>=8.3.5",

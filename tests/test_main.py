@@ -122,10 +122,6 @@ async def test_lifecycle(
     err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
 
     for record in err_records:
-        # Event stream is not mocked
-        if "Error occurred while processing beacon node events" in record.message:
-            continue
-
         pytest.fail(f"Error occurred: {record.message}")
 
     # Send SIGTERM signal to process to initiate a clean shutdown

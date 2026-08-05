@@ -14,7 +14,7 @@ from aioresponses import CallbackResult, aioresponses
 
 from args import CLIArgs
 from providers import MultiBeaconNode
-from providers._headers import ContentType
+from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from schemas import SchemaBeaconAPI
 
 
@@ -340,7 +340,7 @@ async def test_produce_best_block(
                         return CallbackResult(
                             body=_response.data,
                             headers={
-                                "Eth-Consensus-Version": _response.version.value.lower(),
+                                ETH_CONSENSUS_VERSION: _response.version.value.lower(),
                                 "Eth-Execution-Payload-Blinded": str(
                                     _response.execution_payload_blinded
                                 ).lower(),
