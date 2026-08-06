@@ -118,7 +118,7 @@ class MultiBeaconNode:
 
     async def initialize(self) -> None:
         if self._skip_init:
-            for bn in self.beacon_nodes:
+            for bn in self.beacon_nodes + self.beacon_nodes_proposal:
                 bn.initialized = True
             return
 
