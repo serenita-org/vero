@@ -1,6 +1,6 @@
 [project]
 name = "vero"
-version = "1.4.0"
+version = "1.4.1"
 description = "Vero is a multi-node validator client software implementation, targeting Ethereum and Gnosis Chain."
 readme = "README.md"
 requires-python = ">=3.12"
