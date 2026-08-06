@@ -93,6 +93,7 @@ class BeaconNode:
         self.metrics.beacon_node_score_g.labels(host=self.host).set(0)
         self.metrics.checkpoint_confirmations_c.labels(host=self.host).reset()
         self.node_version = ""
+        self.client_version_v2: SchemaBeaconAPI.GetVersionV2Data | None = None
 
         self._trace_default_request_ctx = dict(
             host=self.host,
@@ -149,6 +150,13 @@ class BeaconNode:
             minutes=10,
             next_run_time=datetime.datetime.now(tz=datetime.UTC),
             id=f"{self.__class__.__name__}.update_node_version-{self.base_url}",
+        )
+        self.scheduler.add_job(
+            self.update_client_version_v2,
+            "interval",
+            minutes=10,
+            next_run_time=datetime.datetime.now(tz=datetime.UTC),
+            id=f"{self.__class__.__name__}.update_client_version_v2-{self.base_url}",
         )
 
         self.score = BeaconNode.MAX_SCORE
@@ -318,6 +326,31 @@ class BeaconNode:
         self.metrics.beacon_node_version_g.labels(
             host=self.host, version=self.node_version
         ).set(1)
+
+    async def update_client_version_v2(self) -> None:
+        try:
+            resp_bytes, _, _ = await self._make_request(
+                method="GET",
+                endpoint="/eth/v2/node/version",
+            )
+            response = msgspec.json.decode(
+                resp_bytes, type=SchemaBeaconAPI.GetVersionV2Response
+            )
+        except Exception as e:
+            self.client_version_v2 = None
+            self.logger.debug(
+                "Failed to update structured beacon node version"
+                f" from {self.host}: {e!r}",
+            )
+            return
+
+        self.client_version_v2 = response.data
+        execution_client = response.data.execution_client
+        self.logger.debug(
+            f"Structured client data from {self.host}:"
+            f" CL={response.data.beacon_node.code}"
+            f" EL={execution_client.code if execution_client else 'unknown'}"
+        )
 
     async def produce_attestation_data(
         self,
@@ -642,6 +675,7 @@ class BeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        client_data: bytes | None = None,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator.
         The returned block may be blinded or unblinded, depending on the current state of the network
@@ -660,6 +694,8 @@ class BeaconNode:
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
+        if client_data is not None:
+            params["client_data"] = f"0x{client_data.hex()}"
 
         accept_header = (
             ContentType.JSON.value

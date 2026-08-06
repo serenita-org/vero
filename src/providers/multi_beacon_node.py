@@ -38,6 +38,7 @@ import logging
 import time
 from collections import Counter
 from collections.abc import AsyncIterator
+from enum import Enum
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, cast
 
@@ -73,6 +74,37 @@ from .beacon_node import BeaconNode
 
 if TYPE_CHECKING:
     from .vero import Vero
+
+
+_CLIENT_DATA_FIELD_VERSION = 1
+_CLIENT_DATA_SETUP_VERO = 6
+_CLIENT_DATA_MAX_PAIRS = 14
+
+
+class ClientCodeCL(Enum):
+    UNDEFINED = 0
+    UNKNOWN = 1
+    OTHER = 2
+    CN = 3  # Caplin
+    GR = 4  # Grandine
+    LH = 5  # Lighthouse
+    LS = 6  # Lodestar
+    NB = 7  # Nimbus CL
+    TK = 8  # Teku
+    PM = 9  # Prysm
+
+
+class ClientCodeEL(Enum):
+    UNDEFINED = 0
+    UNKNOWN = 1
+    OTHER = 2
+    BU = 3  # Besu
+    EG = 4  # Erigon
+    EX = 5  # Ethrex
+    GE = 6  # Geth
+    NM = 7  # Nethermind
+    NE = 8  # Nimbus
+    RH = 9  # Reth
 
 
 class MultiBeaconNode:
@@ -192,6 +224,57 @@ class MultiBeaconNode:
     @property
     def initialized_beacon_nodes(self) -> list[BeaconNode]:
         return [bn for bn in self.beacon_nodes if bn.initialized]
+
+    def _encode_client_data(self, beacon_nodes: list[BeaconNode]) -> bytes:
+        client_data = bytearray(32)
+        client_data[0] = _CLIENT_DATA_FIELD_VERSION
+        client_data[1] = (_CLIENT_DATA_SETUP_VERO << 3) | min(
+            self._attestation_consensus_threshold, 7
+        )
+
+        if len(beacon_nodes) > _CLIENT_DATA_MAX_PAIRS:
+            self.logger.error(
+                f"Too many beacon nodes to encode client data for: {len(beacon_nodes)}"
+            )
+            return bytes(bytearray(32))
+
+        for offset, bn in enumerate(beacon_nodes, start=2):
+            version_data = bn.client_version_v2
+            if version_data is None:
+                self.logger.debug(
+                    f"Encoding other client data for {bn.host}:"
+                    " structured version unavailable"
+                )
+                client_data[offset] = (
+                    ClientCodeCL.UNKNOWN.value << 4
+                ) | ClientCodeEL.UNKNOWN.value
+                continue
+
+            cl_code_letters = version_data.beacon_node.code.upper()
+            if cl_code_letters:
+                try:
+                    cl_code = ClientCodeCL[cl_code_letters]
+                except KeyError:
+                    cl_code = ClientCodeCL.OTHER
+            else:
+                cl_code = ClientCodeCL.UNKNOWN
+
+            el_code_letters = (
+                version_data.execution_client.code.upper()
+                if version_data.execution_client is not None
+                else ""
+            )
+            if el_code_letters:
+                try:
+                    el_code = ClientCodeEL[el_code_letters]
+                except KeyError:
+                    el_code = ClientCodeEL.OTHER
+            else:
+                el_code = ClientCodeEL.UNKNOWN
+
+            client_data[offset] = (cl_code.value << 4) | el_code.value
+
+        return bytes(client_data)
 
     async def _get_first_beacon_node_response(
         self,
@@ -324,6 +407,7 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
+        client_data: bytes,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
@@ -351,6 +435,7 @@ class MultiBeaconNode:
                     graffiti=graffiti,
                     builder_boost_factor=builder_boost_factor,
                     randao_reveal=randao_reveal,
+                    client_data=client_data,
                 ),
             )
             for bn in beacon_nodes_to_use
@@ -453,11 +538,15 @@ class MultiBeaconNode:
         #  We could however take the best beacon block
         #  and combine it with the best execution payload.
         #  That would take up some extra processing time though.
+        client_data = self._encode_client_data(self.beacon_nodes)
+        self.logger.info(f"Requesting block with client data field {client_data!r}")
+
         best_block_response, content_type = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
             builder_boost_factor=builder_boost_factor,
             randao_reveal=randao_reveal,
+            client_data=client_data,
         )
 
         return self._parse_block_response(
