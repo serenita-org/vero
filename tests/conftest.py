@@ -19,6 +19,7 @@ from providers import (
     SignatureProvider,
     DutyCache,
     Vero,
+    MultiBuilder,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
@@ -275,6 +276,15 @@ async def multi_beacon_node_with_mocked_endpoints(
     multi_beacon_node: MultiBeaconNode,
 ) -> MultiBeaconNode:
     return multi_beacon_node
+
+
+@pytest.fixture
+async def multi_builder(
+    vero: Vero,
+    request: pytest.FixtureRequest,
+) -> AsyncGenerator[MultiBuilder, None]:
+    async with MultiBuilder(vero=vero) as mbn:
+        yield mbn
 
 
 @pytest.fixture

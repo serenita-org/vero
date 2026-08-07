@@ -143,6 +143,7 @@ async def test_update_duties_exited_validators(
 
     service = SyncCommitteeService(
         multi_beacon_node=None,  # type: ignore[arg-type]
+        multi_builder=None,  # type: ignore[arg-type]
         signature_provider=None,  # type: ignore[arg-type]
         keymanager=None,  # type: ignore[arg-type]
         duty_cache=None,  # type: ignore[arg-type]

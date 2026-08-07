@@ -1,11 +1,16 @@
 import asyncio
 import logging
+from types import TracebackType
+from typing import TYPE_CHECKING, Self
 
 import aiohttp
 import msgspec.json
 from aiohttp import web
 
 from schemas import SchemaBuilderAPI
+
+if TYPE_CHECKING:
+    from .vero import Vero
 
 
 class Builder:
@@ -50,9 +55,31 @@ class Builder:
 
 
 class MultiBuilder:
-    def __init__(self, builder_urls: list[str]):
+    def __init__(self, vero: "Vero"):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.builders = [Builder(url) for url in builder_urls]
+        self.builders = [Builder(url) for url in vero.cli_args.builder_urls]
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        await self._close_client_sessions()
+
+    async def _close_client_sessions(self) -> None:
+        pass
+        # TODO
+        # await asyncio.gather(
+        #     *[
+        #         b.client_session.close()
+        #         for b in self.builders
+        #         if not b.client_session.closed
+        #     ],
+        # )
 
     async def get_execution_payload_bid(
         self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
