@@ -145,7 +145,9 @@ class BeaconNode:
             return Fork.GLOAS
         if epoch >= int(self.spec.FULU_FORK_EPOCH):
             return Fork.FULU
-        return Fork.ELECTRA
+        if epoch >= int(self.spec.ELECTRA_FORK_EPOCH):
+            return Fork.ELECTRA
+        raise NotImplementedError(f"Unsupported fork for {epoch=}")
 
     @property
     def score(self) -> int:
@@ -294,7 +296,7 @@ class BeaconNode:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
-            self.logger.exception(
+            self.logger.debug(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -1071,6 +1073,9 @@ class BeaconNode:
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
             payload_attributes=SchemaBeaconAPI.PayloadAttributesEvent,
+            # TODO subscribe to this topic, see how much load this is
+            #  when connected to multiple beacon nodes...
+            # execution_payload_bid=SchemaBeaconAPI.PayloadAttributesEvent,
         )
 
         async with self.client_session.get(

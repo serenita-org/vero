@@ -293,8 +293,6 @@ class MultiBeaconNode:
         await self.best_beacon_node.register_validator(**kwargs)
 
     async def submit_proposer_preferences(self, **kwargs: Any) -> None:
-        # Only ask one of the beacon nodes to register the validators with
-        # MEV relays - no need to overwhelm them with duplicate registrations
         await self._get_all_beacon_node_responses(
             func_name="submit_proposer_preferences", **kwargs
         )
@@ -397,6 +395,8 @@ class MultiBeaconNode:
                 )
                 for bn in beacon_nodes_to_use
             }
+        else:
+            raise NotImplementedError(f"Unsupported fork version {fork_version=}")
         pending = tasks
 
         best_block_value = -1
@@ -582,6 +582,9 @@ class MultiBeaconNode:
                 # New AttestationData has arrived from this host
                 self.logger.debug(f"AttestationData received from {host}: {att_data}")
                 host_to_att_data[host] = att_data
+                # TODO should we loosen this? AttestationData.index may differ
+                #  depending on the beacon node - the index now represents payloa
+                #  status EMPTY/FULL
                 att_data_counter[att_data] += 1
                 if prev_att_data is not None:
                     att_data_counter[prev_att_data] -= 1

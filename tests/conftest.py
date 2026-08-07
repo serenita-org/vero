@@ -124,7 +124,7 @@ def _init_observability() -> None:
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
 ) -> Generator[None, None, None]:
-    requested_fork_version = getattr(request, "param", ForkVersion.FULU)
+    requested_fork_version = getattr(request, "param", ForkVersion.GLOAS)
 
     with mock.patch.object(
         beacon_chain, "current_fork_version", requested_fork_version

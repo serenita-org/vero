@@ -359,6 +359,10 @@ class BlockProposalService(ValidatorDutyService):
         # TODO Ok this needs some reworking, it seems we should only send these
         # when expecting to propose soonish? so different from validator registrations
 
+        # TODO we only really _need_ to broadcast this if we want to receive trusted
+        #  bids.
+        #  OR (!!!) indicate what target gas limit we want.
+
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
         default_fee_recipient = self.cli_args.fee_recipient
@@ -703,7 +707,10 @@ class BlockProposalService(ValidatorDutyService):
             for payload_attributes_event in self.payload_attributes_events_store:
                 # TODO with the current implementation, there may be
                 #  multiple events for the same slot -> we should probably
-                #  only keep the latest event per slot
+                #  only keep the latest event per slot?
+                #  hmm I don't know actually, what if it's forked off, or processed
+                #  a slot late? Maybe we should use a counter and pick the event
+                #  that was emitted the most times?
                 if int(payload_attributes_event.data.proposal_slot) == slot:
                     payload_attributes_data = payload_attributes_event.data
                     self.logger.info("Have payload attributes data")

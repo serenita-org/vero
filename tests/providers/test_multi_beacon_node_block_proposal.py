@@ -13,13 +13,13 @@ from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
 
 from args import CLIArgs
-from providers import MultiBeaconNode
+from providers import BeaconChain, MultiBeaconNode
 from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from schemas import SchemaBeaconAPI
 
 
 class BeaconNodeResponse(TypedDict):
-    response: SchemaBeaconAPI.ProduceBlockV3Response | None
+    response: SchemaBeaconAPI.ProduceBlockV4Response | None
     exception: Exception | None
     delay: float | int
 
@@ -38,9 +38,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-a",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -54,9 +54,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-b",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -70,9 +70,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-c",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(120),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -92,9 +92,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-a",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -108,9 +108,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-b",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -140,9 +140,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-a",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -218,9 +218,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-a",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -234,9 +234,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-b",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(200),
                                 consensus_block_value=str(50),
                                 data=b"",
@@ -250,9 +250,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-c",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value=str(1000),
                                 consensus_block_value=str(500),
                                 data=b"",
@@ -272,9 +272,9 @@ class BeaconNodeResponseSequence(TypedDict):
                     host="beacon-node-a",
                     responses=[
                         BeaconNodeResponse(
-                            response=SchemaBeaconAPI.ProduceBlockV3Response(
+                            response=SchemaBeaconAPI.ProduceBlockV4Response(
                                 version=SchemaBeaconAPI.ForkVersion.FULU,
-                                execution_payload_blinded=False,
+                                execution_payload_included=False,
                                 execution_payload_value="",
                                 consensus_block_value="",
                                 data=b"",
@@ -311,6 +311,7 @@ async def test_produce_best_block(
     bn_response_sequences: list[BeaconNodeResponseSequence],
     returned_block_value: int,
     multi_beacon_node: MultiBeaconNode,
+    beacon_chain: BeaconChain,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon requests blocks from all beacon nodes
@@ -320,14 +321,14 @@ async def test_produce_best_block(
         for sequence in bn_response_sequences:
             bn_host = sequence["host"]
             url_regex_to_mock = re.compile(
-                rf"^http://{bn_host}:1234/eth/v3/validator/blocks/\d+",
+                rf"^http://{bn_host}:1234/eth/v4/validator/blocks/\d+",
             )
 
             for r in sequence["responses"]:
                 response, exception, delay = r["response"], r["exception"], r["delay"]
 
                 async def _f(
-                    _response: SchemaBeaconAPI.ProduceBlockV3Response | None,
+                    _response: SchemaBeaconAPI.ProduceBlockV4Response | None,
                     _exception: Exception | None,
                     _delay: float,
                     *args: Any,
@@ -341,9 +342,6 @@ async def test_produce_best_block(
                             body=_response.data,
                             headers={
                                 ETH_CONSENSUS_VERSION: _response.version.value.lower(),
-                                "Eth-Execution-Payload-Blinded": str(
-                                    _response.execution_payload_blinded
-                                ).lower(),
                                 "Eth-Execution-Payload-Value": _response.execution_payload_value,
                                 "Eth-Consensus-Block-Value": _response.consensus_block_value,
                             },
@@ -373,9 +371,13 @@ async def test_produce_best_block(
                 graffiti=b"test_produce_best_block",
                 builder_boost_factor=90,
                 randao_reveal="randao",
+                signed_payload_bid=None,
+                fork_version=beacon_chain.current_fork_version,
                 soft_timeout=0.1666,
             )
             assert content_type == ContentType.JSON
+            # this test is currently failing with produceBlockV4
+            # because we hardcoded execution_payload_value to 0 there for now
             assert (
                 int(full_response.consensus_block_value)
                 + int(full_response.execution_payload_value)
@@ -391,5 +393,7 @@ async def test_produce_best_block(
                     graffiti=b"test_produce_best_block",
                     builder_boost_factor=90,
                     randao_reveal="randao",
+                    signed_payload_bid=None,
+                    fork_version=beacon_chain.current_fork_version,
                     soft_timeout=0.1666,
                 )

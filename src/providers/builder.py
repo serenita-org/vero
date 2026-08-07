@@ -35,6 +35,17 @@ class Builder:
                 resp_decoded = msgspec.json.decode(
                     resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
                 )
+
+                # TODO bid verification? or shall we just let the beacon node handle
+                #  all this?
+                #  see https://github.com/ethereum/consensus-specs/blob/master/specs/gloas/validator.md#signed-execution-payload-bid
+                # 1) signature verification - requires knowing the builder's pubkey
+                # 2) builder balance - must cover the bid.value
+                # 3) bid.slot - correct value
+                # 4) bid.parent_block_hash + bid.parent_block_root - correct values
+                # 5) bid.prev_randao
+                # 6) fee recipient in signed_execution_payload_bid.message
+
                 return resp_decoded.data
 
 
