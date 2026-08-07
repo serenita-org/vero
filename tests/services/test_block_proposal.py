@@ -94,6 +94,7 @@ async def test_register_validators(
     [
         pytest.param(ForkVersion.ELECTRA, id="Electra"),
         pytest.param(ForkVersion.FULU, id="Fulu"),
+        pytest.param(ForkVersion.GLOAS, id="Gloas"),
     ],
     indirect=True,
 )

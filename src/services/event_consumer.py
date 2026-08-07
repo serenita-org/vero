@@ -39,6 +39,11 @@ class EventConsumerService:
                 Coroutine[Any, Any, None],
             ]
         ] = []
+        self.payload_attributes_event_handlers: list[
+            Callable[
+                [SchemaBeaconAPI.PayloadAttributesEvent], Coroutine[Any, Any, None]
+            ]
+        ] = []
 
         self._recent_event_keys: deque[Hashable] = deque(maxlen=10 * len(beacon_nodes))
 
@@ -76,6 +81,15 @@ class EventConsumerService:
         ],
     ) -> None:
         self.slashing_event_handlers.append(event_handler)
+
+    def add_payload_attributes_event_handler(
+        self,
+        event_handler: Callable[
+            [SchemaBeaconAPI.PayloadAttributesEvent],
+            Coroutine[Any, Any, None],
+        ],
+    ) -> None:
+        self.payload_attributes_event_handlers.append(event_handler)
 
     def _has_seen_event(self, event: SchemaBeaconAPI.BeaconNodeEvent) -> bool:
         key = event.dedup_key
@@ -134,6 +148,17 @@ class EventConsumerService:
                         sl_handler(event),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{sl_handler.__name__}-{uuid4().hex}",
                     )
+        elif isinstance(
+            event,
+            SchemaBeaconAPI.PayloadAttributesEvent,
+        ):
+            if not self._has_seen_event(event):
+                self.logger.debug(f"{event_type}: {event.dedup_key}")
+                for pa_handler in self.payload_attributes_event_handlers:
+                    self.task_manager.create_task(
+                        pa_handler(event),
+                        name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
+                    )
         else:
             raise NotImplementedError(f"Unsupported event type: {event_type}")
 
@@ -145,7 +170,7 @@ class EventConsumerService:
     async def handle_events(self, beacon_node: BeaconNode) -> None:
         self.logger.debug(f"Subscribing to events from {beacon_node.host}")
 
-        topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
+        topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing", "payload_attributes"]
 
         try:
             async for event in beacon_node.subscribe_to_events(topics=topics):

@@ -1,59 +1,107 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from spy_ssz import (
-    AggregateAndProof,
-    Attestation,
-    AttestationData as AttestationData,
-    ContributionAndProof,
+    AggregateAndProofElectra,
+    AggregateAndProofFulu,
+    AggregateAndProofGloas,
+    AttestationDataElectra,
+    AttestationDataFulu,
+    AttestationDataGloas,
+    AttestationElectra,
+    AttestationFulu,
+    AttestationGloas,
+    ContributionAndProofElectra,
+    ContributionAndProofFulu,
+    ContributionAndProofGloas,
+    Fork,
     Preset as SpyPreset,
-    SignedAggregateAndProof as SignedAggregateAndProof,
-    SignedContributionAndProof as SignedContributionAndProof,
-    SingleAttestation as SingleAttestation,
+    SignedAggregateAndProofElectra,
+    SignedAggregateAndProofFulu,
+    SignedAggregateAndProofGloas,
+    SignedContributionAndProofElectra,
+    SignedContributionAndProofFulu,
+    SignedContributionAndProofGloas,
+    SingleAttestationElectra,
+    SingleAttestationFulu,
+    SingleAttestationGloas,
     SszObject,
-    SyncCommitteeContribution,
-    SyncCommitteeMessage as SyncCommitteeMessage,
+    SyncCommitteeContributionElectra,
+    SyncCommitteeContributionFulu,
+    SyncCommitteeContributionGloas,
+    SyncCommitteeMessageElectra,
+    SyncCommitteeMessageFulu,
+    SyncCommitteeMessageGloas,
     get_ssz_type,
 )
 from spy_ssz.electra import (
-    ElectraBeaconBlockContents,
-    ElectraBlindedBeaconBlock,
-    ElectraSignedBeaconBlockContents,
-    ElectraSignedBlindedBeaconBlock,
+    BeaconBlockContentsElectra,
+    BlindedBeaconBlockElectra,
+    SignedBeaconBlockContentsElectra,
+    SignedBlindedBeaconBlockElectra,
 )
 from spy_ssz.fulu import (
-    FuluBeaconBlockContents,
-    FuluBlindedBeaconBlock,
-    FuluSignedBeaconBlockContents,
-    FuluSignedBlindedBeaconBlock,
+    BeaconBlockContentsFulu,
+    BlindedBeaconBlockFulu,
+    SignedBeaconBlockContentsFulu,
+    SignedBlindedBeaconBlockFulu,
 )
+from spy_ssz.gloas import BeaconBlockGloas, SignedBeaconBlockGloas
 from spy_ssz.projections import Checkpoint as Checkpoint
 
 Preset = Literal["mainnet", "minimal", "gnosis"]
+AttestationData = AttestationDataElectra | AttestationDataFulu | AttestationDataGloas
+Attestation = AttestationElectra | AttestationFulu | AttestationGloas
+AggregateAndProof = (
+    AggregateAndProofElectra | AggregateAndProofFulu | AggregateAndProofGloas
+)
+SyncCommitteeContribution = (
+    SyncCommitteeContributionElectra
+    | SyncCommitteeContributionFulu
+    | SyncCommitteeContributionGloas
+)
+ContributionAndProof = (
+    ContributionAndProofElectra | ContributionAndProofFulu | ContributionAndProofGloas
+)
+SingleAttestation = (
+    SingleAttestationElectra | SingleAttestationFulu | SingleAttestationGloas
+)
+SyncCommitteeMessage = (
+    SyncCommitteeMessageElectra | SyncCommitteeMessageFulu | SyncCommitteeMessageGloas
+)
+SignedAggregateAndProof = (
+    SignedAggregateAndProofElectra
+    | SignedAggregateAndProofFulu
+    | SignedAggregateAndProofGloas
+)
+SignedContributionAndProof = (
+    SignedContributionAndProofElectra
+    | SignedContributionAndProofFulu
+    | SignedContributionAndProofGloas
+)
 BeaconBlock = (
-    ElectraBeaconBlockContents
-    | ElectraBlindedBeaconBlock
-    | FuluBeaconBlockContents
-    | FuluBlindedBeaconBlock
+    BeaconBlockContentsElectra
+    | BlindedBeaconBlockElectra
+    | BeaconBlockContentsFulu
+    | BlindedBeaconBlockFulu
+    | BeaconBlockGloas
 )
 SignedBeaconBlock = (
-    ElectraSignedBeaconBlockContents
-    | ElectraSignedBlindedBeaconBlock
-    | FuluSignedBeaconBlockContents
-    | FuluSignedBlindedBeaconBlock
+    SignedBeaconBlockContentsElectra
+    | SignedBlindedBeaconBlockElectra
+    | SignedBeaconBlockContentsFulu
+    | SignedBlindedBeaconBlockFulu
+    | SignedBeaconBlockGloas
 )
 
 
 @dataclass(frozen=True)
 class PresetTypes:
     preset: Preset
+    fork: Fork
     attestation_data: type[AttestationData]
     attestation: type[Attestation]
     aggregate_and_proof: type[AggregateAndProof]
-    block_contents: type[ElectraBeaconBlockContents]
-    signed_block_contents: type[ElectraSignedBeaconBlockContents]
-    blinded_block: type[ElectraBlindedBeaconBlock]
-    signed_blinded_block: type[ElectraSignedBlindedBeaconBlock]
     sync_committee_contribution: type[SyncCommitteeContribution]
     contribution_and_proof: type[ContributionAndProof]
     single_attestation: type[SingleAttestation]
@@ -62,10 +110,10 @@ class PresetTypes:
     signed_contribution_and_proof: type[SignedContributionAndProof]
 
 
-def _resolve_type[SszObjectT: SszObject](
+def _resolve_type(
     preset: SpyPreset,
-    expected_type: type[SszObjectT],
-) -> type[SszObjectT]:
+    expected_type: type[SszObject],
+) -> type[SszObject]:
     fork = expected_type.expected_fork
     kind = expected_type.expected_kind
     if fork is None or kind is None:
@@ -80,46 +128,117 @@ def _resolve_type[SszObjectT: SszObject](
     return resolved
 
 
-_active_types: PresetTypes | None = None
+_active_types: dict[Fork, PresetTypes] = {}
+
+
+def _initialize_fork_types(
+    *,
+    preset: Preset,
+    spy_preset: SpyPreset,
+    fork: Fork,
+) -> PresetTypes:
+    type_names = {
+        Fork.ELECTRA: (
+            AttestationDataElectra,
+            AttestationElectra,
+            AggregateAndProofElectra,
+            SyncCommitteeContributionElectra,
+            ContributionAndProofElectra,
+            SingleAttestationElectra,
+            SyncCommitteeMessageElectra,
+            SignedAggregateAndProofElectra,
+            SignedContributionAndProofElectra,
+        ),
+        Fork.FULU: (
+            AttestationDataFulu,
+            AttestationFulu,
+            AggregateAndProofFulu,
+            SyncCommitteeContributionFulu,
+            ContributionAndProofFulu,
+            SingleAttestationFulu,
+            SyncCommitteeMessageFulu,
+            SignedAggregateAndProofFulu,
+            SignedContributionAndProofFulu,
+        ),
+        Fork.GLOAS: (
+            AttestationDataGloas,
+            AttestationGloas,
+            AggregateAndProofGloas,
+            SyncCommitteeContributionGloas,
+            ContributionAndProofGloas,
+            SingleAttestationGloas,
+            SyncCommitteeMessageGloas,
+            SignedAggregateAndProofGloas,
+            SignedContributionAndProofGloas,
+        ),
+    }
+    (
+        attestation_data,
+        attestation,
+        aggregate_and_proof,
+        sync_committee_contribution,
+        contribution_and_proof,
+        single_attestation,
+        sync_committee_message,
+        signed_aggregate_and_proof,
+        signed_contribution_and_proof,
+    ) = type_names[fork]
+    return PresetTypes(
+        preset=preset,
+        fork=fork,
+        attestation_data=cast(
+            "type[AttestationData]",
+            _resolve_type(spy_preset, attestation_data),
+        ),
+        attestation=cast(
+            "type[Attestation]",
+            _resolve_type(spy_preset, attestation),
+        ),
+        aggregate_and_proof=cast(
+            "type[AggregateAndProof]",
+            _resolve_type(spy_preset, aggregate_and_proof),
+        ),
+        sync_committee_contribution=cast(
+            "type[SyncCommitteeContribution]",
+            _resolve_type(spy_preset, sync_committee_contribution),
+        ),
+        contribution_and_proof=cast(
+            "type[ContributionAndProof]",
+            _resolve_type(spy_preset, contribution_and_proof),
+        ),
+        single_attestation=cast(
+            "type[SingleAttestation]",
+            _resolve_type(spy_preset, single_attestation),
+        ),
+        sync_committee_message=cast(
+            "type[SyncCommitteeMessage]",
+            _resolve_type(spy_preset, sync_committee_message),
+        ),
+        signed_aggregate_and_proof=cast(
+            "type[SignedAggregateAndProof]",
+            _resolve_type(spy_preset, signed_aggregate_and_proof),
+        ),
+        signed_contribution_and_proof=cast(
+            "type[SignedContributionAndProof]",
+            _resolve_type(spy_preset, signed_contribution_and_proof),
+        ),
+    )
 
 
 def initialize_preset(preset: Preset) -> None:
     global _active_types
     spy_preset = SpyPreset[preset.upper()]
-    _active_types = PresetTypes(
-        preset=preset,
-        attestation_data=_resolve_type(spy_preset, AttestationData),
-        attestation=_resolve_type(spy_preset, Attestation),
-        aggregate_and_proof=_resolve_type(spy_preset, AggregateAndProof),
-        block_contents=_resolve_type(spy_preset, ElectraBeaconBlockContents),
-        signed_block_contents=_resolve_type(
-            spy_preset,
-            ElectraSignedBeaconBlockContents,
-        ),
-        blinded_block=_resolve_type(spy_preset, ElectraBlindedBeaconBlock),
-        signed_blinded_block=_resolve_type(
-            spy_preset,
-            ElectraSignedBlindedBeaconBlock,
-        ),
-        sync_committee_contribution=_resolve_type(
-            spy_preset,
-            SyncCommitteeContribution,
-        ),
-        contribution_and_proof=_resolve_type(spy_preset, ContributionAndProof),
-        single_attestation=_resolve_type(spy_preset, SingleAttestation),
-        sync_committee_message=_resolve_type(spy_preset, SyncCommitteeMessage),
-        signed_aggregate_and_proof=_resolve_type(
-            spy_preset,
-            SignedAggregateAndProof,
-        ),
-        signed_contribution_and_proof=_resolve_type(
-            spy_preset,
-            SignedContributionAndProof,
-        ),
-    )
+    _active_types = {
+        fork: _initialize_fork_types(
+            preset=preset,
+            spy_preset=spy_preset,
+            fork=fork,
+        )
+        for fork in (Fork.ELECTRA, Fork.FULU, Fork.GLOAS)
+    }
 
 
-def preset_types() -> PresetTypes:
-    if _active_types is None:
+def preset_types(fork: Fork = Fork.FULU) -> PresetTypes:
+    if not _active_types:
         raise RuntimeError("initialize_preset was not called")
-    return _active_types
+    return _active_types[fork]

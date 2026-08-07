@@ -8,7 +8,7 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
-from spy_ssz import Bitfield
+from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
 from yarl import URL
 
 from providers import BeaconChain
@@ -17,7 +17,7 @@ from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import preset_types
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
@@ -50,7 +50,7 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 @pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecFulu,
+    spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
@@ -86,7 +86,7 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/node/version", url.raw_path):
             return CallbackResult(payload=dict(data=dict(version="beacon-node/test")))
 
-        if re.match(r"/eth/v1/validator/duties/proposer/\d+", url.raw_path):
+        if re.match(r"/eth/v[12]/validator/duties/proposer/\d+", url.raw_path):
             # This endpoint returns all proposer duties for the epoch
             epoch_no = int(url.raw_path.split("/")[-1])
 
@@ -178,6 +178,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version not in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
@@ -322,12 +323,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                signed_block_type = get_ssz_type(
+                    Fork[fork_version.name],
+                    ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS,
+                    Preset[preset_types().preset.upper()],
+                )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_block_contents.from_json(
-                        _data_response(kwargs["data"])
-                    )
+                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
                 else:
-                    _ = preset_types().signed_block_contents.from_ssz(kwargs["data"])
+                    _ = signed_block_type.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -344,12 +348,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                signed_block_type = get_ssz_type(
+                    Fork[fork_version.name],
+                    ObjectKind.SIGNED_BLINDED_BEACON_BLOCK,
+                    Preset[preset_types().preset.upper()],
+                )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_blinded_block.from_json(
-                        _data_response(kwargs["data"])
-                    )
+                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
                 else:
-                    _ = preset_types().signed_blinded_block.from_ssz(kwargs["data"])
+                    _ = signed_block_type.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -412,6 +419,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 attestations = msgspec.json.decode(
                     kwargs["data"], type=list[msgspec.Raw]
@@ -441,6 +449,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 assert aggregate["committee_bits"] == "0x0040000000000000"
                 assert aggregate["aggregation_bits"] == "0x7507"

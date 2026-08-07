@@ -9,6 +9,8 @@ class SigningRequestType(Enum):
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
     BLOCK_V2 = "BLOCK_V2"
+    EXECUTION_PAYLOAD_ENVELOPE = "EXECUTION_PAYLOAD_ENVELOPE"
+    PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES"
     RANDAO_REVEAL = "RANDAO_REVEAL"
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
     SYNC_COMMITTEE_MESSAGE = "SYNC_COMMITTEE_MESSAGE"
@@ -72,6 +74,19 @@ class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     randao_reveal: RandaoReveal
 
 
+class ProposerPreferences(msgspec.Struct):
+    dependent_root: str
+    proposal_slot: str
+    validator_index: str
+    fee_recipient: str
+    target_gas_limit: str
+
+
+class ProposerPreferencesSignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.PROPOSER_PREFERENCES
+    proposer_preferences: ProposerPreferences
+
+
 class BeaconBlockHeader(msgspec.Struct):
     slot: str
     proposer_index: str
@@ -88,6 +103,21 @@ class BeaconBlock(msgspec.Struct):
 class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.BLOCK_V2
     beacon_block: BeaconBlock
+
+
+class ExecutionPayloadEnvelope(msgspec.Struct):
+    payload: dict[str, Any]
+    execution_requests: dict[str, Any]
+    builder_index: str
+    beacon_block_root: str
+    parent_beacon_block_root: str
+
+
+class ExecutionPayloadEnvelopeSignableMessage(
+    SignableMessageWithForkInfo, kw_only=True
+):
+    type: SigningRequestType = SigningRequestType.EXECUTION_PAYLOAD_ENVELOPE
+    execution_payload_envelope: ExecutionPayloadEnvelope
 
 
 class SyncCommitteeMessage(msgspec.Struct):
