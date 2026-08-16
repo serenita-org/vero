@@ -12,7 +12,13 @@ from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
 from yarl import URL
 
 from providers import BeaconChain
-from providers._headers import ETH_CONSENSUS_VERSION, ContentType
+from providers._headers import (
+    ETH_CONSENSUS_BLOCK_VALUE,
+    ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_VALUE,
+    ContentType,
+)
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
@@ -144,9 +150,9 @@ def _mocked_beacon_node_endpoints(
             headers = {
                 CONTENT_TYPE: response_content_type.value,
                 ETH_CONSENSUS_VERSION: fork_version.value,
-                "Eth-Execution-Payload-Blinded": str(execution_payload_blinded).lower(),
-                "Eth-Execution-Payload-Value": str(exec_payload_value),
-                "Eth-Consensus-Block-Value": str(consensus_block_value),
+                ETH_EXECUTION_PAYLOAD_BLINDED: str(execution_payload_blinded).lower(),
+                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
+                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
             }
 
             if response_content_type == ContentType.OCTET_STREAM:

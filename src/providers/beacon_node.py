@@ -29,7 +29,11 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import (
     ETH_BLOB_DATA_INCLUDED,
+    ETH_CONSENSUS_BLOCK_VALUE,
     ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_INCLUDED,
+    ETH_EXECUTION_PAYLOAD_VALUE,
     ContentType,
 )
 from providers._response import raise_for_response_size
@@ -704,7 +708,7 @@ class BeaconNode:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/proposer_preferences",
-            headers={"Eth-Consensus-Version": fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork_version.value},
             data=self.json_encoder.encode(
                 [
                     dict(message=preferences, signature=sig)
@@ -779,12 +783,10 @@ class BeaconNode:
 
             response = SchemaBeaconAPI.ProduceBlockV3Response(
                 version=SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
-                execution_payload_blinded=headers[
-                    "Eth-Execution-Payload-Blinded"
-                ].lower()
+                execution_payload_blinded=headers[ETH_EXECUTION_PAYLOAD_BLINDED].lower()
                 == "true",
-                execution_payload_value=headers["Eth-Execution-Payload-Value"],
-                consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                execution_payload_value=headers[ETH_EXECUTION_PAYLOAD_VALUE],
+                consensus_block_value=headers[ETH_CONSENSUS_BLOCK_VALUE],
                 data=resp_bytes,
             )
 
@@ -829,13 +831,14 @@ class BeaconNode:
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         # TODO deduplicate with produce_block_v3, it's near to a copy-paste
+        # Keep the stateful self-build flow: Lodestar caches the payload envelope,
+        # which Vero retrieves after publishing the beacon block.
+        # TODO support stateless self-build flow?
+        include_payload = False
         params = dict(
             randao_reveal=randao_reveal,
             builder_boost_factor=str(builder_boost_factor),
-            # Keep the stateful self-build flow: Lodestar caches the payload envelope,
-            # which Vero retrieves after publishing the beacon block.
-            # TODO support stateless self-build flow?
-            include_payload="false",
+            include_payload=str(include_payload).lower(),
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
@@ -881,7 +884,7 @@ class BeaconNode:
                 ),
                 headers={
                     ACCEPT: accept_header,
-                    "Eth-Consensus-Version": fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork_version.value,
                 },
             )
             if (
@@ -900,16 +903,21 @@ class BeaconNode:
                 ) from None
 
             # TODO Lodestar is not providing this header right now
-            execution_payload_included = False
-            # execution_payload_included = headers["Eth-Execution-Payload-Included"].lower() == "true"
-            execution_payload_value = "0"
-            # execution_payload_value = headers["Eth-Execution-Payload-Value"]
+            # TODO move hardcoded headers to _hdrs
+            execution_payload_included = (
+                headers[ETH_EXECUTION_PAYLOAD_INCLUDED].lower() == "true"
+            )
+            if include_payload != execution_payload_included:
+                self.logger.warning(
+                    f"Block requested with {include_payload=} but"
+                    f" {self.host} returned {execution_payload_included=}."
+                )
 
             response = SchemaBeaconAPI.ProduceBlockV4Response(
-                version=SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"]),
+                version=SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_included=execution_payload_included,
-                execution_payload_value=execution_payload_value,
-                consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                execution_payload_value=headers[ETH_EXECUTION_PAYLOAD_VALUE],
+                consensus_block_value=headers[ETH_CONSENSUS_BLOCK_VALUE],
                 data=resp_bytes,
             )
 
@@ -1013,7 +1021,7 @@ class BeaconNode:
             )
             # TODO remove
             assert content_type == ContentType.JSON.value
-            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
+            fork_version = SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION])
 
             # TODO why are not decoding as schema here? Probably just to get something working asap
             #  -> fix
@@ -1038,7 +1046,7 @@ class BeaconNode:
                 method="POST",
                 endpoint="/eth/v1/beacon/execution_payload_envelopes",
                 headers={
-                    "Eth-Consensus-Version": fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork_version.value,
                     # TODO
                     ETH_BLOB_DATA_INCLUDED: "false",
                     CONTENT_TYPE: ContentType.JSON.value,

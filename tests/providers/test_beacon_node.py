@@ -8,7 +8,13 @@ from aiohttp.hdrs import CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
 
 from providers import BeaconNode, MultiBeaconNode, Vero
-from providers._headers import ETH_CONSENSUS_VERSION, ContentType
+from providers._headers import (
+    ETH_CONSENSUS_BLOCK_VALUE,
+    ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_VALUE,
+    ContentType,
+)
 from schemas import SchemaBeaconAPI
 from spec.base import Version
 from spec.common import Uint64
@@ -56,9 +62,9 @@ async def test_produce_block_v3_response(
     response_headers = {
         CONTENT_TYPE: response_content_type.value,
         ETH_CONSENSUS_VERSION: api_response.version.value,
-        "Eth-Execution-Payload-Blinded": "false",
-        "Eth-Execution-Payload-Value": "3",
-        "Eth-Consensus-Block-Value": "4",
+        ETH_EXECUTION_PAYLOAD_BLINDED: "false",
+        ETH_EXECUTION_PAYLOAD_VALUE: "3",
+        ETH_CONSENSUS_BLOCK_VALUE: "4",
     }
 
     with aioresponses() as mocked_responses:
