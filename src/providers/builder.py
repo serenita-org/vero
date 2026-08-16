@@ -120,7 +120,7 @@ class MultiBuilder:
 
             # TODO we probably want to do as_completed here with a timeout?
             best_bid = None
-            best_bid_value_wei = -1
+            best_bid_value_gwei = -1
             for result in results:
                 if isinstance(result, BaseException):
                     # TODO log warning and continue
@@ -131,17 +131,17 @@ class MultiBuilder:
                     continue
 
                 bid: SchemaBuilderAPI.SignedExecutionPayloadBid = result
-                bid_value_wei = 1e9 * int(bid.message.value) + int(
+                bid_value_gwei = int(bid.message.value) + int(
                     bid.message.execution_payment
                 )
-                if bid_value_wei > best_bid_value_wei:
+                if bid_value_gwei > best_bid_value_gwei:
                     best_bid = bid
-                    best_bid_value_wei = bid_value_wei
+                    best_bid_value_gwei = bid_value_gwei
 
             if best_bid is None:
                 self.logger.warning("No bid retrieved from builders")
                 return None
 
-            self.logger.info(f"Picked best bid with value {best_bid_value_wei}")
+            self.logger.info(f"Picked best bid with value {best_bid_value_gwei}")
             self.logger.debug(f"Best bid: {best_bid}")
             return best_bid
