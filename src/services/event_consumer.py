@@ -176,7 +176,8 @@ class EventConsumerService:
             "attester_slashing",
             "proposer_slashing",
             "payload_attributes",
-            "execution_payload_bid",
+            # TODO enable, process, ...
+            # "execution_payload_bid",
         ]
 
         try:
