@@ -510,9 +510,6 @@ class AttestationService(ValidatorDutyService):
         if len(aggregator_duties) == 0:
             return
 
-        # TODO currently getting invalid signature from Lodestar, fix later
-        return
-
         self.logger.debug(
             f"Aggregating attestations for slot {slot}, {len(aggregator_duties)} duties",
         )
