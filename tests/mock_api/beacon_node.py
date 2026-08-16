@@ -16,6 +16,7 @@ from providers._headers import (
     ETH_CONSENSUS_BLOCK_VALUE,
     ETH_CONSENSUS_VERSION,
     ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_INCLUDED,
     ETH_EXECUTION_PAYLOAD_VALUE,
     ContentType,
 )
@@ -34,8 +35,10 @@ from tests.ssz_objects import (
     ZERO_ROOT,
     make_attestation,
     make_attestation_data,
-    make_block,
+    make_block_electra_fulu,
+    make_block_gloas,
     make_contribution,
+    make_execution_payload_envelope_gloas,
 )
 
 
@@ -136,7 +139,9 @@ def _mocked_beacon_node_endpoints(
             headers = kwargs["headers"]
 
             fork_version = beacon_chain.current_fork_version
-            _data = make_block(slot=slot, blinded=execution_payload_blinded)
+            _data = make_block_electra_fulu(
+                slot=slot, blinded=execution_payload_blinded
+            )
 
             # Not correct parsing but sufficient for our purposes
             response_content_type = (
@@ -265,6 +270,70 @@ def _mocked_beacon_node_endpoints(
 
             return CallbackResult(body=_data_response(contribution.to_json()))
 
+        # TODO change to POST variant
+        if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
+            slot = int(url.raw_path.split("/")[-1])
+            params = kwargs["params"]
+            if params["include_payload"] == "true":
+                raise NotImplementedError
+
+            request_headers = kwargs["headers"]
+            fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
+            _data = make_block_gloas(slot=slot)
+
+            # Not correct parsing but sufficient for our purposes
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
+                else ContentType.JSON
+            )
+
+            exec_payload_value = random.randint(0, 10_000_000)
+            consensus_block_value = random.randint(0, 10_000_000)
+            headers = {
+                CONTENT_TYPE: response_content_type.value,
+                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
+                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
+                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
+            }
+
+            if response_content_type == ContentType.OCTET_STREAM:
+                return CallbackResult(body=_data.to_ssz(), headers=headers)
+
+            return CallbackResult(
+                body=_data_response(
+                    msgspec.json.encode(msgspec.json.decode(_data.to_json())["data"]),
+                    version=fork_version,
+                    execution_payload_included=False,
+                    execution_payload_value=str(exec_payload_value),
+                    consensus_block_value=str(consensus_block_value),
+                ),
+                headers=headers,
+            )
+
+        if re.match("/eth/v1/validator/execution_payload_envelopes/.*", url.raw_path):
+            beacon_block_root = url.raw_path.split("/")[-1]
+            envelope = make_execution_payload_envelope_gloas(
+                beacon_block_root=beacon_block_root
+            )
+            request_headers = kwargs["headers"]
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
+                else ContentType.JSON
+            )
+            headers = {
+                CONTENT_TYPE: response_content_type.value,
+                ETH_CONSENSUS_VERSION: ForkVersion.GLOAS.value,
+            }
+            body = (
+                envelope.to_ssz()
+                if response_content_type is ContentType.OCTET_STREAM
+                else envelope.to_json()
+            )
+            return CallbackResult(body=body, headers=headers)
+
         raise NotImplementedError(
             f"Beacon API response for GET {url} does not have a mock handler",
         )
@@ -324,25 +393,38 @@ def _mocked_beacon_node_endpoints(
             headers = kwargs["headers"]
             fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
 
-            if fork_version not in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-            ):
-                raise NotImplementedError(f"Unsupported fork version {fork_version}")
-
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
-                signed_block_type = get_ssz_type(
-                    Fork[fork_version.name],
-                    ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS,
-                    Preset[preset_types().preset.upper()],
-                )
-                if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
-                else:
-                    _ = signed_block_type.from_ssz(kwargs["data"])
+                object_kind = ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS
+            elif fork_version is ForkVersion.GLOAS:
+                object_kind = ObjectKind.SIGNED_BEACON_BLOCK
+            else:
+                raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
+            signed_block_type = get_ssz_type(
+                Fork[fork_version.name],
+                object_kind,
+                Preset[preset_types().preset.upper()],
+            )
+            if headers[CONTENT_TYPE] == ContentType.JSON.value:
+                _ = signed_block_type.from_json(_data_response(kwargs["data"]))
+            else:
+                _ = signed_block_type.from_ssz(kwargs["data"])
+
+            return CallbackResult(status=200)
+
+        if re.match("/eth/v1/beacon/execution_payload_envelopes", url.raw_path):
+            headers = kwargs["headers"]
+            signed_envelope_type = get_ssz_type(
+                Fork.GLOAS,
+                ObjectKind.SIGNED_EXECUTION_PAYLOAD_ENVELOPE,
+                Preset[preset_types().preset.upper()],
+            )
+            if headers[CONTENT_TYPE] == ContentType.JSON.value:
+                _ = signed_envelope_type.from_json(_data_response(kwargs["data"]))
+            else:
+                _ = signed_envelope_type.from_ssz(kwargs["data"])
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):

@@ -17,6 +17,7 @@ from providers import BeaconChain, MultiBeaconNode
 from providers._headers import (
     ETH_CONSENSUS_BLOCK_VALUE,
     ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_INCLUDED,
     ETH_EXECUTION_PAYLOAD_VALUE,
     ContentType,
 )
@@ -349,6 +350,7 @@ async def test_produce_best_block(
                                 ETH_CONSENSUS_VERSION: _response.version.value.lower(),
                                 ETH_EXECUTION_PAYLOAD_VALUE: _response.execution_payload_value,
                                 ETH_CONSENSUS_BLOCK_VALUE: _response.consensus_block_value,
+                                ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
                             },
                         )
                     raise ValueError("No exception or response to return")

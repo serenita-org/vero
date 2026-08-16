@@ -7,7 +7,7 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
-from typing import TYPE_CHECKING, Any, Literal, Unpack
+from typing import TYPE_CHECKING, Literal, Unpack, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -18,7 +18,13 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from multidict import CIMultiDictProxy
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from spy_ssz import Fork
+from spy_ssz import (
+    ExecutionPayloadEnvelopeGloas,
+    Fork,
+    ObjectKind,
+    Preset,
+    get_ssz_type,
+)
 from yarl import URL
 
 from observability import (
@@ -902,8 +908,6 @@ class BeaconNode:
                     f"Unsupported content type: {content_type}"
                 ) from None
 
-            # TODO Lodestar is not providing this header right now
-            # TODO move hardcoded headers to _hdrs
             execution_payload_included = (
                 headers[ETH_EXECUTION_PAYLOAD_INCLUDED].lower() == "true"
             )
@@ -1001,8 +1005,13 @@ class BeaconNode:
         self,
         slot: int,
         beacon_block_root: str,
-    ) -> tuple[SchemaBeaconAPI.ForkVersion, dict[str, Any]]:
-        # TODO we can do JSON and SSZ here
+    ) -> tuple[SchemaBeaconAPI.ForkVersion, ExecutionPayloadEnvelopeGloas]:
+        accept_header = (
+            ContentType.JSON.value
+            if self._force_json_wire_format
+            # Prefer SSZ over JSON
+            else f"{ContentType.OCTET_STREAM.value};q=1.0,{ContentType.JSON.value};q=0.9"
+        )
 
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_envelope",
@@ -1018,21 +1027,45 @@ class BeaconNode:
                     slot=slot,
                     beacon_block_root=beacon_block_root,
                 ),
+                headers={ACCEPT: accept_header},
             )
-            # TODO remove
-            assert content_type == ContentType.JSON.value
-            fork_version = SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION])
+            if (
+                content_type == ContentType.JSON.value
+                and not self._force_json_wire_format
+            ):
+                self.logger.warning(
+                    f"{self.host} returned an execution payload envelope as JSON but Vero requested SSZ"
+                )
 
-            # TODO why are not decoding as schema here? Probably just to get something working asap
-            #  -> fix
-            decoded = msgspec.json.decode(resp_bytes)
-            return fork_version, decoded["data"]
+            try:
+                response_content_type = ContentType(content_type)
+            except ValueError:
+                raise NotImplementedError(
+                    f"Unsupported content type: {content_type}"
+                ) from None
+
+            fork_version = SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION])
+            payload_cls = get_ssz_type(
+                Fork[fork_version.name],
+                ObjectKind.EXECUTION_PAYLOAD_ENVELOPE,
+                Preset[preset_types().preset.upper()],
+            )
+
+            if response_content_type is ContentType.JSON:
+                envelope = payload_cls.from_json(resp_bytes)
+            elif response_content_type is ContentType.OCTET_STREAM:
+                envelope = payload_cls.from_ssz(resp_bytes)
+            else:
+                raise NotImplementedError(
+                    f"Unsupported content type: {response_content_type}"
+                )
+            return fork_version, cast("ExecutionPayloadEnvelopeGloas", envelope)
 
     async def publish_execution_payload_envelope(
         self,
-        envelope: dict[str, Any],
-        signature: str,
+        signed_execution_payload_envelope: bytes,
         fork_version: SchemaBeaconAPI.ForkVersion,
+        content_type: ContentType,
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_execution_payload_envelope",
@@ -1041,22 +1074,15 @@ class BeaconNode:
                 "server.address": self.host,
             },
         ):
-            # TODO again SSZ/JSON
             _, _, _ = await self._make_request(
                 method="POST",
                 endpoint="/eth/v1/beacon/execution_payload_envelopes",
                 headers={
                     ETH_CONSENSUS_VERSION: fork_version.value,
-                    # TODO
                     ETH_BLOB_DATA_INCLUDED: "false",
-                    CONTENT_TYPE: ContentType.JSON.value,
+                    CONTENT_TYPE: content_type.value,
                 },
-                data=self.json_encoder.encode(
-                    dict(
-                        message=envelope,
-                        signature=signature,
-                    )
-                ),
+                data=signed_execution_payload_envelope,
             )
 
     async def get_liveness(

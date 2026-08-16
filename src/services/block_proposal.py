@@ -11,7 +11,11 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
-from spy_ssz import ObjectKind
+from spy_ssz import (
+    ExecutionPayloadEnvelopeGloas,
+    ObjectKind,
+    SignedExecutionPayloadEnvelopeGloas,
+)
 
 from observability import ErrorType, HandledRuntimeError
 from providers._headers import ContentType
@@ -628,8 +632,8 @@ class BlockProposalService(ValidatorDutyService):
         self,
         slot: int,
         duty: SchemaBeaconAPI.ProposerDuty,
-        blinded_envelope_dict: dict,
-    ) -> str:
+        execution_payload_envelope: ExecutionPayloadEnvelopeGloas,
+    ) -> SignedExecutionPayloadEnvelopeGloas:
         # TODO based on tracing data this signing takes a pretty long time (>100ms)
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._sign_execution_payload_envelope",
@@ -638,18 +642,10 @@ class BlockProposalService(ValidatorDutyService):
                 _, signature, _ = await self.signature_provider.sign(
                     message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
                         fork_info=self.beacon_chain.get_fork_info(slot=slot),
-                        execution_payload_envelope=SchemaRemoteSigner.ExecutionPayloadEnvelope(
-                            payload=blinded_envelope_dict["payload"],
-                            execution_requests=blinded_envelope_dict[
-                                "execution_requests"
-                            ],
-                            builder_index=blinded_envelope_dict["builder_index"],
-                            beacon_block_root=blinded_envelope_dict[
-                                "beacon_block_root"
-                            ],
-                            parent_beacon_block_root=blinded_envelope_dict[
-                                "parent_beacon_block_root"
-                            ],
+                        execution_payload_envelope=(
+                            SchemaRemoteSigner.ExecutionPayloadEnvelope(
+                                **execution_payload_envelope.to_obj()
+                            )
                         ),
                     ),
                     identifier=duty.pubkey,
@@ -661,8 +657,7 @@ class BlockProposalService(ValidatorDutyService):
                 raise HandledRuntimeError(
                     errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
                 ) from None
-            else:
-                return signature
+            return execution_payload_envelope.sign(signature)
 
     async def _publish_payload_envelope(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, beacon_block_root: str
@@ -681,18 +676,27 @@ class BlockProposalService(ValidatorDutyService):
             #  produced the beacon block we proposed?
             (
                 fork_version,
-                blinded_envelope_dict,
+                execution_payload_envelope,
             ) = await self.multi_beacon_node._get_first_beacon_node_response(
                 func_name="get_execution_payload_envelope",
                 slot=slot,
                 beacon_block_root=beacon_block_root,
             )
 
-            signature = await self._sign_execution_payload_envelope(
-                slot=slot,
-                duty=duty,
-                blinded_envelope_dict=blinded_envelope_dict,
+            signed_execution_payload_envelope = (
+                await self._sign_execution_payload_envelope(
+                    slot=slot,
+                    duty=duty,
+                    execution_payload_envelope=execution_payload_envelope,
+                )
             )
+            with signed_execution_payload_envelope:
+                if self.cli_args.force_json_wire_format:
+                    encoded = signed_execution_payload_envelope.to_json()
+                    content_type = ContentType.JSON
+                else:
+                    encoded = signed_execution_payload_envelope.to_ssz()
+                    content_type = ContentType.OCTET_STREAM
 
             # TODO should we use first response here?
             #  we should (?) only send this to the beacon node that returned the
@@ -701,9 +705,9 @@ class BlockProposalService(ValidatorDutyService):
             #  envelope
             await self.multi_beacon_node._get_first_beacon_node_response(
                 func_name="publish_execution_payload_envelope",
-                envelope=blinded_envelope_dict,
-                signature=signature,
+                signed_execution_payload_envelope=encoded,
                 fork_version=fork_version,
+                content_type=content_type,
             )
             self.logger.info("Published payload envelope")
 

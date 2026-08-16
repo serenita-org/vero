@@ -18,7 +18,7 @@ from providers._headers import (
 from schemas import SchemaBeaconAPI
 from spec.base import Version
 from spec.common import Uint64
-from tests.ssz_objects import ZERO_SIGNATURE, make_block
+from tests.ssz_objects import ZERO_SIGNATURE, make_block_electra_fulu
 
 
 @pytest.mark.parametrize(
@@ -29,7 +29,7 @@ async def test_produce_block_v3_response(
     response_content_type: ContentType,
     vero: Vero,
 ) -> None:
-    block = make_block(slot=1, blinded=False)
+    block = make_block_electra_fulu(slot=1, blinded=False)
     block_data = (
         block.to_json() if response_content_type == ContentType.JSON else block.to_ssz()
     )

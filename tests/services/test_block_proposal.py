@@ -7,6 +7,7 @@ from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
+from tests.ssz_objects import ZERO_ROOT
 
 
 @pytest.mark.parametrize(
@@ -154,6 +155,42 @@ async def test_publish_block(
             "Using Keymanager-provided graffiti: overridden" in m
             for m in caplog.messages
         )
+
+
+@pytest.mark.parametrize(
+    argnames="cli_args",
+    argvalues=[
+        pytest.param({"force_json_wire_format": False}, id="Prefer SSZ"),
+        pytest.param({"force_json_wire_format": True}, id="Force JSON"),
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "fork_version",
+    [pytest.param(ForkVersion.GLOAS, id="Gloas")],
+    indirect=True,
+)
+async def test_publish_payload_envelope(
+    block_proposal_service: BlockProposalService,
+    beacon_chain: BeaconChain,
+    random_active_validator: ValidatorIndexPubkey,
+    fork_version: ForkVersion,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    slot = beacon_chain.current_slot + 1
+    duty = SchemaBeaconAPI.ProposerDuty(
+        pubkey=random_active_validator.pubkey,
+        validator_index=str(random_active_validator.index),
+        slot=str(slot),
+    )
+
+    await block_proposal_service._publish_payload_envelope(
+        slot=slot,
+        duty=duty,
+        beacon_block_root=ZERO_ROOT,
+    )
+
+    assert "Published payload envelope" in caplog.messages
 
 
 @pytest.mark.parametrize(
