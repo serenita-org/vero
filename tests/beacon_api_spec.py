@@ -77,6 +77,18 @@ def _validate_parameters(
     )
 
 
+def _query_parameter_value(parameter: Mapping[str, Any], url: URL) -> object:
+    name = parameter["name"]
+    schema = parameter["schema"]
+    if schema.get("type") == "array":
+        return list(url.query.getall(name))
+
+    value = url.query[name]
+    if schema.get("type") == "boolean" and value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    return value
+
+
 def _validate_response_headers(
     definitions: Mapping[str, Any], values: Mapping[str, object]
 ) -> None:
@@ -128,11 +140,7 @@ class BeaconAPISpec:
         for parameter in operation.get("parameters", []):
             name = parameter["name"]
             if parameter["in"] == "query" and name in url.query:
-                query[name] = (
-                    list(url.query.getall(name))
-                    if parameter["schema"].get("type") == "array"
-                    else url.query[name]
-                )
+                query[name] = _query_parameter_value(parameter, url)
 
         for location, values in (
             ("path", dict(path_parameters)),
