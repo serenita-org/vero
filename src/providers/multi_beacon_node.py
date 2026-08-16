@@ -186,7 +186,7 @@ class MultiBeaconNode:
         best = max(self.initialized_beacon_nodes, key=lambda bn: bn.score)
         if best != self.initialized_beacon_nodes[0]:
             self.logger.warning(
-                f"Using {best.host} as `best` beacon node (duty fetching, MEV registrations)"
+                f"Using {best.host} as `best` beacon node (duty fetching)"
             )
         return best
 

@@ -997,7 +997,7 @@ class BeaconNode:
         # TODO we can do JSON and SSZ here
 
         with self.tracer.start_as_current_span(
-            name=f"{self.__class__.__name__}.publish_payload_envelope",
+            name=f"{self.__class__.__name__}.get_execution_payload_envelope",
             kind=SpanKind.CLIENT,
             attributes={
                 "server.address": self.host,
@@ -1015,6 +1015,8 @@ class BeaconNode:
             assert content_type == ContentType.JSON.value
             fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
 
+            # TODO why are not decoding as schema here? Probably just to get something working asap
+            #  -> fix
             decoded = msgspec.json.decode(resp_bytes)
             return fork_version, decoded["data"]
 

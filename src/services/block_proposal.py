@@ -1,7 +1,7 @@
 import asyncio
 import contextlib
 import time
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from types import TracebackType
 from typing import Self, Unpack
 
@@ -27,6 +27,10 @@ from spec.utils import encode_graffiti
 
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX
 BUILDER_INDEX_SELF_BUILD = 2**64 - 1
+
+BlockPublishResult = namedtuple(
+    "BlockPublishResult", ["block_root", "envelope_required"]
+)
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -557,11 +561,10 @@ class BlockProposalService(ValidatorDutyService):
     async def _publish_block(
         self,
         slot: int,
-        duty: SchemaBeaconAPI.ProposerDuty,
         fork_version: SchemaBeaconAPI.ForkVersion,
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
-    ) -> None:
+    ) -> BlockPublishResult:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.BLOCK_PROPOSAL.value,
@@ -596,24 +599,6 @@ class BlockProposalService(ValidatorDutyService):
                         signed_blinded_beacon_block=encoded,
                         content_type=content_type,
                     )
-
-                # If self-building, published payload envelope too
-                # TODO test - we MUST publish the envelope in this case!
-                # TODO we probably want to do this more async - we don't want to be
-                #  blocked too long by the above block-publish call that IIRC
-                #  has no timeout
-                if fork_version is SchemaBeaconAPI.ForkVersion.GLOAS and (
-                    block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
-                    == BUILDER_INDEX_SELF_BUILD
-                ):
-                    self.task_manager.create_task(
-                        self._publish_payload_envelope(
-                            slot=slot,
-                            duty=duty,
-                            beacon_block_root="0x"
-                            + block_contents_or_blinded_block.hash_tree_root().hex(),
-                        )
-                    )
             except Exception as e:
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
@@ -628,60 +613,99 @@ class BlockProposalService(ValidatorDutyService):
                     f"Published block for slot {slot}, root {block_root}",
                 )
                 self.metrics.vc_published_blocks_c.inc()
+                envelope_required = False
+                if (
+                    fork_version is SchemaBeaconAPI.ForkVersion.GLOAS
+                    and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
+                    == BUILDER_INDEX_SELF_BUILD
+                ):
+                    envelope_required = True
+                return BlockPublishResult(
+                    block_root=block_root, envelope_required=envelope_required
+                )
+
+    async def _sign_execution_payload_envelope(
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        blinded_envelope_dict: dict,
+    ) -> str:
+        # TODO based on tracing data this signing takes a pretty long time (>100ms)
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}._sign_execution_payload_envelope",
+        ):
+            try:
+                _, signature, _ = await self.signature_provider.sign(
+                    message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
+                        fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                        execution_payload_envelope=SchemaRemoteSigner.ExecutionPayloadEnvelope(
+                            payload=blinded_envelope_dict["payload"],
+                            execution_requests=blinded_envelope_dict[
+                                "execution_requests"
+                            ],
+                            builder_index=blinded_envelope_dict["builder_index"],
+                            beacon_block_root=blinded_envelope_dict[
+                                "beacon_block_root"
+                            ],
+                            parent_beacon_block_root=blinded_envelope_dict[
+                                "parent_beacon_block_root"
+                            ],
+                        ),
+                    ),
+                    identifier=duty.pubkey,
+                )
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to get signature for execution payload envelope: {e!r}",
+                )
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
+                ) from None
+            else:
+                return signature
 
     async def _publish_payload_envelope(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, beacon_block_root: str
     ) -> None:
-        # step 1 - get envelope by slot + beacon block root
-        #  (if we add the include_payload query param we would not need to query for
-        #  this payload separately)
-        # step 2 sign envelope
-        # step 3 publish signed envelope
-        self.logger.info("Publishing payload envelope")
-        # TODO should we use first response here?
-        #  or only ask the one specific beacon node that
-        #  produced the beacon block we proposed?
-        (
-            fork_version,
-            blinded_envelope_dict,
-        ) = await self.multi_beacon_node._get_first_beacon_node_response(
-            func_name="get_execution_payload_envelope",
-            slot=slot,
-            beacon_block_root=beacon_block_root,
-        )
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}._publish_payload_envelope",
+        ):
+            # step 1 - get envelope by slot + beacon block root
+            #  (if we add the include_payload query param we would not need to query for
+            #  this payload separately)
+            # step 2 sign envelope
+            # step 3 publish signed envelope
+            self.logger.info("Publishing payload envelope")
+            # TODO should we use first response here?
+            #  or only ask the one specific beacon node that
+            #  produced the beacon block we proposed?
+            (
+                fork_version,
+                blinded_envelope_dict,
+            ) = await self.multi_beacon_node._get_first_beacon_node_response(
+                func_name="get_execution_payload_envelope",
+                slot=slot,
+                beacon_block_root=beacon_block_root,
+            )
 
-        # TODO Beacon API should return this root directly!!! ( blinded_envelope_dict["payload_root"], )
-        # payload_root =
+            signature = await self._sign_execution_payload_envelope(
+                slot=slot,
+                duty=duty,
+                blinded_envelope_dict=blinded_envelope_dict,
+            )
 
-        _, signature, _ = await self.signature_provider.sign(
-            message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
-                fork_info=self.beacon_chain.get_fork_info(slot=slot),
-                execution_payload_envelope=SchemaRemoteSigner.ExecutionPayloadEnvelope(
-                    payload=blinded_envelope_dict["payload"],
-                    execution_requests=blinded_envelope_dict["execution_requests"],
-                    builder_index=blinded_envelope_dict["builder_index"],
-                    beacon_block_root=blinded_envelope_dict["beacon_block_root"],
-                    parent_beacon_block_root=blinded_envelope_dict[
-                        "parent_beacon_block_root"
-                    ],
-                ),
-            ),
-            identifier=duty.pubkey,
-        )
-
-        # TODO should we use first response here?
-        #  we should (?) only send this to the beacon node that returned the
-        #  envelope since the other ones won't have the rest of the data.
-        #  Or, we could keep track of the beacon node that returned the
-        #  envelope
-        await self.multi_beacon_node._get_first_beacon_node_response(
-            func_name="publish_execution_payload_envelope",
-            envelope=blinded_envelope_dict,
-            signature=signature,
-            fork_version=fork_version,
-        )
-
-        self.logger.info("Published payload envelope")
+            # TODO should we use first response here?
+            #  we should (?) only send this to the beacon node that returned the
+            #  envelope since the other ones won't have the rest of the data.
+            #  Or, we could keep track of the beacon node that returned the
+            #  envelope
+            await self.multi_beacon_node._get_first_beacon_node_response(
+                func_name="publish_execution_payload_envelope",
+                envelope=blinded_envelope_dict,
+                signature=signature,
+                fork_version=fork_version,
+            )
+            self.logger.info("Published payload envelope")
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
@@ -754,13 +778,26 @@ class BlockProposalService(ValidatorDutyService):
                     block_version=fork_version.value.upper(),
                 )
 
-                await self._publish_block(
+                block_publish_result = await self._publish_block(
                     slot=slot,
-                    duty=duty,
                     fork_version=fork_version,
                     signature=signature,
                     block_contents_or_blinded_block=block_contents_or_blinded_block,
                 )
+
+                # TODO test - we MUST publish the envelope in this case!
+                # TODO we probably want to do this more async - we don't want to be
+                #  blocked too long by the above block-publish call that IIRC
+                #  has no timeout
+                if block_publish_result.envelope_required:
+                    self.task_manager.create_task(
+                        self._publish_payload_envelope(
+                            slot=slot,
+                            duty=duty,
+                            beacon_block_root=block_publish_result.block_root,
+                        )
+                    )
+
             finally:
                 block_contents_or_blinded_block.close()
 
