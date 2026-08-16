@@ -599,6 +599,9 @@ class BlockProposalService(ValidatorDutyService):
 
                 # If self-building, published payload envelope too
                 # TODO test - we MUST publish the envelope in this case!
+                # TODO we probably want to do this more async - we don't want to be
+                #  blocked too long by the above block-publish call that IIRC
+                #  has no timeout
                 if fork_version is SchemaBeaconAPI.ForkVersion.GLOAS and (
                     block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
                     == BUILDER_INDEX_SELF_BUILD
