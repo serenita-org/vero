@@ -159,6 +159,9 @@ class EventConsumerService:
                         pa_handler(event),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
                     )
+        elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadBidEvent):
+            # TODO process
+            self.logger.info(f"Execution payload bid event: {event}")
         else:
             raise NotImplementedError(f"Unsupported event type: {event_type}")
 
@@ -176,8 +179,7 @@ class EventConsumerService:
             "attester_slashing",
             "proposer_slashing",
             "payload_attributes",
-            # TODO enable, process, ...
-            # "execution_payload_bid",
+            "execution_payload_bid",
         ]
 
         try:

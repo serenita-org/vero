@@ -110,6 +110,9 @@ async def test_lifecycle(
             ]
         )
 
+        # TODO for Gloas, also require the payload envelope to be published
+        #  in the self-build case
+
     timeout = 5
     start = asyncio.get_running_loop().time()
 

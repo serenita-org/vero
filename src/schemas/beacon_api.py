@@ -14,6 +14,8 @@ from typing import Any, Self
 
 import msgspec
 
+from schemas.shared import ForkVersion, SignedExecutionPayloadBid
+
 
 class ExecutionOptimisticResponse(msgspec.Struct):
     execution_optimistic: bool
@@ -61,12 +63,6 @@ class BlockRoot(msgspec.Struct):
 class GetBlockRootResponse(ExecutionOptimisticResponse):
     finalized: bool
     data: BlockRoot
-
-
-class ForkVersion(Enum):
-    ELECTRA = "electra"
-    FULU = "fulu"
-    GLOAS = "gloas"
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
@@ -214,6 +210,9 @@ class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
         return self.block
 
 
+# TODO HeadEventV2
+
+
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
     slot: str
     depth: str
@@ -259,10 +258,22 @@ class ProposerSlashingEvent(BeaconNodeEvent):
         return self.signed_header_1.message.proposer_index
 
 
+class ExecutionPayloadBidEvent(BeaconNodeEvent):
+    version: ForkVersion
+    data: SignedExecutionPayloadBid
+
+    @property
+    def dedup_key(self) -> Hashable:
+        # TODO not sure if complete
+        #  but this is based on:
+        #  - the same block can potentially have different CL bid values
+        #  - for EL payments, the block hash would change
+        return self.data.message.block_hash + self.data.message.value
+
+
 class PayloadAttributesData(msgspec.Struct):
     proposal_slot: str
     parent_block_root: str
-    # to-be-removed I believe    parent_block_number: str
     parent_block_hash: str
     proposer_index: str
     payload_attributes: dict[str, Any]

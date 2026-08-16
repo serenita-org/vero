@@ -1079,9 +1079,7 @@ class BeaconNode:
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
             payload_attributes=SchemaBeaconAPI.PayloadAttributesEvent,
-            # TODO subscribe to this topic, see how much load this is
-            #  when connected to multiple beacon nodes...
-            # execution_payload_bid=SchemaBeaconAPI.PayloadAttributesEvent,
+            execution_payload_bid=SchemaBeaconAPI.PayloadAttributesEvent,
         )
 
         async with self.client_session.get(
