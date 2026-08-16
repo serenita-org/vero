@@ -7,11 +7,13 @@ from unittest import mock
 
 import prometheus_client
 import pytest
+from spy_ssz import Fork
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
 from providers import (
     BeaconChain,
+    BeaconNode,
     MultiBeaconNode,
     RemoteSigner,
     Keymanager,
@@ -127,8 +129,13 @@ def fork_version(
 ) -> Generator[None, None, None]:
     requested_fork_version = getattr(request, "param", ForkVersion.GLOAS)
 
-    with mock.patch.object(
-        beacon_chain, "current_fork_version", requested_fork_version
+    with (
+        mock.patch.object(beacon_chain, "current_fork_version", requested_fork_version),
+        mock.patch.object(
+            BeaconNode,
+            "_fork_for_slot",
+            return_value=Fork[requested_fork_version.name],
+        ),
     ):
         yield
 
