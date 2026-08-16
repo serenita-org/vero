@@ -308,6 +308,9 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/validator/prepare_beacon_proposer", url.raw_path):
             return CallbackResult(status=200)
 
+        if re.match("/eth/v1/validator/proposer_preferences", url.raw_path):
+            return CallbackResult(status=200)
+
         if re.match("/eth/v1/validator/register_validator", url.raw_path):
             return CallbackResult(status=200)
 

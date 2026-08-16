@@ -171,7 +171,7 @@ async def run_services(vero: Vero) -> None:
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
-            multi_builder=MultiBuilder(builder_urls=vero.cli_args.builder_urls),
+            multi_builder=MultiBuilder(vero=vero),
             signature_provider=signature_provider,
             keymanager=keymanager,
             duty_cache=DutyCache(data_dir=vero.cli_args.data_dir),

@@ -598,7 +598,8 @@ class BlockProposalService(ValidatorDutyService):
                     )
 
                 # If self-building, published payload envelope too
-                if (
+                # TODO test - we MUST publish the envelope in this case!
+                if fork_version is SchemaBeaconAPI.ForkVersion.GLOAS and (
                     block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
                     == BUILDER_INDEX_SELF_BUILD
                 ):
