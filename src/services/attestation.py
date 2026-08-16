@@ -14,7 +14,7 @@ from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from providers import AttestationDataProvider
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
@@ -123,7 +123,7 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to attest 1/3 into the slot at the latest.
-        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             attestation_due_s = self._attestation_due_s_gloas
         else:
             attestation_due_s = self._attestation_due_s
@@ -428,7 +428,7 @@ class AttestationService(ValidatorDutyService):
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation
-        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             aggregate_due_s = self._aggregate_due_s_gloas
         else:
             aggregate_due_s = self._aggregate_due_s
@@ -464,7 +464,7 @@ class AttestationService(ValidatorDutyService):
         slot: int,
         messages: list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage],
         identifiers: list[str],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         signed_aggregate_and_proofs: list[SignedAggregateAndProof] = []
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(

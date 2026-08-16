@@ -12,7 +12,7 @@ from apscheduler.jobstores.base import JobLookupError
 from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared, SchemaValidator
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
@@ -126,7 +126,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Schedule sync message job at the deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to produce it 1/3 into the slot at the latest.
-        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             sync_message_due_s = self._sync_message_due_s_gloas
         else:
             sync_message_due_s = self._sync_message_due_s
@@ -432,7 +432,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         # Sign and submit aggregated sync committee contributions
-        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             contribution_due_s = self._contribution_due_s_gloas
         else:
             contribution_due_s = self._contribution_due_s

@@ -18,7 +18,7 @@ from spy_ssz import Bitfield
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
-from schemas import SchemaBeaconAPI
+from schemas import SchemaShared
 from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from tests.ssz_objects import (
@@ -308,7 +308,7 @@ async def test_get_aggregate_attestation(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
                             {
-                                "version": SchemaBeaconAPI.ForkVersion.FULU,
+                                "version": SchemaShared.ForkVersion.FULU,
                                 "data": msgspec.Raw(
                                     make_attestation(
                                         aggregation_bits=_bits,

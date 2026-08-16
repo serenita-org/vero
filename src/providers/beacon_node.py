@@ -45,8 +45,8 @@ from providers._headers import (
 from providers._response import raise_for_response_size
 from schemas import (
     SchemaBeaconAPI,
-    SchemaBuilderAPI,
     SchemaRemoteSigner,
+    SchemaShared,
     SchemaValidator,
 )
 from spec import (
@@ -569,7 +569,7 @@ class BeaconNode:
     async def publish_attestations(
         self,
         encoded_attestations: bytes,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
@@ -632,7 +632,7 @@ class BeaconNode:
     async def publish_aggregate_and_proofs(
         self,
         encoded_signed_aggregate_and_proofs: bytes,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
@@ -709,7 +709,7 @@ class BeaconNode:
         signed_proposer_preferences: list[
             tuple[SchemaRemoteSigner.ProposerPreferences, str]
         ],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         await self._make_request(
             method="POST",
@@ -788,7 +788,7 @@ class BeaconNode:
                 ) from None
 
             response = SchemaBeaconAPI.ProduceBlockV3Response(
-                version=SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
+                version=SchemaShared.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_blinded=headers[ETH_EXECUTION_PAYLOAD_BLINDED].lower()
                 == "true",
                 execution_payload_value=headers[ETH_EXECUTION_PAYLOAD_VALUE],
@@ -832,8 +832,8 @@ class BeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        fork_version: SchemaShared.ForkVersion,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         # TODO deduplicate with produce_block_v3, it's near to a copy-paste
@@ -918,7 +918,7 @@ class BeaconNode:
                 )
 
             response = SchemaBeaconAPI.ProduceBlockV4Response(
-                version=SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
+                version=SchemaShared.ForkVersion(headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_included=execution_payload_included,
                 execution_payload_value=headers[ETH_EXECUTION_PAYLOAD_VALUE],
                 consensus_block_value=headers[ETH_CONSENSUS_BLOCK_VALUE],
@@ -957,7 +957,7 @@ class BeaconNode:
 
     async def publish_block_v2(
         self,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
         signed_block_contents: bytes,
         content_type: ContentType,
     ) -> None:
@@ -980,7 +980,7 @@ class BeaconNode:
 
     async def publish_blinded_block_v2(
         self,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
         signed_blinded_beacon_block: bytes,
         content_type: ContentType,
     ) -> None:
@@ -1005,7 +1005,7 @@ class BeaconNode:
         self,
         slot: int,
         beacon_block_root: str,
-    ) -> tuple[SchemaBeaconAPI.ForkVersion, ExecutionPayloadEnvelopeGloas]:
+    ) -> tuple[SchemaShared.ForkVersion, ExecutionPayloadEnvelopeGloas]:
         accept_header = (
             ContentType.JSON.value
             if self._force_json_wire_format
@@ -1044,7 +1044,7 @@ class BeaconNode:
                     f"Unsupported content type: {content_type}"
                 ) from None
 
-            fork_version = SchemaBeaconAPI.ForkVersion(headers[ETH_CONSENSUS_VERSION])
+            fork_version = SchemaShared.ForkVersion(headers[ETH_CONSENSUS_VERSION])
             payload_cls = get_ssz_type(
                 Fork[fork_version.name],
                 ObjectKind.EXECUTION_PAYLOAD_ENVELOPE,
@@ -1064,7 +1064,7 @@ class BeaconNode:
     async def publish_execution_payload_envelope(
         self,
         signed_execution_payload_envelope: bytes,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
         content_type: ContentType,
     ) -> None:
         with self.tracer.start_as_current_span(

@@ -9,7 +9,7 @@ from aiohttp import web
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 
-from schemas import SchemaBuilderAPI
+from schemas import SchemaBuilderAPI, SchemaShared
 
 if TYPE_CHECKING:
     from .vero import Vero
@@ -24,7 +24,7 @@ class Builder:
 
     async def get_execution_payload_bid(
         self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
-    ) -> SchemaBuilderAPI.SignedExecutionPayloadBid | None:
+    ) -> SchemaShared.SignedExecutionPayloadBid | None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,
@@ -95,7 +95,7 @@ class MultiBuilder:
 
     async def get_execution_payload_bid(
         self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
-    ) -> SchemaBuilderAPI.SignedExecutionPayloadBid | None:
+    ) -> SchemaShared.SignedExecutionPayloadBid | None:
         # TODO early return if no builders enabled / ...
         if len(self.builders) == 0:
             return None
@@ -130,7 +130,7 @@ class MultiBuilder:
                     # No bid from builder
                     continue
 
-                bid: SchemaBuilderAPI.SignedExecutionPayloadBid = result
+                bid: SchemaShared.SignedExecutionPayloadBid = result
                 bid_value_gwei = int(bid.message.value) + int(
                     bid.message.execution_payment
                 )

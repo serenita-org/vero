@@ -52,8 +52,8 @@ from spy_ssz import (
 )
 
 from observability import ErrorType
-from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaValidator
-from schemas.beacon_api import ForkVersion
+from schemas import SchemaBeaconAPI, SchemaShared, SchemaValidator
+from schemas.shared import ForkVersion
 from spec import (
     Attestation,
     AttestationData,
@@ -344,8 +344,8 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
     ) -> tuple[
         SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response,
@@ -493,8 +493,8 @@ class MultiBeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
     ) -> BeaconBlock:
         best_block_response, content_type = await self._produce_best_block(
@@ -671,7 +671,7 @@ class MultiBeaconNode:
     async def publish_attestations(
         self,
         attestations: list[SingleAttestation],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
@@ -740,7 +740,7 @@ class MultiBeaconNode:
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[SignedAggregateAndProof],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         encoded = encode_json_array(signed_aggregate_and_proofs)
         await self._get_all_beacon_node_responses(

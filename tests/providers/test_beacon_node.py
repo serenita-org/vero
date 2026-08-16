@@ -15,7 +15,7 @@ from providers._headers import (
     ETH_EXECUTION_PAYLOAD_VALUE,
     ContentType,
 )
-from schemas import SchemaBeaconAPI
+from schemas import SchemaBeaconAPI, SchemaShared
 from spec.base import Version
 from spec.common import Uint64
 from tests.ssz_objects import ZERO_SIGNATURE, make_block_electra_fulu
@@ -34,7 +34,7 @@ async def test_produce_block_v3_response(
         block.to_json() if response_content_type == ContentType.JSON else block.to_ssz()
     )
     api_response = SchemaBeaconAPI.ProduceBlockV3Response(
-        version=SchemaBeaconAPI.ForkVersion.FULU,
+        version=SchemaShared.ForkVersion.FULU,
         # Use different values here vs headers below
         # to test that Vero considers the header
         # values as the source of truth

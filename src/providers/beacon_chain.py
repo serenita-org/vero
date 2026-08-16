@@ -6,7 +6,7 @@ import time
 from math import floor
 from typing import TYPE_CHECKING, Any
 
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner
+from schemas import SchemaRemoteSigner, SchemaShared
 from spec._ascii import GLOAS as GLOAS_ASCII_ART
 from spec.base import Genesis, SpecGloas, Version
 from tasks import TaskManager
@@ -58,12 +58,12 @@ class BeaconChain:
 
         current_epoch = self.current_slot // self.SLOTS_PER_EPOCH
         if current_epoch >= self.GLOAS_FORK_EPOCH:
-            self.current_fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+            self.current_fork_version = SchemaShared.ForkVersion.GLOAS
         elif current_epoch >= self.FULU_FORK_EPOCH:
             self._log_fork_readiness()
-            self.current_fork_version = SchemaBeaconAPI.ForkVersion.FULU
+            self.current_fork_version = SchemaShared.ForkVersion.FULU
         elif current_epoch >= self.ELECTRA_FORK_EPOCH:
-            self.current_fork_version = SchemaBeaconAPI.ForkVersion.ELECTRA
+            self.current_fork_version = SchemaShared.ForkVersion.ELECTRA
         else:
             raise NotImplementedError(f"Unsupported fork for epoch {current_epoch}")
 
@@ -148,7 +148,7 @@ class BeaconChain:
             if _current_epoch < self.GLOAS_FORK_EPOCH:
                 self._log_fork_readiness()
             elif _current_epoch == self.GLOAS_FORK_EPOCH:
-                self.current_fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+                self.current_fork_version = SchemaShared.ForkVersion.GLOAS
                 self.logger.info(f"Gloas fork epoch reached! {GLOAS_ASCII_ART}")
 
         for handler in self.new_slot_handlers:

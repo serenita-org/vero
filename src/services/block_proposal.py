@@ -1,9 +1,9 @@
 import asyncio
 import contextlib
 import time
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from types import TracebackType
-from typing import Self, Unpack
+from typing import NamedTuple, Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -19,7 +19,7 @@ from spy_ssz import (
 
 from observability import ErrorType, HandledRuntimeError
 from providers._headers import ContentType
-from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
@@ -32,9 +32,10 @@ from spec.utils import encode_graffiti
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX
 BUILDER_INDEX_SELF_BUILD = 2**64 - 1
 
-BlockPublishResult = namedtuple(
-    "BlockPublishResult", ["block_root", "envelope_required"]
-)
+
+class BlockPublishResult(NamedTuple):
+    block_root: str
+    envelope_required: bool
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -419,7 +420,7 @@ class BlockProposalService(ValidatorDutyService):
                 continue
 
             # TODO unhardcode
-            _fork_version = SchemaBeaconAPI.ForkVersion.GLOAS
+            _fork_version = SchemaShared.ForkVersion.GLOAS
 
             await self.multi_beacon_node.submit_proposer_preferences(
                 signed_proposer_preferences=[
@@ -486,7 +487,7 @@ class BlockProposalService(ValidatorDutyService):
         slot: int,
         duty: SchemaBeaconAPI.ProposerDuty,
         randao_reveal: str,
-        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
     ) -> tuple[
         BeaconBlock,
         SchemaRemoteSigner.BeaconBlockHeader,
@@ -565,7 +566,7 @@ class BlockProposalService(ValidatorDutyService):
     async def _publish_block(
         self,
         slot: int,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
     ) -> BlockPublishResult:
@@ -619,7 +620,7 @@ class BlockProposalService(ValidatorDutyService):
                 self.metrics.vc_published_blocks_c.inc()
                 envelope_required = False
                 if (
-                    fork_version is SchemaBeaconAPI.ForkVersion.GLOAS
+                    fork_version is SchemaShared.ForkVersion.GLOAS
                     and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
                     == BUILDER_INDEX_SELF_BUILD
                 ):
@@ -772,7 +773,7 @@ class BlockProposalService(ValidatorDutyService):
                 signed_payload_bid=best_bid,
             )
             try:
-                fork_version = SchemaBeaconAPI.ForkVersion[
+                fork_version = SchemaShared.ForkVersion[
                     block_contents_or_blinded_block.fork.name
                 ]
                 signature = await self._sign_block(
