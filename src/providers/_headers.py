@@ -9,3 +9,4 @@ class ContentType(Enum):
 
 
 ETH_CONSENSUS_VERSION = "Eth-Consensus-Version"
+ETH_BLOB_DATA_INCLUDED = "Eth-Blob-Data-Included"

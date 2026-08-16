@@ -27,7 +27,11 @@ from observability import (
     get_service_version,
 )
 from observability.api_client import RequestLatency, ServiceType
-from providers._headers import ETH_CONSENSUS_VERSION, ContentType
+from providers._headers import (
+    ETH_BLOB_DATA_INCLUDED,
+    ETH_CONSENSUS_VERSION,
+    ContentType,
+)
 from providers._response import raise_for_response_size
 from schemas import (
     SchemaBeaconAPI,
@@ -828,8 +832,10 @@ class BeaconNode:
         params = dict(
             randao_reveal=randao_reveal,
             builder_boost_factor=str(builder_boost_factor),
-            # TODO include_payload param
-            include_payload="true",
+            # Keep the stateful self-build flow: Lodestar caches the payload envelope,
+            # which Vero retrieves after publishing the beacon block.
+            # TODO support stateless self-build flow?
+            include_payload="false",
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
@@ -1032,7 +1038,7 @@ class BeaconNode:
                 headers={
                     "Eth-Consensus-Version": fork_version.value,
                     # TODO
-                    "Eth-Execution-Payload-Blinded": "true",
+                    ETH_BLOB_DATA_INCLUDED: "false",
                     CONTENT_TYPE: ContentType.JSON.value,
                 },
                 data=self.json_encoder.encode(
