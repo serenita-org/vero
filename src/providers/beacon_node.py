@@ -1079,7 +1079,7 @@ class BeaconNode:
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
             payload_attributes=SchemaBeaconAPI.PayloadAttributesEvent,
-            execution_payload_bid=SchemaBeaconAPI.PayloadAttributesEvent,
+            execution_payload_bid=SchemaBeaconAPI.ExecutionPayloadBidEvent,
         )
 
         async with self.client_session.get(

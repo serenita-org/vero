@@ -272,10 +272,10 @@ class ExecutionPayloadBidEvent(BeaconNodeEvent):
 
 
 class PayloadAttributesData(msgspec.Struct):
+    proposer_index: str
     proposal_slot: str
     parent_block_root: str
     parent_block_hash: str
-    proposer_index: str
     payload_attributes: dict[str, Any]
 
 

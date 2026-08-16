@@ -160,7 +160,7 @@ class EventConsumerService:
                         name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
                     )
         elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadBidEvent):
-            # TODO process
+            # TODO deduplicate + process
             self.logger.info(f"Execution payload bid event: {event}")
         else:
             raise NotImplementedError(f"Unsupported event type: {event_type}")
