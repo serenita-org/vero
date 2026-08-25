@@ -21,6 +21,7 @@ class ErrorType(Enum):
     AGGREGATE_ATTESTATION_PUBLISH = "aggregate-attestation-publish"
     BLOCK_PRODUCE = "block-produce"
     BLOCK_PUBLISH = "block-publish"
+    BUILDER_GET_BID = "builder-get-bid"
     SYNC_COMMITTEE_CONTRIBUTION_PRODUCE = "sync-committee-contribution-produce"
     SYNC_COMMITTEE_CONTRIBUTION_PUBLISH = "sync-committee-contribution-publish"
     SYNC_COMMITTEE_MESSAGE_PRODUCE = "sync-committee-message-produce"

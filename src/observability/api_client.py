@@ -107,6 +107,7 @@ async def _on_request_end(
 
 class ServiceType(Enum):
     BEACON_NODE = "beacon_node"
+    BUILDER = "builder"
     REMOTE_SIGNER = "remote_signer"
 
 
