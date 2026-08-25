@@ -79,7 +79,7 @@ async def test_produce_block_v3_response(
         )
         beacon_node._force_json_wire_format = response_content_type == ContentType.JSON
         try:
-            response, content_type = await beacon_node.produce_block_v3(
+            response, content_type, _ = await beacon_node.produce_block_v3(
                 slot=1,
                 graffiti=b"",
                 builder_boost_factor=90,

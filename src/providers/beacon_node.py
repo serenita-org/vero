@@ -7,7 +7,7 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
-from typing import TYPE_CHECKING, Literal, Unpack, cast
+from typing import TYPE_CHECKING, Literal, Self, Unpack, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -729,7 +729,7 @@ class BeaconNode:
         graffiti: bytes,
         builder_boost_factor: int,
         randao_reveal: str,
-    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType, Self]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator.
         The returned block may be blinded or unblinded, depending on the current state of the network
         as decided by the execution and beacon nodes.
@@ -824,7 +824,7 @@ class BeaconNode:
                 host=self.host
             ).observe(execution_payload_value_int)
 
-            return response, response_content_type
+            return response, response_content_type, self
 
     async def produce_block_v4(
         self,
@@ -834,7 +834,7 @@ class BeaconNode:
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
         fork_version: SchemaShared.ForkVersion,
-    ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType]:
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType, Self]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         # TODO deduplicate with produce_block_v3, it's near to a copy-paste
         # Keep the stateful self-build flow: Lodestar caches the payload envelope,
@@ -953,7 +953,7 @@ class BeaconNode:
                 host=self.host
             ).observe(execution_payload_value_int)
 
-            return response, response_content_type
+            return response, response_content_type, self
 
     async def publish_block_v2(
         self,

@@ -18,6 +18,7 @@ from spy_ssz import (
 )
 
 from observability import ErrorType, HandledRuntimeError
+from providers import BeaconNode
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
@@ -488,10 +489,7 @@ class BlockProposalService(ValidatorDutyService):
         duty: SchemaBeaconAPI.ProposerDuty,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
-    ) -> tuple[
-        BeaconBlock,
-        SchemaRemoteSigner.BeaconBlockHeader,
-    ]:
+    ) -> tuple[BeaconBlock, SchemaRemoteSigner.BeaconBlockHeader, BeaconNode]:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._produce_block",
         ):
@@ -507,16 +505,17 @@ class BlockProposalService(ValidatorDutyService):
                     graffiti = encode_graffiti(kmgr_graffiti_str)
 
             try:
-                block_contents_or_blinded_block = (
-                    await self.multi_beacon_node.produce_block(
-                        slot=slot,
-                        graffiti=graffiti,
-                        builder_boost_factor=self.cli_args.builder_boost_factor,
-                        randao_reveal=randao_reveal,
-                        signed_payload_bid=signed_payload_bid,
-                        fork_version=self.beacon_chain.current_fork_version,
-                        soft_timeout=self._block_production_soft_timeout,
-                    )
+                (
+                    block_contents_or_blinded_block,
+                    beacon_node,
+                ) = await self.multi_beacon_node.produce_block(
+                    slot=slot,
+                    graffiti=graffiti,
+                    builder_boost_factor=self.cli_args.builder_boost_factor,
+                    randao_reveal=randao_reveal,
+                    signed_payload_bid=signed_payload_bid,
+                    fork_version=self.beacon_chain.current_fork_version,
+                    soft_timeout=self._block_production_soft_timeout,
                 )
             except Exception as e:
                 self.logger.exception(
@@ -530,7 +529,7 @@ class BlockProposalService(ValidatorDutyService):
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
                     **block_contents_or_blinded_block.header_dict()
                 )
-                return block_contents_or_blinded_block, block_header
+                return block_contents_or_blinded_block, block_header, beacon_node
 
     async def _sign_block(
         self,
@@ -661,7 +660,11 @@ class BlockProposalService(ValidatorDutyService):
             return execution_payload_envelope.sign(signature)
 
     async def _publish_payload_envelope(
-        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, beacon_block_root: str
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        beacon_block_root: str,
+        beacon_node: BeaconNode,
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._publish_payload_envelope",
@@ -672,14 +675,14 @@ class BlockProposalService(ValidatorDutyService):
             # step 2 sign envelope
             # step 3 publish signed envelope
             self.logger.info("Publishing payload envelope")
-            # TODO should we use first response here?
-            #  or only ask the one specific beacon node that
-            #  produced the beacon block we proposed?
+            # Only the beacon node that we got the BeaconBlock
+            # from has its associated execution payload envelope.
+            # (Unless running in stateless mode which Vero doesn't
+            # support right now)
             (
                 fork_version,
                 execution_payload_envelope,
-            ) = await self.multi_beacon_node._get_first_beacon_node_response(
-                func_name="get_execution_payload_envelope",
+            ) = await beacon_node.get_execution_payload_envelope(
                 slot=slot,
                 beacon_block_root=beacon_block_root,
             )
@@ -699,13 +702,11 @@ class BlockProposalService(ValidatorDutyService):
                     encoded = signed_execution_payload_envelope.to_ssz()
                     content_type = ContentType.OCTET_STREAM
 
-            # TODO should we use first response here?
-            #  we should (?) only send this to the beacon node that returned the
-            #  envelope since the other ones won't have the rest of the data.
-            #  Or, we could keep track of the beacon node that returned the
-            #  envelope
-            await self.multi_beacon_node._get_first_beacon_node_response(
-                func_name="publish_execution_payload_envelope",
+            # Publish using the beacon node that produced the envelope,
+            # because it also has cached blob data for that envelope.
+            # We could also retrieve the full envelope-contents
+            # for a stateless flow - not implemented right now.
+            await beacon_node.publish_execution_payload_envelope(
                 signed_execution_payload_envelope=encoded,
                 fork_version=fork_version,
                 content_type=content_type,
@@ -766,6 +767,7 @@ class BlockProposalService(ValidatorDutyService):
             (
                 block_contents_or_blinded_block,
                 block_header,
+                beacon_node,
             ) = await self._produce_block(
                 slot=slot,
                 duty=duty,
@@ -800,6 +802,7 @@ class BlockProposalService(ValidatorDutyService):
                             slot=slot,
                             duty=duty,
                             beacon_block_root=block_publish_result.block_root,
+                            beacon_node=beacon_node,
                         )
                     )
 

@@ -36,7 +36,7 @@ class BeaconNodeResponseSequence(TypedDict):
 
 
 @pytest.mark.parametrize(
-    argnames=("bn_response_sequences", "returned_block_value"),
+    argnames=("bn_response_sequences", "best_bn_host", "returned_block_value"),
     argvalues=[
         pytest.param(
             [
@@ -89,6 +89,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-b",
             200,
             id="Happy path - blocks returned from all beacon nodes",
         ),
@@ -137,6 +138,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-b",
             200,
             id="2/3 blocks returned, 1 request timeout",
         ),
@@ -179,6 +181,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-a",
             150,
             id="1/3 blocks returned, 2 requests time out",
         ),
@@ -215,6 +218,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-b",
             0,
             id="No blocks returned -> produce_best_block raises an Exception",
         ),
@@ -269,6 +273,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-b",
             250,
             id="2 fast responses and 1 delayed - we do not wait for the delayed one",
         ),
@@ -291,6 +296,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
+            "beacon-node-a",
             0,
             # https://github.com/OffchainLabs/prysm/issues/15174
             id="No block value provided",
@@ -315,6 +321,7 @@ class BeaconNodeResponseSequence(TypedDict):
 )
 async def test_produce_best_block(
     bn_response_sequences: list[BeaconNodeResponseSequence],
+    best_bn_host: str,
     returned_block_value: int,
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
@@ -373,7 +380,11 @@ async def test_produce_best_block(
         )
 
         if success_expected:
-            full_response, content_type = await multi_beacon_node._produce_best_block(
+            (
+                full_response,
+                content_type,
+                bn,
+            ) = await multi_beacon_node._produce_best_block(
                 slot=1,
                 graffiti=b"test_produce_best_block",
                 builder_boost_factor=90,
@@ -383,6 +394,7 @@ async def test_produce_best_block(
                 soft_timeout=0.1666,
             )
             assert content_type == ContentType.JSON
+            assert bn.host == best_bn_host
             # this test is currently failing with produceBlockV4
             # because we hardcoded execution_payload_value to 0 there for now
             assert (

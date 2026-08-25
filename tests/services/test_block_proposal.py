@@ -165,11 +165,6 @@ async def test_publish_block(
     ],
     indirect=True,
 )
-@pytest.mark.parametrize(
-    "fork_version",
-    [pytest.param(ForkVersion.GLOAS, id="Gloas")],
-    indirect=True,
-)
 async def test_publish_payload_envelope(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
@@ -188,6 +183,7 @@ async def test_publish_payload_envelope(
         slot=slot,
         duty=duty,
         beacon_block_root=ZERO_ROOT,
+        beacon_node=block_proposal_service.multi_beacon_node.beacon_nodes[0]
     )
 
     assert "Published payload envelope" in caplog.messages

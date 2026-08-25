@@ -350,6 +350,7 @@ class MultiBeaconNode:
     ) -> tuple[
         SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response,
         ContentType,
+        BeaconNode,
     ]:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
@@ -430,7 +431,7 @@ class MultiBeaconNode:
                     )
                     continue
 
-                response, _ = result
+                response, _, _ = result
                 block_value = int(response.consensus_block_value)
                 if _use_payload_value_for_comparison:
                     block_value += int(response.execution_payload_value)
@@ -457,7 +458,7 @@ class MultiBeaconNode:
             for coro_first in asyncio.as_completed(pending):
                 try:
                     best_block_result = await coro_first
-                    best_block_response, _ = best_block_result
+                    best_block_response, _, beacon_node = best_block_result
 
                     best_block_value = int(best_block_response.consensus_block_value)
                     if _use_payload_value_for_comparison:
@@ -483,7 +484,7 @@ class MultiBeaconNode:
 
         self.logger.info(f"Proceeding with best block by value: {best_block_value}")
         return cast(
-            "tuple[SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response, ContentType]",
+            "tuple[SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response, ContentType, BeaconNode]",
             best_block_result,
         )
 
@@ -496,8 +497,8 @@ class MultiBeaconNode:
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
-    ) -> BeaconBlock:
-        best_block_response, content_type = await self._produce_best_block(
+    ) -> tuple[BeaconBlock, BeaconNode]:
+        best_block_response, content_type, beacon_node = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
             builder_boost_factor=builder_boost_factor,
@@ -510,7 +511,7 @@ class MultiBeaconNode:
         return self._parse_block_response(
             response=best_block_response,
             content_type=content_type,
-        )
+        ), beacon_node
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:
