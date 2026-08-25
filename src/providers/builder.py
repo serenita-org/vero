@@ -16,6 +16,7 @@ from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBuilderAPI, SchemaShared
 
 from ._headers import ContentType
+from ._response import raise_for_response_size
 
 if TYPE_CHECKING:
     from .vero import Vero
@@ -37,6 +38,7 @@ class Builder:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.client_session = aiohttp.ClientSession(
+            base_url=self.base_url,
             timeout=ClientTimeout(
                 connect=_TIMEOUT_DEFAULT_CONNECT,
                 total=_TIMEOUT_DEFAULT_TOTAL,
@@ -53,6 +55,12 @@ class Builder:
             # resulting in ValueError("Chunk too big")
             read_bufsize=2**19,
         )
+
+    # TODO refactor -> ApiClient base class?
+    @staticmethod
+    async def _read_error_text(response: aiohttp.ClientResponse) -> str:
+        raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
+        return await response.text()
 
     async def get_execution_payload_bid(
         self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
@@ -71,7 +79,8 @@ class Builder:
                         error_type=ErrorType.BUILDER_GET_BID.value,
                     ).inc()
                     raise ValueError(
-                        f"NOK response received for get-bid request: {await resp.text()}"
+                        f"Received status code {resp.status} for request to {resp.request_info.url}"
+                        f" Full response text: {await Builder._read_error_text(resp)}",
                     )
 
                 if resp.status == web.HTTPNoContent.status_code:
@@ -155,7 +164,7 @@ class MultiBuilder:
             best_bid_value_gwei = -1
             for result in results:
                 if isinstance(result, BaseException):
-                    # TODO log warning and continue
+                    self.logger.warning(f"Failed to get bid from builder: {result!r}")
                     continue
 
                 if result is None:
