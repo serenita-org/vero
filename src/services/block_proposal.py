@@ -18,7 +18,7 @@ from spy_ssz import (
 )
 
 from observability import ErrorType, HandledRuntimeError
-from providers import BeaconNode
+from providers import BeaconNode, BidSelector
 from providers._headers import ContentType
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
@@ -43,6 +43,8 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
+        self.bid_selector = BidSelector(vero=self.vero)
+
         # Block production API requests "soft" time out half-way into the attestation
         # deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain). This ensures
         # a single slow beacon node does not delay a block proposal too much.
@@ -62,11 +64,6 @@ class BlockProposalService(ValidatorDutyService):
             defaultdict(set)
         )
         self.proposer_duties_dependent_roots: dict[int, str] = dict()
-
-        # TODO prune
-        self.payload_attributes_events_store: list[
-            SchemaBeaconAPI.PayloadAttributesEvent
-        ] = []
 
         self.randao_reveal_cache: dict[tuple[int, str], str] = dict()
 
@@ -193,12 +190,6 @@ class BlockProposalService(ValidatorDutyService):
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.create_task(super().update_duties())
-
-    async def handle_payload_attributes_event(
-        self, event: SchemaBeaconAPI.PayloadAttributesEvent
-    ) -> None:
-        self.logger.debug(f"Received payload attributes event: {event}")
-        self.payload_attributes_events_store.append(event)
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
@@ -740,35 +731,9 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
-            for payload_attributes_event in self.payload_attributes_events_store:
-                # TODO with the current implementation, there may be
-                #  multiple events for the same slot -> we should probably
-                #  only keep the latest event per slot?
-                #  hmm I don't know actually, what if it's forked off, or processed
-                #  a slot late? Maybe we should use a counter and pick the event
-                #  that was emitted the most times?
-                if int(payload_attributes_event.data.proposal_slot) == slot:
-                    payload_attributes_data = payload_attributes_event.data
-                    self.logger.info("Have payload attributes data")
-                    break
-            else:
-                self.logger.warning(
-                    "Payload attributes unknown -> unable to fetch bids from builders"
-                )
-                payload_attributes_data = None
-
-            best_bid = None
-            if payload_attributes_data:
-                best_bid = await self.multi_builder.get_execution_payload_bid(
-                    slot=slot,
-                    parent_hash=payload_attributes_data.parent_block_hash,
-                    parent_root=payload_attributes_data.parent_block_root,
-                    proposer_pubkey=duty.pubkey,
-                    fork_version=self.beacon_chain.current_fork_version,
-                    # TODO parametrize/hardcode, similar to block production timeout
-                    soft_timeout=0.1,
-                    hard_timeout=0.2,
-                )
+            selected_bid = await self.bid_selector.get_bid(
+                slot=slot, proposer_duty=duty
+            )
 
             (
                 block_contents_or_blinded_block,
@@ -778,7 +743,7 @@ class BlockProposalService(ValidatorDutyService):
                 slot=slot,
                 duty=duty,
                 randao_reveal=randao_reveal,
-                signed_payload_bid=best_bid,
+                signed_payload_bid=selected_bid,
             )
             try:
                 fork_version = SchemaShared.ForkVersion[

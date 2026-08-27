@@ -13,7 +13,6 @@ from providers import (
     DutyCache,
     Keymanager,
     MultiBeaconNode,
-    MultiBuilder,
     RemoteSigner,
     Vero,
 )
@@ -68,7 +67,10 @@ def _register_event_handlers(
         )
 
     event_consumer_service.add_payload_attributes_event_handler(
-        event_handler=block_proposal_service.handle_payload_attributes_event
+        event_handler=block_proposal_service.bid_selector.handle_payload_attributes_event
+    )
+    event_consumer_service.add_bid_event_handler(
+        event_handler=block_proposal_service.bid_selector.handle_bid_event
     )
 
     event_consumer_service.add_slashing_event_handler(
@@ -171,7 +173,6 @@ async def run_services(vero: Vero) -> None:
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
-            multi_builder=MultiBuilder(vero=vero),
             signature_provider=signature_provider,
             keymanager=keymanager,
             duty_cache=DutyCache(data_dir=vero.cli_args.data_dir),

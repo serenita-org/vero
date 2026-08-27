@@ -14,7 +14,6 @@ from providers import (
     DutyCache,
     Keymanager,
     MultiBeaconNode,
-    MultiBuilder,
     SignatureProvider,
     Vero,
 )
@@ -34,7 +33,6 @@ class ValidatorDuty(Enum):
 
 class ValidatorDutyServiceOptions(TypedDict):
     multi_beacon_node: MultiBeaconNode
-    multi_builder: MultiBuilder
     signature_provider: SignatureProvider
     keymanager: Keymanager
     duty_cache: DutyCache
@@ -51,7 +49,6 @@ class ValidatorDutyService:
         **kwargs: Unpack[ValidatorDutyServiceOptions],
     ):
         self.multi_beacon_node = kwargs["multi_beacon_node"]
-        self.multi_builder = kwargs["multi_builder"]
         self.signature_provider = kwargs["signature_provider"]
         self.keymanager = kwargs["keymanager"]
         self.duty_cache = kwargs["duty_cache"]
@@ -65,6 +62,7 @@ class ValidatorDutyService:
         self.metrics = vero.metrics
         self.cli_args = vero.cli_args
         self.spec = vero.spec
+        self.vero = vero
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
