@@ -15,3 +15,7 @@ ETH_EXECUTION_PAYLOAD_VALUE = "Eth-Execution-Payload-Value"
 ETH_EXECUTION_PAYLOAD_BLINDED = "Eth-Execution-Payload-Blinded"
 ETH_EXECUTION_PAYLOAD_INCLUDED = "Eth-Execution-Payload-Included"
 ETH_BLOB_DATA_INCLUDED = "Eth-Blob-Data-Included"
+
+# Builder API
+DATE_MILLISECONDS = "Date-Milliseconds"
+X_TIMEOUT_MS = "X-Timeout-Ms"

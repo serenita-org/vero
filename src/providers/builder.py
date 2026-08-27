@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from time import time_ns
 from types import TracebackType
 from typing import TYPE_CHECKING, Self
 from urllib.parse import urlparse
@@ -15,14 +16,19 @@ from observability import ErrorType, get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
 from schemas import SchemaBuilderAPI, SchemaShared
 
-from ._headers import ContentType
+from ._headers import (
+    DATE_MILLISECONDS,
+    ETH_CONSENSUS_VERSION,
+    X_TIMEOUT_MS,
+    ContentType,
+)
 from ._response import raise_for_response_size
 
 if TYPE_CHECKING:
     from .vero import Vero
 
 _TIMEOUT_DEFAULT_CONNECT = 2
-_TIMEOUT_DEFAULT_TOTAL = 10
+_TIMEOUT_DEFAULT_TOTAL = 0.1
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
@@ -63,7 +69,13 @@ class Builder:
         return await response.text()
 
     async def get_execution_payload_bid(
-        self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
+        self,
+        slot: int,
+        parent_hash: str,
+        parent_root: str,
+        proposer_pubkey: str,
+        fork_version: SchemaShared.ForkVersion,
+        soft_timeout: float,
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
@@ -72,8 +84,17 @@ class Builder:
                 "server.address": self.base_url,
             },
         ):
+            # TODO Content-Type header
+            #      ... do we even want to bother with SSZ for this tiny object?
+            #          maybe? We do then send it to N beacon nodes so savings are not just 1x
+            # TODO SignedBuilderRequestAuth in request body - seems to be required now?
             url_path = f"/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
-            async with self.client_session.post(url_path) as resp:
+            headers = {
+                ETH_CONSENSUS_VERSION: fork_version.value,
+                DATE_MILLISECONDS: time_ns() // 1_000_000,
+                X_TIMEOUT_MS: int(soft_timeout * 1_000),
+            }
+            async with self.client_session.post(url_path, headers=headers) as resp:
                 if not resp.ok:
                     self.metrics.errors_c.labels(
                         error_type=ErrorType.BUILDER_GET_BID.value,
@@ -90,9 +111,16 @@ class Builder:
 
                 resp_bytes = await resp.read()
 
+                # parse based on Eth-Consensus-Version response header?
+                # or just check it is Gloas for now...
+                resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
+                if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
+                    raise NotImplementedError
+
                 resp_decoded = msgspec.json.decode(
                     resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
                 )
+                self.logger.debug(f"Received bid: {resp_decoded.data}")
 
                 # TODO bid verification? or shall we just let the beacon node handle
                 #  all this?
@@ -104,8 +132,13 @@ class Builder:
                 # 5) bid.prev_randao
                 # 6) fee recipient in signed_execution_payload_bid.message
                 # 7) no trusted payment should be present (at least yet)
+                # 8) trusted payment is <= max execution payment
 
                 return resp_decoded.data
+
+
+# TODO submit builder preferences
+#  - this is for max_execution_payment and SignedBuilderRequestAuth
 
 
 class MultiBuilder:
@@ -135,54 +168,125 @@ class MultiBuilder:
         )
 
     async def get_execution_payload_bid(
-        self, slot: int, parent_hash: str, parent_root: str, proposer_pubkey: str
+        self,
+        slot: int,
+        parent_hash: str,
+        parent_root: str,
+        proposer_pubkey: str,
+        fork_version: SchemaShared.ForkVersion,
+        soft_timeout: float,
+        hard_timeout: float,
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
-        # TODO early return if no builders enabled / ...
+        """Gets the get execution payload bid response from all builders and returns
+        the best one by its reported value.
+
+        Most of the logic in here makes sure we don't wait too long for a builder to
+        return a bid.
+
+        If no bid is returned within the soft timeout, we wait until the hard timeout
+        for any builder to return a bid and use that.
+
+        Note: Bears similarities with the MultiBeaconNode._produce_best_block function.
+        """
         if len(self.builders) == 0:
             return None
+
+        if fork_version != SchemaShared.ForkVersion.GLOAS:
+            raise NotImplementedError
 
         # TODO pass on Builder API headers - timeout, date-milliseconds
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,
         ):
-            results = await asyncio.gather(
-                *[
+            tasks = [
+                asyncio.create_task(
                     builder.get_execution_payload_bid(
                         slot=slot,
                         parent_hash=parent_hash,
                         parent_root=parent_root,
                         proposer_pubkey=proposer_pubkey,
+                        fork_version=fork_version,
+                        soft_timeout=soft_timeout,
                     )
-                    for builder in self.builders
-                ],
-                return_exceptions=True,
-            )
+                )
+                for builder in self.builders
+            ]
+            pending = tasks
+            start_time = asyncio.get_running_loop().time()
+            remaining_soft_timeout = soft_timeout
 
-            # TODO we probably want to do as_completed here with a timeout?
             best_bid = None
             best_bid_value_gwei = -1
-            for result in results:
-                if isinstance(result, BaseException):
-                    self.logger.warning(f"Failed to get bid from builder: {result!r}")
-                    continue
 
-                if result is None:
-                    # No bid from builder
-                    continue
-
-                bid: SchemaShared.SignedExecutionPayloadBid = result
-                bid_value_gwei = int(bid.message.value) + int(
-                    bid.message.execution_payment
+            while pending and remaining_soft_timeout > 0:
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=remaining_soft_timeout,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
-                if bid_value_gwei > best_bid_value_gwei:
-                    best_bid = bid
-                    best_bid_value_gwei = bid_value_gwei
 
-            if best_bid is None:
-                self.logger.warning("No bid retrieved from builders")
+                for coro in done:
+                    try:
+                        result = await coro
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get bid from builder: {e!r}")
+                        continue
+
+                    if result is None:
+                        # No bid from builder
+                        continue
+
+                    bid: SchemaShared.SignedExecutionPayloadBid = result
+                    bid_value_gwei = bid.total_value
+                    if bid_value_gwei > best_bid_value_gwei:
+                        best_bid = bid
+                        best_bid_value_gwei = bid_value_gwei
+
+                # Calculate remaining timeout
+                elapsed_time = asyncio.get_running_loop().time() - start_time
+                remaining_soft_timeout = max(soft_timeout - elapsed_time, 0)
+
+            # Soft timeout reached or all tasks finished
+            if len(pending) == 0:
+                if best_bid:
+                    self.logger.info(
+                        f"Selected best bid with value {best_bid_value_gwei}"
+                    )
+                    return best_bid
+                self.logger.info("No bid retrieved from builders")
                 return None
 
-            self.logger.info(f"Picked best bid with value {best_bid_value_gwei}")
-            self.logger.debug(f"Best bid: {best_bid}")
-            return best_bid
+            # Soft timeout reached but not all tasks finished
+            self.logger.warning("Bid selection soft timeout reached.")
+            # Wait until hard timeout for any builder to return a bid
+            elapsed_time = asyncio.get_running_loop().time() - start_time
+            remaining_hard_timeout = max(hard_timeout - elapsed_time, 0)
+            while remaining_hard_timeout > 0:
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=remaining_hard_timeout,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+
+                for coro in done:
+                    try:
+                        result = await coro
+                    except Exception as e:
+                        self.logger.warning(f"Failed to get bid from builder: {e!r}")
+                        continue
+
+                    if result is None:
+                        # No bid from builder
+                        continue
+                    self.logger.info(
+                        f"Selected first bid with value {result.total_value}"
+                    )
+                    return result
+
+                # Calculate remaining timeout
+                elapsed_time = asyncio.get_running_loop().time() - start_time
+                remaining_hard_timeout = max(hard_timeout - elapsed_time, 0)
+
+            self.logger.warning("Bid selection hard timeout reached")
+            return None

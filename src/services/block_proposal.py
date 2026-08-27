@@ -762,6 +762,10 @@ class BlockProposalService(ValidatorDutyService):
                     parent_hash=payload_attributes_data.parent_block_hash,
                     parent_root=payload_attributes_data.parent_block_root,
                     proposer_pubkey=duty.pubkey,
+                    fork_version=self.beacon_chain.current_fork_version,
+                    # TODO parametrize/hardcode, similar to block production timeout
+                    soft_timeout=0.1,
+                    hard_timeout=0.2,
                 )
 
             (

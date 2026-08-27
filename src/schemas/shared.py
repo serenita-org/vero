@@ -27,3 +27,7 @@ class ExecutionPayloadBid(msgspec.Struct):
 class SignedExecutionPayloadBid(msgspec.Struct):
     message: ExecutionPayloadBid
     signature: str
+
+    @property
+    def total_value(self) -> int:
+        return int(self.message.value) + int(self.message.execution_payment)

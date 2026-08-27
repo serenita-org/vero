@@ -82,6 +82,7 @@ def cli_args(
     attestation_consensus_threshold = indirect_params.get(
         "attestation_consensus_threshold", None
     )
+    builder_urls = indirect_params.get("builder_urls", [])
     ignore_spec_mismatch = indirect_params.get("ignore_spec_mismatch", False)
     force_json_wire_format = indirect_params.get("force_json_wire_format", False)
 
@@ -99,7 +100,7 @@ def cli_args(
         graffiti=encode_graffiti("graffiti-in-pytest"),
         gas_limit=30_000_000,
         use_external_builder=False,
-        builder_urls=[],
+        builder_urls=builder_urls,
         builder_boost_factor=90,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
