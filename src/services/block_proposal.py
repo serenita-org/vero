@@ -597,6 +597,8 @@ class BlockProposalService(ValidatorDutyService):
                         signed_block_contents=encoded,
                         content_type=content_type,
                     )
+                    # TODO in Gloas, we should also submit the block to the builder if
+                    #  we used one
                 else:
                     await self.multi_beacon_node.publish_blinded_block_v2(
                         fork_version=fork_version,
