@@ -152,6 +152,9 @@ class AttestationService(ValidatorDutyService):
     ) -> None:
         if any(
             root not in self.attester_duties_dependent_roots.values()
+            # TODO fix these dependent roots now (same in block proposal service)
+            #  seems like a good time to make sure everyone uses them correctly
+            #  (see also SigP audit)
             for root in (
                 event.previous_duty_dependent_root,
                 event.current_duty_dependent_root,
