@@ -13,6 +13,9 @@ class BidSelector:
         self.multi_builder = MultiBuilder(vero=vero)
 
         # TODO prune
+        self.proposal_slots: set[int] = set()
+
+        # TODO prune
         self.payload_attributes_events_store: list[
             SchemaBeaconAPI.PayloadAttributesEvent
         ] = []
@@ -21,14 +24,20 @@ class BidSelector:
     async def handle_payload_attributes_event(
         self, event: SchemaBeaconAPI.PayloadAttributesEvent
     ) -> None:
-        self.logger.debug(f"Received payload attributes event: {event}")
-        self.payload_attributes_events_store.append(event)
+        if int(event.data.proposal_slot) in self.proposal_slots:
+            self.logger.info(f"Received payload attributes event: {event}")
+            self.payload_attributes_events_store.append(event)
+        else:
+            self.logger.debug(f"Ignoring payload attributes event: {event}")
 
     async def handle_bid_event(
         self, event: SchemaBeaconAPI.ExecutionPayloadBidEvent
     ) -> None:
-        self.logger.debug(f"Received bid event: {event}")
-        self.bid_events_store.append(event)
+        if int(event.data.message.slot) in self.proposal_slots:
+            self.logger.info(f"Received bid event: {event}")
+            self.bid_events_store.append(event)
+        else:
+            self.logger.debug(f"Ignoring bid event: {event}")
 
     def _get_payload_attributes_data(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty

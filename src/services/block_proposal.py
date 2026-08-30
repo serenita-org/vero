@@ -242,6 +242,7 @@ class BlockProposalService(ValidatorDutyService):
                 self.logger.info(
                     f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}",
                 )
+                self.bid_selector.proposal_slots.add(int(duty.slot))
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
