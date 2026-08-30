@@ -132,6 +132,7 @@ def _block_body(*, blinded: bool) -> dict[str, Any]:
         "bls_to_execution_changes": [],
         "blob_kzg_commitments": [],
         "execution_requests": {"deposits": [], "withdrawals": [], "consolidations": []},
+        "client_data": ZERO_ROOT,
     }
 
 

@@ -63,6 +63,22 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
     data: BlockRoot
 
 
+class ClientVersionV1(msgspec.Struct):
+    code: str
+    name: str
+    version: str
+    commit: str
+
+
+class GetVersionV2Data(msgspec.Struct):
+    beacon_node: ClientVersionV1
+    execution_client: ClientVersionV1 | None = None
+
+
+class GetVersionV2Response(msgspec.Struct):
+    data: GetVersionV2Data
+
+
 class ForkVersion(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
