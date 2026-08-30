@@ -7,7 +7,7 @@ import logging
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
-from typing import TYPE_CHECKING, Literal, Unpack
+from typing import TYPE_CHECKING, Any, Literal, Unpack
 from urllib.parse import urlparse
 
 import aiohttp
@@ -18,7 +18,7 @@ from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from multidict import CIMultiDictProxy
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
-from spy_ssz import Attestation, SyncCommitteeContribution
+from spy_ssz import Fork
 from yarl import URL
 
 from observability import (
@@ -29,14 +29,21 @@ from observability import (
 from observability.api_client import RequestLatency, ServiceType
 from providers._headers import ETH_CONSENSUS_VERSION, ContentType
 from providers._response import raise_for_response_size
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
+from schemas import (
+    SchemaBeaconAPI,
+    SchemaBuilderAPI,
+    SchemaRemoteSigner,
+    SchemaValidator,
+)
 from spec import (
+    Attestation,
     AttestationData,
     Checkpoint,
+    SyncCommitteeContribution,
     preset_types,
 )
-from spec.base import SpecFulu, parse_spec
-from spec.constants import INTERVALS_PER_SLOT
+from spec.base import SpecGloas, parse_spec
+from spec.common import get_slot_component_duration_ms
 
 if TYPE_CHECKING:
     from .vero import Vero
@@ -80,7 +87,20 @@ class BeaconNode:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
         self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(self.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
+        self._timeout_request_aggregate = (
+            int(self.spec.SLOT_DURATION_MS)
+            - get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+        ) / 1_000
+        self._timeout_request_contribution = (
+            int(self.spec.SLOT_DURATION_MS)
+            - get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+        ) / 1_000
         self._ignore_spec_mismatch = vero.cli_args.ignore_spec_mismatch
         self._force_json_wire_format = vero.cli_args.force_json_wire_format
 
@@ -118,6 +138,14 @@ class BeaconNode:
         )
 
         self.json_encoder = msgspec.json.Encoder()
+
+    def _fork_for_slot(self, slot: int) -> Fork:
+        epoch = slot // int(self.spec.SLOTS_PER_EPOCH)
+        if epoch >= int(self.spec.GLOAS_FORK_EPOCH):
+            return Fork.GLOAS
+        if epoch >= int(self.spec.FULU_FORK_EPOCH):
+            return Fork.FULU
+        return Fork.ELECTRA
 
     @property
     def score(self) -> int:
@@ -266,7 +294,7 @@ class BeaconNode:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
             raise
         except Exception as e:
-            self.logger.debug(
+            self.logger.exception(
                 f"Failed to get response from {self.host} for {method} {endpoint}: {e!r}",
             )
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
@@ -279,7 +307,7 @@ class BeaconNode:
         if response.execution_optimistic:
             raise ValueError(f"Execution optimistic on {self.host}")
 
-    async def get_spec(self) -> SpecFulu:
+    async def get_spec(self) -> SpecGloas:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
@@ -338,7 +366,12 @@ class BeaconNode:
         )
 
         response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
-        return self.host, preset_types().attestation_data.from_json(response.data)
+        return (
+            self.host,
+            preset_types(self._fork_for_slot(slot)).attestation_data.from_json(
+                response.data
+            ),
+        )
 
     async def wait_for_attestation_data(
         self,
@@ -472,6 +505,23 @@ class BeaconNode:
 
         return response
 
+    async def get_proposer_duties_v2(
+        self,
+        epoch: int,
+    ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
+        resp_bytes, _, _ = await self._make_request(
+            method="GET",
+            endpoint="/eth/v2/validator/duties/proposer/{epoch}",
+            formatted_endpoint_string_params=dict(epoch=epoch),
+        )
+
+        response = msgspec.json.decode(
+            resp_bytes, type=SchemaBeaconAPI.GetProposerDutiesResponse
+        )
+        self._raise_if_optimistic(response)
+
+        return response
+
     async def get_sync_duties(
         self,
         epoch: int,
@@ -546,7 +596,7 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_aggregate,
             ),
         )
 
@@ -554,7 +604,9 @@ class BeaconNode:
             resp_bytes, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
         )
 
-        att = preset_types().attestation.from_json(response.data)
+        att = preset_types(self._fork_for_slot(slot)).attestation.from_json(
+            response.data
+        )
 
         self.metrics.beacon_node_aggregate_attestation_participant_count_h.labels(
             host=self.host
@@ -589,14 +641,14 @@ class BeaconNode:
             ),
             timeout=ClientTimeout(
                 connect=self.client_session.timeout.connect,
-                total=self.SECONDS_PER_INTERVAL,
+                total=self._timeout_request_contribution,
             ),
         )
 
         response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
-        contribution = preset_types().sync_committee_contribution.from_json(
-            response.data
-        )
+        contribution = preset_types(
+            self._fork_for_slot(slot)
+        ).sync_committee_contribution.from_json(response.data)
         self.metrics.beacon_node_sync_contribution_participant_count_h.labels(
             host=self.host
         ).observe(sum(contribution.aggregation_bits))
@@ -632,6 +684,25 @@ class BeaconNode:
                 [
                     dict(message=registration, signature=sig)
                     for registration, sig in signed_registrations
+                ]
+            ),
+        )
+
+    async def submit_proposer_preferences(
+        self,
+        signed_proposer_preferences: list[
+            tuple[SchemaRemoteSigner.ProposerPreferences, str]
+        ],
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
+        await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/validator/proposer_preferences",
+            headers={"Eth-Consensus-Version": fork_version.value},
+            data=self.json_encoder.encode(
+                [
+                    dict(message=preferences, signature=sig)
+                    for preferences, sig in signed_proposer_preferences
                 ]
             ),
         )
@@ -713,31 +784,154 @@ class BeaconNode:
 
             # Prysm may return an empty string for the block value
             # https://github.com/OffchainLabs/prysm/issues/15174
-            execution_payload_value = int(response.execution_payload_value or 0)
-            consensus_block_value = int(response.consensus_block_value or 0)
-            response.execution_payload_value = str(execution_payload_value)
-            response.consensus_block_value = str(consensus_block_value)
+            execution_payload_value_int = int(response.execution_payload_value or 0)
+            consensus_block_value_int = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value_int)
+            response.consensus_block_value = str(consensus_block_value_int)
 
             tracer_span.add_event(
                 "ProduceBlockV3Response",
                 attributes=dict(
                     blinded=response.execution_payload_blinded,
-                    execution_payload_value=execution_payload_value,
-                    consensus_block_value=consensus_block_value,
+                    execution_payload_value=execution_payload_value_int,
+                    consensus_block_value=consensus_block_value_int,
                 ),
             )
 
             self.logger.info(
                 f"{self.host} returned block with"
-                f" consensus block value {consensus_block_value},"
-                f" execution payload value {execution_payload_value}."
+                f" consensus block value {consensus_block_value_int},"
+                f" execution payload value {execution_payload_value_int}."
             )
             self.metrics.beacon_node_consensus_block_value_h.labels(
                 host=self.host
-            ).observe(consensus_block_value)
+            ).observe(consensus_block_value_int)
             self.metrics.beacon_node_execution_payload_value_h.labels(
                 host=self.host
-            ).observe(execution_payload_value)
+            ).observe(execution_payload_value_int)
+
+            return response, response_content_type
+
+    async def produce_block_v4(
+        self,
+        slot: int,
+        graffiti: bytes,
+        builder_boost_factor: int,
+        randao_reveal: str,
+        signed_payload_bid: SchemaBuilderAPI.SignedExecutionPayloadBid | None,
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType]:
+        """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
+        # TODO deduplicate with produce_block_v3, it's near to a copy-paste
+        params = dict(
+            randao_reveal=randao_reveal,
+            builder_boost_factor=str(builder_boost_factor),
+            # TODO include_payload param
+            include_payload="true",
+        )
+        if graffiti:
+            params["graffiti"] = f"0x{graffiti.hex()}"
+
+        # TODO BYOB not yet implemented - possibly in separate endpoint!
+        if False and signed_payload_bid:
+            self.logger.info(
+                f"Setting body for block production, bid: {signed_payload_bid}"
+            )
+            data = self.json_encoder.encode(
+                dict(signed_execution_payload_bid=signed_payload_bid)
+            )
+        else:
+            # empty dict
+            # lodestar complains otherwise about getting a content-type header application/json
+            # and an empty body
+            data = b"{}"
+
+        accept_header = (
+            ContentType.JSON.value
+            if self._force_json_wire_format
+            # Prefer SSZ over JSON
+            else f"{ContentType.OCTET_STREAM.value};q=1.0,{ContentType.JSON.value};q=0.9"
+        )
+
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.produce_block_v4",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ) as tracer_span:
+            resp_bytes, content_type, headers = await self._make_request(
+                # TODO switch to POST once discussions are finished
+                method="GET",
+                endpoint="/eth/v4/validator/blocks/{slot}",
+                formatted_endpoint_string_params=dict(slot=slot),
+                params=params,
+                # TODO uncomment when adding POST
+                # data=data,
+                timeout=ClientTimeout(
+                    connect=self.client_session.timeout.connect,
+                ),
+                headers={
+                    ACCEPT: accept_header,
+                    "Eth-Consensus-Version": fork_version.value,
+                },
+            )
+            if (
+                content_type == ContentType.JSON.value
+                and not self._force_json_wire_format
+            ):
+                self.logger.warning(
+                    f"{self.host} returned block as JSON but Vero requested SSZ"
+                )
+
+            try:
+                response_content_type = ContentType(content_type)
+            except ValueError:
+                raise NotImplementedError(
+                    f"Unsupported content type: {content_type}"
+                ) from None
+
+            # TODO Lodestar is not providing this header right now
+            execution_payload_included = False
+            # execution_payload_included = headers["Eth-Execution-Payload-Included"].lower() == "true"
+            execution_payload_value = "0"
+            # execution_payload_value = headers["Eth-Execution-Payload-Value"]
+
+            response = SchemaBeaconAPI.ProduceBlockV4Response(
+                version=SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"]),
+                execution_payload_included=execution_payload_included,
+                execution_payload_value=execution_payload_value,
+                consensus_block_value=headers["Eth-Consensus-Block-Value"],
+                data=resp_bytes,
+            )
+
+            # Prysm may return an empty string for the block value
+            # https://github.com/OffchainLabs/prysm/issues/15174
+            execution_payload_value_int = int(response.execution_payload_value or 0)
+            consensus_block_value_int = int(response.consensus_block_value or 0)
+            response.execution_payload_value = str(execution_payload_value_int)
+            response.consensus_block_value = str(consensus_block_value_int)
+
+            tracer_span.add_event(
+                "ProduceBlockV4Response",
+                attributes=dict(
+                    execution_payload_included=response.execution_payload_included,
+                    execution_payload_value=execution_payload_value_int,
+                    consensus_block_value=consensus_block_value_int,
+                ),
+            )
+
+            self.logger.info(
+                f"{self.host} returned block with"
+                f" consensus block value {consensus_block_value_int},"
+                f" execution payload value {execution_payload_value_int}."
+            )
+            self.metrics.beacon_node_consensus_block_value_h.labels(
+                host=self.host
+            ).observe(consensus_block_value_int)
+            self.metrics.beacon_node_execution_payload_value_h.labels(
+                host=self.host
+            ).observe(execution_payload_value_int)
 
             return response, response_content_type
 
@@ -787,6 +981,66 @@ class BeaconNode:
                 },
             )
 
+    async def get_execution_payload_envelope(
+        self,
+        slot: int,
+        beacon_block_root: str,
+    ) -> tuple[SchemaBeaconAPI.ForkVersion, dict[str, Any]]:
+        # TODO we can do JSON and SSZ here
+
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_payload_envelope",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            resp_bytes, content_type, headers = await self._make_request(
+                method="GET",
+                endpoint="/eth/v1/validator/execution_payload_envelopes/{slot}/{beacon_block_root}",
+                formatted_endpoint_string_params=dict(
+                    slot=slot,
+                    beacon_block_root=beacon_block_root,
+                ),
+            )
+            # TODO remove
+            assert content_type == ContentType.JSON.value
+            fork_version = SchemaBeaconAPI.ForkVersion(headers["Eth-Consensus-Version"])
+
+            decoded = msgspec.json.decode(resp_bytes)
+            return fork_version, decoded["data"]
+
+    async def publish_execution_payload_envelope(
+        self,
+        envelope: dict[str, Any],
+        signature: str,
+        fork_version: SchemaBeaconAPI.ForkVersion,
+    ) -> None:
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}.publish_execution_payload_envelope",
+            kind=SpanKind.CLIENT,
+            attributes={
+                "server.address": self.host,
+            },
+        ):
+            # TODO again SSZ/JSON
+            _, _, _ = await self._make_request(
+                method="POST",
+                endpoint="/eth/v1/beacon/execution_payload_envelopes",
+                headers={
+                    "Eth-Consensus-Version": fork_version.value,
+                    # TODO
+                    "Eth-Execution-Payload-Blinded": "true",
+                    CONTENT_TYPE: ContentType.JSON.value,
+                },
+                data=self.json_encoder.encode(
+                    dict(
+                        message=envelope,
+                        signature=signature,
+                    )
+                ),
+            )
+
     async def get_liveness(
         self, epoch: int, validator_indices: list[int]
     ) -> tuple[str, list[SchemaBeaconAPI.ValidatorLiveness]]:
@@ -816,6 +1070,7 @@ class BeaconNode:
             chain_reorg=SchemaBeaconAPI.ChainReorgEvent,
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,
+            payload_attributes=SchemaBeaconAPI.PayloadAttributesEvent,
         )
 
         async with self.client_session.get(

@@ -13,6 +13,7 @@ from providers import (
     DutyCache,
     Keymanager,
     MultiBeaconNode,
+    MultiBuilder,
     RemoteSigner,
     Vero,
 )
@@ -29,7 +30,7 @@ from services import (
 _logger = logging.getLogger("vero-init")
 
 
-async def _wait_for_genesis(genesis_timestamp: int) -> None:
+async def _wait_for_genesis(genesis_timestamp: float) -> None:
     while True:
         time_remaining = genesis_timestamp - time.time()
         if time_remaining <= 0:
@@ -65,6 +66,10 @@ def _register_event_handlers(
         event_consumer_service.add_reorg_event_handler(
             event_handler=reorg_handler_service.handle_reorg_event,
         )
+
+    event_consumer_service.add_payload_attributes_event_handler(
+        event_handler=block_proposal_service.handle_payload_attributes_event
+    )
 
     event_consumer_service.add_slashing_event_handler(
         event_handler=validator_status_tracker_service.handle_slashing_event,
@@ -166,6 +171,7 @@ async def run_services(vero: Vero) -> None:
 
         validator_service_args = ValidatorDutyServiceOptions(
             multi_beacon_node=multi_beacon_node,
+            multi_builder=MultiBuilder(builder_urls=vero.cli_args.builder_urls),
             signature_provider=signature_provider,
             keymanager=keymanager,
             duty_cache=DutyCache(data_dir=vero.cli_args.data_dir),

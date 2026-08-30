@@ -5,7 +5,7 @@ from typing import Any, get_args
 
 from yaml import BaseLoader, load
 
-from spec.base import Genesis, SpecFulu, parse_spec
+from spec.base import Genesis, SpecGloas, parse_spec
 from spec.preset import Preset
 
 
@@ -72,7 +72,7 @@ def parse_yaml_file(fp: Path) -> dict[str, Any]:
 
 def get_network_spec(
     network: Network, network_custom_config_path: str | None = None
-) -> tuple[SpecFulu, Preset]:
+) -> tuple[SpecGloas, Preset]:
     spec_dict = {}
 
     if network == Network.CUSTOM:

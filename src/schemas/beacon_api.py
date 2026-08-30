@@ -10,7 +10,7 @@ https://docs.nodereal.io/reference/eventstream
 
 from collections.abc import Hashable
 from enum import Enum
-from typing import Self
+from typing import Any, Self
 
 import msgspec
 
@@ -66,6 +66,7 @@ class GetBlockRootResponse(ExecutionOptimisticResponse):
 class ForkVersion(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
+    GLOAS = "gloas"
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
@@ -172,6 +173,19 @@ class ProduceBlockV3Response(msgspec.Struct):
     data: bytes
 
 
+class ProduceBlockV4Response(msgspec.Struct):
+    version: ForkVersion
+    execution_payload_included: bool
+    execution_payload_value: str
+    consensus_block_value: str
+    data: bytes
+
+
+class GetExecutionPayloadEnvelopeResponse(msgspec.Struct):
+    version: ForkVersion
+    data: bytes
+
+
 # Liveness endpoint
 class ValidatorLiveness(msgspec.Struct):
     index: str
@@ -243,3 +257,24 @@ class ProposerSlashingEvent(BeaconNodeEvent):
     @property
     def dedup_key(self) -> Hashable:
         return self.signed_header_1.message.proposer_index
+
+
+class PayloadAttributesData(msgspec.Struct):
+    proposal_slot: str
+    parent_block_root: str
+    # to-be-removed I believe    parent_block_number: str
+    parent_block_hash: str
+    proposer_index: str
+    payload_attributes: dict[str, Any]
+
+
+class PayloadAttributes(msgspec.Struct):
+    version: ForkVersion
+    data: PayloadAttributesData
+
+
+class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
+    @property
+    def dedup_key(self) -> Hashable:
+        # TODO simplify if possible
+        return f"{self.data.proposal_slot}+{self.data.parent_block_root}+{self.data.proposer_index}"

@@ -24,7 +24,7 @@ from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
 from schemas.beacon_api import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.configs import Network
 from spec.utils import encode_graffiti
 
@@ -96,6 +96,7 @@ def cli_args(
         graffiti=encode_graffiti("graffiti-in-pytest"),
         gas_limit=30_000_000,
         use_external_builder=False,
+        builder_urls=[],
         builder_boost_factor=90,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
@@ -283,7 +284,7 @@ def beacon_chain(vero: Vero) -> BeaconChain:
 
 
 @pytest.fixture
-def spec(vero: Vero) -> SpecFulu:
+def spec(vero: Vero) -> SpecGloas:
     # Just a convenience fixture
     return vero.spec
 

@@ -3,7 +3,7 @@
 ## Upcoming release
 
 #### Features
-
+- Add support for the Gloas fork
 - Replace the SSZ library with spy-ssz ([#333](https://github.com/serenita-org/vero/pull/333))
 
 #### Bugfixes

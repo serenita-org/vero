@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
+from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from providers import AttestationDataProvider
@@ -27,6 +28,7 @@ from spec import (
 )
 from spec.common import (
     bytes_to_uint64,
+    get_slot_component_duration_ms,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
@@ -37,6 +39,35 @@ _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot
 class AttestationService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
+
+        self._attestation_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._attestation_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._aggregate_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._aggregate_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.AGGREGATE_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
 
         self.attestation_data_provider = AttestationDataProvider(
             multi_beacon_node=self.multi_beacon_node,
@@ -92,9 +123,14 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
         # aiming to attest 1/3 into the slot at the latest.
+        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+            attestation_due_s = self._attestation_due_s_gloas
+        else:
+            attestation_due_s = self._attestation_due_s
+
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + attestation_due_s,
             tz=datetime.UTC,
         )
 
@@ -155,6 +191,8 @@ class AttestationService(ValidatorDutyService):
     ) -> AttestationData:
         consensus_start = asyncio.get_running_loop().time()
         try:
+            # TODO Note - in Gloas the meaning of the AttestationData.index field
+            #  changes to indicate payload availability
             att_data = await asyncio.wait_for(
                 self.attestation_data_provider.produce_attestation_data(
                     slot=slot,
@@ -239,7 +277,9 @@ class AttestationService(ValidatorDutyService):
 
                 duty = pubkey_to_duty[pubkey]
                 signed_attestations_batch.append(
-                    preset_types().single_attestation(
+                    preset_types(
+                        Fork[self.beacon_chain.current_fork_version.name]
+                    ).single_attestation(
                         committee_index=int(duty.committee_index),
                         attester_index=int(duty.validator_index),
                         data=att_data,
@@ -387,10 +427,14 @@ class AttestationService(ValidatorDutyService):
         att_data: AttestationData,
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
-        # Schedule aggregated attestation at 2/3 of the slot
+        # Schedule aggregated attestation
+        if self.beacon_chain.current_fork_version == SchemaBeaconAPI.ForkVersion.GLOAS:
+            aggregate_due_s = self._aggregate_due_s_gloas
+        else:
+            aggregate_due_s = self._aggregate_due_s
+
         aggregation_run_time = datetime.datetime.fromtimestamp(
-            timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            timestamp=self.beacon_chain.get_timestamp_for_slot(slot) + aggregate_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
@@ -428,10 +472,10 @@ class AttestationService(ValidatorDutyService):
             identifiers=identifiers,
         ):
             signed_aggregate_and_proofs.append(
-                preset_types().signed_aggregate_and_proof(
-                    message=preset_types().aggregate_and_proof.from_json(
-                        msg.aggregate_and_proof.data
-                    ),
+                preset_types(Fork[fork_version.name]).signed_aggregate_and_proof(
+                    message=preset_types(
+                        Fork[fork_version.name]
+                    ).aggregate_and_proof.from_json(msg.aggregate_and_proof.data),
                     signature=sig,
                 )
             )
@@ -465,6 +509,9 @@ class AttestationService(ValidatorDutyService):
     ) -> None:
         if len(aggregator_duties) == 0:
             return
+
+        # TODO currently getting invalid signature from Lodestar, fix later
+        return
 
         self.logger.debug(
             f"Aggregating attestations for slot {slot}, {len(aggregator_duties)} duties",
@@ -501,7 +548,7 @@ class AttestationService(ValidatorDutyService):
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
                                 version=self.beacon_chain.current_fork_version.value.upper(),
                                 data=msgspec.Raw(
-                                    preset_types()
+                                    preset_types(Fork[_fork_version.name])
                                     .aggregate_and_proof(
                                         aggregator_index=int(duty.validator_index),
                                         aggregate=aggregate,

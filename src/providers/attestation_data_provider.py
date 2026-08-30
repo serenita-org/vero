@@ -11,7 +11,7 @@ from spec import AttestationData, Checkpoint
 from .multi_beacon_node import MultiBeaconNode
 
 if TYPE_CHECKING:
-    from spec.base import SpecFulu
+    from spec.base import SpecGloas
 
 
 class AttestationDataProvider:
@@ -19,7 +19,7 @@ class AttestationDataProvider:
         self,
         multi_beacon_node: MultiBeaconNode,
         scheduler: AsyncIOScheduler,
-        spec: "SpecFulu",
+        spec: "SpecGloas",
     ):
         self.logger = logging.getLogger("AttestationData")
 

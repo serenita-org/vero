@@ -9,7 +9,7 @@ participants:
 
 network_params:
   fulu_fork_epoch: 1
-  seconds_per_slot: 3
+  slot_duration_ms: 3000
 
 additional_services:
   - assertoor
