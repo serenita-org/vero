@@ -31,3 +31,7 @@ class SignedExecutionPayloadBid(msgspec.Struct):
     @property
     def total_value(self) -> int:
         return int(self.message.value) + int(self.message.execution_payment)
+
+    @property
+    def total_value_wei(self) -> int:
+        return int(1e9 * self.total_value)

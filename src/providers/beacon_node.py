@@ -946,6 +946,16 @@ class BeaconNode:
                 ),
             )
 
+            # TODO do something else/more here?
+            #  also we only need this in the BYOB endpoint
+            if (
+                signed_payload_bid
+                and signed_payload_bid.total_value_wei != execution_payload_value_int
+            ):
+                self.logger.warning(
+                    f"Mismatch between supplied bid and execution payload value: {signed_payload_bid.total_value} != {execution_payload_value_int}"
+                )
+
             self.logger.info(
                 f"{self.host} returned block with"
                 f" consensus block value {consensus_block_value_int},"
