@@ -106,7 +106,7 @@ class Builder:
 
                 if resp.status == web.HTTPNoContent.status_code:
                     # No bid is available
-                    self.logger.info(f"No bid available for slot {slot}")
+                    self.logger.info(f"No bid available from {self.base_url}")
                     return None
 
                 resp_bytes = await resp.read()

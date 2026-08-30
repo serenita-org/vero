@@ -95,6 +95,10 @@ class BidSelector:
                 best_p2p_bid = bid_event.data
                 best_p2p_bid_value = bid_event.data.total_value
 
+        self.logger.info(
+            f"Best P2P bid value: {best_p2p_bid_value if best_p2p_bid else 'N/A'}"
+        )
+
         best_direct_bid = await self.multi_builder.get_execution_payload_bid(
             slot=slot,
             parent_hash=payload_attributes_data.parent_block_hash,
@@ -106,8 +110,16 @@ class BidSelector:
             hard_timeout=0.2,
         )
 
+        self.logger.info(
+            f"Best direct bid value: {best_direct_bid.total_value if best_direct_bid else 'N/A'}"
+        )
+
         # TODO which is picked if they have the same value? and which should be?
         #  potuz said direct bid should be preferred in this case on Discord
-        return max(
+        best_bid = max(
             (best_p2p_bid, best_direct_bid), key=(lambda x: x.total_value if x else -1)
         )
+
+        self.logger.info(f"Selected best bid: {best_bid}")
+
+        return best_bid
