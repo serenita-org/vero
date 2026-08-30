@@ -96,6 +96,8 @@ class BidSelector:
                 best_p2p_bid = bid_event.data
                 best_p2p_bid_value = bid_event.data.total_value
 
+        # TODO Entire bid selection logging - high-level useful data into INFO,
+        #  rest into DEBUG, without repeating info.
         self.logger.info(
             f"Best P2P bid value: {best_p2p_bid_value if best_p2p_bid else 'N/A'}"
         )
