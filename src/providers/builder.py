@@ -91,8 +91,8 @@ class Builder:
             url_path = f"/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
             headers = {
                 ETH_CONSENSUS_VERSION: fork_version.value,
-                DATE_MILLISECONDS: time_ns() // 1_000_000,
-                X_TIMEOUT_MS: int(soft_timeout * 1_000),
+                DATE_MILLISECONDS: str(time_ns() // 1_000_000),
+                X_TIMEOUT_MS: str(int(soft_timeout * 1_000)),
             }
             async with self.client_session.post(url_path, headers=headers) as resp:
                 if not resp.ok:

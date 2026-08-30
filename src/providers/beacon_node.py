@@ -861,7 +861,14 @@ class BeaconNode:
             # empty dict
             # lodestar complains otherwise about getting a content-type header application/json
             # and an empty body
-            data = b"{}"
+            # TODO SSZ
+            request_body = dict(
+                # TODO
+                min_bid="0",
+                builder_boost_factor="100",
+                builders=[],
+            )
+            data = msgspec.json.encode(request_body)
 
         accept_header = (
             ContentType.JSON.value
@@ -878,13 +885,11 @@ class BeaconNode:
             },
         ) as tracer_span:
             resp_bytes, content_type, headers = await self._make_request(
-                # TODO switch to POST once discussions are finished
-                method="GET",
+                method="POST",
                 endpoint="/eth/v4/validator/blocks/{slot}",
                 formatted_endpoint_string_params=dict(slot=slot),
                 params=params,
-                # TODO uncomment when adding POST
-                # data=data,
+                data=data,
                 timeout=ClientTimeout(
                     connect=self.client_session.timeout.connect,
                 ),

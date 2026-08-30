@@ -270,48 +270,6 @@ def _mocked_beacon_node_endpoints(
 
             return CallbackResult(body=_data_response(contribution.to_json()))
 
-        # TODO change to POST variant
-        if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
-            slot = int(url.raw_path.split("/")[-1])
-            params = kwargs["params"]
-            if params["include_payload"] == "true":
-                raise NotImplementedError
-
-            request_headers = kwargs["headers"]
-            fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
-            _data = make_block_gloas(slot=slot)
-
-            # Not correct parsing but sufficient for our purposes
-            response_content_type = (
-                ContentType.OCTET_STREAM
-                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
-                else ContentType.JSON
-            )
-
-            exec_payload_value = random.randint(0, 10_000_000)
-            consensus_block_value = random.randint(0, 10_000_000)
-            headers = {
-                CONTENT_TYPE: response_content_type.value,
-                ETH_CONSENSUS_VERSION: fork_version.value,
-                ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
-                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
-                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
-            }
-
-            if response_content_type == ContentType.OCTET_STREAM:
-                return CallbackResult(body=_data.to_ssz(), headers=headers)
-
-            return CallbackResult(
-                body=_data_response(
-                    msgspec.json.encode(msgspec.json.decode(_data.to_json())["data"]),
-                    version=fork_version,
-                    execution_payload_included=False,
-                    execution_payload_value=str(exec_payload_value),
-                    consensus_block_value=str(consensus_block_value),
-                ),
-                headers=headers,
-            )
-
         if re.match("/eth/v1/validator/execution_payload_envelopes/.*", url.raw_path):
             beacon_block_root = url.raw_path.split("/")[-1]
             envelope = make_execution_payload_envelope_gloas(
@@ -388,6 +346,47 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v1/validator/register_validator", url.raw_path):
             return CallbackResult(status=200)
+
+        if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
+            slot = int(url.raw_path.split("/")[-1])
+            params = kwargs["params"]
+            if params["include_payload"] == "true":
+                raise NotImplementedError
+
+            request_headers = kwargs["headers"]
+            fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
+            _data = make_block_gloas(slot=slot)
+
+            # Not correct parsing but sufficient for our purposes
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
+                else ContentType.JSON
+            )
+
+            exec_payload_value = random.randint(0, 10_000_000)
+            consensus_block_value = random.randint(0, 10_000_000)
+            headers = {
+                CONTENT_TYPE: response_content_type.value,
+                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
+                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
+                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
+            }
+
+            if response_content_type == ContentType.OCTET_STREAM:
+                return CallbackResult(body=_data.to_ssz(), headers=headers)
+
+            return CallbackResult(
+                body=_data_response(
+                    msgspec.json.encode(msgspec.json.decode(_data.to_json())["data"]),
+                    version=fork_version,
+                    execution_payload_included=False,
+                    execution_payload_value=str(exec_payload_value),
+                    consensus_block_value=str(consensus_block_value),
+                ),
+                headers=headers,
+            )
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
             headers = kwargs["headers"]

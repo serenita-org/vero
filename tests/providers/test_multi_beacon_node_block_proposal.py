@@ -368,7 +368,7 @@ async def test_produce_best_block(
                     exception,
                     delay,
                 )
-                m.get(
+                m.post(
                     url=url_regex_to_mock,
                     callback=_callback,
                 )
