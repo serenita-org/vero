@@ -97,6 +97,8 @@ class BidSelector:
             hard_timeout=0.2,
         )
 
+        # TODO which is picked if they have the same value? and which should be?
+        #  potuz said direct bid should be preferred in this case on Discord
         return max(
             (best_p2p_bid, best_direct_bid), key=(lambda x: x.total_value if x else -1)
         )
