@@ -85,6 +85,7 @@ class BidSelector:
             if int(bid_event.data.message.slot) != slot:
                 continue
 
+            # TODO - more bid validation?
             if (
                 bid_event.data.message.parent_block_root
                 != payload_attributes_data.parent_block_root

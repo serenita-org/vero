@@ -732,9 +732,13 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
-            selected_bid = await self.bid_selector.get_bid(
-                slot=slot, proposer_duty=duty
-            )
+            selected_bid = None
+            if self.beacon_chain.current_fork_version in (
+                SchemaShared.ForkVersion.GLOAS,
+            ):
+                selected_bid = await self.bid_selector.get_bid(
+                    slot=slot, proposer_duty=duty
+                )
 
             (
                 block_contents_or_blinded_block,
