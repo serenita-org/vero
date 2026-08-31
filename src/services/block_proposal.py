@@ -169,6 +169,9 @@ class BlockProposalService(ValidatorDutyService):
             )
             # TODO
             await self.submit_proposer_preferences()
+            # Pre-establish connections to builders
+            # to avoid tcp+tls handshake overhead on the get-bid request
+            await self.bid_selector.multi_builder.warm_connections()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
         # TODO?

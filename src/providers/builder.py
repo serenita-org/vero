@@ -68,6 +68,18 @@ class Builder:
         raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
         return await response.text()
 
+    async def get_status(self) -> None:
+        async with self.client_session.get(
+            "/eth/v1/builder/status", timeout=ClientTimeout(total=1.0)
+        ) as resp:
+            # Consume the response body so the connection is eligible for reuse.
+            _ = await resp.read()
+
+            if not resp.ok:
+                self.logger.warning(
+                    f"NOK status code {resp.status} for status request to {self.base_url}"
+                )
+
     async def get_execution_payload_bid(
         self,
         slot: int,
@@ -165,6 +177,15 @@ class MultiBuilder:
                 for b in self.builders
                 if not b.client_session.closed
             ],
+        )
+
+    async def warm_connections(self) -> None:
+        # TODO logging -> debug?
+        self.logger.info("Pre-warming builder connections with status requests")
+
+        await asyncio.gather(
+            *(b.get_status() for b in self.builders),
+            return_exceptions=True,
         )
 
     async def get_execution_payload_bid(
