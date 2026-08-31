@@ -287,6 +287,12 @@ class BlockProposalService(ValidatorDutyService):
         if not self.cli_args.use_external_builder:
             return
 
+        if self.beacon_chain.current_fork_version not in (
+            SchemaShared.ForkVersion.ELECTRA,
+            SchemaShared.ForkVersion.FULU,
+        ):
+            return
+
         _batch_size = 512
 
         active_and_pending_validators = (
