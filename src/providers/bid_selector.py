@@ -34,10 +34,14 @@ class BidSelector:
         self, event: SchemaBeaconAPI.ExecutionPayloadBidEvent
     ) -> None:
         if int(event.data.message.slot) in self.proposal_slots:
-            self.logger.info(f"Received bid event: {event}")
+            self.logger.info(
+                f"Received bid event with value: {event.data.message.value}"
+            )
             self.bid_events_store.append(event)
         else:
-            self.logger.debug(f"Ignoring bid event: {event}")
+            self.logger.debug(
+                f"Ignoring bid event for non-proposal slot: {event.data.message.slot}"
+            )
 
     def _get_payload_attributes_data(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
