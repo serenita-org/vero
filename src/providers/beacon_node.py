@@ -953,7 +953,7 @@ class BeaconNode:
                 and signed_payload_bid.total_value_wei != execution_payload_value_int
             ):
                 self.logger.warning(
-                    f"Mismatch between supplied bid and execution payload value: {signed_payload_bid.total_value} != {execution_payload_value_int}"
+                    f"Mismatch between supplied bid and execution payload value: {signed_payload_bid.total_value_wei} != {execution_payload_value_int}"
                 )
 
             self.logger.info(
