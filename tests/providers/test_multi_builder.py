@@ -121,6 +121,27 @@ def _create_bid(
             [
                 BuilderResponse(
                     base_url="https://builder-1",
+                    exception=TimeoutError(),
+                    delay=0.15,
+                ),
+                BuilderResponse(
+                    base_url="https://builder-2",
+                    exception=TimeoutError(),
+                    delay=0.15,
+                ),
+                BuilderResponse(
+                    base_url="https://builder-3",
+                    exception=TimeoutError(),
+                    delay=0.15,
+                ),
+            ],
+            None,
+            id="all builders fail between soft and hard timeout",
+        ),
+        pytest.param(
+            [
+                BuilderResponse(
+                    base_url="https://builder-1",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=4),

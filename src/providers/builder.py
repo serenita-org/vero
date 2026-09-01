@@ -284,7 +284,7 @@ class MultiBuilder:
             # Wait until hard timeout for any builder to return a bid
             elapsed_time = asyncio.get_running_loop().time() - start_time
             remaining_hard_timeout = max(hard_timeout - elapsed_time, 0)
-            while remaining_hard_timeout > 0:
+            while pending and remaining_hard_timeout > 0:
                 done, pending = await asyncio.wait(
                     pending,
                     timeout=remaining_hard_timeout,
