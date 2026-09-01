@@ -28,8 +28,6 @@ from ._response import raise_for_response_size
 if TYPE_CHECKING:
     from .vero import Vero
 
-_TIMEOUT_DEFAULT_CONNECT = 2
-_TIMEOUT_DEFAULT_TOTAL = 0.1
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
@@ -46,10 +44,6 @@ class Builder:
 
         self.client_session = aiohttp.ClientSession(
             base_url=self.base_url,
-            timeout=ClientTimeout(
-                connect=_TIMEOUT_DEFAULT_CONNECT,
-                total=_TIMEOUT_DEFAULT_TOTAL,
-            ),
             headers={
                 ACCEPT: ContentType.JSON.value,
                 CONTENT_TYPE: ContentType.JSON.value,
@@ -107,7 +101,10 @@ class Builder:
                 DATE_MILLISECONDS: str(time_ns() // 1_000_000),
                 X_TIMEOUT_MS: str(int(soft_timeout * 1_000)),
             }
-            async with self.client_session.post(url_path, headers=headers) as resp:
+            timeout = ClientTimeout(total=soft_timeout)
+            async with self.client_session.post(
+                url_path, headers=headers, timeout=timeout
+            ) as resp:
                 if not resp.ok:
                     self.metrics.errors_c.labels(
                         error_type=ErrorType.BUILDER_GET_BID.value,
