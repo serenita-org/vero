@@ -69,20 +69,9 @@ class BidSelector:
             return pa_event.data
         return None
 
-    async def get_bid(
-        self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
+    def _get_best_p2p_bid(
+        self, slot: int, payload_attributes_data: SchemaBeaconAPI.PayloadAttributesData
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
-        payload_attributes_data = self._get_payload_attributes_data(
-            slot=slot, proposer_duty=proposer_duty
-        )
-        if not payload_attributes_data:
-            self.logger.warning(
-                "Unable to fetch bids from builders - did not find corresponding payload attributes data"
-            )
-            return None
-
-        # TODO all the bid value comparison craziness goes here, boost factor, min bid,
-        #  Keymanager API overrides
         best_p2p_bid = None
         best_p2p_bid_value = -1
         for bid_event in self.bid_events_store:
@@ -100,12 +89,25 @@ class BidSelector:
                 best_p2p_bid = bid_event.data
                 best_p2p_bid_value = bid_event.data.total_value
 
+        return best_p2p_bid
+
+    async def get_bid(
+        self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
+    ) -> SchemaShared.SignedExecutionPayloadBid | None:
+        payload_attributes_data = self._get_payload_attributes_data(
+            slot=slot, proposer_duty=proposer_duty
+        )
+        if not payload_attributes_data:
+            self.logger.warning(
+                "Unable to fetch bids from builders - did not find corresponding payload attributes data"
+            )
+            return None
+
+        # TODO all the bid value comparison craziness goes here, boost factor, min bid,
+        #  Keymanager API overrides
+
         # TODO Entire bid selection logging - high-level useful data into INFO,
         #  rest into DEBUG, without repeating info.
-        self.logger.info(
-            f"Best P2P bid value: {best_p2p_bid_value if best_p2p_bid else 'N/A'}"
-        )
-
         best_direct_bid = await self.multi_builder.get_execution_payload_bid(
             slot=slot,
             parent_hash=payload_attributes_data.parent_block_hash,
@@ -116,9 +118,15 @@ class BidSelector:
             soft_timeout=1.0,
             hard_timeout=1.2,
         )
-
         self.logger.info(
             f"Best direct bid value: {best_direct_bid.total_value if best_direct_bid else 'N/A'}"
+        )
+
+        best_p2p_bid = self._get_best_p2p_bid(
+            slot=slot, payload_attributes_data=payload_attributes_data
+        )
+        self.logger.info(
+            f"Best P2P bid value: {best_p2p_bid.total_value if best_p2p_bid else 'N/A'}"
         )
 
         # TODO which is picked if they have the same value? and which should be?
@@ -128,5 +136,4 @@ class BidSelector:
         )
 
         self.logger.info(f"Selected best bid: {best_bid}")
-
         return best_bid
