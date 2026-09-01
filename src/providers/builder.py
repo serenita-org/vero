@@ -345,6 +345,8 @@ class MultiBuilder:
                 elapsed_time = asyncio.get_running_loop().time() - start_time
                 remaining_soft_timeout = max(soft_timeout - elapsed_time, 0)
 
+            # TODO cancel pending tasks when returning from this function
+
             # Soft timeout reached or all tasks finished
             # If we have a bid at this point, we use it
             if best_bid:
