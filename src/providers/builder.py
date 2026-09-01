@@ -94,7 +94,7 @@ class Builder:
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,
             attributes={
-                "server.address": self.base_url,
+                "server.address": str(self.base_url),
             },
         ):
             # TODO Content-Type header
