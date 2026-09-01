@@ -162,6 +162,8 @@ class BlockProposalService(ValidatorDutyService):
             # just before a block proposal is scheduled to decrease
             # the chances of the fee recipient being set incorrectly,
             # e.g., due to a beacon node restarting.
+            # TODO these things in here can be run out of order, let's create tasks
+            #  in self.task_manager
             await self.prepare_beacon_proposer()
             await self.register_validators(
                 current_slot=slot,
