@@ -247,6 +247,13 @@ class BlockProposalService(ValidatorDutyService):
                 )
                 self.bid_selector.proposal_slots.add(int(duty.slot))
 
+            if fetched_duties:
+                self.task_manager.create_task(
+                    self.bid_selector.multi_builder.cache_bid_request_auth_data(
+                        proposal_duties=fetched_duties
+                    )
+                )
+
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
             )

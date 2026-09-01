@@ -9,6 +9,11 @@ class ForkVersion(Enum):
     GLOAS = "gloas"
 
 
+class BuilderRequestAuth(msgspec.Struct):
+    data: str
+    slot: str
+
+
 class ExecutionPayloadBid(msgspec.Struct):
     parent_block_hash: str
     parent_block_root: str

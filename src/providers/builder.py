@@ -15,7 +15,7 @@ from yarl import URL
 
 from observability import ErrorType, get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
-from schemas import SchemaBuilderAPI, SchemaShared
+from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner, SchemaShared
 
 from ._headers import (
     DATE_MILLISECONDS,
@@ -26,6 +26,8 @@ from ._headers import (
 from ._response import raise_for_response_size
 
 if TYPE_CHECKING:
+    from providers import SignatureProvider
+
     from .vero import Vero
 
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
@@ -57,11 +59,45 @@ class Builder:
             read_bufsize=2**19,
         )
 
+        self._bid_request_auth_cache: dict[
+            tuple[int, str], SchemaBuilderAPI.SignedBuilderRequestAuth
+        ] = {}
+
     # TODO refactor -> ApiClient base class?
     @staticmethod
     async def _read_error_text(response: aiohttp.ClientResponse) -> str:
         raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
         return await response.text()
+
+    async def _cache_bid_request_auth_data(
+        self,
+        proposal_duties: list[SchemaBeaconAPI.ProposerDuty],
+        signature_provider: SignatureProvider,
+    ) -> None:
+        for duty in proposal_duties:
+            _cache_key = (int(duty.slot), duty.pubkey)
+            if _cache_key in self._bid_request_auth_cache:
+                continue
+
+            self.logger.debug(f"Caching builder request data for {_cache_key}")
+
+            message, signature, _ = await signature_provider.sign(
+                message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
+                    builder_request_auth=SchemaShared.BuilderRequestAuth(
+                        # TODO support variable data from Keymgr API
+                        data=str(self.base_url),
+                        slot=duty.slot,
+                    ),
+                ),
+                identifier=duty.pubkey,
+            )
+
+            signed_builder_request_auth = SchemaBuilderAPI.SignedBuilderRequestAuth(
+                message=message.builder_request_auth,
+                signature=signature,
+            )
+
+            self._bid_request_auth_cache[_cache_key] = signed_builder_request_auth
 
     async def get_status(self) -> None:
         async with self.client_session.get(
@@ -96,6 +132,18 @@ class Builder:
             #          maybe? We do then send it to N beacon nodes so savings are not just 1x
             # TODO SignedBuilderRequestAuth in request body - seems to be required now?
             url_path = f"/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
+
+            _cache_key = (slot, proposer_pubkey)
+            try:
+                signed_builder_request_auth = self._bid_request_auth_cache.pop(
+                    _cache_key
+                )
+            except KeyError:
+                self.logger.error(
+                    f"No builder request auth for {_cache_key} -> {self.base_url}"
+                )
+                return None
+
             headers = {
                 ETH_CONSENSUS_VERSION: fork_version.value,
                 DATE_MILLISECONDS: str(time_ns() // 1_000_000),
@@ -103,7 +151,10 @@ class Builder:
             }
             timeout = ClientTimeout(total=soft_timeout)
             async with self.client_session.post(
-                url_path, headers=headers, timeout=timeout
+                url_path,
+                headers=headers,
+                timeout=timeout,
+                data=msgspec.json.encode(signed_builder_request_auth),
             ) as resp:
                 if not resp.ok:
                     self.metrics.errors_c.labels(
@@ -184,6 +235,21 @@ class MultiBuilder:
         await asyncio.gather(
             *(b.get_status() for b in self.builders),
             return_exceptions=True,
+        )
+
+    async def cache_bid_request_auth_data(
+        self,
+        proposal_duties: list[SchemaBeaconAPI.ProposerDuty],
+        signature_provider: SignatureProvider,
+    ) -> None:
+        await asyncio.gather(
+            *(
+                b._cache_bid_request_auth_data(
+                    proposal_duties=proposal_duties,
+                    signature_provider=signature_provider,
+                )
+                for b in self.builders
+            )
         )
 
     async def get_execution_payload_bid(

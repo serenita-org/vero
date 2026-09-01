@@ -3,6 +3,8 @@ from typing import Any, TypeVar
 
 import msgspec
 
+from .shared import BuilderRequestAuth
+
 
 class SigningRequestType(Enum):
     AGGREGATE_AND_PROOF_V2 = "AGGREGATE_AND_PROOF_V2"
@@ -11,6 +13,7 @@ class SigningRequestType(Enum):
     BLOCK_V2 = "BLOCK_V2"
     EXECUTION_PAYLOAD_ENVELOPE = "EXECUTION_PAYLOAD_ENVELOPE"
     PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES"
+    BUILDER_REQUEST_AUTH = "BUILDER_REQUEST_AUTH"
     RANDAO_REVEAL = "RANDAO_REVEAL"
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
     SYNC_COMMITTEE_MESSAGE = "SYNC_COMMITTEE_MESSAGE"
@@ -85,6 +88,11 @@ class ProposerPreferences(msgspec.Struct):
 class ProposerPreferencesSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.PROPOSER_PREFERENCES
     proposer_preferences: ProposerPreferences
+
+
+class BuilderRequestAuthSignableMessage(SignableMessage, kw_only=True):
+    type: SigningRequestType = SigningRequestType.BUILDER_REQUEST_AUTH
+    builder_request_auth: BuilderRequestAuth
 
 
 class BeaconBlockHeader(msgspec.Struct):
