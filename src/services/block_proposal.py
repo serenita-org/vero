@@ -250,7 +250,8 @@ class BlockProposalService(ValidatorDutyService):
             if fetched_duties:
                 self.task_manager.create_task(
                     self.bid_selector.multi_builder.cache_bid_request_auth_data(
-                        proposal_duties=fetched_duties
+                        proposal_duties=fetched_duties,
+                        signature_provider=self.signature_provider,
                     )
                 )
 

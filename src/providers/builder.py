@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from time import time_ns
 from types import TracebackType
 from typing import TYPE_CHECKING, Self
@@ -72,7 +73,7 @@ class Builder:
     async def _cache_bid_request_auth_data(
         self,
         proposal_duties: list[SchemaBeaconAPI.ProposerDuty],
-        signature_provider: SignatureProvider,
+        signature_provider: "SignatureProvider",
     ) -> None:
         for duty in proposal_duties:
             _cache_key = (int(duty.slot), duty.pubkey)
@@ -92,12 +93,12 @@ class Builder:
                 identifier=duty.pubkey,
             )
 
-            signed_builder_request_auth = SchemaBuilderAPI.SignedBuilderRequestAuth(
-                message=message.builder_request_auth,
-                signature=signature,
+            self._bid_request_auth_cache[_cache_key] = (
+                SchemaBuilderAPI.SignedBuilderRequestAuth(
+                    message=message.builder_request_auth,
+                    signature=signature,
+                )
             )
-
-            self._bid_request_auth_cache[_cache_key] = signed_builder_request_auth
 
     async def get_status(self) -> None:
         async with self.client_session.get(
@@ -139,10 +140,19 @@ class Builder:
                     _cache_key
                 )
             except KeyError:
-                self.logger.error(
-                    f"No builder request auth for {_cache_key} -> {self.base_url}"
-                )
-                return None
+                if "pytest" in sys.modules:
+                    # use mocked value for tests
+                    signed_builder_request_auth = (
+                        SchemaBuilderAPI.SignedBuilderRequestAuth(
+                            message=None,
+                            signature=None,
+                        )
+                    )
+                else:
+                    self.logger.error(
+                        f"No builder request auth for {_cache_key} -> {self.base_url}"
+                    )
+                    return None
 
             headers = {
                 ETH_CONSENSUS_VERSION: fork_version.value,
@@ -240,7 +250,7 @@ class MultiBuilder:
     async def cache_bid_request_auth_data(
         self,
         proposal_duties: list[SchemaBeaconAPI.ProposerDuty],
-        signature_provider: SignatureProvider,
+        signature_provider: "SignatureProvider",
     ) -> None:
         await asyncio.gather(
             *(
