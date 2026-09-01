@@ -113,8 +113,8 @@ class BidSelector:
             proposer_pubkey=proposer_duty.pubkey,
             fork_version=self.beacon_chain.current_fork_version,
             # TODO parametrize/hardcode, similar to block production timeout
-            soft_timeout=0.1,
-            hard_timeout=0.2,
+            soft_timeout=1.0,
+            hard_timeout=1.2,
         )
 
         self.logger.info(
