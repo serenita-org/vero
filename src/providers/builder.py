@@ -85,7 +85,7 @@ class Builder:
             message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
                 builder_request_auth=SchemaShared.BuilderRequestAuth(
                     # TODO support variable data from Keymgr API
-                    data=str(self.base_url),
+                    data="0x" + str(self.base_url).encode().hex(),
                     slot=proposer_duty.slot,
                 ),
             ),
