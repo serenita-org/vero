@@ -11,6 +11,7 @@ from aiohttp import ClientTimeout, web
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
+from yarl import URL
 
 from observability import ErrorType, get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
@@ -38,8 +39,8 @@ class Builder:
         self.logger = logging.getLogger(self.__class__.__name__)
         self.metrics = vero.metrics
         self.tracer = trace.get_tracer(self.__class__.__name__)
-        self.base_url = base_url
-        _host = urlparse(self.base_url).hostname or ""
+        self.base_url = URL(base_url)
+        _host = urlparse(base_url).hostname or ""
         if not _host:
             raise ValueError(f"Failed to parse hostname from {base_url}")
 
