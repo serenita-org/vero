@@ -119,6 +119,7 @@ class Builder:
         proposer_pubkey: str,
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
+        hard_timeout: float,
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
@@ -158,7 +159,7 @@ class Builder:
                 DATE_MILLISECONDS: str(time_ns() // 1_000_000),
                 X_TIMEOUT_MS: str(int(soft_timeout * 1_000)),
             }
-            timeout = ClientTimeout(total=soft_timeout)
+            timeout = ClientTimeout(total=hard_timeout)
             async with self.client_session.post(
                 url_path,
                 headers=headers,
@@ -190,7 +191,9 @@ class Builder:
                 resp_decoded = msgspec.json.decode(
                     resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
                 )
-                self.logger.debug(f"Received bid: {resp_decoded.data}")
+                self.logger.debug(
+                    f"Received bid from {self.base_url}: {resp_decoded.data}"
+                )
 
                 # TODO bid verification? or shall we just let the beacon node handle
                 #  all this?
@@ -302,6 +305,7 @@ class MultiBuilder:
                         proposer_pubkey=proposer_pubkey,
                         fork_version=fork_version,
                         soft_timeout=soft_timeout,
+                        hard_timeout=hard_timeout,
                     )
                 )
                 for builder in self.builders
@@ -342,16 +346,16 @@ class MultiBuilder:
                 remaining_soft_timeout = max(soft_timeout - elapsed_time, 0)
 
             # Soft timeout reached or all tasks finished
-            if len(pending) == 0:
-                if best_bid:
-                    self.logger.info(
-                        f"Selected best bid with value {best_bid_value_gwei}"
-                    )
-                    return best_bid
-                self.logger.info("No bid retrieved from builders")
+            # If we have a bid at this point, we use it
+            if best_bid:
+                self.logger.info(f"Selected best bid with value {best_bid_value_gwei}")
+                return best_bid
+            if not pending:
+                self.logger.info("No bids returned by builders")
                 return None
 
-            # Soft timeout reached but not all tasks finished
+            # Soft timeout reached, but we have no bid yet and we have pending tasks.
+            # We wait until hard timeout for any builder to return a bid
             self.logger.warning("Bid selection soft timeout reached.")
             # Wait until hard timeout for any builder to return a bid
             elapsed_time = asyncio.get_running_loop().time() - start_time
@@ -373,6 +377,7 @@ class MultiBuilder:
                     if result is None:
                         # No bid from builder
                         continue
+
                     self.logger.info(
                         f"Selected first bid with value {result.total_value}"
                     )
@@ -382,5 +387,6 @@ class MultiBuilder:
                 elapsed_time = asyncio.get_running_loop().time() - start_time
                 remaining_hard_timeout = max(hard_timeout - elapsed_time, 0)
 
-            self.logger.warning("Bid selection hard timeout reached")
+            if pending:
+                self.logger.warning("Bid selection hard timeout reached")
             return None
