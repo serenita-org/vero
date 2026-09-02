@@ -433,7 +433,8 @@ class BlockProposalService(ValidatorDutyService):
             # TODO unhardcode
             _fork_version = SchemaShared.ForkVersion.GLOAS
 
-            # TODO submit to builders directly instead of via beacon node
+            # TODO submit directly to builders too,
+            #  instead of only via beacon node -> gossip
             # await self.bid_selector.multi_builder.submit_proposer_preferences(...)
             await self.multi_beacon_node.submit_proposer_preferences(
                 signed_proposer_preferences=[
