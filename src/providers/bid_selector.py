@@ -37,6 +37,7 @@ class BidSelector:
             self.logger.info(
                 f"Received bid event with value: {event.data.message.value}"
             )
+            # TODO check fee recipient
             self.bid_events_store.append(event)
         else:
             self.logger.debug(
