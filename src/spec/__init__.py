@@ -5,6 +5,7 @@ from .preset import (
     BeaconBlock as BeaconBlock,
     Checkpoint as Checkpoint,
     ContributionAndProof as ContributionAndProof,
+    PayloadAttestationData as PayloadAttestationData,
     Preset as Preset,
     PresetTypes as PresetTypes,
     SignedAggregateAndProof as SignedAggregateAndProof,

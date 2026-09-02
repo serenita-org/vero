@@ -127,7 +127,7 @@ def _init_observability() -> None:
 @pytest.fixture
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
-) -> Generator[None, None, None]:
+) -> Generator[ForkVersion, None, None]:
     requested_fork_version = getattr(request, "param", ForkVersion.GLOAS)
 
     with (
@@ -138,7 +138,7 @@ def fork_version(
             return_value=Fork[requested_fork_version.name],
         ),
     ):
-        yield
+        yield requested_fork_version
 
 
 @pytest.fixture(scope="session")

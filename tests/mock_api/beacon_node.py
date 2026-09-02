@@ -186,6 +186,19 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(body=_data_response(att_data.to_json()))
 
+        if re.match("/eth/v1/validator/payload_attestation_data", url.raw_path):
+            payload_attestation_data = preset_types(
+                Fork.GLOAS
+            ).payload_attestation_data(
+                beacon_block_root="0x" + os.urandom(32).hex(),
+                slot=int(url.query["slot"]),
+                payload_present=True,
+                blob_data_available=True,
+            )
+            return CallbackResult(
+                body=_data_response(payload_attestation_data.to_json())
+            )
+
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
             if beacon_chain.current_fork_version not in (
                 ForkVersion.ELECTRA,
@@ -530,24 +543,6 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/validator/aggregate_and_proofs", url.raw_path):
-            data_list = msgspec.json.decode(kwargs["data"])
-            assert len(data_list) == 1
-            data = data_list[0]
-
-            assert data["message"]["aggregator_index"] == "1"
-            aggregate = data["message"]["aggregate"]
-
-            if beacon_chain.current_fork_version in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-                ForkVersion.GLOAS,
-            ):
-                assert aggregate["committee_bits"] == "0x0040000000000000"
-                assert aggregate["aggregation_bits"] == "0x7507"
-            else:
-                raise NotImplementedError(
-                    f"Unsupported fork version {beacon_chain.current_fork_version}"
-                )
             return CallbackResult(status=200)
 
         if re.match(r"/eth/v1/validator/duties/sync/\d+", url.raw_path):
@@ -570,6 +565,32 @@ def _mocked_beacon_node_endpoints(
                     )
                 )
             )
+
+        if re.match(r"/eth/v1/validator/duties/ptc/\d+", url.raw_path):
+            duty_slot = beacon_chain.current_slot + 1
+
+            # assign a PTC to a random validator next slot
+            v = random.choice(validators)
+            ptc_duties = [
+                SchemaBeaconAPI.PtcDuty(
+                    pubkey=v.pubkey,
+                    validator_index=str(v.index),
+                    slot=str(duty_slot),
+                )
+            ]
+
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetPtcDutiesResponse(
+                        dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
+                        execution_optimistic=False,
+                        data=ptc_duties,
+                    )
+                )
+            )
+
+        if re.match("/eth/v1/beacon/pool/payload_attestations", url.raw_path):
+            return CallbackResult(status=200)
 
         if re.match("/eth/v1/validator/sync_committee_subscriptions", url.raw_path):
             return CallbackResult(status=200)

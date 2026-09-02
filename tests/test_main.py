@@ -106,12 +106,16 @@ async def test_lifecycle(
                 "Updated duties",
                 "Published block for slot",
                 "Published attestations for slot",
+                "Published aggregate and proofs for slot",
                 "Published sync committee messages for slot",
+                "Published sync committee contribution and proofs for slot",
             ]
         )
 
-        # TODO for Gloas, also require the payload envelope to be published
-        #  in the self-build case
+        if fork_version == ForkVersion.GLOAS:
+            required_log_lines.append("Published PTC attestations for slot")
+
+        # TODO for Gloas, also require the payload envelope in the self-build case.
 
     timeout = 5
     start = asyncio.get_running_loop().time()

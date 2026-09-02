@@ -125,7 +125,7 @@ class SyncCommitteeService(ValidatorDutyService):
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule sync message job at the deadline in case
         # it is not triggered earlier by a new HeadEvent,
-        # aiming to produce it 1/3 into the slot at the latest.
+        # aiming to produce it self._sync_message_due_s into the slot at the latest.
         if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             sync_message_due_s = self._sync_message_due_s_gloas
         else:

@@ -160,6 +160,17 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
     data: list[SyncDuty]
 
 
+class PtcDuty(msgspec.Struct, frozen=True):
+    pubkey: str
+    validator_index: str
+    slot: str
+
+
+class GetPtcDutiesResponse(ExecutionOptimisticResponse):
+    dependent_root: str
+    data: list[PtcDuty]
+
+
 # Block production
 class ProduceBlockV3Response(msgspec.Struct):
     version: ForkVersion
@@ -207,7 +218,18 @@ class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.block
+        return "head " + self.block
+
+
+class ExecutionPayloadAvailableEvent(BeaconNodeEvent):
+    slot: str
+    block_root: str
+
+    @property
+    def dedup_key(self) -> Hashable:
+        # A head event's dedup key is also the block root,
+        # so we need to differentiate by using an event-specific prefix
+        return "epa " + self.block_root
 
 
 # TODO HeadEventV2
@@ -221,7 +243,7 @@ class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.new_head_block
+        return "reorg " + self.new_head_block
 
 
 # Slashing events
@@ -235,7 +257,7 @@ class AttesterSlashingEvent(BeaconNodeEvent):
 
     @property
     def dedup_key(self) -> Hashable:
-        return str(
+        return "att_slash " + str(
             set(self.attestation_1.attesting_indices)
             & set(self.attestation_2.attesting_indices)
         )
@@ -255,7 +277,7 @@ class ProposerSlashingEvent(BeaconNodeEvent):
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.signed_header_1.message.proposer_index
+        return "prop_slash " + self.signed_header_1.message.proposer_index
 
 
 class ExecutionPayloadBidEvent(BeaconNodeEvent):
@@ -268,7 +290,7 @@ class ExecutionPayloadBidEvent(BeaconNodeEvent):
         #  but this is based on:
         #  - the same block can potentially have different CL bid values
         #  - for EL payments, the block hash would change
-        return self.data.message.block_hash + self.data.message.value
+        return "bid " + self.data.message.block_hash + self.data.message.value
 
 
 class PayloadAttributesData(msgspec.Struct):
@@ -288,4 +310,7 @@ class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
     @property
     def dedup_key(self) -> Hashable:
         # TODO simplify if possible
-        return f"{self.data.proposal_slot}+{self.data.parent_block_root}+{self.data.proposer_index}"
+        return (
+            "payload_attrs "
+            f"{self.data.proposal_slot}+{self.data.parent_block_root}+{self.data.proposer_index}"
+        )

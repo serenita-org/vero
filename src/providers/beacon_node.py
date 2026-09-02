@@ -53,6 +53,7 @@ from spec import (
     Attestation,
     AttestationData,
     Checkpoint,
+    PayloadAttestationData,
     SyncCommitteeContribution,
     preset_types,
 )
@@ -78,6 +79,10 @@ class BeaconNodeUnsupportedEndpoint(Exception):
 
 
 class BeaconNodeReturnedBadRequest(Exception):
+    pass
+
+
+class NoContentResponse(Exception):
     pass
 
 
@@ -215,6 +220,8 @@ class BeaconNode:
     @staticmethod
     async def _handle_nok_status_code(response: aiohttp.ClientResponse) -> None:
         if response.ok:
+            if response.status == 204:
+                raise NoContentResponse
             return
 
         resp_text = await BeaconNode._read_error_text(response)
@@ -308,6 +315,8 @@ class BeaconNode:
                 return await self._read_response_bytes(resp), content_type, resp.headers
         except BeaconNodeNotReady:
             self.score -= BeaconNode.SCORE_DELTA_FAILURE
+            raise
+        except NoContentResponse:
             raise
         except Exception as e:
             self.logger.debug(
@@ -556,6 +565,25 @@ class BeaconNode:
 
         return response
 
+    async def get_ptc_duties(
+        self,
+        epoch: int,
+        indices: list[int],
+    ) -> SchemaBeaconAPI.GetPtcDutiesResponse:
+        resp_bytes, _, _ = await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/validator/duties/ptc/{epoch}",
+            formatted_endpoint_string_params=dict(epoch=epoch),
+            data=self.json_encoder.encode([str(i) for i in indices]),
+        )
+
+        response = msgspec.json.decode(
+            resp_bytes, type=SchemaBeaconAPI.GetPtcDutiesResponse
+        )
+        self._raise_if_optimistic(response)
+
+        return response
+
     async def publish_sync_committee_messages(
         self,
         encoded_messages: bytes,
@@ -678,6 +706,40 @@ class BeaconNode:
             method="POST",
             endpoint="/eth/v1/validator/contribution_and_proofs",
             data=encoded_signed_contribution_and_proofs,
+        )
+
+    async def produce_payload_attestation_data(
+        self,
+        slot: int,
+    ) -> PayloadAttestationData | None:
+        try:
+            resp_bytes, _, _ = await self._make_request(
+                method="GET",
+                endpoint="/eth/v1/validator/payload_attestation_data",
+                params=dict(slot=slot),
+            )
+        except NoContentResponse:
+            # No block has been seen for the requested slot.
+            # Used to signal validator to not cast any payload attestation.
+            return None
+
+        response = msgspec.json.decode(
+            resp_bytes, type=SchemaBeaconAPI.RawDataResponse
+        )
+        return preset_types(
+            self._fork_for_slot(slot)
+        ).payload_attestation_data.from_json(response.data)
+
+    async def publish_payload_attestation_messages(
+        self,
+        encoded_messages: bytes,
+        fork_version: SchemaShared.ForkVersion,
+    ):
+        await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/beacon/pool/payload_attestations",
+            data=encoded_messages,
+            headers={ETH_CONSENSUS_VERSION: fork_version.value},
         )
 
     async def prepare_beacon_proposer(self, data: list[dict[str, str]]) -> None:
@@ -1126,6 +1188,7 @@ class BeaconNode:
             str, type[SchemaBeaconAPI.BeaconNodeEvent]
         ] = dict(
             head=SchemaBeaconAPI.HeadEvent,
+            execution_payload_available=SchemaBeaconAPI.ExecutionPayloadAvailableEvent,
             chain_reorg=SchemaBeaconAPI.ChainReorgEvent,
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
             proposer_slashing=SchemaBeaconAPI.ProposerSlashingEvent,

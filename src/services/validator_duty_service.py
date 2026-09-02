@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 class ValidatorDuty(Enum):
     ATTESTATION = "attestation"
     ATTESTATION_AGGREGATION = "attestation-aggregation"
+    PTC_ATTESTATION = "ptc-attestation"
     BLOCK_PROPOSAL = "block-proposal"
     SYNC_COMMITTEE_MESSAGE = "sync-committee-message"
     SYNC_COMMITTEE_CONTRIBUTION = "sync-committee-contribution"
@@ -142,6 +143,9 @@ class ValidatorDutyService:
         self.logger.info("Validator duty completed")
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        raise NotImplementedError
+
+    def _prune_duties(self) -> None:
         raise NotImplementedError
 
     async def _update_duties(self) -> None:

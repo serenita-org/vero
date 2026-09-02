@@ -122,7 +122,7 @@ class AttestationService(ValidatorDutyService):
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadEvent,
-        # aiming to attest 1/3 into the slot at the latest.
+        # aiming to attest self._attestation_due_s into the slot at the latest.
         if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             attestation_due_s = self._attestation_due_s_gloas
         else:

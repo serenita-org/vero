@@ -10,6 +10,7 @@ class SigningRequestType(Enum):
     AGGREGATE_AND_PROOF_V2 = "AGGREGATE_AND_PROOF_V2"
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
+    PAYLOAD_ATTESTATION_MESSAGE = "PAYLOAD_ATTESTATION_MESSAGE"
     BLOCK_V2 = "BLOCK_V2"
     EXECUTION_PAYLOAD_ENVELOPE = "EXECUTION_PAYLOAD_ENVELOPE"
     PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES"
@@ -47,6 +48,11 @@ class SignableMessageWithForkInfo(SignableMessage, kw_only=True):
 class AttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.ATTESTATION
     attestation: msgspec.Raw
+
+
+class PayloadAttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.PAYLOAD_ATTESTATION_MESSAGE
+    payload_attestation_message: msgspec.Raw
 
 
 class Slot(msgspec.Struct):

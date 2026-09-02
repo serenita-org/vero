@@ -59,6 +59,7 @@ from spec import (
     AttestationData,
     BeaconBlock,
     Checkpoint,
+    PayloadAttestationData,
     SignedAggregateAndProof,
     SignedContributionAndProof,
     SingleAttestation,
@@ -67,6 +68,7 @@ from spec import (
     preset_types,
 )
 from spec.configs import Network
+from spec.preset import PayloadAttestationMessage
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
@@ -838,4 +840,31 @@ class MultiBeaconNode:
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs",
             encoded_signed_contribution_and_proofs=encoded,
+        )
+
+    async def get_ptc_duties(
+        self,
+        epoch: int,
+        indices: list[int],
+    ) -> SchemaBeaconAPI.GetPtcDutiesResponse:
+        return await self.best_beacon_node.get_ptc_duties(epoch=epoch, indices=indices)
+
+    async def produce_payload_attestation_data(
+        self,
+        slot: int,
+    ) -> PayloadAttestationData | None:
+        return await self._get_first_beacon_node_response(
+            func_name="produce_payload_attestation_data",
+            slot=slot,
+        )
+
+    async def publish_payload_attestation_messages(
+        self,
+        messages: list[PayloadAttestationMessage],
+        fork_version: SchemaShared.ForkVersion,
+    ) -> None:
+        await self._get_all_beacon_node_responses(
+            func_name="publish_payload_attestation_messages",
+            encoded_messages=encode_json_array(messages),
+            fork_version=fork_version,
         )

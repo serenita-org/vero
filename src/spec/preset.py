@@ -15,6 +15,8 @@ from spy_ssz import (
     ContributionAndProofFulu,
     ContributionAndProofGloas,
     Fork,
+    PayloadAttestationDataGloas,
+    PayloadAttestationMessageGloas,
     Preset as SpyPreset,
     SignedAggregateAndProofElectra,
     SignedAggregateAndProofFulu,
@@ -69,6 +71,8 @@ SingleAttestation = (
 SyncCommitteeMessage = (
     SyncCommitteeMessageElectra | SyncCommitteeMessageFulu | SyncCommitteeMessageGloas
 )
+PayloadAttestationData = PayloadAttestationDataGloas
+PayloadAttestationMessage = PayloadAttestationMessageGloas
 SignedAggregateAndProof = (
     SignedAggregateAndProofElectra
     | SignedAggregateAndProofFulu
@@ -104,6 +108,8 @@ class PresetTypes:
     aggregate_and_proof: type[AggregateAndProof]
     sync_committee_contribution: type[SyncCommitteeContribution]
     contribution_and_proof: type[ContributionAndProof]
+    payload_attestation_data: type[PayloadAttestationData]
+    payload_attestation_message: type[PayloadAttestationMessage]
     single_attestation: type[SingleAttestation]
     sync_committee_message: type[SyncCommitteeMessage]
     signed_aggregate_and_proof: type[SignedAggregateAndProof]
@@ -144,6 +150,8 @@ def _initialize_fork_types(
             AggregateAndProofElectra,
             SyncCommitteeContributionElectra,
             ContributionAndProofElectra,
+            PayloadAttestationDataGloas,
+            PayloadAttestationMessageGloas,
             SingleAttestationElectra,
             SyncCommitteeMessageElectra,
             SignedAggregateAndProofElectra,
@@ -155,6 +163,8 @@ def _initialize_fork_types(
             AggregateAndProofFulu,
             SyncCommitteeContributionFulu,
             ContributionAndProofFulu,
+            PayloadAttestationDataGloas,
+            PayloadAttestationMessageGloas,
             SingleAttestationFulu,
             SyncCommitteeMessageFulu,
             SignedAggregateAndProofFulu,
@@ -166,6 +176,8 @@ def _initialize_fork_types(
             AggregateAndProofGloas,
             SyncCommitteeContributionGloas,
             ContributionAndProofGloas,
+            PayloadAttestationDataGloas,
+            PayloadAttestationMessageGloas,
             SingleAttestationGloas,
             SyncCommitteeMessageGloas,
             SignedAggregateAndProofGloas,
@@ -178,6 +190,8 @@ def _initialize_fork_types(
         aggregate_and_proof,
         sync_committee_contribution,
         contribution_and_proof,
+        payload_attestation_data,
+        payload_attestation_message,
         single_attestation,
         sync_committee_message,
         signed_aggregate_and_proof,
@@ -205,6 +219,14 @@ def _initialize_fork_types(
         contribution_and_proof=cast(
             "type[ContributionAndProof]",
             _resolve_type(spy_preset, contribution_and_proof),
+        ),
+        payload_attestation_data=cast(
+            "type[PayloadAttestationData]",
+            _resolve_type(spy_preset, payload_attestation_data),
+        ),
+        payload_attestation_message=cast(
+            "type[PayloadAttestationMessage]",
+            _resolve_type(spy_preset, payload_attestation_message),
         ),
         single_attestation=cast(
             "type[SingleAttestation]",

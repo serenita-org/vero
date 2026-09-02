@@ -63,7 +63,7 @@ def event_consumer(
                     attesting_indices=["2", "4", "5"]
                 ),
             ),
-            ["AttesterSlashingEvent: {'2'}"],
+            ["AttesterSlashingEvent: att_slash {'2'}"],
             id="AttesterSlashingEvent",
         ),
         pytest.param(
@@ -79,7 +79,7 @@ def event_consumer(
                     )
                 ),
             ),
-            ["ProposerSlashingEvent: 1234"],
+            ["ProposerSlashingEvent: prop_slash 1234"],
             id="ProposerSlashingEvent",
         ),
     ],
@@ -132,5 +132,5 @@ async def test_recent_event_keys(
     # The last 10 event keys should be cached
     assert len(event_consumer._recent_event_keys) == 10
     assert list(event_consumer._recent_event_keys) == [
-        f"0xblock-{i}" for i in range(90, 100)
+        f"head 0xblock-{i}" for i in range(90, 100)
     ]
