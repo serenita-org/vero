@@ -583,9 +583,6 @@ class MultiBeaconNode:
                 # New AttestationData has arrived from this host
                 self.logger.debug(f"AttestationData received from {host}: {att_data}")
                 host_to_att_data[host] = att_data
-                # TODO should we loosen this? AttestationData.index may differ
-                #  depending on the beacon node - the index now represents payloa
-                #  status EMPTY/FULL
                 att_data_counter[att_data] += 1
                 if prev_att_data is not None:
                     att_data_counter[prev_att_data] -= 1
