@@ -96,6 +96,8 @@ class BidSelector:
     async def get_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
+        # TODO consider builder boost factor + min_bid here
+
         payload_attributes_data = self._get_payload_attributes_data(
             slot=slot, proposer_duty=proposer_duty
         )
