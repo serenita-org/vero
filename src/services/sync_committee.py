@@ -124,7 +124,7 @@ class SyncCommitteeService(ValidatorDutyService):
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule sync message job at the deadline in case
-        # it is not triggered earlier by a new HeadEvent,
+        # it is not triggered earlier by a new HeadV2Event,
         # aiming to produce it self._sync_message_due_s into the slot at the latest.
         if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             sync_message_due_s = self._sync_message_due_s_gloas
@@ -150,9 +150,11 @@ class SyncCommitteeService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadV2Event, _: str
+    ) -> None:
         await self.produce_sync_message(
-            duty_slot=int(event.slot),
+            duty_slot=int(event.data.slot),
             head_event=event,
         )
 
@@ -273,7 +275,7 @@ class SyncCommitteeService(ValidatorDutyService):
         self,
         duty_slot: int,
         sync_period: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None,
         sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
     ) -> None:
         self.logger.debug(
@@ -285,7 +287,7 @@ class SyncCommitteeService(ValidatorDutyService):
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
 
         beacon_block_root = (
-            head_event.block if head_event else await self._get_head_block_root()
+            head_event.data.block if head_event else await self._get_head_block_root()
         )
 
         # Use the beacon_block_root later on for sync contribution duties
@@ -311,7 +313,7 @@ class SyncCommitteeService(ValidatorDutyService):
     async def produce_sync_message(
         self,
         duty_slot: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None = None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None = None,
     ) -> None:
         # Using < and not <= on purpose: if a head event comes in late,
         # we still want to produce a sync message for that block root too

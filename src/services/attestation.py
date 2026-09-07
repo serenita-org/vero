@@ -121,7 +121,7 @@ class AttestationService(ValidatorDutyService):
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule attestation job at the attestation deadline in case
-        # it is not triggered earlier by a new HeadEvent,
+        # it is not triggered earlier by a new HeadV2Event,
         # aiming to attest self._attestation_due_s into the slot at the latest.
         if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
             attestation_due_s = self._attestation_due_s_gloas
@@ -148,19 +148,22 @@ class AttestationService(ValidatorDutyService):
             self.task_manager.create_task(super().update_duties())
 
     async def handle_head_event(
-        self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
+        self, event: SchemaBeaconAPI.HeadV2Event, beacon_node_host: str
     ) -> None:
-        if any(
-            root not in self.attester_duties_dependent_roots.values()
-            # TODO fix these dependent roots now (same in block proposal service)
-            #  seems like a good time to make sure everyone uses them correctly
-            #  (see also SigP audit)
-            for root in (
-                event.previous_duty_dependent_root,
-                event.current_duty_dependent_root,
-            )
+        event_slot = int(event.data.slot)
+        epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
+        dep_root_mismatch = False
+        if (
+            event.data.current_epoch_dependent_root
+            != self.attester_duties_dependent_roots.get(epoch)
+        ) or (
+            event.data.next_epoch_dependent_root
+            != self.attester_duties_dependent_roots.get(epoch + 1)
         ):
-            self.logger.debug(
+            dep_root_mismatch = True
+
+        if dep_root_mismatch:
+            self.logger.warning(
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.create_task(super().update_duties())
@@ -169,13 +172,13 @@ class AttestationService(ValidatorDutyService):
         # A) too late (entirely possible with a block that was proposed late / did not propagate well)
         # or B) we have already seen a different block root in a head event and started attesting using
         #       that (this is unlikely to happen in practice but possible)
-        if int(event.slot) <= self._last_slot_duty_started_for:
+        if event_slot <= self._last_slot_duty_started_for:
             self.logger.warning(
-                f"Ignoring late head event for slot {event.slot} from {beacon_node_host}"
+                f"Ignoring late head event for slot {event.data.slot} from {beacon_node_host}"
             )
             return
 
-        await self.attest_if_not_yet_attested(slot=int(event.slot), head_event=event)
+        await self.attest_if_not_yet_attested(slot=event_slot, head_event=event)
 
     def _get_duties_for_slot(
         self, slot: int
@@ -190,7 +193,7 @@ class AttestationService(ValidatorDutyService):
         return slot_attester_duties
 
     async def _produce_attestation_data(
-        self, slot: int, head_event: SchemaBeaconAPI.HeadEvent | None
+        self, slot: int, head_event: SchemaBeaconAPI.HeadV2Event | None
     ) -> AttestationData:
         consensus_start = asyncio.get_running_loop().time()
         try:
@@ -199,7 +202,7 @@ class AttestationService(ValidatorDutyService):
             att_data = await asyncio.wait_for(
                 self.attestation_data_provider.produce_attestation_data(
                     slot=slot,
-                    head_event_block_root=head_event.block if head_event else None,
+                    head_event_block_root=head_event.data.block if head_event else None,
                 ),
                 timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
                 - time.time(),
@@ -330,7 +333,7 @@ class AttestationService(ValidatorDutyService):
     async def _attest(
         self,
         slot: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None,
         duties: set[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         self.logger.debug(
@@ -369,7 +372,7 @@ class AttestationService(ValidatorDutyService):
     async def attest_if_not_yet_attested(
         self,
         slot: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None = None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None = None,
     ) -> None:
         """
         We either
@@ -418,7 +421,9 @@ class AttestationService(ValidatorDutyService):
                 _ = await asyncio.wait_for(
                     self.attestation_data_provider.produce_attestation_data(
                         slot=slot,
-                        head_event_block_root=head_event.block if head_event else None,
+                        head_event_block_root=head_event.data.block
+                        if head_event
+                        else None,
                     ),
                     timeout=self.beacon_chain.get_timestamp_for_slot(slot + 1)
                     - time.time(),

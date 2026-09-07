@@ -210,15 +210,24 @@ class BeaconNodeEvent(msgspec.Struct):
         raise NotImplementedError
 
 
-class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
+class HeadV2EventData(msgspec.Struct):
     slot: str
     block: str
-    previous_duty_dependent_root: str
-    current_duty_dependent_root: str
+    state: str
+    payload_status: str
+    epoch_transition: bool
+    current_epoch_dependent_root: str
+    next_epoch_dependent_root: str
+    execution_optimistic: bool
+
+
+class HeadV2Event(BeaconNodeEvent):
+    version: ForkVersion
+    data: HeadV2EventData
 
     @property
     def dedup_key(self) -> Hashable:
-        return "head " + self.block
+        return "head_v2 " + self.data.block
 
 
 class ExecutionPayloadAvailableEvent(BeaconNodeEvent):
@@ -230,9 +239,6 @@ class ExecutionPayloadAvailableEvent(BeaconNodeEvent):
         # A head event's dedup key is also the block root,
         # so we need to differentiate by using an event-specific prefix
         return "epa " + self.block_root
-
-
-# TODO HeadEventV2
 
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):

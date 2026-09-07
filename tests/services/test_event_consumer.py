@@ -20,26 +20,38 @@ def event_consumer(
     argnames=("event", "expected_log_messages"),
     argvalues=[
         pytest.param(
-            SchemaBeaconAPI.HeadEvent(
-                execution_optimistic=False,
-                slot="10000",
-                block="0xblockroot",
-                previous_duty_dependent_root="0xprevious",
-                current_duty_dependent_root="0xcurrent",
+            SchemaBeaconAPI.HeadV2Event(
+                version=SchemaBeaconAPI.ForkVersion.GLOAS,
+                data=SchemaBeaconAPI.HeadV2EventData(
+                    slot="10000",
+                    block="0xblockroot",
+                    state="0xstateroot",
+                    payload_status="empty",
+                    epoch_transition=False,
+                    current_epoch_dependent_root="0xcurrent",
+                    next_epoch_dependent_root="0xnext",
+                    execution_optimistic=False,
+                ),
             ),
             ["[bn-test] New head @ 10000 : 0xblockroot"],
-            id="HeadEvent",
+            id="HeadV2Event",
         ),
         pytest.param(
-            SchemaBeaconAPI.HeadEvent(
-                execution_optimistic=False,
-                slot="100",
-                block="0xblockroot",
-                previous_duty_dependent_root="0xprevious",
-                current_duty_dependent_root="0xcurrent",
+            SchemaBeaconAPI.HeadV2Event(
+                version=SchemaBeaconAPI.ForkVersion.GLOAS,
+                data=SchemaBeaconAPI.HeadV2EventData(
+                    slot="100",
+                    block="0xblockroot",
+                    state="0xstateroot",
+                    payload_status="empty",
+                    epoch_transition=False,
+                    current_epoch_dependent_root="0xcurrent",
+                    next_epoch_dependent_root="0xnext",
+                    execution_optimistic=False,
+                ),
             ),
             ["Ignoring event for old slot 100 from bn-test."],
-            id="HeadEvent - old slot",
+            id="HeadV2Event - old slot",
         ),
         pytest.param(
             SchemaBeaconAPI.ChainReorgEvent(
@@ -118,12 +130,18 @@ async def test_recent_event_keys(
     )
     for i in range(100):
         event_consumer._handle_event(
-            event=SchemaBeaconAPI.HeadEvent(
-                execution_optimistic=False,
-                slot=str(event_consumer.beacon_chain.current_slot + i),
-                block=f"0xblock-{i}",
-                previous_duty_dependent_root="0xprevious",
-                current_duty_dependent_root="0xcurrent",
+            event=SchemaBeaconAPI.HeadV2Event(
+                version=SchemaBeaconAPI.ForkVersion.GLOAS,
+                data=SchemaBeaconAPI.HeadV2EventData(
+                    slot=str(event_consumer.beacon_chain.current_slot + i),
+                    block=f"0xblock-{i}",
+                    state=f"0xstate-{i}",
+                    payload_status="empty",
+                    epoch_transition=False,
+                    current_epoch_dependent_root="0xcurrent",
+                    next_epoch_dependent_root="0xnext",
+                    execution_optimistic=False,
+                ),
             ),
             beacon_node=bn,
         )
@@ -132,5 +150,5 @@ async def test_recent_event_keys(
     # The last 10 event keys should be cached
     assert len(event_consumer._recent_event_keys) == 10
     assert list(event_consumer._recent_event_keys) == [
-        f"head 0xblock-{i}" for i in range(90, 100)
+        f"head_v2 0xblock-{i}" for i in range(90, 100)
     ]

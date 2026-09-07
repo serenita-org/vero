@@ -25,7 +25,7 @@ class EventConsumerService:
         self.metrics = vero.metrics
 
         self.head_event_handlers: list[
-            Callable[[SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]]
+            Callable[[SchemaBeaconAPI.HeadV2Event, str], Coroutine[Any, Any, None]]
         ] = []
         self.execution_payload_available_event_handlers: list[
             Callable[
@@ -68,7 +68,7 @@ class EventConsumerService:
     def add_head_event_handler(
         self,
         event_handler: Callable[
-            [SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]
+            [SchemaBeaconAPI.HeadV2Event, str], Coroutine[Any, Any, None]
         ],
     ) -> None:
         self.head_event_handlers.append(event_handler)
@@ -131,21 +131,32 @@ class EventConsumerService:
     def _handle_event(
         self, event: SchemaBeaconAPI.BeaconNodeEvent, beacon_node: BeaconNode
     ) -> None:
-        if hasattr(event, "slot") and int(event.slot) < self.beacon_chain.current_slot:
+        event_slot = None
+        try:
+            event_slot = int(event.slot)
+        except AttributeError:
+            pass
+
+        try:
+            event_slot = int(event.data.slot)
+        except AttributeError:
+            pass
+
+        if event_slot and event_slot < self.beacon_chain.current_slot:
             self.logger.warning(
-                f"Ignoring event for old slot {event.slot} from {beacon_node.host}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
+                f"Ignoring event for old slot {event_slot} from {beacon_node.host}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
             )
             return
 
         event_type = type(event).__name__
 
-        if isinstance(event, SchemaBeaconAPI.HeadEvent):
+        if isinstance(event, SchemaBeaconAPI.HeadV2Event):
             self.metrics.head_event_time_h.labels(host=beacon_node.host).observe(
-                self.beacon_chain.time_since_slot_start(slot=int(event.slot))
+                self.beacon_chain.time_since_slot_start(slot=int(event.data.slot))
             )
             if not self._has_seen_event(event):
                 self.logger.debug(
-                    f"[{beacon_node.host}] New head @ {event.slot} : {event.block}"
+                    f"[{beacon_node.host}] New head @ {event.data.slot} : {event.data.block}"
                 )
                 for head_handler in self.head_event_handlers:
                     self.task_manager.create_task(
@@ -222,7 +233,7 @@ class EventConsumerService:
 
         topics = [
             # TODO use head_v2? !!!
-            "head",
+            "head_v2",
             "execution_payload_available",
             "chain_reorg",
             "attester_slashing",

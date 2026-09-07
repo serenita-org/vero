@@ -723,9 +723,7 @@ class BeaconNode:
             # Used to signal validator to not cast any payload attestation.
             return None
 
-        response = msgspec.json.decode(
-            resp_bytes, type=SchemaBeaconAPI.RawDataResponse
-        )
+        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
         return preset_types(
             self._fork_for_slot(slot)
         ).payload_attestation_data.from_json(response.data)
@@ -1187,7 +1185,7 @@ class BeaconNode:
         _event_name_to_struct_mapping: dict[
             str, type[SchemaBeaconAPI.BeaconNodeEvent]
         ] = dict(
-            head=SchemaBeaconAPI.HeadEvent,
+            head_v2=SchemaBeaconAPI.HeadV2Event,
             execution_payload_available=SchemaBeaconAPI.ExecutionPayloadAvailableEvent,
             chain_reorg=SchemaBeaconAPI.ChainReorgEvent,
             attester_slashing=SchemaBeaconAPI.AttesterSlashingEvent,
