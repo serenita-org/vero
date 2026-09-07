@@ -101,7 +101,22 @@ class BeaconNode:
 
         self.client_session = aiohttp.ClientSession(
             timeout=ClientTimeout(
-                connect=_TIMEOUT_DEFAULT_CONNECT,
+                # TODO: Revisit connection timeout/retry strategy.
+                # Investigation showed these failures (aiohttp.ConnectionTimeoutError in logs)
+                # are not caused by aiohttp pool exhaustion,
+                # DNS latency, leaked responses, or event-loop stalls. Packet capture confirmed
+                # that fresh TCP handshakes to the server normally complete in ~35-80 ms,
+                # but occasionally a SYN/SYN-ACK handshake takes ~1.0 s, causing aiohttp's
+                # connect timeout to fire before the connection is established.
+                # Consider using a shorter sock_connect timeout (e.g. ~500 ms) and retrying
+                # specifically on aiohttp.ConnectionTimeoutError, since that failure occurs
+                # before the HTTP request is sent and is therefore safe to retry even for
+                # non-idempotent requests. Avoid broad retries for errors that may occur after
+                # request transmission.
+                # TODO replace connect timeouts with sock_connects
+                # + add 1-2 retries ONLY on aiohttp.ConnectionTimeoutError
+                # (this is before exchanging any real request/response data so safe)
+                sock_connect=_TIMEOUT_DEFAULT_CONNECT,
                 total=_TIMEOUT_DEFAULT_TOTAL,
             ),
             headers={
