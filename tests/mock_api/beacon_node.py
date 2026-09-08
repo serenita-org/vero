@@ -196,7 +196,8 @@ def _mocked_beacon_node_endpoints(
                 blob_data_available=True,
             )
             return CallbackResult(
-                body=_data_response(payload_attestation_data.to_json())
+                body=_data_response(payload_attestation_data.to_json()),
+                headers={ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value},
             )
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
