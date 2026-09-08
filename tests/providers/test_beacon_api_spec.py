@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.beacon_api_spec import BeaconAPISpec, _validate_parameters
+from tests.beacon_api_spec import BeaconAPISpec, _headers, _validate_parameters
 
 # These requests intentionally bypass BeaconNode._make_request: genesis uses a
 # temporary session during startup, while events keeps an SSE connection open.
@@ -72,3 +72,12 @@ def test_boolean_header_wire_value(value: str) -> None:
         "header",
         {"example-boolean": value},
     )
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_boolean_header_rejects_unserialized_value(value: bool) -> None:
+    with pytest.raises(
+        TypeError,
+        match="HTTP header values must be serialized strings, not booleans",
+    ):
+        _headers({"Example-Boolean": value}, wire_values=True)

@@ -21,7 +21,9 @@ def _validate(schema: Mapping[str, Any], value: object) -> None:
 def _wire_value(value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_wire_value(item) for item in value]
-    return value if isinstance(value, bool) else str(value)
+    if isinstance(value, bool):
+        raise TypeError("HTTP header values must be serialized strings, not booleans")
+    return str(value)
 
 
 def _headers(
