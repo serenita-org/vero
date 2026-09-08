@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.beacon_api_spec import BeaconAPISpec
+from tests.beacon_api_spec import BeaconAPISpec, _validate_parameters
 
 # These requests intentionally bypass BeaconNode._make_request: genesis uses a
 # temporary session during startup, while events keeps an SSE connection open.
@@ -52,3 +52,23 @@ def test_all_provider_operations_exist_in_spec(
 
     for method, path in _provider_operations():
         beacon_api_spec.operation_for(method, path)
+
+
+@pytest.mark.parametrize("value", ["true", "false"])
+def test_boolean_header_wire_value(value: str) -> None:
+    operation = {
+        "parameters": [
+            {
+                "name": "Example-Boolean",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "boolean"},
+            }
+        ]
+    }
+
+    _validate_parameters(
+        operation,
+        "header",
+        {"example-boolean": value},
+    )

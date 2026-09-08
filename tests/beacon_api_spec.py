@@ -60,6 +60,17 @@ def _validate_parameters(
         name: str = parameter["name"]
         return name.lower() if location == "header" else name
 
+    normalized_values = dict(values)
+    for parameter in parameters:
+        parameter_key = key(parameter)
+        value = normalized_values.get(parameter_key)
+        if (
+            parameter["schema"].get("type") == "boolean"
+            and isinstance(value, str)
+            and value.lower() in ("true", "false")
+        ):
+            normalized_values[parameter_key] = value.lower() == "true"
+
     _validate(
         {
             "type": "object",
@@ -73,7 +84,7 @@ def _validate_parameters(
             ],
             "additionalProperties": location == "header",
         },
-        values,
+        normalized_values,
     )
 
 
