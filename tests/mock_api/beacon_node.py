@@ -567,17 +567,18 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match(r"/eth/v1/validator/duties/ptc/\d+", url.raw_path):
-            duty_slot = beacon_chain.current_slot + 1
-
-            # assign a PTC to a random validator next slot
-            v = random.choice(validators)
-            ptc_duties = [
-                SchemaBeaconAPI.PtcDuty(
-                    pubkey=v.pubkey,
-                    validator_index=str(v.index),
-                    slot=str(duty_slot),
+            current_slot = beacon_chain.current_slot
+            ptc_duties = []
+            for duty_slot in range(current_slot, current_slot + beacon_chain.SLOTS_PER_EPOCH):
+                # assign a PTC to a random validator in every slot of this epoch
+                v = random.choice(validators)
+                ptc_duties.append(
+                    SchemaBeaconAPI.PtcDuty(
+                        pubkey=v.pubkey,
+                        validator_index=str(v.index),
+                        slot=str(duty_slot),
+                    )
                 )
-            ]
 
             return CallbackResult(
                 body=msgspec.json.encode(
