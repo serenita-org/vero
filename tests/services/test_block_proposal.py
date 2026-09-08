@@ -183,7 +183,7 @@ async def test_publish_payload_envelope(
         slot=slot,
         duty=duty,
         beacon_block_root=ZERO_ROOT,
-        beacon_node=block_proposal_service.multi_beacon_node.beacon_nodes[0]
+        beacon_node=block_proposal_service.multi_beacon_node.beacon_nodes[0],
     )
 
     assert "Published payload envelope" in caplog.messages

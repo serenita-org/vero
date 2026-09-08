@@ -197,7 +197,9 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(
                 body=_data_response(payload_attestation_data.to_json()),
-                headers={ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value},
+                headers={
+                    ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
+                },
             )
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
@@ -570,7 +572,9 @@ def _mocked_beacon_node_endpoints(
         if re.match(r"/eth/v1/validator/duties/ptc/\d+", url.raw_path):
             current_slot = beacon_chain.current_slot
             ptc_duties = []
-            for duty_slot in range(current_slot, current_slot + beacon_chain.SLOTS_PER_EPOCH):
+            for duty_slot in range(
+                current_slot, current_slot + beacon_chain.SLOTS_PER_EPOCH
+            ):
                 # assign a PTC to a random validator in every slot of this epoch
                 v = random.choice(validators)
                 ptc_duties.append(
