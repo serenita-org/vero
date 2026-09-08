@@ -213,11 +213,6 @@ def _mocked_beacon_node_endpoints(
                 )
 
             fork_version = beacon_chain.current_fork_version
-            response_version = (
-                ForkVersion.FULU
-                if fork_version is ForkVersion.GLOAS
-                else fork_version
-            )
 
             committee_bits = [False] * spec.MAX_COMMITTEES_PER_SLOT
             committee_bits[int(url.query["committee_index"])] = True
@@ -254,7 +249,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(
                 body=msgspec.json.encode(
                     SchemaBeaconAPI.GetAggregatedAttestationV2Response(
-                        version=response_version,
+                        version=fork_version,
                         data=msgspec.Raw(aggregate_attestation.to_json()),
                     )
                 ),
