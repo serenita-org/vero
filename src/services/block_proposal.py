@@ -191,7 +191,6 @@ class BlockProposalService(ValidatorDutyService):
     ) -> None:
         event_slot = int(event.data.slot)
         epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
-        dep_root_mismatch = False
         if (
             event.data.current_epoch_dependent_root
             != self.proposer_duties_dependent_roots.get(epoch)
@@ -199,9 +198,6 @@ class BlockProposalService(ValidatorDutyService):
             event.data.next_epoch_dependent_root
             != self.proposer_duties_dependent_roots.get(epoch + 1)
         ):
-            dep_root_mismatch = True
-
-        if dep_root_mismatch:
             self.logger.warning(
                 "Head event duty dependent root mismatch -> updating duties",
             )
