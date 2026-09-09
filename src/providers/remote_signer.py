@@ -255,7 +255,7 @@ class RemoteSigner(SignatureProvider):
             if not resp.ok:
                 raise ValueError(
                     "NOK status code received "
-                    f"({resp.status}) from remote signer: "
+                    f"({resp.status}) for {request_type} from remote signer: "
                     f"{await self._read_error_text(resp)}",
                 )
 
