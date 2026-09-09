@@ -49,6 +49,7 @@ from schemas import (
     SchemaShared,
     SchemaValidator,
 )
+from schemas.beacon_api import is_optimistic
 from spec import (
     Attestation,
     AttestationData,
@@ -327,9 +328,10 @@ class BeaconNode:
 
     def _raise_if_optimistic(
         self,
-        response: SchemaBeaconAPI.ExecutionOptimisticResponse,
+        response: SchemaBeaconAPI.ExecutionOptimisticResponse
+        | SchemaBeaconAPI.BeaconNodeEvent,
     ) -> None:
-        if response.execution_optimistic:
+        if is_optimistic(response):
             raise ValueError(f"Execution optimistic on {self.host}")
 
     async def get_spec(self) -> SpecGloas:
@@ -1257,10 +1259,7 @@ class BeaconNode:
                     event_data[0].split("data:")[1], type=event_struct
                 )
 
-                if (
-                    hasattr(event, "execution_optimistic")
-                    and event.execution_optimistic
-                ):
+                if is_optimistic(event):
                     raise ValueError(f"Execution optimistic for event: {event}")
 
                 yield event

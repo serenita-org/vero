@@ -320,3 +320,17 @@ class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
             "payload_attrs "
             f"{self.data.proposal_slot}+{self.data.parent_block_root}+{self.data.proposer_index}"
         )
+
+
+def is_optimistic(obj: ExecutionOptimisticResponse | BeaconNodeEvent) -> bool:
+    try:
+        return obj.execution_optimistic
+    except AttributeError:
+        pass
+
+    try:
+        return obj.data.execution_optimistic
+    except AttributeError:
+        pass
+
+    return False
