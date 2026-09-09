@@ -241,8 +241,7 @@ class MultiBuilder:
         )
 
     async def warm_connections(self) -> None:
-        # TODO logging -> debug?
-        self.logger.info("Pre-warming builder connections with status requests")
+        self.logger.debug("Pre-warming builder connections with status requests")
 
         await asyncio.gather(
             *(b.get_status() for b in self.builders),
