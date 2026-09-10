@@ -912,13 +912,17 @@ class BeaconNode:
             params["graffiti"] = f"0x{graffiti.hex()}"
 
         # TODO BYOB not yet implemented - possibly in separate endpoint!
-        if False and signed_payload_bid:
+        _endpoint = "/eth/v4/validator/blocks/{slot}"
+        if signed_payload_bid:
+            # use separate produceBlockV4WithBid endpoint
+            _endpoint += "/with_bid"
+            params["builder_boost_factor"] = str(builder_boost_factor)
             self.logger.info(
                 f"Setting body for block production, bid: {signed_payload_bid}"
             )
-            data = self.json_encoder.encode(
-                dict(signed_execution_payload_bid=signed_payload_bid)
-            )
+            # actually we might want to do all this in MultiBeaconNode already...
+            # at least the "expensive" encoding of the body, just do it once
+            request_body = signed_payload_bid
         else:
             # empty dict
             # lodestar complains otherwise about getting a content-type header application/json
@@ -930,7 +934,7 @@ class BeaconNode:
                 builder_boost_factor="100",
                 builders=[],
             )
-            data = msgspec.json.encode(request_body)
+        data = self.json_encoder.encode(request_body)
 
         accept_header = (
             ContentType.JSON.value
@@ -948,7 +952,7 @@ class BeaconNode:
         ) as tracer_span:
             resp_bytes, content_type, headers = await self._make_request(
                 method="POST",
-                endpoint="/eth/v4/validator/blocks/{slot}",
+                endpoint=_endpoint,
                 formatted_endpoint_string_params=dict(slot=slot),
                 params=params,
                 data=data,
