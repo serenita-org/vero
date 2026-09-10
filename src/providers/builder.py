@@ -197,6 +197,9 @@ class Builder:
                     f"Received bid from {self.base_url}: {resp_decoded.data}"
                 )
 
+                # TODO Lodestar's bid verification
+                # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
+
                 # TODO bid verification? or shall we just let the beacon node handle
                 #  all this?
                 #  see https://github.com/ethereum/consensus-specs/blob/master/specs/gloas/validator.md#signed-execution-payload-bid
