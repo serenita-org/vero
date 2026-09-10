@@ -83,10 +83,12 @@ class Builder:
 
         message, signature, _ = await signature_provider.sign(
             message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
-                builder_request_auth=SchemaShared.BuilderRequestAuth(
-                    # TODO support variable data from Keymgr API
-                    data="0x" + str(self.base_url).encode().hex(),
-                    slot=proposer_duty.slot,
+                builder_request_auth=SchemaRemoteSigner.VersionedBuilderRequestAuth(
+                    data=SchemaShared.BuilderRequestAuth(
+                        # TODO support variable data from Keymgr API
+                        data="0x" + str(self.base_url).encode().hex(),
+                        slot=proposer_duty.slot,
+                    ),
                 ),
             ),
             identifier=proposer_duty.pubkey,
@@ -94,7 +96,7 @@ class Builder:
 
         self._bid_request_auth_cache[_cache_key] = (
             SchemaBuilderAPI.SignedBuilderRequestAuth(
-                message=message.builder_request_auth,
+                message=message.builder_request_auth.data,
                 signature=signature,
             )
         )

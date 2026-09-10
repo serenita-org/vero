@@ -3,7 +3,7 @@ from typing import Any, TypeVar
 
 import msgspec
 
-from .shared import BuilderRequestAuth
+from .shared import BuilderRequestAuth, ForkVersion
 
 
 class SigningRequestType(Enum):
@@ -91,14 +91,24 @@ class ProposerPreferences(msgspec.Struct):
     target_gas_limit: str
 
 
+class VersionedProposerPreferences(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: ProposerPreferences
+
+
 class ProposerPreferencesSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.PROPOSER_PREFERENCES
-    proposer_preferences: ProposerPreferences
+    proposer_preferences: VersionedProposerPreferences
+
+
+class VersionedBuilderRequestAuth(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: BuilderRequestAuth
 
 
 class BuilderRequestAuthSignableMessage(SignableMessage, kw_only=True):
     type: SigningRequestType = SigningRequestType.BUILDER_REQUEST_AUTH
-    builder_request_auth: BuilderRequestAuth
+    builder_request_auth: VersionedBuilderRequestAuth
 
 
 class BeaconBlockHeader(msgspec.Struct):
@@ -127,11 +137,16 @@ class ExecutionPayloadEnvelope(msgspec.Struct):
     parent_beacon_block_root: str
 
 
+class VersionedExecutionPayloadEnvelope(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: ExecutionPayloadEnvelope
+
+
 class ExecutionPayloadEnvelopeSignableMessage(
     SignableMessageWithForkInfo, kw_only=True
 ):
     type: SigningRequestType = SigningRequestType.EXECUTION_PAYLOAD_ENVELOPE
-    execution_payload_envelope: ExecutionPayloadEnvelope
+    execution_payload_envelope: VersionedExecutionPayloadEnvelope
 
 
 class SyncCommitteeMessage(msgspec.Struct):

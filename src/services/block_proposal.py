@@ -406,23 +406,31 @@ class BlockProposalService(ValidatorDutyService):
             for duty in proposer_duties:
                 if int(duty.slot) < current_slot:
                     continue
+
+                duty_epoch = int(duty.slot) // self.beacon_chain.SLOTS_PER_EPOCH
+                if duty_epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
+                    # Pre-Gloas proposal, not submitting preferences
+                    continue
+
                 # TODO parallelize + error-handling (might want to retry here)
                 msg = SchemaRemoteSigner.ProposerPreferencesSignableMessage(
-                    proposer_preferences=SchemaRemoteSigner.ProposerPreferences(
-                        # Lodestar is throwing "PROPOSER_PREFERENCES_ERROR_UNKNOWN_DEPENDENT_ROOT"
-                        # ... dependent roots changed a bit in Gloas so may have sth to do with that
-                        dependent_root=self.proposer_duties_dependent_roots[epoch],
-                        proposal_slot=duty.slot,
-                        validator_index=duty.validator_index,
-                        fee_recipient=default_fee_recipient
-                        if not self.keymanager.enabled
-                        else self.keymanager.pubkey_to_fee_recipient_override.get(
-                            duty.pubkey, default_fee_recipient
-                        ),
-                        target_gas_limit=default_target_gas_limit
-                        if not self.keymanager.enabled
-                        else self.keymanager.pubkey_to_gas_limit_override.get(
-                            duty.pubkey, default_target_gas_limit
+                    proposer_preferences=SchemaRemoteSigner.VersionedProposerPreferences(
+                        data=SchemaRemoteSigner.ProposerPreferences(
+                            # Lodestar is throwing "PROPOSER_PREFERENCES_ERROR_UNKNOWN_DEPENDENT_ROOT"
+                            # ... dependent roots changed a bit in Gloas so may have sth to do with that
+                            dependent_root=self.proposer_duties_dependent_roots[epoch],
+                            proposal_slot=duty.slot,
+                            validator_index=duty.validator_index,
+                            fee_recipient=default_fee_recipient
+                            if not self.keymanager.enabled
+                            else self.keymanager.pubkey_to_fee_recipient_override.get(
+                                duty.pubkey, default_fee_recipient
+                            ),
+                            target_gas_limit=default_target_gas_limit
+                            if not self.keymanager.enabled
+                            else self.keymanager.pubkey_to_gas_limit_override.get(
+                                duty.pubkey, default_target_gas_limit
+                            ),
                         ),
                     ),
                     fork_info=_fork_info,
@@ -445,7 +453,7 @@ class BlockProposalService(ValidatorDutyService):
             # await self.bid_selector.multi_builder.submit_proposer_preferences(...)
             await self.multi_beacon_node.submit_proposer_preferences(
                 signed_proposer_preferences=[
-                    (msg.proposer_preferences, sig)
+                    (msg.proposer_preferences.data, sig)
                     for (msg, sig, _) in signed_preferences
                 ],
                 fork_version=_fork_version,
@@ -665,8 +673,10 @@ class BlockProposalService(ValidatorDutyService):
                     message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
                         fork_info=self.beacon_chain.get_fork_info(slot=slot),
                         execution_payload_envelope=(
-                            SchemaRemoteSigner.ExecutionPayloadEnvelope(
-                                **execution_payload_envelope.to_obj()
+                            SchemaRemoteSigner.VersionedExecutionPayloadEnvelope(
+                                data=SchemaRemoteSigner.ExecutionPayloadEnvelope(
+                                    **execution_payload_envelope.to_obj()
+                                )
                             )
                         ),
                     ),
