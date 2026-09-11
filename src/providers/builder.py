@@ -134,7 +134,17 @@ class Builder:
             #      ... do we even want to bother with SSZ for this tiny object?
             #          maybe? We do then send it to N beacon nodes so savings are not just 1x
             # TODO SignedBuilderRequestAuth in request body - seems to be required now?
-            url_path = f"/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
+            # TODO can we make this formatted endpoint stuf nicer? we are doing it to reduce
+            #  metric cardinality
+            endpoint = "/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
+            kwargs = dict(trace_request_ctx=dict(path=endpoint))
+            formatted_endpoint_string_params = dict(
+                slot=slot,
+                parent_hash=parent_hash,
+                parent_root=parent_root,
+                proposer_pubkey=proposer_pubkey,
+            )
+            endpoint = endpoint.format(**formatted_endpoint_string_params)
 
             _cache_key = (slot, proposer_pubkey)
             try:
@@ -163,10 +173,11 @@ class Builder:
             }
             timeout = ClientTimeout(total=hard_timeout)
             async with self.client_session.post(
-                url_path,
+                endpoint,
                 headers=headers,
                 timeout=timeout,
                 data=msgspec.json.encode(signed_builder_request_auth),
+                **kwargs,
             ) as resp:
                 if not resp.ok:
                     self.metrics.errors_c.labels(
@@ -196,7 +207,9 @@ class Builder:
                 self.logger.debug(
                     f"Received bid from {self.base_url}: {resp_decoded.data}"
                 )
-                self.logger.info(f"Bid with value {resp_decoded.data.total_value} received from {self.base_url}")
+                self.logger.info(
+                    f"Bid with value {resp_decoded.data.total_value} received from {self.base_url}"
+                )
 
                 # TODO Lodestar's bid verification
                 # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
