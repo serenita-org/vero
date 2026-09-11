@@ -196,6 +196,7 @@ class Builder:
                 self.logger.debug(
                     f"Received bid from {self.base_url}: {resp_decoded.data}"
                 )
+                self.logger.info(f"Bid with value {resp_decoded.data.total_value} received from {self.base_url}")
 
                 # TODO Lodestar's bid verification
                 # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
