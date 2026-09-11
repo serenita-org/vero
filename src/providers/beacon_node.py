@@ -913,7 +913,7 @@ class BeaconNode:
 
         # TODO BYOB not yet implemented - possibly in separate endpoint!
         _endpoint = "/eth/v4/validator/blocks/{slot}"
-        if signed_payload_bid:
+        if False and signed_payload_bid:
             # use separate produceBlockV4WithBid endpoint
             _endpoint += "/with_bid"
             params["builder_boost_factor"] = str(builder_boost_factor)
