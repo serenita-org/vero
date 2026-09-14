@@ -1574,7 +1574,7 @@ wheels = [
 [[package]]
 name = "spy-ssz"
 version = "0.1.0"
-source = { git = "https://github.com/eth2353/spy-ssz?rev=5ecae37873dc3643a4d8aba639ecb9f4bba0d1b4#5ecae37873dc3643a4d8aba639ecb9f4bba0d1b4" }
+source = { git = "https://github.com/eth2353/spy-ssz?rev=4d107694b9a6aea6f234b81b13803bd01a69e1fb#4d107694b9a6aea6f234b81b13803bd01a69e1fb" }
 dependencies = [
     { name = "cffi" },
     { name = "msgspec" },
@@ -1660,7 +1660,7 @@ requires-dist = [
     { name = "pyroscope-io", specifier = ">=0.8.8" },
     { name = "pyroscope-otel", specifier = ">=0.4.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "spy-ssz", git = "https://github.com/eth2353/spy-ssz?rev=5ecae37873dc3643a4d8aba639ecb9f4bba0d1b4" },
+    { name = "spy-ssz", git = "https://github.com/eth2353/spy-ssz?rev=4d107694b9a6aea6f234b81b13803bd01a69e1fb" },
 ]
 
 [package.metadata.requires-dev]
