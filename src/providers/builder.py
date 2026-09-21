@@ -197,9 +197,13 @@ class Builder:
 
                 # parse based on Eth-Consensus-Version response header?
                 # or just check it is Gloas for now...
-                resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
-                if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
-                    raise NotImplementedError
+                # actually this header is only required if the response
+                # is SSZ-encoded... so TODO we should probably
+                # check GetExecutionPayloadBidResponse.version since
+                # we're requesting JSON at the moment
+                # resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
+                # if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
+                #    raise NotImplementedError
 
                 resp_decoded = msgspec.json.decode(
                     resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
