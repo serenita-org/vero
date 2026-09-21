@@ -770,6 +770,8 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
+            # TODO make it possible to disable Vero-side bid selection
+            #  using a CLI flag
             selected_bid = None
             if self.beacon_chain.current_fork_version in (
                 SchemaShared.ForkVersion.GLOAS,
