@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import logging
 import sys
 from time import time_ns
@@ -33,6 +34,16 @@ if TYPE_CHECKING:
 
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
+
+def get_default_auth_data(url: URL) -> bytes:
+    host = url.host
+    if host is None:
+        raise ValueError(f"No host in URL: {url}")
+
+    if ":" in host:  # IPv6 literal
+        host = f"[{ipaddress.IPv6Address(host).compressed}]"
+
+    return host.encode("ascii")
 
 
 class Builder:
@@ -86,7 +97,7 @@ class Builder:
                 builder_request_auth=SchemaRemoteSigner.VersionedBuilderRequestAuth(
                     data=SchemaShared.BuilderRequestAuth(
                         # TODO support variable data from Keymgr API
-                        data="0x" + str(self.base_url).encode().hex(),
+                        data="0x" + get_default_auth_data(url=self.base_url).hex(),
                         slot=proposer_duty.slot,
                     ),
                 ),
