@@ -313,7 +313,6 @@ class MultiBuilder:
         if fork_version != SchemaShared.ForkVersion.GLOAS:
             raise NotImplementedError
 
-        # TODO pass on Builder API headers - timeout, date-milliseconds
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,
