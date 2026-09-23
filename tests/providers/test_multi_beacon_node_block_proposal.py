@@ -387,7 +387,11 @@ async def test_produce_best_block(
             ) = await multi_beacon_node._produce_best_block(
                 slot=1,
                 graffiti=b"test_produce_best_block",
-                builder_boost_factor=90,
+                builder_config=SchemaBeaconAPI.BuilderConfig(
+                    min_bid="0",
+                    builder_boost_factor="90",
+                    builders=[],
+                ),
                 randao_reveal="randao",
                 signed_payload_bid=None,
                 fork_version=beacon_chain.current_fork_version,
@@ -410,7 +414,11 @@ async def test_produce_best_block(
                 await multi_beacon_node._produce_best_block(
                     slot=1,
                     graffiti=b"test_produce_best_block",
-                    builder_boost_factor=90,
+                    builder_config=SchemaBeaconAPI.BuilderConfig(
+                        min_bid="0",
+                        builder_boost_factor="90",
+                        builders=[],
+                    ),
                     randao_reveal="randao",
                     signed_payload_bid=None,
                     fork_version=beacon_chain.current_fork_version,

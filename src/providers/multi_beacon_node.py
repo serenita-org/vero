@@ -344,7 +344,6 @@ class MultiBeaconNode:
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
         builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
@@ -379,7 +378,7 @@ class MultiBeaconNode:
                     bn.produce_block_v3(
                         slot=slot,
                         graffiti=graffiti,
-                        builder_boost_factor=builder_boost_factor,
+                        builder_boost_factor=builder_config.builder_boost_factor,
                         randao_reveal=randao_reveal,
                     ),
                 )
@@ -391,7 +390,6 @@ class MultiBeaconNode:
                     bn.produce_block_v4(
                         slot=slot,
                         graffiti=graffiti,
-                        builder_boost_factor=builder_boost_factor,
                         builder_config=builder_config,
                         randao_reveal=randao_reveal,
                         signed_payload_bid=signed_payload_bid,
@@ -496,7 +494,6 @@ class MultiBeaconNode:
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
         builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
@@ -506,7 +503,6 @@ class MultiBeaconNode:
         best_block_response, content_type, beacon_node = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
-            builder_boost_factor=builder_boost_factor,
             builder_config=builder_config,
             randao_reveal=randao_reveal,
             signed_payload_bid=signed_payload_bid,

@@ -703,7 +703,7 @@ class BeaconNode(ApiClient):
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
+        builder_boost_factor: str,
         randao_reveal: str,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType, Self]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator.
@@ -719,7 +719,7 @@ class BeaconNode(ApiClient):
         """
         params = dict(
             randao_reveal=randao_reveal,
-            builder_boost_factor=str(builder_boost_factor),
+            builder_boost_factor=builder_boost_factor,
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
@@ -808,7 +808,6 @@ class BeaconNode(ApiClient):
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
         builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
@@ -822,7 +821,7 @@ class BeaconNode(ApiClient):
         include_payload = False
         params = dict(
             randao_reveal=randao_reveal,
-            builder_boost_factor=str(builder_boost_factor),
+            builder_boost_factor=builder_config.builder_boost_factor,
             include_payload=str(include_payload).lower(),
         )
         if graffiti:
@@ -830,10 +829,13 @@ class BeaconNode(ApiClient):
 
         # TODO BYOB not yet implemented - possibly in separate endpoint!
         _endpoint = "/eth/v4/validator/blocks/{slot}"
+        request_body: (
+            SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
+        )
         if signed_payload_bid:
             # use separate produceBlockV4WithBid endpoint
             _endpoint += "/with_bid"
-            params["builder_boost_factor"] = str(builder_boost_factor)
+            params["builder_boost_factor"] = builder_config.builder_boost_factor
             self.logger.info(
                 f"Setting body for block production, bid: {signed_payload_bid}"
             )
@@ -841,11 +843,7 @@ class BeaconNode(ApiClient):
             # at least the "expensive" encoding of the body, just do it once
             request_body = signed_payload_bid
         else:
-            # empty dict
-            # lodestar complains otherwise about getting a content-type header application/json
-            # and an empty body
-            # TODO SSZ
-            request_body = msgspec.json.encode(builder_config)
+            request_body = builder_config
         data = self.json_encoder.encode(request_body)
 
         accept_header = (

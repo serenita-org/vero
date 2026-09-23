@@ -535,24 +535,26 @@ class BlockProposalService(ValidatorDutyService):
             # TODO keymgr overrides for all these
             builder_config = SchemaBeaconAPI.BuilderConfig(
                 min_bid="0",
-                builder_boost_factor=self.cli_args.builder_boost_factor,
+                builder_boost_factor=str(self.cli_args.builder_boost_factor),
                 builders=[],
             )
             for builder in self.bid_selector.multi_builder.builders:
                 try:
-                    builder_auth = builder.get_signed_builder_request_auth()
+                    builder_auth = builder.get_signed_builder_request_auth(
+                        slot=slot, proposer_pubkey=duty.pubkey
+                    )
                 except KeyError as e:
                     self.logger.warning(f"{e!r}")
                     continue
 
                 builder_config.builders.append(
                     SchemaBeaconAPI.BuilderEntry(
-                        url=builder.base_url,
+                        url=str(builder.base_url),
                         auth=builder_auth,
                         builder_pubkeys=[],
                         max_execution_payment="0",
                         min_bid="0",
-                        builder_boost_factor=self.cli_args.builder_boost_factor,
+                        builder_boost_factor=str(self.cli_args.builder_boost_factor),
                     )
                 )
 
@@ -563,7 +565,6 @@ class BlockProposalService(ValidatorDutyService):
                 ) = await self.multi_beacon_node.produce_block(
                     slot=slot,
                     graffiti=graffiti,
-                    builder_boost_factor=self.cli_args.builder_boost_factor,
                     builder_config=builder_config,
                     randao_reveal=randao_reveal,
                     signed_payload_bid=signed_payload_bid,
