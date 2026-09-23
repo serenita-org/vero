@@ -52,6 +52,8 @@ class Builder(ApiClient):
             timeout=ClientTimeout(total=10.0),
         )
 
+        self.bid_selection_disabled = vero.cli_args.disable_bid_selection
+
         # TODO prune? shouldn't grow normally but still
         self._bid_request_auth_cache: dict[
             tuple[int, str], SchemaBuilderAPI.SignedBuilderRequestAuth
@@ -89,6 +91,9 @@ class Builder(ApiClient):
         )
 
     async def get_status(self) -> None:
+        if self.bid_selection_disabled:
+            return
+
         _ = await self.make_request(
             method="GET",
             endpoint="/eth/v1/builder/status",
@@ -124,6 +129,9 @@ class Builder(ApiClient):
         soft_timeout: float,
         hard_timeout: float,
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
+        if self.bid_selection_disabled:
+            return None
+
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,

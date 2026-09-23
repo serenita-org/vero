@@ -23,6 +23,7 @@ class EventConsumerService:
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.metrics = vero.metrics
+        self.cli_args = vero.cli_args
 
         self.head_event_handlers: list[
             Callable[[SchemaBeaconAPI.HeadV2Event, str], Coroutine[Any, Any, None]]
@@ -238,9 +239,11 @@ class EventConsumerService:
             "chain_reorg",
             "attester_slashing",
             "proposer_slashing",
-            "payload_attributes",
-            "execution_payload_bid",
         ]
+
+        if not self.cli_args.disable_bid_selection:
+            topics.append("payload_attributes")
+            topics.append("execution_payload_bid")
 
         try:
             async for event in beacon_node.subscribe_to_events(topics=topics):
