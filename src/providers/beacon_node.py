@@ -792,8 +792,8 @@ class BeaconNode(ApiClient):
 
             self.logger.info(
                 f"{self.netloc} returned block with"
-                f" consensus block value {consensus_block_value_int},"
-                f" execution payload value {execution_payload_value_int}."
+                f" consensus block value {consensus_block_value_int:,},"
+                f" execution payload value {execution_payload_value_int:,}."
             )
             self.metrics.beacon_node_consensus_block_value_h.labels(
                 netloc=self.netloc
@@ -936,8 +936,8 @@ class BeaconNode(ApiClient):
 
             self.logger.info(
                 f"{self.netloc} returned block with"
-                f" consensus block value {consensus_block_value_int},"
-                f" execution payload value {execution_payload_value_int}."
+                f" consensus block value {consensus_block_value_int:,},"
+                f" execution payload value {execution_payload_value_int:,}."
             )
             self.metrics.beacon_node_consensus_block_value_h.labels(
                 netloc=self.netloc

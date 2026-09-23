@@ -486,7 +486,7 @@ class MultiBeaconNode:
             # We have exhausted all tasks and have not received a block response
             raise RuntimeError("Failed to get a response from all beacon nodes")
 
-        self.logger.info(f"Proceeding with best block by value: {best_block_value}")
+        self.logger.info(f"Proceeding with best block by value: {best_block_value:,}")
         return cast(
             "tuple[SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response, ContentType, BeaconNode]",
             best_block_result,
