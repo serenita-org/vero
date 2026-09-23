@@ -14,6 +14,11 @@ class BuilderRequestAuth(msgspec.Struct):
     slot: str
 
 
+class SignedBuilderRequestAuth(msgspec.Struct):
+    message: BuilderRequestAuth
+    signature: str
+
+
 class ExecutionPayloadBid(msgspec.Struct):
     parent_block_hash: str
     parent_block_root: str

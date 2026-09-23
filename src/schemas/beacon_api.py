@@ -14,7 +14,11 @@ from typing import Any, Self
 
 import msgspec
 
-from schemas.shared import ForkVersion, SignedExecutionPayloadBid
+from schemas.shared import (
+    ForkVersion,
+    SignedBuilderRequestAuth,
+    SignedExecutionPayloadBid,
+)
 
 
 class ExecutionOptimisticResponse(msgspec.Struct):
@@ -178,6 +182,21 @@ class ProduceBlockV3Response(msgspec.Struct):
     execution_payload_value: str
     consensus_block_value: str
     data: bytes
+
+
+class BuilderEntry(msgspec.Struct):
+    url: str
+    auth: SignedBuilderRequestAuth
+    builder_pubkeys: list[str]
+    max_execution_payment: str
+    min_bid: str
+    builder_boost_factor: str
+
+
+class BuilderConfig(msgspec.Struct):
+    min_bid: str
+    builder_boost_factor: str
+    builders: list[BuilderEntry]
 
 
 class ProduceBlockV4Response(msgspec.Struct):

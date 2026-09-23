@@ -56,7 +56,7 @@ class Builder(ApiClient):
 
         # TODO prune? shouldn't grow normally but still
         self._bid_request_auth_cache: dict[
-            tuple[int, str], SchemaBuilderAPI.SignedBuilderRequestAuth
+            tuple[int, str], SchemaShared.SignedBuilderRequestAuth
         ] = {}
 
     async def _cache_bid_request_auth_data(
@@ -84,7 +84,7 @@ class Builder(ApiClient):
         )
 
         self._bid_request_auth_cache[_cache_key] = (
-            SchemaBuilderAPI.SignedBuilderRequestAuth(
+            SchemaShared.SignedBuilderRequestAuth(
                 message=message.builder_request_auth.data,
                 signature=signature,
             )
@@ -100,18 +100,18 @@ class Builder(ApiClient):
             timeout=ClientTimeout(total=1.0),
         )
 
-    def _get_signed_builder_request_auth(
+    def get_signed_builder_request_auth(
         self,
         slot: int,
         proposer_pubkey: str,
-    ) -> SchemaBuilderAPI.SignedBuilderRequestAuth:
+    ) -> SchemaShared.SignedBuilderRequestAuth:
         _cache_key = (slot, proposer_pubkey)
         try:
             return self._bid_request_auth_cache[_cache_key]
         except KeyError:
             if "pytest" in sys.modules:
                 # use mocked value for tests
-                return SchemaBuilderAPI.SignedBuilderRequestAuth(
+                return SchemaShared.SignedBuilderRequestAuth(
                     message=None,
                     signature=None,
                 )
@@ -156,7 +156,7 @@ class Builder(ApiClient):
             endpoint = endpoint.format(**formatted_endpoint_string_params)
 
             try:
-                signed_builder_request_auth = self._get_signed_builder_request_auth(
+                signed_builder_request_auth = self.get_signed_builder_request_auth(
                     slot=slot,
                     proposer_pubkey=proposer_pubkey,
                 )

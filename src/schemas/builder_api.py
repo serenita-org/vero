@@ -8,12 +8,7 @@ https://ethereum.github.io/builder-specs/
 
 import msgspec
 
-from .shared import BuilderRequestAuth, ForkVersion, SignedExecutionPayloadBid
-
-
-class SignedBuilderRequestAuth(msgspec.Struct):
-    message: BuilderRequestAuth
-    signature: str
+from .shared import ForkVersion, SignedExecutionPayloadBid
 
 
 class GetExecutionPayloadBidResponse(msgspec.Struct):

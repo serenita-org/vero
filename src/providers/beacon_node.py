@@ -809,6 +809,7 @@ class BeaconNode(ApiClient):
         slot: int,
         graffiti: bytes,
         builder_boost_factor: int,
+        builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
         fork_version: SchemaShared.ForkVersion,
@@ -829,7 +830,7 @@ class BeaconNode(ApiClient):
 
         # TODO BYOB not yet implemented - possibly in separate endpoint!
         _endpoint = "/eth/v4/validator/blocks/{slot}"
-        if False and signed_payload_bid:
+        if signed_payload_bid:
             # use separate produceBlockV4WithBid endpoint
             _endpoint += "/with_bid"
             params["builder_boost_factor"] = str(builder_boost_factor)
@@ -844,12 +845,7 @@ class BeaconNode(ApiClient):
             # lodestar complains otherwise about getting a content-type header application/json
             # and an empty body
             # TODO SSZ
-            request_body = dict(
-                # TODO
-                min_bid="0",
-                builder_boost_factor="100",
-                builders=[],
-            )
+            request_body = msgspec.json.encode(builder_config)
         data = self.json_encoder.encode(request_body)
 
         accept_header = (
