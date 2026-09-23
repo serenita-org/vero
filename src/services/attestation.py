@@ -148,7 +148,7 @@ class AttestationService(ValidatorDutyService):
             self.task_manager.create_task(super().update_duties())
 
     async def handle_head_event(
-        self, event: SchemaBeaconAPI.HeadV2Event, beacon_node_host: str
+        self, event: SchemaBeaconAPI.HeadV2Event, beacon_node_netloc: str
     ) -> None:
         event_slot = int(event.data.slot)
         epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
@@ -170,7 +170,7 @@ class AttestationService(ValidatorDutyService):
         #       that (this is unlikely to happen in practice but possible)
         if event_slot <= self._last_slot_duty_started_for:
             self.logger.warning(
-                f"Ignoring late head event for slot {event.data.slot} from {beacon_node_host}"
+                f"Ignoring late head event for slot {event.data.slot} from {beacon_node_netloc}"
             )
             return
 

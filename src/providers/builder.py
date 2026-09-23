@@ -5,27 +5,23 @@ import sys
 from time import time_ns
 from types import TracebackType
 from typing import TYPE_CHECKING, Self
-from urllib.parse import urlparse
 
-import aiohttp
 import msgspec.json
 from aiohttp import ClientTimeout, web
-from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from yarl import URL
 
-from observability import ErrorType, get_service_name, get_service_version
-from observability.api_client import RequestLatency, ServiceType
+from observability import ErrorType
+from observability.api_client import ServiceType
 from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner, SchemaShared
 
+from ._api_client import ApiClient
 from ._headers import (
     DATE_MILLISECONDS,
     ETH_CONSENSUS_VERSION,
     X_TIMEOUT_MS,
-    ContentType,
 )
-from ._response import raise_for_response_size
 
 if TYPE_CHECKING:
     from providers import SignatureProvider
@@ -34,6 +30,7 @@ if TYPE_CHECKING:
 
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
+
 
 def get_default_auth_data(url: URL) -> bytes:
     host = url.host
@@ -46,40 +43,19 @@ def get_default_auth_data(url: URL) -> bytes:
     return host.encode("ascii")
 
 
-class Builder:
+class Builder(ApiClient):
     def __init__(self, base_url: str, vero: "Vero"):
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.metrics = vero.metrics
-        self.tracer = trace.get_tracer(self.__class__.__name__)
-        self.base_url = URL(base_url)
-        _host = urlparse(base_url).hostname or ""
-        if not _host:
-            raise ValueError(f"Failed to parse hostname from {base_url}")
-
-        self.client_session = aiohttp.ClientSession(
-            base_url=self.base_url,
-            headers={
-                ACCEPT: ContentType.JSON.value,
-                CONTENT_TYPE: ContentType.JSON.value,
-                USER_AGENT: f"{get_service_name()}/{get_service_version()}",
-            },
-            trace_configs=[
-                RequestLatency(host=_host, service_type=ServiceType.BUILDER),
-            ],
-            # Default aiohttp read buffer is only 64KB which is not always enough,
-            # resulting in ValueError("Chunk too big")
-            read_bufsize=2**19,
+        super().__init__(
+            base_url=base_url,
+            metrics=vero.metrics,
+            service_type=ServiceType.BUILDER,
+            timeout=ClientTimeout(total=10.0),
         )
 
+        # TODO prune? shouldn't grow normally but still
         self._bid_request_auth_cache: dict[
             tuple[int, str], SchemaBuilderAPI.SignedBuilderRequestAuth
         ] = {}
-
-    # TODO refactor -> ApiClient base class?
-    @staticmethod
-    async def _read_error_text(response: aiohttp.ClientResponse) -> str:
-        raise_for_response_size(response, _MAX_ERROR_RESPONSE_BYTES)
-        return await response.text()
 
     async def _cache_bid_request_auth_data(
         self,
@@ -113,16 +89,30 @@ class Builder:
         )
 
     async def get_status(self) -> None:
-        async with self.client_session.get(
-            "/eth/v1/builder/status", timeout=ClientTimeout(total=1.0)
-        ) as resp:
-            # Consume the response body so the connection is eligible for reuse.
-            _ = await resp.read()
+        _ = await self.make_request(
+            method="GET",
+            endpoint="/eth/v1/builder/status",
+            timeout=ClientTimeout(total=1.0),
+        )
 
-            if not resp.ok:
-                self.logger.warning(
-                    f"NOK status code {resp.status} for status request to {self.base_url}"
+    def _get_signed_builder_request_auth(
+        self,
+        slot: int,
+        proposer_pubkey: str,
+    ) -> SchemaBuilderAPI.SignedBuilderRequestAuth:
+        _cache_key = (slot, proposer_pubkey)
+        try:
+            return self._bid_request_auth_cache[_cache_key]
+        except KeyError:
+            if "pytest" in sys.modules:
+                # use mocked value for tests
+                return SchemaBuilderAPI.SignedBuilderRequestAuth(
+                    message=None,
+                    signature=None,
                 )
+            raise KeyError(
+                f"No builder request auth for {_cache_key} -> {self.base_url}"
+            ) from None
 
     async def get_execution_payload_bid(
         self,
@@ -157,25 +147,16 @@ class Builder:
             )
             endpoint = endpoint.format(**formatted_endpoint_string_params)
 
-            _cache_key = (slot, proposer_pubkey)
             try:
-                signed_builder_request_auth = self._bid_request_auth_cache.pop(
-                    _cache_key
+                signed_builder_request_auth = self._get_signed_builder_request_auth(
+                    slot=slot,
+                    proposer_pubkey=proposer_pubkey,
                 )
             except KeyError:
-                if "pytest" in sys.modules:
-                    # use mocked value for tests
-                    signed_builder_request_auth = (
-                        SchemaBuilderAPI.SignedBuilderRequestAuth(
-                            message=None,
-                            signature=None,
-                        )
-                    )
-                else:
-                    self.logger.error(
-                        f"No builder request auth for {_cache_key} -> {self.base_url}"
-                    )
-                    return None
+                self.logger.error(
+                    f"Cannot get bid from {self.base_url} - no builder request auth for {(slot, proposer_pubkey)}"
+                )
+                return None
 
             headers = {
                 ETH_CONSENSUS_VERSION: fork_version.value,
@@ -183,65 +164,63 @@ class Builder:
                 X_TIMEOUT_MS: str(int(soft_timeout * 1_000)),
             }
             timeout = ClientTimeout(total=hard_timeout)
-            async with self.client_session.post(
-                endpoint,
-                headers=headers,
-                timeout=timeout,
-                data=msgspec.json.encode(signed_builder_request_auth),
-                **kwargs,
-            ) as resp:
-                if not resp.ok:
-                    self.metrics.errors_c.labels(
-                        error_type=ErrorType.BUILDER_GET_BID.value,
-                    ).inc()
-                    raise ValueError(
-                        f"Received status code {resp.status} for request to {resp.request_info.url}"
-                        f" Full response text: {await Builder._read_error_text(resp)}",
-                    )
 
-                if resp.status == web.HTTPNoContent.status_code:
-                    # No bid is available
-                    self.logger.info(f"No bid available from {self.base_url}")
-                    return None
-
-                resp_bytes = await resp.read()
-
-                # parse based on Eth-Consensus-Version response header?
-                # or just check it is Gloas for now...
-                # actually this header is only required if the response
-                # is SSZ-encoded... so TODO we should probably
-                # check GetExecutionPayloadBidResponse.version since
-                # we're requesting JSON at the moment
-                # resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
-                # if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
-                #    raise NotImplementedError
-
-                resp_decoded = msgspec.json.decode(
-                    resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
+            try:
+                resp_bytes, content_type, resp = await self.make_request(
+                    method="POST",
+                    endpoint=endpoint,
+                    headers=headers,
+                    timeout=timeout,
+                    data=msgspec.json.encode(signed_builder_request_auth),
+                    **kwargs,
                 )
-                self.logger.debug(
-                    f"Received bid from {self.base_url}: {resp_decoded.data}"
-                )
-                self.logger.info(
-                    f"Bid with value {resp_decoded.data.total_value} received from {self.base_url}"
-                )
+            except Exception as e:
+                self.metrics.errors_c.labels(
+                    error_type=ErrorType.BUILDER_GET_BID.value,
+                ).inc()
+                raise ValueError(
+                    f"Failed to get bid from {self.base_url}: {e!r}"
+                ) from e
 
-                # TODO Lodestar's bid verification
-                # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
+            # OK response
+            if resp.status == web.HTTPNoContent.status_code:
+                # No bid is available
+                self.logger.info(f"No bid available from {self.base_url}")
+                return None
 
-                # TODO bid verification? or shall we just let the beacon node handle
-                #  all this?
-                #  see https://github.com/ethereum/consensus-specs/blob/master/specs/gloas/validator.md#signed-execution-payload-bid
-                # 1) signature verification - requires knowing the builder's pubkey
-                # 2) builder balance - must cover the bid.value
-                # 3) bid.slot - correct value
-                # 4) bid.parent_block_hash + bid.parent_block_root - correct values
-                # 5) bid.prev_randao
-                # 6) fee recipient in signed_execution_payload_bid.message
-                # 7) no trusted payment should be present (at least yet)
-                # 8) trusted payment is <= max execution payment
+            # parse based on Eth-Consensus-Version response header?
+            # or just check it is Gloas for now...
+            # actually this header is only required if the response
+            # is SSZ-encoded... so TODO we should probably
+            # check GetExecutionPayloadBidResponse.version since
+            # we're requesting JSON at the moment
+            # resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
+            # if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
+            #    raise NotImplementedError
 
-                return resp_decoded.data
+            resp_decoded = msgspec.json.decode(
+                resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
+            )
+            self.logger.info(
+                f"Bid with value {resp_decoded.data.total_value:,} received from {self.base_url}"
+            )
+
+            # TODO Lodestar's bid verification
+            # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
+
+            # TODO bid verification? or shall we just let the beacon node handle
+            #  all this?
+            #  see https://github.com/ethereum/consensus-specs/blob/master/specs/gloas/validator.md#signed-execution-payload-bid
+            # 1) signature verification - requires knowing the builder's pubkey
+            # 2) builder balance - must cover the bid.value
+            # 3) bid.slot - correct value
+            # 4) bid.parent_block_hash + bid.parent_block_root - correct values
+            # 5) bid.prev_randao
+            # 6) fee recipient in signed_execution_payload_bid.message
+            # 7) no trusted payment should be present (at least yet)
+            # 8) trusted payment is <= max execution payment
+
+            return resp_decoded.data
 
 
 # TODO submit builder preferences
@@ -380,7 +359,9 @@ class MultiBuilder:
             # Soft timeout reached or all tasks finished
             # If we have a bid at this point, we use it
             if best_bid:
-                self.logger.info(f"Selected best bid with value {best_bid_value_gwei}")
+                self.logger.info(
+                    f"Selected best bid with value {best_bid_value_gwei:,}"
+                )
                 for task in pending:
                     if not task.done():
                         task.cancel()
@@ -414,7 +395,7 @@ class MultiBuilder:
                         continue
 
                     self.logger.info(
-                        f"Selected first bid with value {result.total_value}"
+                        f"Selected first bid with value {result.total_value:,}"
                     )
                     for task in pending:
                         if not task.done():

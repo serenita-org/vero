@@ -59,7 +59,7 @@ MINIMUM_ARG_LIST = [
                 "--beacon-node-urls=   ",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
-            "Not enough beacon node urls provided",
+            "Not enough Beacon node URLs provided",
             {},
             [],
             id="--beacon-node-urls invalid input - empty string",
@@ -83,22 +83,10 @@ MINIMUM_ARG_LIST = [
                 "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-2:5052,http://beacon-node-1:5052",
                 "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
             ],
-            "beacon node urls must be unique",
+            "Beacon node URLs must have unique values",
             {},
             [],
             id="--beacon-node-urls invalid input - duplicate values",
-        ),
-        pytest.param(
-            [
-                "--network=hoodi",
-                "--remote-signer-url=http://signer:9000",
-                "--beacon-node-urls=http://beacon-node-1:5052,http://beacon-node-1:5053",
-                "--fee-recipient=0x1c6c96549debfc6aaec7631051b84ce9a6e11ad2",
-            ],
-            "Beacon node URLs must have unique hostnames",
-            {},
-            [],
-            id="--beacon-node-urls invalid input - duplicate hostname",
         ),
         pytest.param(
             [
@@ -118,13 +106,13 @@ MINIMUM_ARG_LIST = [
         ),
         pytest.param(
             [
-                "--beacon-node-urls-proposal=http://beacon-node-1:5052,http://beacon-node-1:5053",
+                "--beacon-node-urls-proposal=http://beacon-node-1:5052,http://beacon-node-1:5052",
                 *MINIMUM_ARG_LIST,
             ],
-            "Proposal beacon node URLs must have unique hostnames",
+            "Proposal beacon node URLs must have unique values",
             {},
             [],
-            id="--beacon-node-urls-proposal invalid input - duplicate hostname",
+            id="--beacon-node-urls-proposal invalid input - duplicate netloc value",
         ),
         pytest.param(
             [

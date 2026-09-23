@@ -12,7 +12,7 @@ from prometheus_client import Counter, Histogram
 
 class _RequestMetricLabelValues(TypedDict):
     service_type: str
-    host: str
+    netloc: str
     method: str
     path: str
     status: str
@@ -32,12 +32,12 @@ _REQUESTS_COUNTER = Counter(
 _TRANSMIT_BYTES = Counter(
     "transmit_bytes",
     "Total bytes transmitted",
-    labelnames=["service_type", "host"],
+    labelnames=["service_type", "netloc"],
 )
 _RECEIVE_BYTES = Counter(
     "receive_bytes",
     "Total bytes received",
-    labelnames=["service_type", "host"],
+    labelnames=["service_type", "netloc"],
 )
 
 
@@ -56,7 +56,7 @@ async def _on_request_chunk_sent(
 ) -> None:
     _TRANSMIT_BYTES.labels(
         service_type=trace_config_ctx.service_type,
-        host=trace_config_ctx.host,
+        netloc=trace_config_ctx.netloc,
     ).inc(len(params.chunk))
 
 
@@ -67,7 +67,7 @@ async def _on_response_chunk_received(
 ) -> None:
     _RECEIVE_BYTES.labels(
         service_type=trace_config_ctx.service_type,
-        host=trace_config_ctx.host,
+        netloc=trace_config_ctx.netloc,
     ).inc(len(params.chunk))
 
 
@@ -93,7 +93,7 @@ async def _on_request_end(
 
     _labels = _RequestMetricLabelValues(
         service_type=trace_config_ctx.service_type,
-        host=trace_config_ctx.host,
+        netloc=trace_config_ctx.netloc,
         method=params.method,
         path=path,
         status=str(params.response.status),
@@ -112,7 +112,7 @@ class ServiceType(Enum):
 
 
 class RequestLatency(aiohttp.TraceConfig):
-    def __init__(self, host: str, service_type: ServiceType):
+    def __init__(self, netloc: str, service_type: ServiceType):
         super().__init__(
             # While not correct from a typing point of view,
             # this is the most elegant way I found to inject
@@ -120,7 +120,7 @@ class RequestLatency(aiohttp.TraceConfig):
             trace_config_ctx_factory=partial(  # type: ignore[arg-type]
                 lambda trace_request_ctx: SimpleNamespace(
                     trace_request_ctx=trace_request_ctx,
-                    host=host,
+                    netloc=netloc,
                     service_type=service_type.value,
                 ),
             ),

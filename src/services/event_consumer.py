@@ -144,23 +144,23 @@ class EventConsumerService:
 
         if event_slot and event_slot < self.beacon_chain.current_slot:
             self.logger.warning(
-                f"Ignoring event for old slot {event_slot} from {beacon_node.host}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
+                f"Ignoring event for old slot {event_slot} from {beacon_node.netloc}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
             )
             return
 
         event_type = type(event).__name__
 
         if isinstance(event, SchemaBeaconAPI.HeadV2Event):
-            self.metrics.head_event_time_h.labels(host=beacon_node.host).observe(
+            self.metrics.head_event_time_h.labels(netloc=beacon_node.netloc).observe(
                 self.beacon_chain.time_since_slot_start(slot=int(event.data.slot))
             )
             if not self._has_seen_event(event):
                 self.logger.debug(
-                    f"[{beacon_node.host}] New head @ {event.data.slot} : {event.data.block}"
+                    f"[{beacon_node.netloc}] New head @ {event.data.slot} : {event.data.block}"
                 )
                 for head_handler in self.head_event_handlers:
                     self.task_manager.create_task(
-                        head_handler(event, beacon_node.host),
+                        head_handler(event, beacon_node.netloc),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
                     )
         elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadAvailableEvent):
@@ -224,12 +224,12 @@ class EventConsumerService:
             raise NotImplementedError(f"Unsupported event type: {event_type}")
 
         self.metrics.vc_processed_beacon_node_events_c.labels(
-            host=beacon_node.host,
+            netloc=beacon_node.netloc,
             event_type=event_type,
         ).inc()
 
     async def handle_events(self, beacon_node: BeaconNode) -> None:
-        self.logger.debug(f"Subscribing to events from {beacon_node.host}")
+        self.logger.debug(f"Subscribing to events from {beacon_node.netloc}")
 
         topics = [
             # TODO use head_v2? !!!
@@ -253,7 +253,7 @@ class EventConsumerService:
                 error_type=ErrorType.EVENT_CONSUMER.value,
             ).inc()
             self.logger.exception(
-                f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 10 seconds...",
+                f"Error occurred while processing beacon node events from {beacon_node.netloc} ({e!r}). Reconnecting in 10 seconds...",
             )
             self.task_manager.create_task(
                 self.handle_events(beacon_node=beacon_node),

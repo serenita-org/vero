@@ -188,7 +188,7 @@ class MultiBeaconNode:
         best = max(self.initialized_beacon_nodes, key=lambda bn: bn.score)
         if best != self.initialized_beacon_nodes[0]:
             self.logger.warning(
-                f"Using {best.host} as `best` beacon node (duty fetching)"
+                f"Using {best.netloc} as `best` beacon node (duty fetching)"
             )
         return best
 
@@ -367,7 +367,7 @@ class MultiBeaconNode:
         beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
             self.logger.info(
-                f"Overriding beacon nodes for block proposal, using {[bn.host for bn in self.beacon_nodes_proposal]}",
+                f"Overriding beacon nodes for block proposal, using {[bn.netloc for bn in self.beacon_nodes_proposal]}",
             )
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
@@ -549,8 +549,8 @@ class MultiBeaconNode:
         self,
         slot: int,
     ) -> AttestationData:
-        # Maps beacon node hosts to their last returned AttestationData
-        host_to_att_data: dict[str, AttestationData] = {}
+        # Maps beacon node netloc values to their last returned AttestationData
+        netloc_to_att_data: dict[str, AttestationData] = {}
         att_data_counter: Counter[AttestationData] = Counter()
 
         while True:
@@ -567,7 +567,7 @@ class MultiBeaconNode:
 
             for coro in asyncio.as_completed(tasks):
                 try:
-                    host, att_data = await coro
+                    netloc, att_data = await coro
                 except Exception as e:
                     # We can tolerate some attestation data production failures
                     self.logger.warning(
@@ -575,16 +575,16 @@ class MultiBeaconNode:
                     )
                     continue
 
-                prev_att_data = host_to_att_data.get(host)
+                prev_att_data = netloc_to_att_data.get(netloc)
 
                 if att_data == prev_att_data:
-                    # This host has already returned the same AttestationData in the past,
+                    # This netloc has already returned the same AttestationData in the past,
                     # no need to process it
                     continue
 
-                # New AttestationData has arrived from this host
-                self.logger.debug(f"AttestationData received from {host}: {att_data}")
-                host_to_att_data[host] = att_data
+                # New AttestationData has arrived from this netloc
+                self.logger.debug(f"AttestationData received from {netloc}: {att_data}")
+                netloc_to_att_data[netloc] = att_data
                 att_data_counter[att_data] += 1
                 if prev_att_data is not None:
                     att_data_counter[prev_att_data] -= 1
@@ -595,12 +595,12 @@ class MultiBeaconNode:
                     for task in tasks:
                         task.cancel()
 
-                    contributing_hosts = [
-                        h for h, ad in host_to_att_data.items() if ad == att_data
+                    contributing_netlocs = [
+                        n for n, ad in netloc_to_att_data.items() if ad == att_data
                     ]
 
                     self.logger.debug(
-                        f"Produced AttestationData without head event using {contributing_hosts}"
+                        f"Produced AttestationData without head event using {contributing_netlocs}"
                     )
 
                     return att_data

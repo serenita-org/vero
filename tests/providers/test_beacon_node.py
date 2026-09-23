@@ -156,7 +156,7 @@ async def test_initialize_spec_mismatch(
             with pytest.raises(
                 ValueError,
                 match=re.escape(
-                    "Spec values returned by beacon node beacon-node-a not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
+                    "Spec values returned by beacon node beacon-node-a:1234 not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
                 ),
             ):
                 await bn._initialize_full()

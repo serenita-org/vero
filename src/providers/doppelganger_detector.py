@@ -50,9 +50,9 @@ class DoppelgangerDetector:
                 )
                 raise result
 
-            bn_host, liveness_data = result
+            bn_netloc, liveness_data = result
             self.logger.debug(
-                f"Liveness response from {bn_host}: {liveness_data}",
+                f"Liveness response from {bn_netloc}: {liveness_data}",
             )
             live_indices.update([int(v.index) for v in liveness_data if v.is_live])
 

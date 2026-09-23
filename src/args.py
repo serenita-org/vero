@@ -53,7 +53,7 @@ def _validate_comma_separated_strings(
     if len(items) < min_values_required:
         raise ValueError(f"Not enough {entity_name}s provided")
     if len(items) != len(set(items)):
-        raise ValueError(f"{entity_name}s must be unique: {items}")
+        raise ValueError(f"{entity_name}s must have unique values: {items}")
     return items
 
 
@@ -320,32 +320,24 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             _validate_url(url)
             for url in _validate_comma_separated_strings(
                 input_string=parsed_args.beacon_node_urls,
-                entity_name="beacon node url",
+                entity_name="Beacon node URL",
                 min_values_required=1,
             )
         ]
-        if len({urlparse(bn_url).hostname for bn_url in beacon_node_urls}) != len(
-            beacon_node_urls
-        ):
-            parser.error("Beacon node URLs must have unique hostnames.")
         beacon_node_urls_proposal = [
             _validate_url(url)
             for url in _validate_comma_separated_strings(
                 input_string=parsed_args.beacon_node_urls_proposal,
-                entity_name="proposal beacon node url",
+                entity_name="Proposal beacon node URL",
                 min_values_required=0,
             )
         ]
-        if len(
-            {urlparse(bn_url).hostname for bn_url in beacon_node_urls_proposal}
-        ) != len(beacon_node_urls_proposal):
-            parser.error("Proposal beacon node URLs must have unique hostnames.")
 
         builder_urls = [
             _validate_url(url)
             for url in _validate_comma_separated_strings(
                 input_string=parsed_args.builder_urls,
-                entity_name="builder url",
+                entity_name="Builder URL",
                 min_values_required=0,
             )
         ]

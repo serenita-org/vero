@@ -1,6 +1,10 @@
 import logging
+from typing import TYPE_CHECKING
 
 from schemas import SchemaBeaconAPI, SchemaShared
+
+if TYPE_CHECKING:
+    from .vero import Vero
 
 from .builder import MultiBuilder
 
@@ -35,7 +39,7 @@ class BidSelector:
     ) -> None:
         if int(event.data.message.slot) in self.proposal_slots:
             self.logger.info(
-                f"Received bid event with value: {event.data.message.value}"
+                f"Received bid event with value: {int(event.data.message.value):,}"
             )
             # TODO check fee recipient
             self.bid_events_store.append(event)
@@ -122,16 +126,18 @@ class BidSelector:
             soft_timeout=1.0,
             hard_timeout=1.2,
         )
-        self.logger.info(
-            f"Best direct bid value: {best_direct_bid.total_value if best_direct_bid else 'N/A'}"
-        )
+        best_dir_bid_value = "N/A"
+        if best_direct_bid:
+            best_dir_bid_value = f"{best_direct_bid.total_value:,}"
+        self.logger.info(f"Best direct bid value: {best_dir_bid_value}")
 
         best_p2p_bid = self._get_best_p2p_bid(
             slot=slot, payload_attributes_data=payload_attributes_data
         )
-        self.logger.info(
-            f"Best P2P bid value: {best_p2p_bid.total_value if best_p2p_bid else 'N/A'}"
-        )
+        best_p2p_bid_value = "N/A"
+        if best_p2p_bid:
+            best_p2p_bid_value = f"{best_p2p_bid.total_value:,}"
+        self.logger.info(f"Best P2P bid value: {best_p2p_bid_value}")
 
         # TODO which is picked if they have the same value? and which should be?
         #  potuz said direct bid should be preferred in this case on Discord

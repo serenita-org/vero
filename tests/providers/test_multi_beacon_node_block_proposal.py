@@ -31,17 +31,17 @@ class BeaconNodeResponse(TypedDict):
 
 
 class BeaconNodeResponseSequence(TypedDict):
-    host: str
+    netloc: str
     responses: list[BeaconNodeResponse]
 
 
 @pytest.mark.parametrize(
-    argnames=("bn_response_sequences", "best_bn_host", "returned_block_value"),
+    argnames=("bn_response_sequences", "best_bn_netloc", "returned_block_value"),
     argvalues=[
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -57,7 +57,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-b",
+                    netloc="beacon-node-b:8080",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -73,7 +73,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-c",
+                    netloc="beacon-node-c:5555",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -89,14 +89,14 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-b",
+            "beacon-node-b:8080",
             200,
             id="Happy path - blocks returned from all beacon nodes",
         ),
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -112,7 +112,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-b",
+                    netloc="beacon-node-b:8080",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -128,7 +128,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-c",
+                    netloc="beacon-node-c:5555",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -138,14 +138,14 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-b",
+            "beacon-node-b:8080",
             200,
             id="2/3 blocks returned, 1 request timeout",
         ),
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -161,7 +161,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-b",
+                    netloc="beacon-node-b:8080",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -171,7 +171,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-c",
+                    netloc="beacon-node-c:5555",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -181,14 +181,14 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-a",
+            "beacon-node-a:1234",
             150,
             id="1/3 blocks returned, 2 requests time out",
         ),
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -198,7 +198,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-b",
+                    netloc="beacon-node-b:8080",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -208,7 +208,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-c",
+                    netloc="beacon-node-c:5555",
                     responses=[
                         BeaconNodeResponse(
                             response=None,
@@ -218,14 +218,14 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-b",
+            "beacon-node-b:8080",
             0,
             id="No blocks returned -> produce_best_block raises an Exception",
         ),
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -241,7 +241,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-b",
+                    netloc="beacon-node-b:8080",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -257,7 +257,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
                 dict(
-                    host="beacon-node-c",
+                    netloc="beacon-node-c:5555",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -273,14 +273,14 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-b",
+            "beacon-node-b:8080",
             250,
             id="2 fast responses and 1 delayed - we do not wait for the delayed one",
         ),
         pytest.param(
             [
                 dict(
-                    host="beacon-node-a",
+                    netloc="beacon-node-a:1234",
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
@@ -296,7 +296,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     ],
                 ),
             ],
-            "beacon-node-a",
+            "beacon-node-a:1234",
             0,
             # https://github.com/OffchainLabs/prysm/issues/15174
             id="No block value provided",
@@ -310,8 +310,8 @@ class BeaconNodeResponseSequence(TypedDict):
             {
                 "beacon_node_urls": [
                     "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
+                    "http://beacon-node-b:8080",
+                    "http://beacon-node-c:5555",
                 ],
             },
             id="3 beacon nodes",
@@ -321,7 +321,7 @@ class BeaconNodeResponseSequence(TypedDict):
 )
 async def test_produce_best_block(
     bn_response_sequences: list[BeaconNodeResponseSequence],
-    best_bn_host: str,
+    best_bn_netloc: str,
     returned_block_value: int,
     multi_beacon_node: MultiBeaconNode,
     beacon_chain: BeaconChain,
@@ -332,9 +332,9 @@ async def test_produce_best_block(
     """
     with aioresponses() as m:
         for sequence in bn_response_sequences:
-            bn_host = sequence["host"]
+            bn_netloc = sequence["netloc"]
             url_regex_to_mock = re.compile(
-                rf"^http://{bn_host}:1234/eth/v4/validator/blocks/\d+",
+                rf"^http://{bn_netloc}/eth/v4/validator/blocks/\d+",
             )
 
             for r in sequence["responses"]:
@@ -394,7 +394,7 @@ async def test_produce_best_block(
                 soft_timeout=0.1666,
             )
             assert content_type == ContentType.JSON
-            assert bn.host == best_bn_host
+            assert bn.netloc == best_bn_netloc
             # this test is currently failing with produceBlockV4
             # because we hardcoded execution_payload_value to 0 there for now
             assert (

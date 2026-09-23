@@ -92,7 +92,7 @@ def _setup_head_event_time_metric(
     return Histogram(
         "head_event_time",
         "Time into slot at which a head event for the slot was received",
-        labelnames=["host"],
+        labelnames=["netloc"],
         buckets=buckets_s,
     )
 
@@ -170,7 +170,7 @@ class Metrics:
         self.vc_processed_beacon_node_events_c = Counter(
             "vc_processed_beacon_node_events",
             "Successfully processed beacon node events",
-            labelnames=["host", "event_type"],
+            labelnames=["netloc", "event_type"],
         )
         self.head_event_time_h = _setup_head_event_time_metric(
             slot_duration_ms=int(spec.SLOT_DURATION_MS),
@@ -257,23 +257,23 @@ class Metrics:
         self.beacon_node_score_g = Gauge(
             "beacon_node_score",
             "Beacon node score",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )
         self.beacon_node_version_g = Gauge(
             "beacon_node_version",
             "Beacon node version",
-            labelnames=["host", "version"],
+            labelnames=["netloc", "version"],
         )
         self.beacon_node_aggregate_attestation_participant_count_h = Histogram(
             "beacon_node_aggregate_attestation_participant_count",
             "Tracks the number of participants included in aggregates returned by this beacon node.",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=[16, 32, 64, 128, 256, 512, 1_024, 2_048],
         )
         self.beacon_node_sync_contribution_participant_count_h = Histogram(
             "beacon_node_sync_contribution_participant_count",
             "Tracks the number of participants included in sync contributions returned by this beacon node.",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=[8, 16, 32, 64, 128],
         )
         _block_value_buckets = [
@@ -286,19 +286,19 @@ class Metrics:
         self.beacon_node_consensus_block_value_h = Histogram(
             "beacon_node_consensus_block_value",
             "Tracks the value of consensus layer rewards paid to the proposer in the block produced by this beacon node",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=_block_value_buckets,
         )
         self.beacon_node_execution_payload_value_h = Histogram(
             "beacon_node_execution_payload_value",
             "Tracks the value of execution payloads in blocks produced by this beacon node",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=_block_value_buckets,
         )
         self.checkpoint_confirmations_c = Counter(
             "checkpoint_confirmations",
             "Tracks how many times each beacon node confirmed finality checkpoints.",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )
 
         # RemoteSigner
@@ -310,5 +310,5 @@ class Metrics:
         self.remote_signer_score_g = Gauge(
             "remote_signer_score",
             "Remote signer score",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )
