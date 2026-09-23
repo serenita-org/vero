@@ -15,6 +15,7 @@ class BidSelector:
 
         self.beacon_chain = vero.beacon_chain
         self.multi_builder = MultiBuilder(vero=vero)
+        self.bid_selection_disabled = vero.cli_args.disable_bid_selection
 
         # TODO prune
         self.proposal_slots: set[int] = set()
@@ -100,6 +101,10 @@ class BidSelector:
     async def get_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
+        if self.bid_selection_disabled:
+            self.logger.debug(f"Bid selection disabled, returning None for slot {slot}")
+            return None
+
         # TODO consider builder boost factor + min_bid here
 
         payload_attributes_data = self._get_payload_attributes_data(
