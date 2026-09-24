@@ -28,6 +28,7 @@ from observability import (
 from observability.api_client import ServiceType
 from providers._headers import (
     ETH_BLOB_DATA_INCLUDED,
+    ETH_BUILDER_URL,
     ETH_CONSENSUS_BLOCK_VALUE,
     ETH_CONSENSUS_VERSION,
     ETH_EXECUTION_PAYLOAD_BLINDED,
@@ -903,6 +904,7 @@ class BeaconNode(ApiClient):
                 execution_payload_included=execution_payload_included,
                 execution_payload_value=resp.headers[ETH_EXECUTION_PAYLOAD_VALUE],
                 consensus_block_value=resp.headers[ETH_CONSENSUS_BLOCK_VALUE],
+                builder_url=resp.headers.get(ETH_BUILDER_URL),
                 data=resp_bytes,
             )
 
@@ -950,8 +952,15 @@ class BeaconNode(ApiClient):
         self,
         fork_version: SchemaShared.ForkVersion,
         signed_block_contents: bytes,
+        builder_url: str | None,
         content_type: ContentType,
     ) -> None:
+        headers = {
+            ETH_CONSENSUS_VERSION: fork_version.value,
+            CONTENT_TYPE: content_type.value,
+        }
+        if builder_url:
+            headers[ETH_BUILDER_URL] = builder_url
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}.publish_block_v2",
             kind=SpanKind.CLIENT,
@@ -963,10 +972,7 @@ class BeaconNode(ApiClient):
                 method="POST",
                 endpoint="/eth/v2/beacon/blocks",
                 data=signed_block_contents,
-                headers={
-                    ETH_CONSENSUS_VERSION: fork_version.value,
-                    CONTENT_TYPE: content_type.value,
-                },
+                headers=headers,
             )
 
     async def publish_blinded_block_v2(

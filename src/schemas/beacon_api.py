@@ -204,6 +204,7 @@ class ProduceBlockV4Response(msgspec.Struct):
     execution_payload_included: bool
     execution_payload_value: str
     consensus_block_value: str
+    builder_url: str | None
     data: bytes
 
 

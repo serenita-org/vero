@@ -517,7 +517,9 @@ class BlockProposalService(ValidatorDutyService):
         duty: SchemaBeaconAPI.ProposerDuty,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
-    ) -> tuple[BeaconBlock, SchemaRemoteSigner.BeaconBlockHeader, BeaconNode]:
+    ) -> tuple[
+        BeaconBlock, SchemaRemoteSigner.BeaconBlockHeader, BeaconNode, str | None
+    ]:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._produce_block",
         ):
@@ -562,6 +564,7 @@ class BlockProposalService(ValidatorDutyService):
                 (
                     block_contents_or_blinded_block,
                     beacon_node,
+                    builder_url,
                 ) = await self.multi_beacon_node.produce_block(
                     slot=slot,
                     graffiti=graffiti,
@@ -583,7 +586,12 @@ class BlockProposalService(ValidatorDutyService):
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
                     **block_contents_or_blinded_block.header_dict()
                 )
-                return block_contents_or_blinded_block, block_header, beacon_node
+                return (
+                    block_contents_or_blinded_block,
+                    block_header,
+                    beacon_node,
+                    builder_url,
+                )
 
     async def _sign_block(
         self,
@@ -622,6 +630,7 @@ class BlockProposalService(ValidatorDutyService):
         fork_version: SchemaShared.ForkVersion,
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
+        builder_url: str | None,
     ) -> BlockPublishResult:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(
@@ -649,6 +658,7 @@ class BlockProposalService(ValidatorDutyService):
                     await self.multi_beacon_node.publish_block_v2(
                         fork_version=fork_version,
                         signed_block_contents=encoded,
+                        builder_url=builder_url,
                         content_type=content_type,
                     )
                     # TODO in Gloas, we should also submit the block to the builder if
@@ -810,6 +820,7 @@ class BlockProposalService(ValidatorDutyService):
                 block_contents_or_blinded_block,
                 block_header,
                 beacon_node,
+                builder_url,
             ) = await self._produce_block(
                 slot=slot,
                 duty=duty,
@@ -832,6 +843,7 @@ class BlockProposalService(ValidatorDutyService):
                     fork_version=fork_version,
                     signature=signature,
                     block_contents_or_blinded_block=block_contents_or_blinded_block,
+                    builder_url=builder_url,
                 )
 
                 # TODO test - we MUST publish the envelope in this case!

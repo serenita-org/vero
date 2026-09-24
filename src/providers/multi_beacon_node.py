@@ -499,7 +499,7 @@ class MultiBeaconNode:
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
-    ) -> tuple[BeaconBlock, BeaconNode]:
+    ) -> tuple[BeaconBlock, BeaconNode, str | None]:
         best_block_response, content_type, beacon_node = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
@@ -510,10 +510,19 @@ class MultiBeaconNode:
             soft_timeout=soft_timeout,
         )
 
-        return self._parse_block_response(
-            response=best_block_response,
-            content_type=content_type,
-        ), beacon_node
+        if isinstance(best_block_response, SchemaBeaconAPI.ProduceBlockV3Response):
+            builder_url = None
+        else:
+            builder_url = best_block_response.builder_url
+
+        return (
+            self._parse_block_response(
+                response=best_block_response,
+                content_type=content_type,
+            ),
+            beacon_node,
+            builder_url,
+        )
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
         if self.beacon_nodes_proposal:
