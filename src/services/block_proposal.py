@@ -265,7 +265,17 @@ class BlockProposalService(ValidatorDutyService):
         self._prune_duties()
 
     async def prepare_beacon_proposer(self) -> None:
+        # TODO [remove post-Gloas]
         self.logger.debug("Calling prepare_beacon_proposer")
+
+        if self.beacon_chain.current_fork_version not in (
+            SchemaShared.ForkVersion.ELECTRA,
+            SchemaShared.ForkVersion.FULU,
+        ):
+            self.logger.debug(
+                "Skipping prepare_beacon_proposer - not on ELECTRA/FULU",
+            )
+            return
 
         our_validators = (
             self.validator_status_tracker_service.active_validators
