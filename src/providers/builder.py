@@ -68,7 +68,7 @@ class Builder(ApiClient):
         if _cache_key in self._bid_request_auth_cache:
             return
 
-        self.logger.info(f"Caching builder request data for {_cache_key}")
+        self.logger.debug(f"Caching bid request auth data for {_cache_key}")
 
         message, signature, _ = await signature_provider.sign(
             message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
