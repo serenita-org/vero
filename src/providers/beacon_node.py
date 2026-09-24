@@ -431,23 +431,6 @@ class BeaconNode(ApiClient):
 
         return response
 
-    async def get_proposer_duties(
-        self,
-        epoch: int,
-    ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
-        resp_bytes, _, _ = await self._make_request(
-            method="GET",
-            endpoint="/eth/v1/validator/duties/proposer/{epoch}",
-            formatted_endpoint_string_params=dict(epoch=epoch),
-        )
-
-        response = msgspec.json.decode(
-            resp_bytes, type=SchemaBeaconAPI.GetProposerDutiesResponse
-        )
-        self._raise_if_optimistic(response)
-
-        return response
-
     async def get_proposer_duties_v2(
         self,
         epoch: int,

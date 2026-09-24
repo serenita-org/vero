@@ -227,14 +227,9 @@ class BlockProposalService(ValidatorDutyService):
         for epoch in (current_epoch, current_epoch + 1):
             self.logger.debug(f"Updating proposer duties for epoch {epoch}")
 
-            if epoch >= self.beacon_chain.GLOAS_FORK_EPOCH:
-                response = await self.multi_beacon_node.get_proposer_duties_v2(
-                    epoch=epoch,
-                )
-            else:
-                response = await self.multi_beacon_node.get_proposer_duties(
-                    epoch=epoch,
-                )
+            response = await self.multi_beacon_node.get_proposer_duties_v2(
+                epoch=epoch,
+            )
             fetched_duties = response.data
 
             self.proposer_duties_dependent_roots[epoch] = response.dependent_root

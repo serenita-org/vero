@@ -271,12 +271,6 @@ class MultiBeaconNode:
         )
         return resp
 
-    async def get_proposer_duties(
-        self,
-        **kwargs: Any,
-    ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
-        return await self.best_beacon_node.get_proposer_duties(**kwargs)
-
     async def get_proposer_duties_v2(
         self,
         **kwargs: Any,
