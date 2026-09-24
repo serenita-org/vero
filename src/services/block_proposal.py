@@ -158,26 +158,25 @@ class BlockProposalService(ValidatorDutyService):
             await self._fetch_randao_reveal(
                 slot=slot + 1, pubkey=duty_for_next_slot.pubkey
             )
-            # Call `prepare_beacon_proposer` and `register_validators` one more time
-            # just before a block proposal is scheduled to decrease
-            # the chances of the fee recipient being set incorrectly,
-            # e.g., due to a beacon node restarting.
-            # TODO these things in here can be run out of order, let's create tasks
-            #  in self.task_manager
-            await self.prepare_beacon_proposer()
-            await self.register_validators(
-                current_slot=slot,
-                pubkeys_to_register=[duty_for_next_slot.pubkey],
-            )
-            # TODO
-            await self.submit_proposer_preferences()
+            # Supply connected beacon nodes and builders with
+            # just-in-time information to decrease the chances of
+            # the fee recipient being set incorrectly, e.g., due to
+            # a beacon node restarting.
+            for coro in (
+                self.prepare_beacon_proposer(),
+                self.submit_proposer_preferences(),
+                self.register_validators(
+                    current_slot=slot,
+                    pubkeys_to_register=[duty_for_next_slot.pubkey],
+                ),
+            ):
+                self.task_manager.create_task(coro)
+
             # Pre-establish connections to builders
             # to avoid tcp+tls handshake overhead on the get-bid request
             await self.bid_selector.multi_builder.warm_connections()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
-        # TODO?
-        # self.task_manager.create_task(self.submit_proposer_preferences())
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -185,6 +184,7 @@ class BlockProposalService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
+            self.task_manager.create_task(self.submit_proposer_preferences())
 
     async def handle_head_event(
         self, event: SchemaBeaconAPI.HeadV2Event, _: str
@@ -308,6 +308,7 @@ class BlockProposalService(ValidatorDutyService):
         current_slot: int,
         pubkeys_to_register: list[str] | None = None,
     ) -> None:
+        # TODO [remove post-Gloas]
         if not self.cli_args.use_external_builder:
             return
 
@@ -388,80 +389,73 @@ class BlockProposalService(ValidatorDutyService):
             )
 
     async def submit_proposer_preferences(self) -> None:
-        # TODO Ok this needs some reworking, it seems we should only send these
-        # when expecting to propose soonish? so different from validator registrations
-
-        # TODO we only really _need_ to broadcast this if we want to receive trusted
-        #  bids.
-        #  OR (!!!) indicate what target gas limit we want.
-
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
         default_fee_recipient = self.cli_args.fee_recipient
-        # TODO consider adding deprecating gas-limit CLI flag and replacing it with target-gas-limit
         default_target_gas_limit = str(self.cli_args.gas_limit)
 
         current_slot = self.beacon_chain.current_slot
 
         for epoch, proposer_duties in self.proposer_duties.items():
-            signed_preferences = []
+            if epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
+                # Pre-Gloas proposal, not submitting preferences
+                continue
+
             _fork_info = self.beacon_chain.get_fork_info(
                 slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
             )
+            messages_to_sign = []
             for duty in proposer_duties:
                 if int(duty.slot) < current_slot:
                     continue
 
-                duty_epoch = int(duty.slot) // self.beacon_chain.SLOTS_PER_EPOCH
-                if duty_epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
-                    # Pre-Gloas proposal, not submitting preferences
-                    continue
-
                 # TODO parallelize + error-handling (might want to retry here)
-                msg = SchemaRemoteSigner.ProposerPreferencesSignableMessage(
-                    proposer_preferences=SchemaRemoteSigner.VersionedProposerPreferences(
-                        data=SchemaRemoteSigner.ProposerPreferences(
-                            # Lodestar is throwing "PROPOSER_PREFERENCES_ERROR_UNKNOWN_DEPENDENT_ROOT"
-                            # ... dependent roots changed a bit in Gloas so may have sth to do with that
-                            dependent_root=self.proposer_duties_dependent_roots[epoch],
-                            proposal_slot=duty.slot,
-                            validator_index=duty.validator_index,
-                            fee_recipient=default_fee_recipient
-                            if not self.keymanager.enabled
-                            else self.keymanager.pubkey_to_fee_recipient_override.get(
-                                duty.pubkey, default_fee_recipient
+                messages_to_sign.append(
+                    (
+                        duty.pubkey,
+                        SchemaRemoteSigner.ProposerPreferencesSignableMessage(
+                            proposer_preferences=SchemaRemoteSigner.VersionedProposerPreferences(
+                                data=SchemaRemoteSigner.ProposerPreferences(
+                                    dependent_root=self.proposer_duties_dependent_roots[
+                                        epoch
+                                    ],
+                                    proposal_slot=duty.slot,
+                                    validator_index=duty.validator_index,
+                                    fee_recipient=default_fee_recipient
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_fee_recipient_override.get(
+                                        duty.pubkey, default_fee_recipient
+                                    ),
+                                    target_gas_limit=default_target_gas_limit
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_gas_limit_override.get(
+                                        duty.pubkey, default_target_gas_limit
+                                    ),
+                                ),
                             ),
-                            target_gas_limit=default_target_gas_limit
-                            if not self.keymanager.enabled
-                            else self.keymanager.pubkey_to_gas_limit_override.get(
-                                duty.pubkey, default_target_gas_limit
-                            ),
+                            fork_info=_fork_info,
                         ),
-                    ),
-                    fork_info=_fork_info,
-                )
-                signed_preferences.append(
-                    await self.signature_provider.sign(
-                        message=msg,
-                        identifier=duty.pubkey,
                     )
                 )
-
-            if len(signed_preferences) == 0:
+            if len(messages_to_sign) == 0:
                 continue
 
-            # TODO unhardcode
-            _fork_version = SchemaShared.ForkVersion.GLOAS
+            signed_preferences = await asyncio.gather(
+                *(
+                    self.signature_provider.sign(
+                        message=msg,
+                        identifier=pubkey,
+                    )
+                    for pubkey, msg in messages_to_sign
+                )
+            )
 
-            # TODO submit directly to builders too,
-            #  instead of only via beacon node -> gossip
-            # await self.bid_selector.multi_builder.submit_proposer_preferences(...)
             await self.multi_beacon_node.submit_proposer_preferences(
                 signed_proposer_preferences=[
                     (msg.proposer_preferences.data, sig)
                     for (msg, sig, _) in signed_preferences
                 ],
-                fork_version=_fork_version,
+                fork_version=SchemaShared.ForkVersion.GLOAS,
             )
 
             self.logger.info(
