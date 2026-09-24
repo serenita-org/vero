@@ -811,7 +811,6 @@ class BeaconNode(ApiClient):
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
 
-        # TODO BYOB not yet implemented - possibly in separate endpoint!
         _endpoint = "/eth/v4/validator/blocks/{slot}"
         request_body: (
             SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
