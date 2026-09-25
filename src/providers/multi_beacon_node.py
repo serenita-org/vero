@@ -382,7 +382,10 @@ class MultiBeaconNode:
             request_body: (
                 SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
             )
-            request_body = signed_payload_bid or builder_config
+            if signed_payload_bid:  # noqa: SIM108
+                request_body = signed_payload_bid
+            else:
+                request_body = builder_config
             encoded_request_body = self._json_encoder.encode(request_body)
             tasks = {
                 asyncio.create_task(
