@@ -144,10 +144,9 @@ class BidSelector:
             best_p2p_bid_value = f"{best_p2p_bid.total_value:,}"
         self.logger.info(f"Best P2P bid value: {best_p2p_bid_value}")
 
-        # TODO which is picked if they have the same value? and which should be?
-        #  potuz said direct bid should be preferred in this case on Discord
+        # max() returns the first item on ties, so prefer the direct bid.
         best_bid = max(
-            (best_p2p_bid, best_direct_bid), key=(lambda x: x.total_value if x else -1)
+            (best_direct_bid, best_p2p_bid), key=(lambda x: x.total_value if x else -1)
         )
 
         self.logger.info(f"Selected best bid: {best_bid}")
