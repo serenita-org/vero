@@ -4,7 +4,6 @@ from yarl import URL
 from providers.builder import get_default_auth_data
 
 
-
 @pytest.mark.parametrize(
     argnames=("builder_url", "expected_auth_data"),
     argvalues=[
@@ -35,8 +34,10 @@ from providers.builder import get_default_auth_data
         pytest.param(
             URL("https://[::ffff:192.0.2.1]/"),
             b"[::ffff:c000:201]",
-        )
-    ]
+        ),
+    ],
 )
-async def test_get_default_auth_data(builder_url: URL, expected_auth_data: bytes) -> None:
+async def test_get_default_auth_data(
+    builder_url: URL, expected_auth_data: bytes
+) -> None:
     assert get_default_auth_data(builder_url) == expected_auth_data
