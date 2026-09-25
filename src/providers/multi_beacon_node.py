@@ -379,13 +379,22 @@ class MultiBeaconNode:
                 for bn in beacon_nodes_to_use
             }
         elif fork_version == ForkVersion.GLOAS:
+            request_body: (
+                SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
+            )
+            if signed_payload_bid:
+                request_body = signed_payload_bid
+            else:
+                request_body = builder_config
+            encoded_request_body = self._json_encoder.encode(request_body)
             tasks = {
                 asyncio.create_task(
                     bn.produce_block_v4(
                         slot=slot,
-                        graffiti=graffiti,
-                        builder_config=builder_config,
                         randao_reveal=randao_reveal,
+                        graffiti=graffiti,
+                        encoded_request_body=encoded_request_body,
+                        builder_config=builder_config,
                         signed_payload_bid=signed_payload_bid,
                         fork_version=fork_version,
                     ),

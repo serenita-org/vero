@@ -791,43 +791,29 @@ class BeaconNode(ApiClient):
     async def produce_block_v4(
         self,
         slot: int,
-        graffiti: bytes,
-        builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
+        graffiti: bytes,
+        encoded_request_body: bytes,
+        builder_config: SchemaBeaconAPI.BuilderConfig,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
         fork_version: SchemaShared.ForkVersion,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType, Self]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
-        # TODO deduplicate with produce_block_v3, it's near to a copy-paste
-        # Keep the stateful self-build flow: Lodestar caches the payload envelope,
+        # Uses the stateful self-build flow: beacon node caches the payload envelope,
         # which Vero retrieves after publishing the beacon block.
-        # TODO support stateless self-build flow?
         include_payload = False
         params = dict(
             randao_reveal=randao_reveal,
-            builder_boost_factor=builder_config.builder_boost_factor,
             include_payload=str(include_payload).lower(),
         )
         if graffiti:
             params["graffiti"] = f"0x{graffiti.hex()}"
 
         _endpoint = "/eth/v4/validator/blocks/{slot}"
-        request_body: (
-            SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
-        )
         if signed_payload_bid:
             # use separate produceBlockV4WithBid endpoint
             _endpoint += "/with_bid"
             params["builder_boost_factor"] = builder_config.builder_boost_factor
-            self.logger.info(
-                f"Setting body for block production, bid: {signed_payload_bid}"
-            )
-            # actually we might want to do all this in MultiBeaconNode already...
-            # at least the "expensive" encoding of the body, just do it once
-            request_body = signed_payload_bid
-        else:
-            request_body = builder_config
-        data = self.json_encoder.encode(request_body)
 
         accept_header = (
             ContentType.JSON.value
@@ -848,7 +834,7 @@ class BeaconNode(ApiClient):
                 endpoint=_endpoint,
                 formatted_endpoint_string_params=dict(slot=slot),
                 params=params,
-                data=data,
+                data=encoded_request_body,
                 timeout=ClientTimeout(
                     sock_connect=self.client_session.timeout.sock_connect,
                 ),
