@@ -102,7 +102,7 @@ class BidSelector:
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> SchemaShared.SignedExecutionPayloadBid | None:
         if self.bid_selection_disabled:
-            self.logger.debug(f"Bid selection disabled, returning None for slot {slot}")
+            self.logger.info(f"Bid selection disabled, returning None for slot {slot}")
             return None
 
         # TODO consider builder boost factor + min_bid here
