@@ -4,7 +4,7 @@ import pytest
 
 from providers import BeaconChain, Keymanager, Vero
 from schemas import SchemaBeaconAPI
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
 from tests.ssz_objects import ZERO_ROOT

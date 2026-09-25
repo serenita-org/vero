@@ -5,7 +5,8 @@ import pytest
 
 from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
-from schemas.beacon_api import ForkVersion, ValidatorStatus
+from schemas.beacon_api import ValidatorStatus
+from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 from tests.ssz_objects import make_attestation_data

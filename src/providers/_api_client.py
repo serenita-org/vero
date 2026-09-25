@@ -42,9 +42,10 @@ class ApiClient:
         self.base_url = URL(base_url)
         # netloc without the user+password part to avoid
         # exposing credentials in telemetry / unexpectedly
-        self.netloc = self.base_url.host_port_subcomponent
-        if not self.netloc:
+        netloc = self.base_url.host_port_subcomponent
+        if not netloc:
             raise ValueError(f"Failed to parse netloc from {self.base_url}")
+        self.netloc = netloc
 
         self.client_session = aiohttp.ClientSession(
             base_url=self.base_url,

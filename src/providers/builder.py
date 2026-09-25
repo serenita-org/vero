@@ -1,7 +1,6 @@
 import asyncio
 import ipaddress
 import logging
-import sys
 from time import time_ns
 from types import TracebackType
 from typing import TYPE_CHECKING, Self
@@ -109,12 +108,6 @@ class Builder(ApiClient):
         try:
             return self._bid_request_auth_cache[_cache_key]
         except KeyError:
-            if "pytest" in sys.modules:
-                # use mocked value for tests
-                return SchemaShared.SignedBuilderRequestAuth(
-                    message=None,
-                    signature=None,
-                )
             raise KeyError(
                 f"No builder request auth for {_cache_key} -> {self.base_url}"
             ) from None
@@ -146,7 +139,7 @@ class Builder(ApiClient):
             # TODO can we make this formatted endpoint stuf nicer? we are doing it to reduce
             #  metric cardinality
             endpoint = "/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
-            kwargs = dict(trace_request_ctx=dict(path=endpoint))
+            trace_request_ctx = dict(path=endpoint)
             formatted_endpoint_string_params = dict(
                 slot=slot,
                 parent_hash=parent_hash,
@@ -180,7 +173,7 @@ class Builder(ApiClient):
                     headers=headers,
                     timeout=timeout,
                     data=msgspec.json.encode(signed_builder_request_auth),
-                    **kwargs,
+                    trace_request_ctx=trace_request_ctx,
                 )
             except Exception as e:
                 self.metrics.errors_c.labels(
@@ -329,7 +322,7 @@ class MultiBuilder:
                 )
                 for builder in self.builders
             ]
-            pending = tasks
+            pending = set(tasks)
             start_time = asyncio.get_running_loop().time()
             remaining_soft_timeout = soft_timeout
 

@@ -214,12 +214,12 @@ class BeaconNode(ApiClient):
         formatted_endpoint_string_params: dict[str, str | int] | None = None,
         **kwargs: Unpack[_RequestOptions],
     ) -> tuple[bytes, str | None, ClientResponse]:
+        kwargs["raise_for_status"] = self._raise_for_status
         try:
             resp_tuple = await super().make_request(
                 method=method,
                 endpoint=endpoint,
                 formatted_endpoint_string_params=formatted_endpoint_string_params,
-                raise_for_status=self._raise_for_status,
                 **kwargs,
             )
         except BeaconNodeNotReady:

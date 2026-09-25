@@ -21,7 +21,7 @@ from providers._headers import (
     ContentType,
 )
 from schemas import SchemaBeaconAPI
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from spec import preset_types
 from spec.base import SpecGloas

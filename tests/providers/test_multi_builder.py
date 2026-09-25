@@ -12,6 +12,7 @@ from args import CLIArgs
 from providers import BeaconChain, MultiBuilder
 from providers._headers import ETH_CONSENSUS_VERSION
 from schemas import SchemaBuilderAPI, SchemaShared
+from tests.ssz_objects import ZERO_SIGNATURE
 
 
 @dataclass
@@ -250,6 +251,13 @@ async def test_bid_selection_builders(
     multi_builder: MultiBuilder,
     cli_args: CLIArgs,
 ) -> None:
+    for builder in multi_builder.builders:
+        builder._bid_request_auth_cache[(123, "0x9abc")] = (
+            SchemaShared.SignedBuilderRequestAuth(
+                message=SchemaShared.BuilderRequestAuth(data="0x", slot="123"),
+                signature=ZERO_SIGNATURE,
+            )
+        )
     with aioresponses() as m:
         for builder_response in builder_responses:
             base_url = builder_response.base_url
@@ -269,7 +277,7 @@ async def test_bid_selection_builders(
                 if _exception:
                     raise _exception
 
-                _body, _headers = "", {}
+                _body, _headers = b"", {}
                 if _response:
                     _body = msgspec.json.encode(_response)
                     _headers = {

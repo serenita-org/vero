@@ -343,14 +343,9 @@ class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
 
 
 def is_optimistic(obj: ExecutionOptimisticResponse | BeaconNodeEvent) -> bool:
-    try:
+    if isinstance(obj, ExecutionOptimisticResponse):
         return obj.execution_optimistic
-    except AttributeError:
-        pass
-
-    try:
+    if isinstance(obj, HeadV2Event):
         return obj.data.execution_optimistic
-    except AttributeError:
-        pass
 
     return False

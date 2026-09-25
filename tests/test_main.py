@@ -12,7 +12,7 @@ import pytest
 
 from main import main
 from providers import Vero
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 
 
 @pytest.fixture

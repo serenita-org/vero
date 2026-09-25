@@ -24,7 +24,7 @@ from providers import (
     MultiBuilder,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec.base import SpecGloas

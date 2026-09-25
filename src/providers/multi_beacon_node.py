@@ -862,9 +862,12 @@ class MultiBeaconNode:
         self,
         slot: int,
     ) -> PayloadAttestationData | None:
-        return await self._get_first_beacon_node_response(
-            func_name="produce_payload_attestation_data",
-            slot=slot,
+        return cast(
+            "PayloadAttestationData | None",
+            await self._get_first_beacon_node_response(
+                func_name="produce_payload_attestation_data",
+                slot=slot,
+            ),
         )
 
     async def publish_payload_attestation_messages(

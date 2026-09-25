@@ -1,7 +1,8 @@
 import pytest
 from yarl import URL
 
-from providers.builder import get_default_auth_data
+from providers import Vero
+from providers.builder import Builder, get_default_auth_data
 
 
 @pytest.mark.parametrize(
@@ -41,3 +42,12 @@ async def test_get_default_auth_data(
     builder_url: URL, expected_auth_data: bytes
 ) -> None:
     assert get_default_auth_data(builder_url) == expected_auth_data
+
+
+async def test_missing_builder_request_auth(vero: Vero) -> None:
+    builder = Builder(base_url="https://builder.example.com", vero=vero)
+    try:
+        with pytest.raises(KeyError, match="No builder request auth"):
+            builder.get_signed_builder_request_auth(slot=123, proposer_pubkey="0x9abc")
+    finally:
+        await builder.client_session.close()

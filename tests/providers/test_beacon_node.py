@@ -82,7 +82,7 @@ async def test_produce_block_v3_response(
             response, content_type, _ = await beacon_node.produce_block_v3(
                 slot=1,
                 graffiti=b"",
-                builder_boost_factor=90,
+                builder_boost_factor="90",
                 randao_reveal=ZERO_SIGNATURE,
             )
         finally:

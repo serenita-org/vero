@@ -4,7 +4,6 @@ from providers import (
     DutyCache,
     Keymanager,
     MultiBeaconNode,
-    MultiBuilder,
     SignatureProvider,
     Vero,
 )
@@ -20,7 +19,6 @@ from services.validator_duty_service import ValidatorDutyServiceOptions
 @pytest.fixture
 def validator_duty_service_options(
     multi_beacon_node_with_mocked_endpoints: MultiBeaconNode,
-    multi_builder: MultiBuilder,
     signature_provider: SignatureProvider,
     keymanager: Keymanager,
     duty_cache: DutyCache,
@@ -29,7 +27,6 @@ def validator_duty_service_options(
 ) -> ValidatorDutyServiceOptions:
     return ValidatorDutyServiceOptions(
         multi_beacon_node=multi_beacon_node_with_mocked_endpoints,
-        multi_builder=multi_builder,
         signature_provider=signature_provider,
         keymanager=keymanager,
         duty_cache=duty_cache,
