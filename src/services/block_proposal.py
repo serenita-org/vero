@@ -396,6 +396,7 @@ class BlockProposalService(ValidatorDutyService):
 
         current_slot = self.beacon_chain.current_slot
 
+        messages_by_epoch = []
         for epoch, proposer_duties in self.proposer_duties.items():
             if epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
                 # Pre-Gloas proposal, not submitting preferences
@@ -439,7 +440,9 @@ class BlockProposalService(ValidatorDutyService):
                 )
             if len(messages_to_sign) == 0:
                 continue
+            messages_by_epoch.append((epoch, messages_to_sign))
 
+        for epoch, messages_to_sign in messages_by_epoch:
             signed_preferences = await asyncio.gather(
                 *(
                     self.signature_provider.sign(
