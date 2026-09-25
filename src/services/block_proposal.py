@@ -27,7 +27,7 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec import BeaconBlock
-from spec.common import get_slot_component_duration_ms
+from spec.slot_components import get_slot_component_duration_ms
 from spec.utils import encode_graffiti
 
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX

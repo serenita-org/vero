@@ -308,7 +308,7 @@ class MultiBuilder:
             name=f"{self.__class__.__name__}.get_execution_payload_bid",
             kind=SpanKind.CLIENT,
         ):
-            tasks = [
+            pending = {
                 asyncio.create_task(
                     builder.get_execution_payload_bid(
                         slot=slot,
@@ -321,8 +321,7 @@ class MultiBuilder:
                     )
                 )
                 for builder in self.builders
-            ]
-            pending = set(tasks)
+            }
             start_time = asyncio.get_running_loop().time()
             remaining_soft_timeout = soft_timeout
 

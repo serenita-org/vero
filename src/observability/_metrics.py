@@ -9,7 +9,7 @@ from prometheus_client import (
 )
 
 from spec.base import SpecGloas
-from spec.common import get_slot_component_duration_ms
+from spec.slot_components import get_slot_component_duration_ms
 
 from ._vero_info import get_service_commit, get_service_version
 

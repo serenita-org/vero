@@ -28,10 +28,10 @@ from spec import (
 )
 from spec.common import (
     bytes_to_uint64,
-    get_slot_component_duration_ms,
     hash_function,
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
+from spec.slot_components import get_slot_component_duration_ms
 
 _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 

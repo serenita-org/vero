@@ -18,7 +18,7 @@ from providers._headers import (
 from schemas import SchemaBeaconAPI, SchemaShared
 from spec.base import Version
 from spec.common import Uint64
-from tests.ssz_objects import ZERO_SIGNATURE, make_block_electra_fulu
+from tests.ssz_objects import make_block_electra_fulu
 
 
 @pytest.mark.parametrize(
@@ -83,7 +83,7 @@ async def test_produce_block_v3_response(
                 slot=1,
                 graffiti=b"",
                 builder_boost_factor="90",
-                randao_reveal=ZERO_SIGNATURE,
+                randao_reveal="0x" + "00" * 96,
             )
         finally:
             await beacon_node.client_session.close()

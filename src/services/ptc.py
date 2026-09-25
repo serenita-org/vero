@@ -16,7 +16,7 @@ from services.validator_duty_service import (
     ValidatorDutyServiceOptions,
 )
 from spec import preset_types
-from spec.common import get_slot_component_duration_ms
+from spec.slot_components import get_slot_component_duration_ms
 
 _PRODUCE_JOB_ID = "PtcService.attest_if_not_yet_attested-slot-{duty_slot}"
 

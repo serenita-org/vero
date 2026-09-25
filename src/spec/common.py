@@ -49,9 +49,6 @@ class Bytes32(FixedBytes):
     length = 32
 
 
-from spec.constants import BASIS_POINTS  # noqa: E402 - constants depend on Uint64 above
-
-
 def bytes_to_uint64(
     data: bytes,
 ) -> Uint64:
@@ -60,15 +57,6 @@ def bytes_to_uint64(
 
 def hash_function(x: bytes | bytearray | memoryview) -> Bytes32:
     return Bytes32(sha256(x).digest())
-
-
-def get_slot_component_duration_ms(
-    basis_points: Uint64, slot_duration_ms: Uint64
-) -> int:
-    """
-    Calculate the duration of a slot component in milliseconds.
-    """
-    return int(basis_points * slot_duration_ms // BASIS_POINTS)
 
 
 class Root(Bytes32):

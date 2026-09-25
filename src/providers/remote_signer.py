@@ -85,10 +85,10 @@ class RemoteSigner(SignatureProvider):
         self.url = url
         # netloc without the user+password part to avoid
         # exposing credentials in telemetry / unexpectedly
-        netloc = URL(self.url).host_port_subcomponent
-        if not netloc:
+        _netloc = URL(self.url).host_port_subcomponent
+        if not _netloc:
             raise ValueError(f"Failed to parse netloc from {self.url}")
-        self.netloc = netloc
+        self.netloc = _netloc
 
         self._score = RemoteSigner.MAX_SCORE
         self._run_health_poll = vero is not None

@@ -23,11 +23,12 @@ from spec import (
     SyncCommitteeMessage,
     preset_types,
 )
-from spec.common import bytes_to_uint64, get_slot_component_duration_ms, hash_function
+from spec.common import bytes_to_uint64, hash_function
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
+from spec.slot_components import get_slot_component_duration_ms
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
