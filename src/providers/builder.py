@@ -59,7 +59,7 @@ class Builder(ApiClient):
             tuple[int, str], SchemaShared.SignedBuilderRequestAuth
         ] = {}
 
-    async def _cache_bid_request_auth_data(
+    async def cache_bid_request_auth_data(
         self,
         proposer_duty: SchemaBeaconAPI.ProposerDuty,
         signature_provider: "SignatureProvider",
@@ -174,7 +174,7 @@ class Builder(ApiClient):
             timeout = ClientTimeout(total=hard_timeout)
 
             try:
-                resp_bytes, content_type, resp = await self.make_request(
+                resp_bytes, _content_type, resp = await self.make_request(
                     method="POST",
                     endpoint=endpoint,
                     headers=headers,
@@ -276,7 +276,7 @@ class MultiBuilder:
     ) -> None:
         await asyncio.gather(
             *(
-                b._cache_bid_request_auth_data(
+                b.cache_bid_request_auth_data(
                     proposer_duty=proposer_duty,
                     signature_provider=signature_provider,
                 )

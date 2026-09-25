@@ -228,7 +228,7 @@ def _create_bid(
     ],
 )
 @pytest.mark.parametrize(
-    argnames=("cli_args",),
+    argnames="cli_args",
     argvalues=[
         pytest.param(
             {

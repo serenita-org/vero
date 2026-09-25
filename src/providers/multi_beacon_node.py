@@ -382,10 +382,7 @@ class MultiBeaconNode:
             request_body: (
                 SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
             )
-            if signed_payload_bid:
-                request_body = signed_payload_bid
-            else:
-                request_body = builder_config
+            request_body = signed_payload_bid or builder_config
             encoded_request_body = self._json_encoder.encode(request_body)
             tasks = {
                 asyncio.create_task(
@@ -463,7 +460,7 @@ class MultiBeaconNode:
             for coro_first in asyncio.as_completed(pending):
                 try:
                     best_block_result = await coro_first
-                    best_block_response, _, beacon_node = best_block_result
+                    best_block_response, _, _beacon_node = best_block_result
 
                     best_block_value = int(best_block_response.consensus_block_value)
                     if _use_payload_value_for_comparison:

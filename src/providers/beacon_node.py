@@ -190,12 +190,12 @@ class BeaconNode(ApiClient):
                 self.initialize_full(), delay=self._init_retry_interval
             )
 
-    @staticmethod
-    async def _raise_for_status(response: ClientResponse) -> None:
+    @classmethod
+    async def _raise_for_status(cls, response: ClientResponse) -> None:
         try:
-            await ApiClient._raise_for_status(response)
+            await super()._raise_for_status(response)
         except ValueError:
-            resp_text = await ApiClient._read_error_text(response)
+            resp_text = await cls._read_error_text(response)
             exc_map = {
                 503: BeaconNodeNotReady,
                 405: BeaconNodeUnsupportedEndpoint,

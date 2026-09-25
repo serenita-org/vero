@@ -808,9 +808,7 @@ class BlockProposalService(ValidatorDutyService):
             # TODO make it possible to disable Vero-side bid selection
             #  using a CLI flag
             selected_bid = None
-            if self.beacon_chain.current_fork_version in (
-                SchemaShared.ForkVersion.GLOAS,
-            ):
+            if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
                 selected_bid = await self.bid_selector.get_bid(
                     slot=slot, proposer_duty=duty
                 )

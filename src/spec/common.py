@@ -49,7 +49,7 @@ class Bytes32(FixedBytes):
     length = 32
 
 
-from spec.constants import BASIS_POINTS
+from spec.constants import BASIS_POINTS  # noqa: E402 - constants depend on Uint64 above
 
 
 def bytes_to_uint64(

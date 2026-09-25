@@ -133,15 +133,14 @@ class EventConsumerService:
         self, event: SchemaBeaconAPI.BeaconNodeEvent, beacon_node: BeaconNode
     ) -> None:
         event_slot = None
-        try:
+        if isinstance(
+            event,
+            SchemaBeaconAPI.ExecutionPayloadAvailableEvent
+            | SchemaBeaconAPI.ChainReorgEvent,
+        ):
             event_slot = int(event.slot)
-        except AttributeError:
-            pass
-
-        try:
+        elif isinstance(event, SchemaBeaconAPI.HeadV2Event):
             event_slot = int(event.data.slot)
-        except AttributeError:
-            pass
 
         if event_slot and event_slot < self.beacon_chain.current_slot:
             self.logger.warning(

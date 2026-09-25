@@ -147,12 +147,13 @@ class PtcService(ValidatorDutyService):
         for result in await asyncio.gather(*signing_coros, return_exceptions=True):
             if isinstance(result, BaseException):
                 self.metrics.errors_c.labels(error_type=ErrorType.SIGNATURE.value).inc()
-                self.logger.exception(
+                self.logger.error(
                     f"Failed to get signature for PTC message for slot {slot}: {result!r}",
+                    exc_info=result,
                 )
                 continue
 
-            msg, sig, pubkey = result
+            _msg, sig, pubkey = result
             duty = pubkey_to_duty[pubkey]
             signed_messages.append(
                 preset_types(
