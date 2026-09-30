@@ -120,5 +120,18 @@ class SpecFulu:
         }
 
 
+def _with_seconds_per_slot(data: dict[str, str]) -> dict[str, str]:
+    # consensus-specs replaced SECONDS_PER_SLOT with SLOT_DURATION_MS
+    # (ethereum/consensus-specs#4926), so newer configs only carry the latter.
+    if "SECONDS_PER_SLOT" in data or "SLOT_DURATION_MS" not in data:
+        return data
+    slot_duration_ms = int(data["SLOT_DURATION_MS"])
+    if slot_duration_ms % 1000 != 0:
+        raise ValueError(
+            f"SLOT_DURATION_MS ({slot_duration_ms}) is not a whole number of seconds"
+        )
+    return {**data, "SECONDS_PER_SLOT": str(slot_duration_ms // 1000)}
+
+
 def parse_spec(data: dict[str, str]) -> SpecFulu:
-    return SpecFulu.from_obj(data)
+    return SpecFulu.from_obj(_with_seconds_per_slot(data))
