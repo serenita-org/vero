@@ -52,6 +52,7 @@ class Builder(ApiClient):
         )
 
         self.bid_selection_disabled = vero.cli_args.disable_bid_selection
+        self.cli_args = vero.cli_args
 
         # TODO prune? shouldn't grow normally but still
         self._bid_request_auth_cache: dict[
@@ -202,6 +203,13 @@ class Builder(ApiClient):
             resp_decoded = msgspec.json.decode(
                 resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
             )
+
+            if resp_decoded.data.total_value < self.cli_args.builder_min_bid:
+                self.logger.debug(
+                    f"Ignoring bid event with value {int(resp_decoded.data.total_value):,} below configured min bid"
+                )
+                return None
+
             self.logger.info(
                 f"Bid with value {resp_decoded.data.total_value:,} received from {self.base_url}"
             )

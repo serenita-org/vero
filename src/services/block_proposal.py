@@ -538,7 +538,7 @@ class BlockProposalService(ValidatorDutyService):
 
             # TODO keymgr overrides for all these
             builder_config = SchemaBeaconAPI.BuilderConfig(
-                min_bid="0",
+                min_bid=str(self.cli_args.builder_min_bid),
                 builder_boost_factor=str(self.cli_args.builder_boost_factor),
                 builders=[],
             )
@@ -557,7 +557,7 @@ class BlockProposalService(ValidatorDutyService):
                         auth=builder_auth,
                         builder_pubkeys=[],
                         max_execution_payment="0",
-                        min_bid="0",
+                        min_bid=str(self.cli_args.builder_min_bid),
                         builder_boost_factor=str(self.cli_args.builder_boost_factor),
                     )
                 )

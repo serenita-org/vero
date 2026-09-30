@@ -16,6 +16,7 @@ class BidSelector:
         self.beacon_chain = vero.beacon_chain
         self.multi_builder = MultiBuilder(vero=vero)
         self.bid_selection_disabled = vero.cli_args.disable_bid_selection
+        self.cli_args = vero.cli_args
 
         # TODO prune
         self.proposal_slots: set[int] = set()
@@ -38,16 +39,22 @@ class BidSelector:
     async def handle_bid_event(
         self, event: SchemaBeaconAPI.ExecutionPayloadBidEvent
     ) -> None:
-        if int(event.data.message.slot) in self.proposal_slots:
-            self.logger.info(
-                f"Received bid event with value: {int(event.data.message.value):,}"
-            )
-            # TODO check fee recipient
-            self.bid_events_store.append(event)
-        else:
+        if int(event.data.message.slot) not in self.proposal_slots:
             self.logger.debug(
                 f"Ignoring bid event for non-proposal slot: {event.data.message.slot}"
             )
+
+        if int(event.data.total_value) < self.cli_args.builder_min_bid:
+            self.logger.debug(
+                f"Ignoring bid event with value {int(event.data.total_value):,} below configured min bid"
+            )
+            return
+
+        self.logger.info(
+            f"Received bid event with value: {int(event.data.message.value):,}"
+        )
+        # TODO check fee recipient
+        self.bid_events_store.append(event)
 
     def _get_payload_attributes_data(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
@@ -105,7 +112,7 @@ class BidSelector:
             self.logger.info(f"Bid selection disabled, returning None for slot {slot}")
             return None
 
-        # TODO consider builder boost factor + min_bid here
+        # TODO consider builder boost factor here
 
         payload_attributes_data = self._get_payload_attributes_data(
             slot=slot, proposer_duty=proposer_duty

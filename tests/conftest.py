@@ -102,6 +102,7 @@ def cli_args(
         use_external_builder=False,
         builder_urls=builder_urls,
         builder_boost_factor=90,
+        builder_min_bid=0,
         disable_bid_selection=False,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
