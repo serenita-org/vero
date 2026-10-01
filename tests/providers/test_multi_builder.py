@@ -28,14 +28,14 @@ def _create_bid(
 ) -> SchemaShared.SignedExecutionPayloadBid:
     return SchemaShared.SignedExecutionPayloadBid(
         message=SchemaShared.ExecutionPayloadBid(
-            parent_block_hash="0x" + "00" * 32,
-            parent_block_root="0x" + "00" * 32,
+            parent_block_hash="0x" + "aa" * 32,
+            parent_block_root="0x" + "bb" * 32,
             block_hash="0x" + "00" * 32,
             prev_randao="0x" + "00" * 32,
-            fee_recipient="0x" + "00" * 20,
+            fee_recipient="0xfee0000000000000000000000000000000000000",
             gas_limit="100000000",
             builder_index="123",
-            slot="1234",
+            slot="123",
             value=str(value),
             execution_payment=str(execution_payment),
             blob_kzg_commitments=[],
@@ -302,8 +302,8 @@ async def test_bid_selection_builders(
 
         bid = await multi_builder.get_execution_payload_bid(
             slot=123,
-            parent_hash="0x1234",
-            parent_root="0x5678",
+            parent_hash="0x" + "aa" * 32,
+            parent_root="0x" + "bb" * 32,
             proposer_pubkey="0x9abc",
             fork_version=beacon_chain.current_fork_version,
             soft_timeout=0.1,

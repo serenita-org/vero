@@ -1,4 +1,5 @@
 import logging
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from schemas import SchemaBeaconAPI, SchemaShared
@@ -104,7 +105,8 @@ class BidSelector:
         return best_p2p_bid
 
     def prune(self, *, finished_proposal_slot: int) -> None:
-        self.proposal_slots.remove(finished_proposal_slot)
+        with suppress(KeyError):
+            self.proposal_slots.remove(finished_proposal_slot)
         for pa_event in self.payload_attributes_events_store:
             if int(pa_event.data.proposal_slot) <= finished_proposal_slot:
                 self.payload_attributes_events_store.remove(pa_event)

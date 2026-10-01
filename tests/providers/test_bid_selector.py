@@ -12,10 +12,10 @@ def _create_bid(
 ) -> SchemaShared.SignedExecutionPayloadBid:
     return SchemaShared.SignedExecutionPayloadBid(
         message=SchemaShared.ExecutionPayloadBid(
-            parent_block_hash="0x" + "00" * 32,
-            parent_block_root="0x" + "00" * 32,
-            block_hash="0x" + "00" * 32,
-            prev_randao="0x" + "00" * 32,
+            parent_block_hash="0x" + "aa" * 32,
+            parent_block_root="0x" + "bb" * 32,
+            block_hash="0x" + "cc" * 32,
+            prev_randao="0x" + "rr" * 32,
             fee_recipient="0x" + "00" * 20,
             gas_limit="30000000",
             builder_index="123",

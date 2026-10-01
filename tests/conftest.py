@@ -103,6 +103,7 @@ def cli_args(
         builder_urls=builder_urls,
         builder_boost_factor=90,
         builder_min_bid=0,
+        builder_max_execution_payment=123,
         disable_bid_selection=False,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,

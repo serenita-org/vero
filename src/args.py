@@ -27,6 +27,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     builder_urls: list[str]
     builder_boost_factor: int
     builder_min_bid: int
+    builder_max_execution_payment: int
     disable_bid_selection: bool
     enable_doppelganger_detection: bool
     enable_keymanager_api: bool
@@ -233,6 +234,13 @@ def get_parser() -> argparse.ArgumentParser:
         help="The minimum value of a builder bid required to be included. Defaults to 0.",
     )
     parser.add_argument(
+        "--builder-max-execution-payment",
+        type=int,
+        required=False,
+        default=0,
+        help="The maximum allowed value of a trusted payment from an external builder bid. Defaults to 0.",
+    )
+    parser.add_argument(
         "--disable-bid-selection",
         action="store_true",
         help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
@@ -385,6 +393,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             builder_urls=builder_urls,
             builder_boost_factor=parsed_args.builder_boost_factor,
             builder_min_bid=parsed_args.builder_min_bid,
+            builder_max_execution_payment=parsed_args.builder_max_execution_payment,
             disable_bid_selection=parsed_args.disable_bid_selection,
             enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,

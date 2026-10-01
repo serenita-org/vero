@@ -199,18 +199,42 @@ class Builder(ApiClient):
             # if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
             #    raise NotImplementedError
 
-            resp_decoded = msgspec.json.decode(
+            bid = msgspec.json.decode(
                 resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
-            )
+            ).data
 
-            if resp_decoded.data.total_value < self.cli_args.builder_min_bid:
+            if int(bid.message.slot) != slot:
+                raise ValueError(
+                    f"Slot mismatch in bid from {self.base_url}: {bid.message.slot} != {slot}"
+                )
+            if bid.message.parent_block_hash != parent_hash:
+                raise ValueError(
+                    f"Parent hash mismatch in bid from {self.base_url}: {bid.message.parent_block_hash} != {parent_hash}"
+                )
+            if bid.message.parent_block_root != parent_root:
+                raise ValueError(
+                    f"Parent root mismatch in bid from {self.base_url}: {bid.message.parent_block_root} != {parent_root}"
+                )
+            if bid.message.fee_recipient != self.cli_args.fee_recipient:
+                raise ValueError(
+                    f"Fee recipient mismatch in bid from {self.base_url}: {bid.message.fee_recipient} != {self.cli_args.fee_recipient}"
+                )
+            if (
+                int(bid.message.execution_payment)
+                > self.cli_args.builder_max_execution_payment
+            ):
+                raise ValueError(
+                    f"Execution payment {int(bid.message.execution_payment):,} exceeds configured max execution payment {self.cli_args.builder_max_execution_payment:,}"
+                )
+
+            if bid.total_value < self.cli_args.builder_min_bid:
                 self.logger.debug(
-                    f"Ignoring bid event with value {int(resp_decoded.data.total_value):,} below configured min bid"
+                    f"Ignoring bid event with value {int(bid.total_value):,} below configured min bid"
                 )
                 return None
 
             self.logger.info(
-                f"Bid with value {resp_decoded.data.total_value:,} received from {self.base_url}"
+                f"Bid with value {bid.total_value:,} received from {self.base_url}"
             )
 
             # TODO Lodestar's bid verification
@@ -228,7 +252,7 @@ class Builder(ApiClient):
             # 7) no trusted payment should be present (at least yet)
             # 8) trusted payment is <= max execution payment
 
-            return resp_decoded.data
+            return bid
 
 
 # TODO submit builder preferences
