@@ -457,4 +457,4 @@ class Keymanager(SignatureProvider):
         ]
 
 
-# TODO Gloas Keymanager API changes
+# TODO [Gloas] Keymanager API changes

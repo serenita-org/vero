@@ -536,7 +536,7 @@ class BlockProposalService(ValidatorDutyService):
                     )
                     graffiti = encode_graffiti(kmgr_graffiti_str)
 
-            # TODO keymgr overrides for all these
+            # TODO [Gloas] keymgr overrides for all these
             builder_config = SchemaBeaconAPI.BuilderConfig(
                 min_bid=str(self.cli_args.builder_min_bid),
                 builder_boost_factor=str(self.cli_args.builder_boost_factor),

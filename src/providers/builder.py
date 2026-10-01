@@ -74,7 +74,7 @@ class Builder(ApiClient):
             message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
                 builder_request_auth=SchemaRemoteSigner.VersionedBuilderRequestAuth(
                     data=SchemaShared.BuilderRequestAuth(
-                        # TODO support variable data from Keymgr API
+                        # TODO [Gloas] support variable data from Keymgr API
                         data="0x" + get_default_auth_data(url=self.base_url).hex(),
                         slot=proposer_duty.slot,
                     ),
