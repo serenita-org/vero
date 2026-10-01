@@ -312,10 +312,6 @@ class ExecutionPayloadBidEvent(BeaconNodeEvent):
 
     @property
     def dedup_key(self) -> Hashable:
-        # TODO not sure if complete
-        #  but this is based on:
-        #  - the same block can potentially have different CL bid values
-        #  - for EL payments, the block hash would change
         return "bid " + self.data.message.block_hash + self.data.message.value
 
 
