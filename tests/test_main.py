@@ -71,6 +71,11 @@ def _profile_program_run() -> Generator[None, None, None]:
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "return_self_built_block",
+    [pytest.param(False, id="External builder"), pytest.param(True, id="Self-built")],
+    indirect=True,
+)
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
 @pytest.mark.usefixtures("_profile_program_run")
@@ -79,6 +84,7 @@ async def test_lifecycle(
     vero: Vero,
     enable_keymanager_api: bool,
     fork_version: ForkVersion,
+    return_self_built_block: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
@@ -114,8 +120,8 @@ async def test_lifecycle(
 
         if fork_version == ForkVersion.GLOAS:
             required_log_lines.append("Published PTC attestations for slot")
-
-        # TODO for Gloas, also require the payload envelope in the self-build case.
+            if return_self_built_block:
+                required_log_lines.append("Published payload envelope for slot")
 
     timeout = 5
     start = asyncio.get_running_loop().time()

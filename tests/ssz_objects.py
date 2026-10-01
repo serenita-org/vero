@@ -173,7 +173,7 @@ def make_block_electra_fulu(*, slot: int, blinded: bool) -> BeaconBlock:
     )
 
 
-def _block_body_gloas() -> dict[str, Any]:
+def _block_body_gloas(*, builder_index: int) -> dict[str, Any]:
     preset_config = load_preset(Preset[preset_types().preset.upper()])
     return {
         "randao_reveal": ZERO_SIGNATURE,
@@ -203,7 +203,7 @@ def _block_body_gloas() -> dict[str, Any]:
                 "prev_randao": ZERO_ROOT,
                 "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
                 "gas_limit": "0",
-                "builder_index": "123",
+                "builder_index": str(builder_index),
                 "slot": "1234",
                 "value": "54321",
                 "execution_payment": "0",
@@ -223,13 +223,13 @@ def _block_body_gloas() -> dict[str, Any]:
     }
 
 
-def make_block_gloas(*, slot: int) -> BeaconBlock:
+def make_block_gloas(*, slot: int, builder_index: int) -> BeaconBlock:
     block = {
         "slot": str(slot),
         "proposer_index": "123",
         "parent_root": "0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
         "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-        "body": _block_body_gloas(),
+        "body": _block_body_gloas(builder_index=builder_index),
     }
     block_type = get_ssz_type(Fork.GLOAS, ObjectKind.BEACON_BLOCK)
     return cast(

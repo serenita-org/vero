@@ -781,7 +781,7 @@ class BlockProposalService(ValidatorDutyService):
                 fork_version=fork_version,
                 content_type=content_type,
             )
-            self.logger.info("Published payload envelope")
+            self.logger.info(f"Published payload envelope for slot {slot}")
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty

@@ -186,7 +186,7 @@ async def test_publish_payload_envelope(
         beacon_node=block_proposal_service.multi_beacon_node.beacon_nodes[0],
     )
 
-    assert "Published payload envelope" in caplog.messages
+    assert any("Published payload envelope" in m for m in caplog.messages)
 
 
 @pytest.mark.parametrize(

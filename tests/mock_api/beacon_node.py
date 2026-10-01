@@ -23,6 +23,7 @@ from providers._headers import (
 from schemas import SchemaBeaconAPI
 from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
+from services.block_proposal import BUILDER_INDEX_SELF_BUILD
 from spec import preset_types
 from spec.base import SpecGloas
 from spec.constants import (
@@ -57,12 +58,18 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
+def return_self_built_block(request: pytest.FixtureRequest) -> bool:
+    return getattr(request, "param", False)
+
+
+@pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
     spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
+    return_self_built_block: bool,
     beacon_api_spec: BeaconAPISpec | None,
 ) -> None:
     def _validate_response(
@@ -371,7 +378,8 @@ def _mocked_beacon_node_endpoints(
 
             request_headers = kwargs["headers"]
             fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
-            _data = make_block_gloas(slot=slot)
+            builder_index = BUILDER_INDEX_SELF_BUILD if return_self_built_block else 123
+            _data = make_block_gloas(slot=slot, builder_index=builder_index)
 
             # Not correct parsing but sufficient for our purposes
             response_content_type = (
