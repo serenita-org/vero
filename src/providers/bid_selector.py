@@ -18,10 +18,8 @@ class BidSelector:
         self.bid_selection_disabled = vero.cli_args.disable_bid_selection
         self.cli_args = vero.cli_args
 
-        # TODO prune
         self.proposal_slots: set[int] = set()
 
-        # TODO prune
         self.payload_attributes_events_store: list[
             SchemaBeaconAPI.PayloadAttributesEvent
         ] = []
@@ -104,6 +102,15 @@ class BidSelector:
                 best_p2p_bid_value = bid_event.data.total_value
 
         return best_p2p_bid
+
+    def prune(self, *, finished_proposal_slot: int) -> None:
+        self.proposal_slots.remove(finished_proposal_slot)
+        for pa_event in self.payload_attributes_events_store:
+            if int(pa_event.data.proposal_slot) <= finished_proposal_slot:
+                self.payload_attributes_events_store.remove(pa_event)
+        for bid_event in self.bid_events_store:
+            if int(bid_event.data.message.slot) <= finished_proposal_slot:
+                self.bid_events_store.remove(bid_event)
 
     async def get_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty

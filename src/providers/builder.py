@@ -54,7 +54,6 @@ class Builder(ApiClient):
         self.bid_selection_disabled = vero.cli_args.disable_bid_selection
         self.cli_args = vero.cli_args
 
-        # TODO prune? shouldn't grow normally but still
         self._bid_request_auth_cache: dict[
             tuple[int, str], SchemaShared.SignedBuilderRequestAuth
         ] = {}
