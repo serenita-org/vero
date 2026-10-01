@@ -140,7 +140,6 @@ def _mocked_beacon_node_endpoints(
                 ),
             )
 
-        # TODO mock produceBlockV4, payload envelope endpoints, PTC, ...
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
             slot = int(url.raw_path.split("/")[-1])
             headers = kwargs["headers"]
