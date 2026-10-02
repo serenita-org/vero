@@ -892,8 +892,6 @@ class BeaconNode(ApiClient):
                 ),
             )
 
-            # TODO do something else/more here?
-            #  also we only need this in the BYOB endpoint
             if (
                 signed_payload_bid
                 and signed_payload_bid.total_value_wei != execution_payload_value_int
