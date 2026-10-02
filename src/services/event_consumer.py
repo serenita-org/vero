@@ -164,7 +164,6 @@ class EventConsumerService:
                         name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
                     )
         elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadAvailableEvent):
-            # TODO metric - track how far into the slot this happens on each connected node?
             if not self._has_seen_event(event):
                 self.logger.debug(
                     f"Execution payload available @ {event.slot} : {event.block_root}"
