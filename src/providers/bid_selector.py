@@ -42,6 +42,7 @@ class BidSelector:
             self.logger.debug(
                 f"Ignoring bid event for non-proposal slot: {event.data.message.slot}"
             )
+            return
 
         if int(event.data.total_value) < self.cli_args.builder_min_bid:
             self.logger.debug(
@@ -49,10 +50,15 @@ class BidSelector:
             )
             return
 
+        if event.data.message.fee_recipient != self.cli_args.fee_recipient:
+            self.logger.warning(
+                f"Ignoring bid event with fee recipient {event.data.message.fee_recipient} != configured fee recipient {self.cli_args.fee_recipient}"
+            )
+            return
+
         self.logger.info(
             f"Received bid event with value: {int(event.data.message.value):,}"
         )
-        # TODO check fee recipient
         self.bid_events_store.append(event)
 
     def _get_payload_attributes_data(
