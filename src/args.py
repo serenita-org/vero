@@ -231,14 +231,14 @@ def get_parser() -> argparse.ArgumentParser:
         type=int,
         required=False,
         default=0,
-        help="The minimum value of a builder bid required to be included. Defaults to 0.",
+        help="The minimum value of a builder bid required to be included. In GWei. Defaults to 0.",
     )
     parser.add_argument(
         "--builder-max-execution-payment",
         type=int,
         required=False,
         default=0,
-        help="The maximum allowed value of a trusted payment from an external builder bid. Defaults to 0.",
+        help="The maximum allowed value of a trusted payment from an external builder bid. In GWei. Defaults to 0.",
     )
     parser.add_argument(
         "--disable-bid-selection",
