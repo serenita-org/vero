@@ -132,6 +132,11 @@ ___
 Provide this flag to submit validator registrations to external builders.
 ___
 
+#### `--builder-urls`
+
+**[required]** A comma-separated list of external builder URLs, e.g. `https://builder-a.com,https://builder-b.net`.
+___
+
 #### `--builder-boost-factor`
 
 A percentage multiplier applied to externally built blocks when comparing their value
@@ -140,6 +145,24 @@ post-multiplication, is higher than the locally built block's value.
 
 Defaults to `90`. This means an externally built block must be
 ~11% more valuable to be chosen over a locally built block.
+___
+
+#### `--builder-min-bid`
+
+The minimum value of a builder bid required to be included. In GWei.
+Defaults to `0`.
+___
+
+#### `--builder-max-execution-payment`
+
+The maximum allowed value of a trusted payment from an external builder bid.
+In GWei. Defaults to `0`.
+___
+
+#### `--disable-bid-selection`
+
+Disables Vero's own bid selection as well as all direct communication
+with builders, leaving that workload to the connected beacon node(s).
 ___
 
 #### `--enable-doppelganger-detection`
