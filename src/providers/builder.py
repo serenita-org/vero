@@ -132,21 +132,13 @@ class Builder(ApiClient):
                 "server.address": str(self.base_url),
             },
         ):
-            # TODO Content-Type header
-            #      ... do we even want to bother with SSZ for this tiny object?
-            #          maybe? We do then send it to N beacon nodes so savings are not just 1x
-            # TODO SignedBuilderRequestAuth in request body - seems to be required now?
-            # TODO can we make this formatted endpoint stuf nicer? we are doing it to reduce
-            #  metric cardinality
             endpoint = "/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
-            trace_request_ctx = dict(path=endpoint)
-            formatted_endpoint_string_params = dict(
+            formatted_endpoint_string_params: dict[str, str | int] = dict(
                 slot=slot,
                 parent_hash=parent_hash,
                 parent_root=parent_root,
                 proposer_pubkey=proposer_pubkey,
             )
-            endpoint = endpoint.format(**formatted_endpoint_string_params)
 
             try:
                 signed_builder_request_auth = self.get_signed_builder_request_auth(
@@ -170,10 +162,10 @@ class Builder(ApiClient):
                 resp_bytes, _content_type, resp = await self.make_request(
                     method="POST",
                     endpoint=endpoint,
+                    formatted_endpoint_string_params=formatted_endpoint_string_params,
                     headers=headers,
                     timeout=timeout,
                     data=msgspec.json.encode(signed_builder_request_auth),
-                    trace_request_ctx=trace_request_ctx,
                 )
             except Exception as e:
                 self.metrics.errors_c.labels(
