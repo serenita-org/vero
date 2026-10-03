@@ -131,7 +131,7 @@ class Builder(ApiClient):
             attributes={
                 "server.address": str(self.base_url),
             },
-        ):
+        ) as tracer_span:
             endpoint = "/eth/v1/builder/execution_payload_bid/{slot}/{parent_hash}/{parent_root}/{proposer_pubkey}"
             formatted_endpoint_string_params: dict[str, str | int] = dict(
                 slot=slot,
@@ -219,14 +219,23 @@ class Builder(ApiClient):
                     f"Execution payment {int(bid.message.execution_payment):,} exceeds configured max execution payment {self.cli_args.builder_max_execution_payment:,}"
                 )
 
-            if bid.total_value < self.cli_args.builder_min_bid:
+            _bid_total_value = bid.total_value
+            if _bid_total_value < self.cli_args.builder_min_bid:
                 self.logger.debug(
-                    f"Ignoring bid event with value {int(bid.total_value):,} below configured min bid"
+                    f"Ignoring bid event with value {_bid_total_value:,} below configured min bid"
                 )
                 return None
 
             self.logger.info(
-                f"Bid with value {bid.total_value:,} received from {self.base_url}"
+                f"Bid with value {_bid_total_value:,} received from {self.base_url}"
+            )
+            tracer_span.add_event(
+                "GetExecutionPayloadBidResponse",
+                attributes=dict(
+                    value=int(bid.message.value),
+                    execution_payment=int(bid.message.execution_payment),
+                    total_value=_bid_total_value,
+                ),
             )
 
             # TODO Lodestar's bid verification
