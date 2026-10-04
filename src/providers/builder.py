@@ -207,7 +207,7 @@ class Builder(ApiClient):
                 raise ValueError(
                     f"Parent root mismatch in bid from {self.base_url}: {bid.message.parent_block_root} != {parent_root}"
                 )
-            if bid.message.fee_recipient != self.cli_args.fee_recipient:
+            if bid.message.fee_recipient.lower() != self.cli_args.fee_recipient:
                 raise ValueError(
                     f"Fee recipient mismatch in bid from {self.base_url}: {bid.message.fee_recipient} != {self.cli_args.fee_recipient}"
                 )

@@ -93,7 +93,7 @@ def _process_fee_recipient(input_string: str) -> str:
     except ValueError as e:
         raise ValueError(f"Invalid fee recipient {input_string}: {e!r}") from e
     else:
-        return input_string
+        return input_string.lower()
 
 
 def _process_gas_limit(input_value: int | None, network: Network) -> int:

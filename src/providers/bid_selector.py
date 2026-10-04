@@ -50,7 +50,7 @@ class BidSelector:
             )
             return
 
-        if event.data.message.fee_recipient != self.cli_args.fee_recipient:
+        if event.data.message.fee_recipient.lower() != self.cli_args.fee_recipient:
             self.logger.warning(
                 f"Ignoring bid event with fee recipient {event.data.message.fee_recipient} != configured fee recipient {self.cli_args.fee_recipient}"
             )
