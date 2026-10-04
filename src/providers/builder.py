@@ -216,7 +216,7 @@ class Builder(ApiClient):
                 > self.cli_args.builder_max_execution_payment
             ):
                 raise ValueError(
-                    f"Execution payment {int(bid.message.execution_payment):,} exceeds configured max execution payment {self.cli_args.builder_max_execution_payment:,}"
+                    f"Invalid execution payment in bid from {self.base_url}. {int(bid.message.execution_payment):,} exceeds configured max execution payment {self.cli_args.builder_max_execution_payment:,}"
                 )
 
             _bid_total_value = bid.total_value

@@ -556,7 +556,9 @@ class BlockProposalService(ValidatorDutyService):
                         url=str(builder.base_url),
                         auth=builder_auth,
                         builder_pubkeys=[],
-                        max_execution_payment="0",
+                        max_execution_payment=str(
+                            self.cli_args.builder_max_execution_payment
+                        ),
                         min_bid=str(self.cli_args.builder_min_bid),
                         builder_boost_factor=str(self.cli_args.builder_boost_factor),
                     )
