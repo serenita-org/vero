@@ -417,7 +417,6 @@ class MultiBeaconNode:
             Network.GNOSIS,
             Network.CHIADO,
         ]
-        # TODO use value from bid post-Gloas - there is no execution_payload_value
         _compare_consensus_block_value_only = True
 
         while pending and remaining_soft_timeout > 0:
