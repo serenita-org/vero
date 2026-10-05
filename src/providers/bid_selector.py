@@ -44,7 +44,7 @@ class BidSelector:
             )
             return
 
-        if int(event.data.total_value) < self.cli_args.builder_min_bid:
+        if event.data.total_value < self.cli_args.builder_min_bid:
             self.logger.debug(
                 f"Ignoring bid event with value {int(event.data.total_value):,} below configured min bid"
             )
