@@ -405,7 +405,16 @@ class BlockProposalService(ValidatorDutyService):
                 if int(duty.slot) < current_slot:
                     continue
 
-                if self.cli_args.disable_bid_selection:
+                if self.cli_args.enable_bid_selection:
+                    # Submit directly to builders
+                    self.task_manager.create_task(
+                        self.bid_selector.multi_builder.submit_builder_preferences(
+                            slot=int(duty.slot),
+                            proposer_pubkey=duty.pubkey,
+                            fork_version=SchemaShared.ForkVersion.GLOAS,
+                        )
+                    )
+                else:
                     # Submit via beacon nodes
                     builder_preferences = []
                     max_exec_payment = str(self.cli_args.builder_max_execution_payment)
@@ -428,15 +437,6 @@ class BlockProposalService(ValidatorDutyService):
                         )
                     self.task_manager.create_task(
                         self.multi_beacon_node.submit_builder_preferences(
-                            slot=int(duty.slot),
-                            proposer_pubkey=duty.pubkey,
-                            fork_version=SchemaShared.ForkVersion.GLOAS,
-                        )
-                    )
-                else:
-                    # Submit directly to builders
-                    self.task_manager.create_task(
-                        self.bid_selector.multi_builder.submit_builder_preferences(
                             slot=int(duty.slot),
                             proposer_pubkey=duty.pubkey,
                             fork_version=SchemaShared.ForkVersion.GLOAS,

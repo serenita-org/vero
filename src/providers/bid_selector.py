@@ -15,7 +15,7 @@ class BidSelector:
 
         self.beacon_chain = vero.beacon_chain
         self.multi_builder = MultiBuilder(vero=vero)
-        self.bid_selection_disabled = vero.cli_args.disable_bid_selection
+        self.bid_selection_disabled = vero.cli_args.enable_bid_selection is False
         self.cli_args = vero.cli_args
 
         self.proposal_slots: set[int] = set()

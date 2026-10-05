@@ -235,7 +235,7 @@ class EventConsumerService:
             "proposer_slashing",
         ]
 
-        if not self.cli_args.disable_bid_selection:
+        if self.cli_args.enable_bid_selection:
             topics.append("payload_attributes")
             topics.append("execution_payload_bid")
 

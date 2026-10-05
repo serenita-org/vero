@@ -53,7 +53,7 @@ class Builder(ApiClient):
             timeout=ClientTimeout(total=10.0),
         )
 
-        self.bid_selection_disabled = vero.cli_args.disable_bid_selection
+        self.bid_selection_disabled = vero.cli_args.enable_bid_selection is False
         self.cli_args = vero.cli_args
 
         self._bid_request_auth_cache: dict[

@@ -28,7 +28,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     builder_boost_factor: int
     builder_min_bid: int
     builder_max_execution_payment: int
-    disable_bid_selection: bool
+    enable_bid_selection: bool
     enable_doppelganger_detection: bool
     enable_keymanager_api: bool
     keymanager_api_token_file_path: Path
@@ -242,7 +242,9 @@ def get_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--disable-bid-selection",
-        action="store_true",
+        dest="enable_bid_selection",
+        action="store_false",
+        default=True,
         help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
     )
     parser.add_argument(
@@ -394,7 +396,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             builder_boost_factor=parsed_args.builder_boost_factor,
             builder_min_bid=parsed_args.builder_min_bid,
             builder_max_execution_payment=parsed_args.builder_max_execution_payment,
-            disable_bid_selection=parsed_args.disable_bid_selection,
+            enable_bid_selection=parsed_args.enable_bid_selection,
             enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,
             keymanager_api_token_file_path=Path(keymanager_api_token_file_path),

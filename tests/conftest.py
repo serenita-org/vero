@@ -104,7 +104,7 @@ def cli_args(
         builder_boost_factor=90,
         builder_min_bid=0,
         builder_max_execution_payment=123,
-        disable_bid_selection=False,
+        enable_bid_selection=True,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
         keymanager_api_token_file_path=tmp_path / "keymanager-api-token.txt",
