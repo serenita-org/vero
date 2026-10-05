@@ -620,6 +620,11 @@ class BlockProposalService(ValidatorDutyService):
                 )
 
             try:
+                soft_timeout = max(
+                    0.0,
+                    self._block_production_soft_timeout
+                    - self.beacon_chain.time_since_slot_start(slot=slot),
+                )
                 (
                     block_contents_or_blinded_block,
                     beacon_node,
@@ -631,7 +636,7 @@ class BlockProposalService(ValidatorDutyService):
                     randao_reveal=randao_reveal,
                     signed_payload_bid=signed_payload_bid,
                     fork_version=self.beacon_chain.current_fork_version,
-                    soft_timeout=self._block_production_soft_timeout,
+                    soft_timeout=soft_timeout,
                 )
             except Exception as e:
                 self.logger.exception(
