@@ -661,18 +661,23 @@ class BlockProposalService(ValidatorDutyService):
                     block_contents_or_blinded_block.object_kind
                     is not ObjectKind.BLINDED_BEACON_BLOCK
                 ):
-                    await self.multi_beacon_node.publish_block_v2(
-                        fork_version=fork_version,
-                        data=encoded,
-                        header_builder_url=header_builder_url,
-                        content_type=content_type,
-                    )
-                    if selected_builder:
-                        await selected_builder.submit_signed_beacon_block(
+                    publish_coros = [
+                        self.multi_beacon_node.publish_block_v2(
                             fork_version=fork_version,
                             data=encoded,
+                            header_builder_url=header_builder_url,
                             content_type=content_type,
                         )
+                    ]
+                    if selected_builder:
+                        publish_coros.append(
+                            selected_builder.submit_signed_beacon_block(
+                                fork_version=fork_version,
+                                data=encoded,
+                                content_type=content_type,
+                            )
+                        )
+                    await asyncio.gather(*publish_coros)
                 else:
                     await self.multi_beacon_node.publish_blinded_block_v2(
                         fork_version=fork_version,
