@@ -28,6 +28,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     builder_boost_factor: int
     builder_min_bid: int
     builder_max_execution_payment: int
+    builder_bid_request_timeout: int
     enable_bid_selection: bool
     enable_doppelganger_detection: bool
     enable_keymanager_api: bool
@@ -241,6 +242,13 @@ def get_parser() -> argparse.ArgumentParser:
         help="The maximum allowed value of a trusted payment from an external builder bid. In GWei. Defaults to 0.",
     )
     parser.add_argument(
+        "--builder-bid-request-timeout",
+        type=int,
+        required=False,
+        default=500,
+        help="The maximum amount of time into the slot that Vero will wait for a bid from external builders. In milliseconds. Defaults to 500.",
+    )
+    parser.add_argument(
         "--disable-bid-selection",
         dest="enable_bid_selection",
         action="store_false",
@@ -396,6 +404,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             builder_boost_factor=parsed_args.builder_boost_factor,
             builder_min_bid=parsed_args.builder_min_bid,
             builder_max_execution_payment=parsed_args.builder_max_execution_payment,
+            builder_bid_request_timeout=parsed_args.builder_bid_request_timeout,
             enable_bid_selection=parsed_args.enable_bid_selection,
             enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,

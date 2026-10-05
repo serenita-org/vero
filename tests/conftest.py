@@ -104,6 +104,7 @@ def cli_args(
         builder_boost_factor=90,
         builder_min_bid=0,
         builder_max_execution_payment=123,
+        builder_bid_request_timeout=10,
         enable_bid_selection=True,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,

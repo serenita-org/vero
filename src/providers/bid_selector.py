@@ -17,6 +17,7 @@ class BidSelector:
         self.multi_builder = MultiBuilder(vero=vero)
         self.bid_selection_disabled = vero.cli_args.enable_bid_selection is False
         self.cli_args = vero.cli_args
+        self._get_bid_soft_timeout = self.cli_args.builder_bid_request_timeout / 1_000
 
         self.proposal_slots: set[int] = set()
 
@@ -136,9 +137,8 @@ class BidSelector:
             parent_root=payload_attributes_data.parent_block_root,
             proposer_pubkey=proposer_duty.pubkey,
             fork_version=self.beacon_chain.current_fork_version,
-            # TODO parametrize/hardcode, similar to block production timeout
-            soft_timeout=0.6,
-            hard_timeout=1.2,
+            soft_timeout=self._get_bid_soft_timeout,
+            hard_timeout=self._get_bid_soft_timeout + 0.1,
         )
         best_dir_bid_value = "N/A"
         best_dir_bid_builder, best_direct_bid = None, None

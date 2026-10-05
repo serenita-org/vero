@@ -159,6 +159,12 @@ The maximum allowed value of a trusted payment from an external builder bid.
 In GWei. Defaults to `0`.
 ___
 
+#### `--builder-bid-request-timeout`
+
+The maximum amount of time into the slot that Vero will wait for a bid from
+external builders. In milliseconds. Defaults to `500`.
+___
+
 #### `--disable-bid-selection`
 
 Disables Vero's own bid selection as well as all direct communication
