@@ -186,6 +186,7 @@ class BlockProposalService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
+            self.task_manager.create_task(self.submit_builder_preferences())
             self.task_manager.create_task(self.submit_proposer_preferences())
 
     async def handle_head_event(
@@ -389,6 +390,58 @@ class BlockProposalService(ValidatorDutyService):
             self.logger.info(
                 f"Published validator registrations, count: {len(pubkey_batch)}"
             )
+
+    async def submit_builder_preferences(self) -> None:
+        current_slot = self.beacon_chain.current_slot
+        for epoch, proposer_duties in self.proposer_duties.items():
+            if epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
+                # Pre-Gloas proposal, not submitting preferences
+                continue
+
+            _fork_info = self.beacon_chain.get_fork_info(
+                slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
+            )
+            for duty in proposer_duties:
+                if int(duty.slot) < current_slot:
+                    continue
+
+                if self.cli_args.disable_bid_selection:
+                    # Submit via beacon nodes
+                    builder_preferences = []
+                    max_exec_payment = str(self.cli_args.builder_max_execution_payment)
+                    for builder in self.bid_selector.multi_builder.builders:
+                        try:
+                            builder_auth = builder.get_signed_builder_request_auth(
+                                slot=int(duty.slot), proposer_pubkey=duty.pubkey
+                            )
+                        except KeyError as e:
+                            self.logger.warning(f"{e!r}")
+                            continue
+
+                        builder_preferences.append(
+                            SchemaBeaconAPI.BuilderPreferencesEntry(
+                                proposer_pubkey=duty.pubkey,
+                                url=str(builder.base_url),
+                                auth=builder_auth,
+                                max_execution_payment=max_exec_payment,
+                            )
+                        )
+                    self.task_manager.create_task(
+                        self.multi_beacon_node.submit_builder_preferences(
+                            slot=int(duty.slot),
+                            proposer_pubkey=duty.pubkey,
+                            fork_version=SchemaShared.ForkVersion.GLOAS,
+                        )
+                    )
+                else:
+                    # Submit directly to builders
+                    self.task_manager.create_task(
+                        self.bid_selector.multi_builder.submit_builder_preferences(
+                            slot=int(duty.slot),
+                            proposer_pubkey=duty.pubkey,
+                            fork_version=SchemaShared.ForkVersion.GLOAS,
+                        )
+                    )
 
     async def submit_proposer_preferences(self) -> None:
         # Default to values provided via the CLI arguments unless overridden

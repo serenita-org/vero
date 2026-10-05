@@ -293,6 +293,11 @@ class MultiBeaconNode:
             func_name="submit_proposer_preferences", **kwargs
         )
 
+    async def submit_builder_preferences(self, **kwargs: Any) -> None:
+        await self._get_all_beacon_node_responses(
+            func_name="submit_builder_preferences", **kwargs
+        )
+
     @staticmethod
     def _parse_block_response(
         response: (

@@ -199,6 +199,13 @@ class BuilderConfig(msgspec.Struct):
     builders: list[BuilderEntry]
 
 
+class BuilderPreferencesEntry(msgspec.Struct):
+    proposer_pubkey: str
+    url: str
+    auth: SignedBuilderRequestAuth
+    max_execution_payment: str
+
+
 class ProduceBlockV4Response(msgspec.Struct):
     version: ForkVersion
     execution_payload_included: bool

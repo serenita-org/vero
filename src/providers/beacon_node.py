@@ -683,6 +683,18 @@ class BeaconNode(ApiClient):
             ),
         )
 
+    async def submit_builder_preferences(
+        self,
+        builder_preferences: list[SchemaBeaconAPI.BuilderPreferencesEntry],
+        fork_version: SchemaShared.ForkVersion,
+    ) -> None:
+        await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/validator/builder_preferences",
+            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            data=self.json_encoder.encode(builder_preferences),
+        )
+
     async def produce_block_v3(
         self,
         slot: int,

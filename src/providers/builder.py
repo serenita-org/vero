@@ -114,6 +114,40 @@ class Builder(ApiClient):
                 f"No builder request auth for {_cache_key} -> {self.base_url}"
             ) from None
 
+    async def submit_builder_preferences(
+        self,
+        slot: int,
+        proposer_pubkey: str,
+        fork_version: SchemaShared.ForkVersion,
+    ) -> None:
+        if self.bid_selection_disabled:
+            return
+
+        endpoint = "/eth/v1/builder/builder_preferences/{proposer_pubkey}"
+        headers = {
+            ETH_CONSENSUS_VERSION: fork_version.value,
+        }
+
+        data = SchemaBuilderAPI.BuilderPreferencesRequest(
+            preferences=SchemaBuilderAPI.BuilderPreferences(
+                max_execution_payment=str(self.cli_args.builder_max_execution_payment),
+            ),
+            auth=self.get_signed_builder_request_auth(
+                slot=slot,
+                proposer_pubkey=proposer_pubkey,
+            ),
+        )
+
+        _ = await self.make_request(
+            method="GET",
+            endpoint=endpoint,
+            formatted_endpoint_string_params=dict(
+                proposer_pubkey=proposer_pubkey,
+            ),
+            headers=headers,
+            data=msgspec.json.encode(data),
+        )
+
     async def get_execution_payload_bid(
         self,
         slot: int,
@@ -322,6 +356,24 @@ class MultiBuilder:
                 for b in self.builders
             )
         )
+
+    async def submit_builder_preferences(
+        self,
+        slot: int,
+        proposer_pubkey: str,
+        fork_version: SchemaShared.ForkVersion,
+    ) -> None:
+        await asyncio.gather(
+            *(
+                b.submit_builder_preferences(
+                    slot=slot,
+                    proposer_pubkey=proposer_pubkey,
+                    fork_version=fork_version,
+                )
+                for b in self.builders
+            )
+        )
+        self.logger.info(f"Submitted builder preferences for slot {slot}")
 
     async def get_execution_payload_bid(
         self,
