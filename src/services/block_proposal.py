@@ -389,7 +389,7 @@ class BlockProposalService(ValidatorDutyService):
     async def submit_builder_preferences(self) -> None:
         current_slot = self.beacon_chain.current_slot
         for epoch, proposer_duties in self.proposer_duties.items():
-            if epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
+            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
                 # Pre-Gloas proposal, not submitting preferences
                 continue
 
@@ -448,7 +448,7 @@ class BlockProposalService(ValidatorDutyService):
 
         messages_by_epoch = []
         for epoch, proposer_duties in self.proposer_duties.items():
-            if epoch <= self.beacon_chain.GLOAS_FORK_EPOCH:
+            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
                 # Pre-Gloas proposal, not submitting preferences
                 continue
 
