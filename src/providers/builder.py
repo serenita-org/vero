@@ -139,7 +139,7 @@ class Builder(ApiClient):
         )
 
         _ = await self.make_request(
-            method="GET",
+            method="POST",
             endpoint=endpoint,
             formatted_endpoint_string_params=dict(
                 proposer_pubkey=proposer_pubkey,
