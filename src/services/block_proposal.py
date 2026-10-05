@@ -460,7 +460,6 @@ class BlockProposalService(ValidatorDutyService):
                 if int(duty.slot) < current_slot:
                     continue
 
-                # TODO parallelize + error-handling (might want to retry here)
                 messages_to_sign.append(
                     (
                         duty.pubkey,
@@ -493,21 +492,35 @@ class BlockProposalService(ValidatorDutyService):
             messages_by_epoch.append((epoch, messages_to_sign))
 
         for epoch, messages_to_sign in messages_by_epoch:
-            signed_preferences = await asyncio.gather(
+            signing_results = await asyncio.gather(
                 *(
                     self.signature_provider.sign(
                         message=msg,
                         identifier=pubkey,
                     )
                     for pubkey, msg in messages_to_sign
-                )
+                ),
+                return_exceptions=True,
             )
+            signed_preferences = []
+            for (pubkey, msg), result in zip(
+                messages_to_sign, signing_results, strict=True
+            ):
+                if isinstance(result, BaseException):
+                    self.logger.error(
+                        f"Failed to sign proposer preferences for validator {pubkey}, slot {msg.proposer_preferences.data.proposal_slot}: {result!r}"
+                    )
+                    continue
+                signed_msg, signature, _ = result
+                signed_preferences.append(
+                    (signed_msg.proposer_preferences.data, signature)
+                )
+
+            if not signed_preferences:
+                continue
 
             await self.multi_beacon_node.submit_proposer_preferences(
-                signed_proposer_preferences=[
-                    (msg.proposer_preferences.data, sig)
-                    for (msg, sig, _) in signed_preferences
-                ],
+                signed_proposer_preferences=signed_preferences,
                 fork_version=SchemaShared.ForkVersion.GLOAS,
             )
 
