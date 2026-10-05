@@ -300,7 +300,7 @@ async def test_bid_selection_builders(
                 callback=_callback,
             )
 
-        bid = await multi_builder.get_execution_payload_bid(
+        result = await multi_builder.get_execution_payload_bid(
             slot=123,
             parent_hash="0x" + "aa" * 32,
             parent_root="0x" + "bb" * 32,
@@ -309,9 +309,10 @@ async def test_bid_selection_builders(
             soft_timeout=0.1,
             hard_timeout=0.2,
         )
-        if bid is None:
+        if result is None:
             assert expected_bid_total_value is None
         else:
+            builder, bid = result
             assert bid.total_value == expected_bid_total_value
 
 

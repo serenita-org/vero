@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Self
 
 import msgspec.json
 from aiohttp import ClientTimeout, web
+from aiohttp.hdrs import CONTENT_TYPE
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from yarl import URL
@@ -20,6 +21,7 @@ from ._headers import (
     DATE_MILLISECONDS,
     ETH_CONSENSUS_VERSION,
     X_TIMEOUT_MS,
+    ContentType,
 )
 
 if TYPE_CHECKING:
@@ -121,7 +123,7 @@ class Builder(ApiClient):
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
         hard_timeout: float,
-    ) -> SchemaShared.SignedExecutionPayloadBid | None:
+    ) -> tuple[Self, SchemaShared.SignedExecutionPayloadBid] | None:
         if self.bid_selection_disabled:
             return None
 
@@ -253,7 +255,38 @@ class Builder(ApiClient):
             # 7) no trusted payment should be present (at least yet)
             # 8) trusted payment is <= max execution payment
 
-            return bid
+            return self, bid
+
+    async def submit_signed_beacon_block(
+        self,
+        fork_version: SchemaShared.ForkVersion,
+        data: bytes,
+        content_type: ContentType,
+    ) -> None:
+        endpoint = "/eth/v1/builder/beacon_blocks"
+        headers = {
+            ETH_CONSENSUS_VERSION: fork_version.value,
+            CONTENT_TYPE: content_type.value,
+        }
+        try:
+            with self.tracer.start_as_current_span(
+                name=f"{self.__class__.__name__}.submit_signed_beacon_block",
+                kind=SpanKind.CLIENT,
+                attributes={
+                    "server.address": str(self.base_url),
+                },
+            ):
+                await self.make_request(
+                    method="POST",
+                    endpoint=endpoint,
+                    data=data,
+                    headers=headers,
+                )
+        except Exception as e:
+            self.metrics.errors_c.labels(
+                error_type=ErrorType.BUILDER_SUBMIT_BLOCK.value,
+            ).inc()
+            self.logger.error(f"Failed to submit block to {self.base_url}: {e!r}")
 
 
 # TODO submit builder preferences
@@ -318,7 +351,7 @@ class MultiBuilder:
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
         hard_timeout: float,
-    ) -> SchemaShared.SignedExecutionPayloadBid | None:
+    ) -> tuple[Builder, SchemaShared.SignedExecutionPayloadBid] | None:
         """Gets the get execution payload bid response from all builders and returns
         the best one by its reported value.
 
@@ -357,6 +390,7 @@ class MultiBuilder:
             start_time = asyncio.get_running_loop().time()
             remaining_soft_timeout = soft_timeout
 
+            best_builder = None
             best_bid = None
             best_bid_value_gwei = -1
 
@@ -378,9 +412,10 @@ class MultiBuilder:
                         # No bid from builder
                         continue
 
-                    bid: SchemaShared.SignedExecutionPayloadBid = result
+                    builder, bid = result
                     bid_value_gwei = bid.total_value
                     if bid_value_gwei > best_bid_value_gwei:
+                        best_builder = builder
                         best_bid = bid
                         best_bid_value_gwei = bid_value_gwei
 
@@ -397,7 +432,7 @@ class MultiBuilder:
                 for task in pending:
                     if not task.done():
                         task.cancel()
-                return best_bid
+                return best_builder, best_bid  # type: ignore[return-value]
             if not pending:
                 self.logger.info("No bids returned by builders")
                 return None
@@ -426,8 +461,9 @@ class MultiBuilder:
                         # No bid from builder
                         continue
 
+                    builder, bid = result
                     self.logger.info(
-                        f"Selected first bid with value {result.total_value:,}"
+                        f"Selected first bid with value {bid.total_value:,}"
                     )
                     for task in pending:
                         if not task.done():

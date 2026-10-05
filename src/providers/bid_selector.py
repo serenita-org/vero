@@ -7,7 +7,7 @@ from schemas import SchemaBeaconAPI, SchemaShared
 if TYPE_CHECKING:
     from .vero import Vero
 
-from .builder import MultiBuilder
+from .builder import Builder, MultiBuilder
 
 
 class BidSelector:
@@ -120,10 +120,10 @@ class BidSelector:
 
     async def get_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
-    ) -> SchemaShared.SignedExecutionPayloadBid | None:
+    ) -> tuple[Builder | None, SchemaShared.SignedExecutionPayloadBid | None]:
         if self.bid_selection_disabled:
             self.logger.info(f"Bid selection disabled, returning None for slot {slot}")
-            return None
+            return None, None
 
         # TODO consider builder boost factor here
 
@@ -134,25 +134,27 @@ class BidSelector:
             self.logger.warning(
                 "Unable to fetch bids from builders - did not find corresponding payload attributes data"
             )
-            return None
+            return None, None
 
         # TODO all the bid value comparison craziness goes here, boost factor, min bid,
         #  Keymanager API overrides
 
         # TODO Entire bid selection logging - high-level useful data into INFO,
         #  rest into DEBUG, without repeating info.
-        best_direct_bid = await self.multi_builder.get_execution_payload_bid(
+        result = await self.multi_builder.get_execution_payload_bid(
             slot=slot,
             parent_hash=payload_attributes_data.parent_block_hash,
             parent_root=payload_attributes_data.parent_block_root,
             proposer_pubkey=proposer_duty.pubkey,
             fork_version=self.beacon_chain.current_fork_version,
             # TODO parametrize/hardcode, similar to block production timeout
-            soft_timeout=1.0,
+            soft_timeout=0.6,
             hard_timeout=1.2,
         )
         best_dir_bid_value = "N/A"
-        if best_direct_bid:
+        best_dir_bid_builder, best_direct_bid = None, None
+        if result is not None:
+            best_dir_bid_builder, best_direct_bid = result
             best_dir_bid_value = f"{best_direct_bid.total_value:,}"
         self.logger.info(f"Best direct bid value: {best_dir_bid_value}")
 
@@ -170,4 +172,6 @@ class BidSelector:
         )
 
         self.logger.info(f"Selected best bid: {best_bid}")
-        return best_bid
+        if best_bid == best_direct_bid:
+            return best_dir_bid_builder, best_direct_bid
+        return None, best_bid

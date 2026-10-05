@@ -22,6 +22,7 @@ class ErrorType(Enum):
     BLOCK_PRODUCE = "block-produce"
     BLOCK_PUBLISH = "block-publish"
     BUILDER_GET_BID = "builder-get-bid"
+    BUILDER_SUBMIT_BLOCK = "builder-submit-block"
     SYNC_COMMITTEE_CONTRIBUTION_PRODUCE = "sync-committee-contribution-produce"
     SYNC_COMMITTEE_CONTRIBUTION_PUBLISH = "sync-committee-contribution-publish"
     SYNC_COMMITTEE_MESSAGE_PRODUCE = "sync-committee-message-produce"

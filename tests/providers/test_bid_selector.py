@@ -65,16 +65,23 @@ async def test_get_bid_selects_best_bid(
         pubkey="0x" + "00" * 48, validator_index="1", slot="1234"
     )
 
+    get_execution_payload_bid_return_value = None
+    if direct_bid:
+        get_execution_payload_bid_return_value = (None, direct_bid)
+
     with (
         mock.patch.object(
             selector, "_get_payload_attributes_data", return_value=payload_attributes
         ),
         mock.patch.object(
-            selector.multi_builder, "get_execution_payload_bid", return_value=direct_bid
+            selector.multi_builder,
+            "get_execution_payload_bid",
+            return_value=get_execution_payload_bid_return_value,
         ),
         mock.patch.object(selector, "_get_best_p2p_bid", return_value=p2p_bid),
     ):
-        bid = await selector.get_bid(slot=1234, proposer_duty=duty)
+        result = await selector.get_bid(slot=1234, proposer_duty=duty)
 
     expected_bid = {"direct": direct_bid, "p2p": p2p_bid, None: None}[expected_source]
+    _builder, bid = result
     assert bid is expected_bid
