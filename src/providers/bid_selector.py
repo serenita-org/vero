@@ -57,7 +57,7 @@ class BidSelector:
             return
 
         self.logger.info(
-            f"Received bid event with value: {int(event.data.message.value):,}"
+            f"Received P2P bid with value: {int(event.data.message.value):,}"
         )
         self.bid_events_store.append(event)
 
@@ -83,7 +83,7 @@ class BidSelector:
             #  hmm I don't know actually, what if it's forked off, or processed
             #  a slot late? Maybe we should use a counter and pick the event
             #  that was emitted the most times?
-            self.logger.info("Found payload attributes data")
+            self.logger.debug("Found matching payload attributes data")
             return pa_event.data
         return None
 

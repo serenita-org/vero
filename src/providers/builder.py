@@ -225,7 +225,7 @@ class Builder(ApiClient):
                 return None
 
             self.logger.info(
-                f"Bid with value {_bid_total_value:,} received from {self.base_url}"
+                f"Received bid with value {_bid_total_value:,} from {self.base_url}"
             )
             tracer_span.add_event(
                 "GetExecutionPayloadBidResponse",
