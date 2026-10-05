@@ -363,7 +363,7 @@ class MultiBuilder:
         proposer_pubkey: str,
         fork_version: SchemaShared.ForkVersion,
     ) -> None:
-        await asyncio.gather(
+        results = await asyncio.gather(
             *(
                 b.submit_builder_preferences(
                     slot=slot,
@@ -371,9 +371,20 @@ class MultiBuilder:
                     fork_version=fork_version,
                 )
                 for b in self.builders
-            )
+            ),
+            return_exceptions=True,
         )
-        self.logger.info(f"Submitted builder preferences for slot {slot}")
+        submitted_count = 0
+        for builder, result in zip(self.builders, results, strict=True):
+            if isinstance(result, BaseException):
+                self.logger.error(
+                    f"Failed to submit builder preferences for slot {slot} to {builder.base_url}: {result!r}"
+                )
+            else:
+                submitted_count += 1
+        self.logger.info(
+            f"Submitted builder preferences for slot {slot} to {submitted_count}/{len(self.builders)} builders"
+        )
 
     async def get_execution_payload_bid(
         self,
