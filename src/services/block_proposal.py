@@ -3,7 +3,7 @@ import contextlib
 import time
 from collections import defaultdict
 from types import TracebackType
-from typing import NamedTuple, Self, Unpack
+from typing import Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -33,11 +33,6 @@ from spec.utils import encode_graffiti
 
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX
 BUILDER_INDEX_SELF_BUILD = 2**64 - 1
-
-
-class BlockPublishResult(NamedTuple):
-    block_root: str
-    envelope_required: bool
 
 
 class BlockProposalService(ValidatorDutyService):
@@ -696,7 +691,7 @@ class BlockProposalService(ValidatorDutyService):
         block_contents_or_blinded_block: BeaconBlock,
         header_builder_url: str | None,
         selected_builder: Builder | None,
-    ) -> BlockPublishResult:
+    ) -> None:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(
             duty=ValidatorDuty.BLOCK_PROPOSAL.value,
@@ -757,16 +752,6 @@ class BlockProposalService(ValidatorDutyService):
                     f"Published block for slot {slot}, root {block_root}",
                 )
                 self.metrics.vc_published_blocks_c.inc()
-                envelope_required = False
-                if (
-                    fork_version is SchemaShared.ForkVersion.GLOAS
-                    and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
-                    == BUILDER_INDEX_SELF_BUILD
-                ):
-                    envelope_required = True
-                return BlockPublishResult(
-                    block_root=block_root, envelope_required=envelope_required
-                )
 
     async def _sign_execution_payload_envelope(
         self,
@@ -908,28 +893,39 @@ class BlockProposalService(ValidatorDutyService):
                     block_version=fork_version.value.upper(),
                 )
 
-                block_publish_result = await self._publish_block(
-                    slot=slot,
-                    fork_version=fork_version,
-                    signature=signature,
-                    block_contents_or_blinded_block=block_contents_or_blinded_block,
-                    header_builder_url=header_builder_url,
-                    selected_builder=selected_builder,
-                )
-
-                # TODO test - we MUST publish the envelope in this case!
-                # TODO we probably want to do this more async - we don't want to be
-                #  blocked too long by the above block-publish call that IIRC
-                #  has no timeout
-                if block_publish_result.envelope_required:
-                    self.task_manager.create_task(
+                publish_coros = [
+                    self._publish_block(
+                        slot=slot,
+                        fork_version=fork_version,
+                        signature=signature,
+                        block_contents_or_blinded_block=block_contents_or_blinded_block,
+                        header_builder_url=header_builder_url,
+                        selected_builder=selected_builder,
+                    )
+                ]
+                if (
+                    fork_version is SchemaShared.ForkVersion.GLOAS
+                    and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
+                    == BUILDER_INDEX_SELF_BUILD
+                ):
+                    publish_coros.append(
                         self._publish_payload_envelope(
                             slot=slot,
                             duty=duty,
-                            beacon_block_root=block_publish_result.block_root,
+                            beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
                             beacon_node=beacon_node,
                         )
                     )
+
+                results = await asyncio.gather(*publish_coros, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, BaseException):
+                        self.logger.error(
+                            f"Publication failed for slot {slot}: {result!r}"
+                        )
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
 
             finally:
                 self.bid_selector.prune(finished_proposal_slot=slot)
