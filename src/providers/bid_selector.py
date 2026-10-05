@@ -130,8 +130,6 @@ class BidSelector:
             )
             return None, None
 
-        # TODO Entire bid selection logging - high-level useful data into INFO,
-        #  rest into DEBUG, without repeating info.
         result = await self.multi_builder.get_execution_payload_bid(
             slot=slot,
             parent_hash=payload_attributes_data.parent_block_hash,
