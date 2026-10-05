@@ -183,19 +183,15 @@ class Builder(ApiClient):
                 self.logger.info(f"No bid available from {self.base_url}")
                 return None
 
-            # parse based on Eth-Consensus-Version response header?
-            # or just check it is Gloas for now...
-            # actually this header is only required if the response
-            # is SSZ-encoded... so TODO we should probably
-            # check GetExecutionPayloadBidResponse.version since
-            # we're requesting JSON at the moment
-            # resp_fork_version = resp.headers[ETH_CONSENSUS_VERSION]
-            # if resp_fork_version != SchemaShared.ForkVersion.GLOAS.value:
-            #    raise NotImplementedError
-
-            bid = msgspec.json.decode(
+            bid_response = msgspec.json.decode(
                 resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
-            ).data
+            )
+            if bid_response.version != fork_version:
+                raise ValueError(
+                    f"Fork version mismatch in bid from {self.base_url}: {bid_response.version} != {fork_version}"
+                )
+
+            bid = bid_response.data
 
             if int(bid.message.slot) != slot:
                 raise ValueError(
