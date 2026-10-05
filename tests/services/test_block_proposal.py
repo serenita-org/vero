@@ -294,3 +294,23 @@ async def test_submit_proposer_preferences_signing_failures(
         "Failed to sign proposer preferences for validator bad" in m
         for m in caplog.messages
     )
+
+
+async def test_duty_refresh_schedules_proposer_preferences(
+    block_proposal_service: BlockProposalService,
+) -> None:
+    service = block_proposal_service
+    service.proposer_duties_dependent_roots.clear()
+    with mock.patch.object(service.task_manager, "create_task") as create_task:
+        await service._update_duties()
+        preferences_calls = [
+            call
+            for call in create_task.call_args_list
+            if call.args[0].cr_code.co_name == "submit_proposer_preferences"
+        ]
+        for call in create_task.call_args_list:
+            call.args[0].close()
+
+    assert len(preferences_calls) == 1
+    assert service.proposer_duties_dependent_roots
+    assert set(service.proposer_duties) <= set(service.proposer_duties_dependent_roots)

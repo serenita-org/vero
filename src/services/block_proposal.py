@@ -182,7 +182,6 @@ class BlockProposalService(ValidatorDutyService):
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
             self.task_manager.create_task(self.submit_builder_preferences())
-            self.task_manager.create_task(self.submit_proposer_preferences())
 
     async def handle_head_event(
         self, event: SchemaBeaconAPI.HeadV2Event, _: str
@@ -261,6 +260,7 @@ class BlockProposalService(ValidatorDutyService):
             )
 
         self._prune_duties()
+        self.task_manager.create_task(self.submit_proposer_preferences())
 
     async def prepare_beacon_proposer(self) -> None:
         # TODO [remove post-Gloas]
