@@ -1,5 +1,4 @@
 import logging
-from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from schemas import SchemaBeaconAPI, SchemaShared
@@ -21,9 +20,9 @@ class BidSelector:
 
         self.proposal_slots: set[int] = set()
 
-        self.payload_attributes_events_store: list[
-            SchemaBeaconAPI.PayloadAttributesEvent
-        ] = []
+        self.payload_attributes_events_store: dict[
+            tuple[int, str], SchemaBeaconAPI.PayloadAttributesData
+        ] = {}
         self.bid_events_store: list[SchemaBeaconAPI.ExecutionPayloadBidEvent] = []
 
     async def handle_payload_attributes_event(
@@ -31,7 +30,10 @@ class BidSelector:
     ) -> None:
         if int(event.data.proposal_slot) in self.proposal_slots:
             self.logger.info(f"Received payload attributes event: {event}")
-            self.payload_attributes_events_store.append(event)
+            # Keep the latest received attributes for each slot and proposer.
+            self.payload_attributes_events_store[
+                (int(event.data.proposal_slot), event.data.proposer_index)
+            ] = event.data
         else:
             self.logger.debug(f"Ignoring payload attributes event: {event}")
 
@@ -64,28 +66,9 @@ class BidSelector:
     def _get_payload_attributes_data(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> SchemaBeaconAPI.PayloadAttributesData | None:
-        pa_events_for_slot = (
-            e
-            for e in self.payload_attributes_events_store
-            if int(e.data.proposal_slot) == slot
+        return self.payload_attributes_events_store.get(
+            (slot, proposer_duty.validator_index)
         )
-
-        for pa_event in pa_events_for_slot:
-            if pa_event.data.proposer_index != proposer_duty.validator_index:
-                self.logger.warning(
-                    f"Skipping payload attributes event for slot {slot} - does not match proposer duty validator index ({pa_event.data.proposer_index} != {proposer_duty.validator_index})"
-                )
-                continue
-
-            # TODO with the current implementation, there may be
-            #  multiple events for the same slot -> we should probably
-            #  only keep the latest event per slot?
-            #  hmm I don't know actually, what if it's forked off, or processed
-            #  a slot late? Maybe we should use a counter and pick the event
-            #  that was emitted the most times?
-            self.logger.debug("Found matching payload attributes data")
-            return pa_event.data
-        return None
 
     def _get_best_p2p_bid(
         self, slot: int, payload_attributes_data: SchemaBeaconAPI.PayloadAttributesData
@@ -99,6 +82,10 @@ class BidSelector:
             if (
                 bid_event.data.message.parent_block_root
                 != payload_attributes_data.parent_block_root
+                # intentionally not requiring parent_block_hash
+                # to match because the connected beacon nodes
+                # may have differing opinions on whether
+                # we're building on top of EMPTY/FULL
             ):
                 continue
 
@@ -109,14 +96,17 @@ class BidSelector:
         return best_p2p_bid
 
     def prune(self, *, finished_proposal_slot: int) -> None:
-        with suppress(KeyError):
-            self.proposal_slots.remove(finished_proposal_slot)
-        for pa_event in self.payload_attributes_events_store:
-            if int(pa_event.data.proposal_slot) <= finished_proposal_slot:
-                self.payload_attributes_events_store.remove(pa_event)
-        for bid_event in self.bid_events_store:
-            if int(bid_event.data.message.slot) <= finished_proposal_slot:
-                self.bid_events_store.remove(bid_event)
+        self.proposal_slots.difference_update(
+            {slot for slot in self.proposal_slots if slot <= finished_proposal_slot}
+        )
+        for key in list(self.payload_attributes_events_store):
+            if key[0] <= finished_proposal_slot:
+                del self.payload_attributes_events_store[key]
+        self.bid_events_store = [
+            event
+            for event in self.bid_events_store
+            if int(event.data.message.slot) > finished_proposal_slot
+        ]
 
     async def get_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty

@@ -331,11 +331,7 @@ class PayloadAttributes(msgspec.Struct):
 class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
     @property
     def dedup_key(self) -> Hashable:
-        # TODO simplify if possible
-        return (
-            "payload_attrs "
-            f"{self.data.proposal_slot}+{self.data.parent_block_root}+{self.data.proposer_index}"
-        )
+        raise NotImplementedError
 
 
 def is_optimistic(obj: ExecutionOptimisticResponse | BeaconNodeEvent) -> bool:

@@ -178,6 +178,7 @@ class BlockProposalService(ValidatorDutyService):
             await self.bid_selector.multi_builder.warm_connections()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
+        self.bid_selector.prune(finished_proposal_slot=slot - 5)
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for

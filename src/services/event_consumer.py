@@ -201,16 +201,12 @@ class EventConsumerService:
             event,
             SchemaBeaconAPI.PayloadAttributesEvent,
         ):
-            # TODO we may want to keep track of how many times we saw a specific
-            #  payload attributes event inside BidSelector, in which case we should
-            #  remote the _has_seen_event filter here.
-            if not self._has_seen_event(event):
-                self.logger.debug(f"{event_type}: {event.dedup_key}")
-                for pa_handler in self.payload_attributes_event_handlers:
-                    self.task_manager.create_task(
-                        pa_handler(event),
-                        name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
-                    )
+            # Forward repeats so an A -> B -> A payload attributes event sequence keeps the latest A.
+            for pa_handler in self.payload_attributes_event_handlers:
+                self.task_manager.create_task(
+                    pa_handler(event),
+                    name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
+                )
         elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadBidEvent):
             if not self._has_seen_event(event):
                 self.logger.debug(f"Execution payload bid event: {event}")
