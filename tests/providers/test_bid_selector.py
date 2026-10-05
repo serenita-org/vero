@@ -85,3 +85,23 @@ async def test_get_bid_selects_best_bid(
     expected_bid = {"direct": direct_bid, "p2p": p2p_bid, None: None}[expected_source]
     _builder, bid = result
     assert bid is expected_bid
+
+
+async def test_get_bid_zero_boost_skips_bid_selection(vero: Vero) -> None:
+    selector = BidSelector(vero=vero)
+    duty = SchemaBeaconAPI.ProposerDuty(
+        pubkey="0x" + "00" * 48, validator_index="1", slot="1234"
+    )
+    with (
+        mock.patch.object(selector.cli_args, "builder_boost_factor", 0),
+        mock.patch.object(selector, "_get_payload_attributes_data") as get_attributes,
+        mock.patch.object(
+            selector.multi_builder, "get_execution_payload_bid"
+        ) as get_direct_bid,
+        mock.patch.object(selector, "_get_best_p2p_bid") as get_p2p_bid,
+    ):
+        assert await selector.get_bid(slot=1234, proposer_duty=duty) == (None, None)
+
+        get_attributes.assert_not_called()
+        get_direct_bid.assert_not_called()
+        get_p2p_bid.assert_not_called()

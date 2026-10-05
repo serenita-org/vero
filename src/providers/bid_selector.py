@@ -115,7 +115,11 @@ class BidSelector:
             self.logger.info(f"Bid selection disabled, returning None for slot {slot}")
             return None, None
 
-        # TODO consider builder boost factor here
+        if self.cli_args.builder_boost_factor == 0:
+            self.logger.info(
+                f"Builder boost factor is 0, returning None for slot {slot}"
+            )
+            return None, None
 
         payload_attributes_data = self._get_payload_attributes_data(
             slot=slot, proposer_duty=proposer_duty
@@ -125,9 +129,6 @@ class BidSelector:
                 "Unable to fetch bids from builders - did not find corresponding payload attributes data"
             )
             return None, None
-
-        # TODO all the bid value comparison craziness goes here, boost factor, min bid,
-        #  Keymanager API overrides
 
         # TODO Entire bid selection logging - high-level useful data into INFO,
         #  rest into DEBUG, without repeating info.
