@@ -29,7 +29,7 @@ class BidSelector:
         self, event: SchemaBeaconAPI.PayloadAttributesEvent
     ) -> None:
         if int(event.data.proposal_slot) in self.proposal_slots:
-            self.logger.info(f"Received payload attributes event: {event}")
+            self.logger.debug(f"Received payload attributes event: {event}")
             # Keep the latest received attributes for each slot and proposer.
             self.payload_attributes_events_store[
                 (int(event.data.proposal_slot), event.data.proposer_index)
