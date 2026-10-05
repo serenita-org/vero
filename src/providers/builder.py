@@ -236,21 +236,6 @@ class Builder(ApiClient):
                 ),
             )
 
-            # TODO Lodestar's bid verification
-            # https://github.com/ChainSafe/lodestar/blob/unstable/packages/beacon-node/src/execution/builder/validateBid.ts
-
-            # TODO bid verification? or shall we just let the beacon node handle
-            #  all this?
-            #  see https://github.com/ethereum/consensus-specs/blob/master/specs/gloas/validator.md#signed-execution-payload-bid
-            # 1) signature verification - requires knowing the builder's pubkey
-            # 2) builder balance - must cover the bid.value
-            # 3) bid.slot - correct value
-            # 4) bid.parent_block_hash + bid.parent_block_root - correct values
-            # 5) bid.prev_randao
-            # 6) fee recipient in signed_execution_payload_bid.message
-            # 7) no trusted payment should be present (at least yet)
-            # 8) trusted payment is <= max execution payment
-
             return self, bid
 
     async def submit_signed_beacon_block(
