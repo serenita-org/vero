@@ -467,7 +467,7 @@ class MultiBuilder:
             # If we have a bid at this point, we use it
             if best_bid:
                 self.logger.info(
-                    f"Selected best bid with value {best_bid_value_gwei:,}"
+                    f"Returning best direct bid with value {best_bid_value_gwei:,}"
                 )
                 for task in pending:
                     if not task.done():
@@ -503,7 +503,7 @@ class MultiBuilder:
 
                     builder, bid = result
                     self.logger.info(
-                        f"Selected first bid with value {bid.total_value:,}"
+                        f"Returning first direct bid with value {bid.total_value:,}"
                     )
                     for task in pending:
                         if not task.done():
