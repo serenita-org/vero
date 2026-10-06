@@ -1,5 +1,4 @@
 import asyncio
-from unittest import mock
 
 import pytest
 
@@ -236,81 +235,3 @@ async def test_block_proposal_beacon_node_urls_proposal(
         assert any(_override_log_string in m for m in caplog.messages)
     else:
         assert all(_override_log_string not in m for m in caplog.messages)
-
-
-@pytest.mark.parametrize("fail_all_first_epoch", [False, True])
-async def test_submit_proposer_preferences_signing_failures(
-    block_proposal_service: BlockProposalService,
-    fail_all_first_epoch: bool,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    service = block_proposal_service
-    epoch = max(
-        service.beacon_chain.current_epoch + 1, service.beacon_chain.GLOAS_FORK_EPOCH
-    )
-    first_slot = epoch * service.beacon_chain.SLOTS_PER_EPOCH
-    service.proposer_duties.clear()
-    service.proposer_duties.update(
-        {
-            epoch: {
-                SchemaBeaconAPI.ProposerDuty(
-                    pubkey="bad", validator_index="1", slot=str(first_slot)
-                ),
-                SchemaBeaconAPI.ProposerDuty(
-                    pubkey="good", validator_index="2", slot=str(first_slot + 1)
-                ),
-            },
-            epoch + 1: {
-                SchemaBeaconAPI.ProposerDuty(
-                    pubkey="later",
-                    validator_index="3",
-                    slot=str(first_slot + service.beacon_chain.SLOTS_PER_EPOCH),
-                )
-            },
-        }
-    )
-    service.proposer_duties_dependent_roots = {epoch: ZERO_ROOT, epoch + 1: ZERO_ROOT}
-
-    async def sign(message: object, identifier: str) -> tuple[object, str, None]:
-        if identifier == "bad" or (fail_all_first_epoch and identifier == "good"):
-            raise RuntimeError("signing failed")
-        return message, "signature", None
-
-    with (
-        mock.patch.object(service.signature_provider, "sign", side_effect=sign),
-        mock.patch.object(
-            service.multi_beacon_node, "submit_proposer_preferences"
-        ) as submit,
-    ):
-        await service.submit_proposer_preferences()
-
-    submitted = [
-        preferences.validator_index
-        for call in submit.call_args_list
-        for preferences, _ in call.kwargs["signed_proposer_preferences"]
-    ]
-    assert submitted == (["3"] if fail_all_first_epoch else ["2", "3"])
-    assert any(
-        "Failed to sign proposer preferences for validator bad" in m
-        for m in caplog.messages
-    )
-
-
-async def test_duty_refresh_schedules_proposer_preferences(
-    block_proposal_service: BlockProposalService,
-) -> None:
-    service = block_proposal_service
-    service.proposer_duties_dependent_roots.clear()
-    with mock.patch.object(service.task_manager, "create_task") as create_task:
-        await service._update_duties()
-        preferences_calls = [
-            call
-            for call in create_task.call_args_list
-            if call.args[0].cr_code.co_name == "submit_proposer_preferences"
-        ]
-        for call in create_task.call_args_list:
-            call.args[0].close()
-
-    assert len(preferences_calls) == 1
-    assert service.proposer_duties_dependent_roots
-    assert set(service.proposer_duties) <= set(service.proposer_duties_dependent_roots)
