@@ -813,6 +813,7 @@ class BeaconNode(ApiClient):
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         # Uses the stateful self-build flow: beacon node caches the payload envelope,
         # which Vero retrieves after publishing the beacon block.
+        # TODO [Gloas] support stateless self-build flow
         include_payload = False
         params = dict(
             randao_reveal=randao_reveal,
