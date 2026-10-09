@@ -2,6 +2,46 @@
 
 ## Post-Gloas
 
+After the Gloas fork, sidecars no longer _need_ to be used. Instead,
+you can use Vero's `--builder-urls` CLI flag to specify a list of
+builder URLs that will be contacted by each connected beacon node
+during block proposal duties.
+
+Besides the existing `--builder-boost-factor` flag, you can also use
+the new `--builder-min-bid` flag to set a minimum accepted bid value,
+and `--builder-max-execution-payment` to set your **trusted** execution
+payment limits.
+
+### MEV and multiple beacon nodes
+
+```mermaid
+flowchart RL
+
+%% VC<->CL
+Lighthouse <--> Vero
+Lodestar <--> Vero
+Teku <--> Vero
+
+%% CL<->EL
+B1(Builder 1) <--> Lighthouse
+B1(Builder 1) <--> Lodestar
+B1(Builder 1) <--> Teku
+
+B2(Builder 2) <--> Lighthouse
+B2(Builder 2) <--> Lodestar
+B2(Builder 2) <--> Teku
+
+B3(Builder 3) <--> Lighthouse
+B3(Builder 3) <--> Lodestar
+B3(Builder 3) <--> Teku
+
+style Vero fill:#11497E,stroke:#000000
+```
+
+<!--
+The section below is commented out since it relies on VC-side bid selection
+-->
+<!--
 After the Gloas fork, Vero can take over some of the MEV-related responsibilities.
 You can opt out of the behavior below by passing the `--disable-bid-selection` CLI flag,
 in which case Vero will behave like a traditional validator client and leave bid
@@ -94,6 +134,7 @@ sequenceDiagram
         Vero->>BC: publishBlock
     end
 ```
+-->
 
 ___
 

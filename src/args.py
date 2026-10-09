@@ -208,6 +208,7 @@ def get_parser() -> argparse.ArgumentParser:
         default=None,
         help="The gas limit value to pass on to external block builders during validator registrations. See the docs for more details.",
     )
+    # TODO [post-Gloas] remove this flag
     parser.add_argument(
         "--use-external-builder",
         action="store_true",
@@ -246,14 +247,18 @@ def get_parser() -> argparse.ArgumentParser:
         type=int,
         required=False,
         default=500,
-        help="The maximum amount of time into the slot that Vero will wait for a bid from external builders. In milliseconds. Defaults to 500.",
+        # TODO [Gloas] Suppressed out until VC-side bid selection is possible
+        # help="The maximum amount of time into the slot that Vero will wait for a bid from external builders. In milliseconds. Defaults to 500.",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--disable-bid-selection",
         dest="enable_bid_selection",
         action="store_false",
         default=False,
-        help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
+        # TODO [Gloas] Suppressed out until VC-side bid selection is possible
+        # help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--enable-doppelganger-detection",
