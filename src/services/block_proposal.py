@@ -772,7 +772,6 @@ class BlockProposalService(ValidatorDutyService):
         duty: SchemaBeaconAPI.ProposerDuty,
         execution_payload_envelope: ExecutionPayloadEnvelopeGloas,
     ) -> SignedExecutionPayloadEnvelopeGloas:
-        # TODO based on tracing data this signing takes a pretty long time (>100ms)
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._sign_execution_payload_envelope",
         ):
@@ -809,11 +808,6 @@ class BlockProposalService(ValidatorDutyService):
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._publish_payload_envelope",
         ):
-            # step 1 - get envelope by slot + beacon block root
-            #  (if we add the include_payload query param we would not need to query for
-            #  this payload separately)
-            # step 2 sign envelope
-            # step 3 publish signed envelope
             self.logger.info("Publishing payload envelope")
             # Only the beacon node that we got the BeaconBlock
             # from has its associated execution payload envelope.
