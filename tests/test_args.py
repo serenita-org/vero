@@ -487,7 +487,7 @@ def test_parse_cli_args_minimal_set_with_defaults() -> None:
         builder_min_bid=0,
         builder_max_execution_payment=0,
         builder_bid_request_timeout=500,
-        enable_bid_selection=True,
+        enable_bid_selection=False,
         enable_doppelganger_detection=False,
         enable_keymanager_api=False,
         keymanager_api_token_file_path=Path("/vero/data") / "keymanager-api-token.txt",

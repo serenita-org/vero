@@ -252,7 +252,7 @@ def get_parser() -> argparse.ArgumentParser:
         "--disable-bid-selection",
         dest="enable_bid_selection",
         action="store_false",
-        default=True,
+        default=False,
         help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
     )
     parser.add_argument(
