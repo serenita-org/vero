@@ -23,9 +23,16 @@ class EventConsumerService:
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.metrics = vero.metrics
+        self.cli_args = vero.cli_args
 
         self.head_event_handlers: list[
-            Callable[[SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]]
+            Callable[[SchemaBeaconAPI.HeadV2Event, str], Coroutine[Any, Any, None]]
+        ] = []
+        self.execution_payload_available_event_handlers: list[
+            Callable[
+                [SchemaBeaconAPI.ExecutionPayloadAvailableEvent],
+                Coroutine[Any, Any, None],
+            ]
         ] = []
         self.reorg_event_handlers: list[
             Callable[[SchemaBeaconAPI.ChainReorgEvent], Coroutine[Any, Any, None]]
@@ -37,6 +44,16 @@ class EventConsumerService:
                     | SchemaBeaconAPI.ProposerSlashingEvent
                 ],
                 Coroutine[Any, Any, None],
+            ]
+        ] = []
+        self.payload_attributes_event_handlers: list[
+            Callable[
+                [SchemaBeaconAPI.PayloadAttributesEvent], Coroutine[Any, Any, None]
+            ]
+        ] = []
+        self.bid_event_handlers: list[
+            Callable[
+                [SchemaBeaconAPI.ExecutionPayloadBidEvent], Coroutine[Any, Any, None]
             ]
         ] = []
 
@@ -52,10 +69,18 @@ class EventConsumerService:
     def add_head_event_handler(
         self,
         event_handler: Callable[
-            [SchemaBeaconAPI.HeadEvent, str], Coroutine[Any, Any, None]
+            [SchemaBeaconAPI.HeadV2Event, str], Coroutine[Any, Any, None]
         ],
     ) -> None:
         self.head_event_handlers.append(event_handler)
+
+    def add_execution_payload_available_event_handler(
+        self,
+        event_handler: Callable[
+            [SchemaBeaconAPI.ExecutionPayloadAvailableEvent], Coroutine[Any, Any, None]
+        ],
+    ) -> None:
+        self.execution_payload_available_event_handlers.append(event_handler)
 
     def add_reorg_event_handler(
         self,
@@ -77,6 +102,24 @@ class EventConsumerService:
     ) -> None:
         self.slashing_event_handlers.append(event_handler)
 
+    def add_payload_attributes_event_handler(
+        self,
+        event_handler: Callable[
+            [SchemaBeaconAPI.PayloadAttributesEvent],
+            Coroutine[Any, Any, None],
+        ],
+    ) -> None:
+        self.payload_attributes_event_handlers.append(event_handler)
+
+    def add_bid_event_handler(
+        self,
+        event_handler: Callable[
+            [SchemaBeaconAPI.ExecutionPayloadBidEvent],
+            Coroutine[Any, Any, None],
+        ],
+    ) -> None:
+        self.bid_event_handlers.append(event_handler)
+
     def _has_seen_event(self, event: SchemaBeaconAPI.BeaconNodeEvent) -> bool:
         key = event.dedup_key
 
@@ -89,26 +132,46 @@ class EventConsumerService:
     def _handle_event(
         self, event: SchemaBeaconAPI.BeaconNodeEvent, beacon_node: BeaconNode
     ) -> None:
-        if hasattr(event, "slot") and int(event.slot) < self.beacon_chain.current_slot:
+        event_slot = None
+        if isinstance(
+            event,
+            SchemaBeaconAPI.ExecutionPayloadAvailableEvent
+            | SchemaBeaconAPI.ChainReorgEvent,
+        ):
+            event_slot = int(event.slot)
+        elif isinstance(event, SchemaBeaconAPI.HeadV2Event):
+            event_slot = int(event.data.slot)
+
+        if event_slot and event_slot < self.beacon_chain.current_slot:
             self.logger.warning(
-                f"Ignoring event for old slot {event.slot} from {beacon_node.host}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
+                f"Ignoring event for old slot {event_slot} from {beacon_node.netloc}. Current slot: {self.beacon_chain.current_slot}. Event: {event}"
             )
             return
 
         event_type = type(event).__name__
 
-        if isinstance(event, SchemaBeaconAPI.HeadEvent):
-            self.metrics.head_event_time_h.labels(host=beacon_node.host).observe(
-                self.beacon_chain.time_since_slot_start(slot=int(event.slot))
+        if isinstance(event, SchemaBeaconAPI.HeadV2Event):
+            self.metrics.head_event_time_h.labels(netloc=beacon_node.netloc).observe(
+                self.beacon_chain.time_since_slot_start(slot=int(event.data.slot))
             )
             if not self._has_seen_event(event):
                 self.logger.debug(
-                    f"[{beacon_node.host}] New head @ {event.slot} : {event.block}"
+                    f"[{beacon_node.netloc}] New head @ {event.data.slot} : {event.data.block}"
                 )
                 for head_handler in self.head_event_handlers:
                     self.task_manager.create_task(
-                        head_handler(event, beacon_node.host),
+                        head_handler(event, beacon_node.netloc),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{head_handler.__name__}-{uuid4().hex}",
+                    )
+        elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadAvailableEvent):
+            if not self._has_seen_event(event):
+                self.logger.debug(
+                    f"Execution payload available @ {event.slot} : {event.block_root}"
+                )
+                for epa_handler in self.execution_payload_available_event_handlers:
+                    self.task_manager.create_task(
+                        epa_handler(event),
+                        name=f"{self.__class__.__name__}.handler-{event_type}-{epa_handler.__name__}-{uuid4().hex}",
                     )
         elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):
             if not self._has_seen_event(event):
@@ -134,18 +197,46 @@ class EventConsumerService:
                         sl_handler(event),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{sl_handler.__name__}-{uuid4().hex}",
                     )
+        elif isinstance(
+            event,
+            SchemaBeaconAPI.PayloadAttributesEvent,
+        ):
+            # Forward repeats so an A -> B -> A payload attributes event sequence keeps the latest A.
+            for pa_handler in self.payload_attributes_event_handlers:
+                self.task_manager.create_task(
+                    pa_handler(event),
+                    name=f"{self.__class__.__name__}.handler-{event_type}-{pa_handler.__name__}-{uuid4().hex}",
+                )
+        elif isinstance(event, SchemaBeaconAPI.ExecutionPayloadBidEvent):
+            if not self._has_seen_event(event):
+                self.logger.debug(f"Execution payload bid event: {event}")
+                for bid_handler in self.bid_event_handlers:
+                    self.task_manager.create_task(
+                        bid_handler(event),
+                        name=f"{self.__class__.__name__}.handler-{event_type}-{bid_handler.__name__}-{uuid4().hex}",
+                    )
         else:
             raise NotImplementedError(f"Unsupported event type: {event_type}")
 
         self.metrics.vc_processed_beacon_node_events_c.labels(
-            host=beacon_node.host,
+            netloc=beacon_node.netloc,
             event_type=event_type,
         ).inc()
 
     async def handle_events(self, beacon_node: BeaconNode) -> None:
-        self.logger.debug(f"Subscribing to events from {beacon_node.host}")
+        self.logger.debug(f"Subscribing to events from {beacon_node.netloc}")
 
-        topics = ["head", "chain_reorg", "attester_slashing", "proposer_slashing"]
+        topics = [
+            "head_v2",
+            "execution_payload_available",
+            "chain_reorg",
+            "attester_slashing",
+            "proposer_slashing",
+        ]
+
+        if self.cli_args.enable_bid_selection:
+            topics.append("payload_attributes")
+            topics.append("execution_payload_bid")
 
         try:
             async for event in beacon_node.subscribe_to_events(topics=topics):
@@ -158,7 +249,7 @@ class EventConsumerService:
                 error_type=ErrorType.EVENT_CONSUMER.value,
             ).inc()
             self.logger.exception(
-                f"Error occurred while processing beacon node events from {beacon_node.host} ({e!r}). Reconnecting in 10 seconds...",
+                f"Error occurred while processing beacon node events from {beacon_node.netloc} ({e!r}). Reconnecting in 10 seconds...",
             )
             self.task_manager.create_task(
                 self.handle_events(beacon_node=beacon_node),

@@ -21,6 +21,7 @@ from services import (
     AttestationService,
     BlockProposalService,
     EventConsumerService,
+    PtcService,
     SyncCommitteeService,
     ValidatorDutyServiceOptions,
     ValidatorStatusTrackerService,
@@ -29,7 +30,7 @@ from services import (
 _logger = logging.getLogger("vero-init")
 
 
-async def _wait_for_genesis(genesis_timestamp: int) -> None:
+async def _wait_for_genesis(genesis_timestamp: float) -> None:
     while True:
         time_remaining = genesis_timestamp - time.time()
         if time_remaining <= 0:
@@ -43,10 +44,11 @@ def _register_event_handlers(
     attestation_service: AttestationService,
     block_proposal_service: BlockProposalService,
     sync_committee_service: SyncCommitteeService,
+    ptc_service: PtcService,
     event_consumer_service: EventConsumerService,
     validator_status_tracker_service: ValidatorStatusTrackerService,
 ) -> None:
-    # Add event handlers for head events, chain reorgs and slashing events
+    # Add SSE event handlers
     for head_handler_service in (
         attestation_service,
         block_proposal_service,
@@ -55,6 +57,10 @@ def _register_event_handlers(
         event_consumer_service.add_head_event_handler(
             event_handler=head_handler_service.handle_head_event,
         )
+
+    event_consumer_service.add_execution_payload_available_event_handler(
+        event_handler=ptc_service.handle_execution_payload_available_event
+    )
 
     for reorg_handler_service in (
         attestation_service,
@@ -65,6 +71,13 @@ def _register_event_handlers(
         event_consumer_service.add_reorg_event_handler(
             event_handler=reorg_handler_service.handle_reorg_event,
         )
+
+    event_consumer_service.add_payload_attributes_event_handler(
+        event_handler=block_proposal_service.bid_selector.handle_payload_attributes_event
+    )
+    event_consumer_service.add_bid_event_handler(
+        event_handler=block_proposal_service.bid_selector.handle_bid_event
+    )
 
     event_consumer_service.add_slashing_event_handler(
         event_handler=validator_status_tracker_service.handle_slashing_event,
@@ -176,11 +189,13 @@ async def run_services(vero: Vero) -> None:
         attestation_service = AttestationService(**validator_service_args)
         block_proposal_service = BlockProposalService(**validator_service_args)
         sync_committee_service = SyncCommitteeService(**validator_service_args)
+        ptc_service = PtcService(**validator_service_args)
 
         for service in (
             attestation_service,
             block_proposal_service,
             sync_committee_service,
+            ptc_service,
         ):
             await exit_stack.enter_async_context(service)
             vero.validator_duty_services.append(service)
@@ -196,6 +211,7 @@ async def run_services(vero: Vero) -> None:
             attestation_service=attestation_service,
             block_proposal_service=block_proposal_service,
             sync_committee_service=sync_committee_service,
+            ptc_service=ptc_service,
             event_consumer_service=event_consumer_service,
             validator_status_tracker_service=validator_status_tracker_service,
         )

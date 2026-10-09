@@ -24,7 +24,12 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     graffiti: bytes
     gas_limit: int
     use_external_builder: bool
+    builder_urls: list[str]
     builder_boost_factor: int
+    builder_min_bid: int
+    builder_max_execution_payment: int
+    builder_bid_request_timeout: int
+    enable_bid_selection: bool
     enable_doppelganger_detection: bool
     enable_keymanager_api: bool
     keymanager_api_token_file_path: Path
@@ -52,7 +57,7 @@ def _validate_comma_separated_strings(
     if len(items) < min_values_required:
         raise ValueError(f"Not enough {entity_name}s provided")
     if len(items) != len(set(items)):
-        raise ValueError(f"{entity_name}s must be unique: {items}")
+        raise ValueError(f"{entity_name}s must have unique values: {items}")
     return items
 
 
@@ -89,7 +94,7 @@ def _process_fee_recipient(input_string: str) -> str:
     except ValueError as e:
         raise ValueError(f"Invalid fee recipient {input_string}: {e!r}") from e
     else:
-        return input_string
+        return input_string.lower()
 
 
 def _process_gas_limit(input_value: int | None, network: Network) -> int:
@@ -203,10 +208,18 @@ def get_parser() -> argparse.ArgumentParser:
         default=None,
         help="The gas limit value to pass on to external block builders during validator registrations. See the docs for more details.",
     )
+    # TODO [post-Gloas] remove this flag
     parser.add_argument(
         "--use-external-builder",
         action="store_true",
         help="Provide this flag to submit validator registrations to external builders.",
+    )
+    parser.add_argument(
+        "--builder-urls",
+        type=str,
+        required=False,
+        default="",
+        help="A comma-separated list of external builder URLs.",
     )
     parser.add_argument(
         "--builder-boost-factor",
@@ -214,6 +227,38 @@ def get_parser() -> argparse.ArgumentParser:
         required=False,
         default=90,
         help="A percentage multiplier applied to externally built blocks when comparing their value to locally built blocks. The externally built block is only chosen if its value, post-multiplication, is higher than the locally built block's value. Defaults to 90.",
+    )
+    parser.add_argument(
+        "--builder-min-bid",
+        type=int,
+        required=False,
+        default=0,
+        help="The minimum value of a builder bid required to be included. In GWei. Defaults to 0.",
+    )
+    parser.add_argument(
+        "--builder-max-execution-payment",
+        type=int,
+        required=False,
+        default=0,
+        help="The maximum allowed value of a trusted payment from an external builder bid. In GWei. Defaults to 0.",
+    )
+    parser.add_argument(
+        "--builder-bid-request-timeout",
+        type=int,
+        required=False,
+        default=500,
+        # TODO [Gloas] Suppressed out until VC-side bid selection is possible
+        # help="The maximum amount of time into the slot that Vero will wait for a bid from external builders. In milliseconds. Defaults to 500.",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--disable-bid-selection",
+        dest="enable_bid_selection",
+        action="store_false",
+        default=False,
+        # TODO [Gloas] Suppressed out until VC-side bid selection is possible
+        # help="Disables Vero's own bid selection as well as all direct communication with builders, leaving that workload to the connected beacon node(s).",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--enable-doppelganger-detection",
@@ -312,26 +357,28 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             _validate_url(url)
             for url in _validate_comma_separated_strings(
                 input_string=parsed_args.beacon_node_urls,
-                entity_name="beacon node url",
+                entity_name="Beacon node URL",
                 min_values_required=1,
             )
         ]
-        if len({urlparse(bn_url).hostname for bn_url in beacon_node_urls}) != len(
-            beacon_node_urls
-        ):
-            parser.error("Beacon node URLs must have unique hostnames.")
         beacon_node_urls_proposal = [
             _validate_url(url)
             for url in _validate_comma_separated_strings(
                 input_string=parsed_args.beacon_node_urls_proposal,
-                entity_name="proposal beacon node url",
+                entity_name="Proposal beacon node URL",
                 min_values_required=0,
             )
         ]
-        if len(
-            {urlparse(bn_url).hostname for bn_url in beacon_node_urls_proposal}
-        ) != len(beacon_node_urls_proposal):
-            parser.error("Proposal beacon node URLs must have unique hostnames.")
+
+        builder_urls = [
+            _validate_url(url)
+            for url in _validate_comma_separated_strings(
+                input_string=parsed_args.builder_urls,
+                entity_name="Builder URL",
+                min_values_required=0,
+            )
+        ]
+
         network = Network(parsed_args.network)
 
         keymanager_api_token_file_path = (
@@ -358,7 +405,12 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 input_value=parsed_args.gas_limit, network=network
             ),
             use_external_builder=parsed_args.use_external_builder,
+            builder_urls=builder_urls,
             builder_boost_factor=parsed_args.builder_boost_factor,
+            builder_min_bid=parsed_args.builder_min_bid,
+            builder_max_execution_payment=parsed_args.builder_max_execution_payment,
+            builder_bid_request_timeout=parsed_args.builder_bid_request_timeout,
+            enable_bid_selection=parsed_args.enable_bid_selection,
             enable_doppelganger_detection=parsed_args.enable_doppelganger_detection,
             enable_keymanager_api=parsed_args.enable_keymanager_api,
             keymanager_api_token_file_path=Path(keymanager_api_token_file_path),

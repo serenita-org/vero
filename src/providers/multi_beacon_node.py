@@ -44,29 +44,31 @@ from typing import TYPE_CHECKING, Any, Self, cast
 import msgspec
 from opentelemetry import trace
 from spy_ssz import (
-    Attestation,
     Fork,
     ObjectKind,
     Preset,
-    SyncCommitteeContribution,
     encode_json_array,
     get_ssz_type,
 )
 
 from observability import ErrorType
-from schemas import SchemaBeaconAPI, SchemaValidator
+from schemas import SchemaBeaconAPI, SchemaShared, SchemaValidator
+from schemas.shared import ForkVersion
 from spec import (
+    Attestation,
     AttestationData,
     BeaconBlock,
     Checkpoint,
+    PayloadAttestationData,
     SignedAggregateAndProof,
     SignedContributionAndProof,
     SingleAttestation,
+    SyncCommitteeContribution,
     SyncCommitteeMessage,
     preset_types,
 )
 from spec.configs import Network
-from spec.constants import INTERVALS_PER_SLOT
+from spec.preset import PayloadAttestationMessage
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
@@ -99,9 +101,6 @@ class MultiBeaconNode:
             )
             for base_url in vero.cli_args.beacon_node_urls_proposal
         ]
-
-        self.spec = vero.spec
-        self.SECONDS_PER_INTERVAL = int(vero.spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT
 
         self.cli_args = vero.cli_args
 
@@ -189,7 +188,7 @@ class MultiBeaconNode:
         best = max(self.initialized_beacon_nodes, key=lambda bn: bn.score)
         if best != self.initialized_beacon_nodes[0]:
             self.logger.warning(
-                f"Using {best.host} as `best` beacon node (duty fetching, MEV registrations)"
+                f"Using {best.netloc} as `best` beacon node (duty fetching)"
             )
         return best
 
@@ -272,11 +271,11 @@ class MultiBeaconNode:
         )
         return resp
 
-    async def get_proposer_duties(
+    async def get_proposer_duties_v2(
         self,
         **kwargs: Any,
     ) -> SchemaBeaconAPI.GetProposerDutiesResponse:
-        return await self.best_beacon_node.get_proposer_duties(**kwargs)
+        return await self.best_beacon_node.get_proposer_duties_v2(**kwargs)
 
     async def prepare_beacon_proposer(self, **kwargs: Any) -> None:
         await self._get_all_beacon_node_responses(
@@ -289,9 +288,22 @@ class MultiBeaconNode:
         # MEV relays - no need to overwhelm them with duplicate registrations
         await self.best_beacon_node.register_validator(**kwargs)
 
+    async def submit_proposer_preferences(self, **kwargs: Any) -> None:
+        await self._get_all_beacon_node_responses(
+            func_name="submit_proposer_preferences", **kwargs
+        )
+
+    async def submit_builder_preferences(self, **kwargs: Any) -> None:
+        await self._get_all_beacon_node_responses(
+            func_name="submit_builder_preferences", **kwargs
+        )
+
     @staticmethod
     def _parse_block_response(
-        response: SchemaBeaconAPI.ProduceBlockV3Response,
+        response: (
+            SchemaBeaconAPI.ProduceBlockV3Response
+            | SchemaBeaconAPI.ProduceBlockV4Response
+        ),
         content_type: ContentType,
     ) -> BeaconBlock:
         # TODO perf
@@ -307,64 +319,101 @@ class MultiBeaconNode:
         #  the execution payload - transactions.
 
         try:
+            object_kind = ObjectKind.BEACON_BLOCK
+            if isinstance(response, SchemaBeaconAPI.ProduceBlockV3Response):
+                object_kind = (
+                    ObjectKind.BLINDED_BEACON_BLOCK
+                    if response.execution_payload_blinded
+                    else ObjectKind.BEACON_BLOCK_CONTENTS
+                )
             block_cls = get_ssz_type(
                 Fork[response.version.name],
-                ObjectKind.BLINDED_BEACON_BLOCK
-                if response.execution_payload_blinded
-                else ObjectKind.BEACON_BLOCK_CONTENTS,
+                object_kind,
                 Preset[preset_types().preset.upper()],
             )
             if content_type == ContentType.JSON:
                 return cast("BeaconBlock", block_cls.from_json(response.data))
             return cast("BeaconBlock", block_cls.from_ssz(response.data))
-        except (KeyError, NotImplementedError):
+        except (KeyError, NotImplementedError) as e:
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"
-            ) from None
+            ) from e
 
     async def _produce_best_block(
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
+        builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
-    ) -> tuple[SchemaBeaconAPI.ProduceBlockV3Response, ContentType]:
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        fork_version: SchemaShared.ForkVersion,
+        soft_timeout: float,
+    ) -> tuple[
+        SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response,
+        ContentType,
+        BeaconNode,
+    ]:
         """Gets the produce block response from all beacon nodes and returns the
         best one by its reported value.
 
         Most of the logic in here makes sure we don't wait too long for a block to be
         produced by an unresponsive beacon node.
+
+        If no block has been returned within the soft timeout, we wait indefinitely
+        for the first block to be returned by any beacon node and use that.
         """
-        # Times out at 1/2 of the SECONDS_PER_INTERVAL spec value into the slot
-        # (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
-        # If no block has been returned by that point, it waits indefinitely for the
-        # first block to be returned by any beacon node.
-        timeout = (1 / 2) * self.SECONDS_PER_INTERVAL
 
         beacon_nodes_to_use = self.initialized_beacon_nodes
         if self.beacon_nodes_proposal:
             self.logger.info(
-                f"Overriding beacon nodes for block proposal, using {[bn.host for bn in self.beacon_nodes_proposal]}",
+                f"Overriding beacon nodes for block proposal, using {[bn.netloc for bn in self.beacon_nodes_proposal]}",
             )
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
-        tasks = {
-            asyncio.create_task(
-                bn.produce_block_v3(
-                    slot=slot,
-                    graffiti=graffiti,
-                    builder_boost_factor=builder_boost_factor,
-                    randao_reveal=randao_reveal,
-                ),
+        tasks: set[asyncio.Task[Any]]
+        if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+            tasks = {
+                asyncio.create_task(
+                    bn.produce_block_v3(
+                        slot=slot,
+                        graffiti=graffiti,
+                        builder_boost_factor=builder_config.builder_boost_factor,
+                        randao_reveal=randao_reveal,
+                    ),
+                )
+                for bn in beacon_nodes_to_use
+            }
+        elif fork_version == ForkVersion.GLOAS:
+            request_body: (
+                SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
             )
-            for bn in beacon_nodes_to_use
-        }
+            if signed_payload_bid:  # noqa: SIM108
+                request_body = signed_payload_bid
+            else:
+                request_body = builder_config
+            encoded_request_body = self._json_encoder.encode(request_body)
+            tasks = {
+                asyncio.create_task(
+                    bn.produce_block_v4(
+                        slot=slot,
+                        randao_reveal=randao_reveal,
+                        graffiti=graffiti,
+                        encoded_request_body=encoded_request_body,
+                        builder_config=builder_config,
+                        signed_payload_bid=signed_payload_bid,
+                        fork_version=fork_version,
+                    ),
+                )
+                for bn in beacon_nodes_to_use
+            }
+        else:
+            raise NotImplementedError(f"Unsupported fork version {fork_version=}")
         pending = tasks
 
         best_block_value = -1
         best_block_result = None
         start_time = asyncio.get_running_loop().time()
-        remaining_timeout = timeout
+        remaining_soft_timeout = soft_timeout
 
         # Only compare consensus block value on Gnosis Chain / Chiado
         # since the execution payload value is in a different
@@ -373,11 +422,12 @@ class MultiBeaconNode:
             Network.GNOSIS,
             Network.CHIADO,
         ]
+        _compare_consensus_block_value_only = True
 
-        while pending and remaining_timeout > 0:
+        while pending and remaining_soft_timeout > 0:
             done, pending = await asyncio.wait(
                 pending,
-                timeout=remaining_timeout,
+                timeout=remaining_soft_timeout,
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
@@ -390,7 +440,7 @@ class MultiBeaconNode:
                     )
                     continue
 
-                response, _ = result
+                response, _, _ = result
                 block_value = int(response.consensus_block_value)
                 if _use_payload_value_for_comparison:
                     block_value += int(response.execution_payload_value)
@@ -401,9 +451,9 @@ class MultiBeaconNode:
 
             # Calculate remaining timeout
             elapsed_time = asyncio.get_running_loop().time() - start_time
-            remaining_timeout = max(timeout - elapsed_time, 0)
+            remaining_soft_timeout = max(soft_timeout - elapsed_time, 0)
 
-        if remaining_timeout <= 0:
+        if remaining_soft_timeout <= 0:
             self.logger.warning("Block production timeout reached.")
 
         # If no block has been returned yet, wait for the first one and return it
@@ -417,7 +467,7 @@ class MultiBeaconNode:
             for coro_first in asyncio.as_completed(pending):
                 try:
                     best_block_result = await coro_first
-                    best_block_response, _ = best_block_result
+                    best_block_response, _, _beacon_node = best_block_result
 
                     best_block_value = int(best_block_response.consensus_block_value)
                     if _use_payload_value_for_comparison:
@@ -441,32 +491,44 @@ class MultiBeaconNode:
             # We have exhausted all tasks and have not received a block response
             raise RuntimeError("Failed to get a response from all beacon nodes")
 
-        self.logger.info(f"Proceeding with best block by value: {best_block_value}")
-        return best_block_result
+        self.logger.info(f"Proceeding with best block by value: {best_block_value:,}")
+        return cast(
+            "tuple[SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response, ContentType, BeaconNode]",
+            best_block_result,
+        )
 
-    async def produce_block_v3(
+    async def produce_block(
         self,
         slot: int,
         graffiti: bytes,
-        builder_boost_factor: int,
+        builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
-    ) -> BeaconBlock:
-        # TODO small room for improvement here.
-        #  We are currently choosing the best block based on total
-        #  block value (consensus+exec).
-        #  We could however take the best beacon block
-        #  and combine it with the best execution payload.
-        #  That would take up some extra processing time though.
-        best_block_response, content_type = await self._produce_best_block(
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        fork_version: SchemaShared.ForkVersion,
+        soft_timeout: float,
+    ) -> tuple[BeaconBlock, BeaconNode, str | None]:
+        best_block_response, content_type, beacon_node = await self._produce_best_block(
             slot=slot,
             graffiti=graffiti,
-            builder_boost_factor=builder_boost_factor,
+            builder_config=builder_config,
             randao_reveal=randao_reveal,
+            signed_payload_bid=signed_payload_bid,
+            fork_version=fork_version,
+            soft_timeout=soft_timeout,
         )
 
-        return self._parse_block_response(
-            response=best_block_response,
-            content_type=content_type,
+        if isinstance(best_block_response, SchemaBeaconAPI.ProduceBlockV3Response):
+            builder_url = None
+        else:
+            builder_url = best_block_response.builder_url
+
+        return (
+            self._parse_block_response(
+                response=best_block_response,
+                content_type=content_type,
+            ),
+            beacon_node,
+            builder_url,
         )
 
     async def publish_block_v2(self, **kwargs: Any) -> None:
@@ -503,8 +565,8 @@ class MultiBeaconNode:
         self,
         slot: int,
     ) -> AttestationData:
-        # Maps beacon node hosts to their last returned AttestationData
-        host_to_att_data: dict[str, AttestationData] = {}
+        # Maps beacon node netloc values to their last returned AttestationData
+        netloc_to_att_data: dict[str, AttestationData] = {}
         att_data_counter: Counter[AttestationData] = Counter()
 
         while True:
@@ -521,7 +583,7 @@ class MultiBeaconNode:
 
             for coro in asyncio.as_completed(tasks):
                 try:
-                    host, att_data = await coro
+                    netloc, att_data = await coro
                 except Exception as e:
                     # We can tolerate some attestation data production failures
                     self.logger.warning(
@@ -529,16 +591,16 @@ class MultiBeaconNode:
                     )
                     continue
 
-                prev_att_data = host_to_att_data.get(host)
+                prev_att_data = netloc_to_att_data.get(netloc)
 
                 if att_data == prev_att_data:
-                    # This host has already returned the same AttestationData in the past,
+                    # This netloc has already returned the same AttestationData in the past,
                     # no need to process it
                     continue
 
-                # New AttestationData has arrived from this host
-                self.logger.debug(f"AttestationData received from {host}: {att_data}")
-                host_to_att_data[host] = att_data
+                # New AttestationData has arrived from this netloc
+                self.logger.debug(f"AttestationData received from {netloc}: {att_data}")
+                netloc_to_att_data[netloc] = att_data
                 att_data_counter[att_data] += 1
                 if prev_att_data is not None:
                     att_data_counter[prev_att_data] -= 1
@@ -549,12 +611,12 @@ class MultiBeaconNode:
                     for task in tasks:
                         task.cancel()
 
-                    contributing_hosts = [
-                        h for h, ad in host_to_att_data.items() if ad == att_data
+                    contributing_netlocs = [
+                        n for n, ad in netloc_to_att_data.items() if ad == att_data
                     ]
 
                     self.logger.debug(
-                        f"Produced AttestationData without head event using {contributing_hosts}"
+                        f"Produced AttestationData without head event using {contributing_netlocs}"
                     )
 
                     return att_data
@@ -625,7 +687,7 @@ class MultiBeaconNode:
     async def publish_attestations(
         self,
         attestations: list[SingleAttestation],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
@@ -694,7 +756,7 @@ class MultiBeaconNode:
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[SignedAggregateAndProof],
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
     ) -> None:
         encoded = encode_json_array(signed_aggregate_and_proofs)
         await self._get_all_beacon_node_responses(
@@ -794,4 +856,34 @@ class MultiBeaconNode:
         await self._get_all_beacon_node_responses(
             func_name="publish_sync_committee_contribution_and_proofs",
             encoded_signed_contribution_and_proofs=encoded,
+        )
+
+    async def get_ptc_duties(
+        self,
+        epoch: int,
+        indices: list[int],
+    ) -> SchemaBeaconAPI.GetPtcDutiesResponse:
+        return await self.best_beacon_node.get_ptc_duties(epoch=epoch, indices=indices)
+
+    async def produce_payload_attestation_data(
+        self,
+        slot: int,
+    ) -> PayloadAttestationData | None:
+        return cast(
+            "PayloadAttestationData | None",
+            await self._get_first_beacon_node_response(
+                func_name="produce_payload_attestation_data",
+                slot=slot,
+            ),
+        )
+
+    async def publish_payload_attestation_messages(
+        self,
+        messages: list[PayloadAttestationMessage],
+        fork_version: SchemaShared.ForkVersion,
+    ) -> None:
+        await self._get_all_beacon_node_responses(
+            func_name="publish_payload_attestation_messages",
+            encoded_messages=encode_json_array(messages),
+            fork_version=fork_version,
         )

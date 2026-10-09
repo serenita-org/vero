@@ -50,9 +50,9 @@ class DoppelgangerDetector:
                 )
                 raise result
 
-            bn_host, liveness_data = result
+            bn_netloc, liveness_data = result
             self.logger.debug(
-                f"Liveness response from {bn_host}: {liveness_data}",
+                f"Liveness response from {bn_netloc}: {liveness_data}",
             )
             live_indices.update([int(v.index) for v in liveness_data if v.is_live])
 
@@ -128,7 +128,7 @@ class DoppelgangerDetector:
         ) - 1
         ts_to_wait_for = self.beacon_chain.get_timestamp_for_slot(
             slot=last_slot_in_next_epoch,
-        ) + (self.beacon_chain.SECONDS_PER_SLOT / 2)
+        ) + (self.beacon_chain.SLOT_DURATION_MS / 2 / 1_000)
         self.logger.info(
             "Waiting for last slot in epoch "
             f"{epoch_to_monitor_for_attestations + 1}: {last_slot_in_next_epoch}"

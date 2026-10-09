@@ -446,7 +446,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "round(increase(vc_processed_beacon_node_events_total{event_type=\"HeadEvent\", instance=\"$instance\"}[$__interval]))",
+          "expr": "round(increase(vc_processed_beacon_node_events_total{event_type=~\"(HeadEvent|HeadV2Event)\", instance=\"$instance\"}[$__interval]))",
           "format": "time_series",
           "hide": false,
           "instant": false,

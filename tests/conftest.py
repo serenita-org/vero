@@ -7,11 +7,13 @@ from unittest import mock
 
 import prometheus_client
 import pytest
+from spy_ssz import Fork
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
 from providers import (
     BeaconChain,
+    BeaconNode,
     MultiBeaconNode,
     RemoteSigner,
     Keymanager,
@@ -19,12 +21,13 @@ from providers import (
     SignatureProvider,
     DutyCache,
     Vero,
+    MultiBuilder,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.configs import Network
 from spec.utils import encode_graffiti
 
@@ -79,6 +82,7 @@ def cli_args(
     attestation_consensus_threshold = indirect_params.get(
         "attestation_consensus_threshold", None
     )
+    builder_urls = indirect_params.get("builder_urls", [])
     ignore_spec_mismatch = indirect_params.get("ignore_spec_mismatch", False)
     force_json_wire_format = indirect_params.get("force_json_wire_format", False)
 
@@ -96,7 +100,12 @@ def cli_args(
         graffiti=encode_graffiti("graffiti-in-pytest"),
         gas_limit=30_000_000,
         use_external_builder=False,
+        builder_urls=builder_urls,
         builder_boost_factor=90,
+        builder_min_bid=0,
+        builder_max_execution_payment=123,
+        builder_bid_request_timeout=10,
+        enable_bid_selection=True,
         enable_doppelganger_detection=False,
         enable_keymanager_api=enable_keymanager_api,
         keymanager_api_token_file_path=tmp_path / "keymanager-api-token.txt",
@@ -122,13 +131,18 @@ def _init_observability() -> None:
 @pytest.fixture
 def fork_version(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
-) -> Generator[None, None, None]:
-    requested_fork_version = getattr(request, "param", ForkVersion.FULU)
+) -> Generator[ForkVersion, None, None]:
+    requested_fork_version = getattr(request, "param", ForkVersion.GLOAS)
 
-    with mock.patch.object(
-        beacon_chain, "current_fork_version", requested_fork_version
+    with (
+        mock.patch.object(beacon_chain, "current_fork_version", requested_fork_version),
+        mock.patch.object(
+            BeaconNode,
+            "_fork_for_slot",
+            return_value=Fork[requested_fork_version.name],
+        ),
     ):
-        yield
+        yield requested_fork_version
 
 
 @pytest.fixture(scope="session")
@@ -277,13 +291,22 @@ async def multi_beacon_node_with_mocked_endpoints(
 
 
 @pytest.fixture
+async def multi_builder(
+    vero: Vero,
+    request: pytest.FixtureRequest,
+) -> AsyncGenerator[MultiBuilder, None]:
+    async with MultiBuilder(vero=vero) as mbn:
+        yield mbn
+
+
+@pytest.fixture
 def beacon_chain(vero: Vero) -> BeaconChain:
     # Just a convenience fixture
     return vero.beacon_chain
 
 
 @pytest.fixture
-def spec(vero: Vero) -> SpecFulu:
+def spec(vero: Vero) -> SpecGloas:
     # Just a convenience fixture
     return vero.spec
 

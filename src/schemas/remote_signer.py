@@ -3,12 +3,18 @@ from typing import Any, TypeVar
 
 import msgspec
 
+from .shared import BuilderRequestAuth, ForkVersion
+
 
 class SigningRequestType(Enum):
     AGGREGATE_AND_PROOF_V2 = "AGGREGATE_AND_PROOF_V2"
     AGGREGATION_SLOT = "AGGREGATION_SLOT"
     ATTESTATION = "ATTESTATION"
+    PAYLOAD_ATTESTATION_MESSAGE = "PAYLOAD_ATTESTATION_MESSAGE"
     BLOCK_V2 = "BLOCK_V2"
+    EXECUTION_PAYLOAD_ENVELOPE = "EXECUTION_PAYLOAD_ENVELOPE"
+    PROPOSER_PREFERENCES = "PROPOSER_PREFERENCES"
+    BUILDER_REQUEST_AUTH = "BUILDER_REQUEST_AUTH"
     RANDAO_REVEAL = "RANDAO_REVEAL"
     SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF = "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF"
     SYNC_COMMITTEE_MESSAGE = "SYNC_COMMITTEE_MESSAGE"
@@ -44,6 +50,11 @@ class AttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     attestation: msgspec.Raw
 
 
+class PayloadAttestationSignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.PAYLOAD_ATTESTATION_MESSAGE
+    payload_attestation_message: msgspec.Raw
+
+
 class Slot(msgspec.Struct):
     slot: str
 
@@ -72,6 +83,34 @@ class RandaoRevealSignableMessage(SignableMessageWithForkInfo, kw_only=True):
     randao_reveal: RandaoReveal
 
 
+class ProposerPreferences(msgspec.Struct):
+    dependent_root: str
+    proposal_slot: str
+    validator_index: str
+    fee_recipient: str
+    target_gas_limit: str
+
+
+class VersionedProposerPreferences(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: ProposerPreferences
+
+
+class ProposerPreferencesSignableMessage(SignableMessageWithForkInfo, kw_only=True):
+    type: SigningRequestType = SigningRequestType.PROPOSER_PREFERENCES
+    proposer_preferences: VersionedProposerPreferences
+
+
+class VersionedBuilderRequestAuth(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: BuilderRequestAuth
+
+
+class BuilderRequestAuthSignableMessage(SignableMessage, kw_only=True):
+    type: SigningRequestType = SigningRequestType.BUILDER_REQUEST_AUTH
+    builder_request_auth: VersionedBuilderRequestAuth
+
+
 class BeaconBlockHeader(msgspec.Struct):
     slot: str
     proposer_index: str
@@ -88,6 +127,26 @@ class BeaconBlock(msgspec.Struct):
 class BeaconBlockV2SignableMessage(SignableMessageWithForkInfo, kw_only=True):
     type: SigningRequestType = SigningRequestType.BLOCK_V2
     beacon_block: BeaconBlock
+
+
+class ExecutionPayloadEnvelope(msgspec.Struct):
+    payload: dict[str, Any]
+    execution_requests: dict[str, Any]
+    builder_index: str
+    beacon_block_root: str
+    parent_beacon_block_root: str
+
+
+class VersionedExecutionPayloadEnvelope(msgspec.Struct, kw_only=True):
+    version: ForkVersion = ForkVersion.GLOAS
+    data: ExecutionPayloadEnvelope
+
+
+class ExecutionPayloadEnvelopeSignableMessage(
+    SignableMessageWithForkInfo, kw_only=True
+):
+    type: SigningRequestType = SigningRequestType.EXECUTION_PAYLOAD_ENVELOPE
+    execution_payload_envelope: VersionedExecutionPayloadEnvelope
 
 
 class SyncCommitteeMessage(msgspec.Struct):

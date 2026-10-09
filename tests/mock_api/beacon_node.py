@@ -8,16 +8,24 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
-from spy_ssz import Bitfield
+from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
 from yarl import URL
 
 from providers import BeaconChain
-from providers._headers import ETH_CONSENSUS_VERSION, ContentType
+from providers._headers import (
+    ETH_CONSENSUS_BLOCK_VALUE,
+    ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_INCLUDED,
+    ETH_EXECUTION_PAYLOAD_VALUE,
+    ContentType,
+)
 from schemas import SchemaBeaconAPI
-from schemas.beacon_api import ForkVersion
+from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
+from services.block_proposal import BUILDER_INDEX_SELF_BUILD
 from spec import preset_types
-from spec.base import SpecFulu
+from spec.base import SpecGloas
 from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
@@ -28,8 +36,10 @@ from tests.ssz_objects import (
     ZERO_ROOT,
     make_attestation,
     make_attestation_data,
-    make_block,
+    make_block_electra_fulu,
+    make_block_gloas,
     make_contribution,
+    make_execution_payload_envelope_gloas,
 )
 
 
@@ -48,12 +58,18 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
+def return_self_built_block(request: pytest.FixtureRequest) -> bool:
+    return getattr(request, "param", False)
+
+
+@pytest.fixture
 def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
-    spec: SpecFulu,
+    spec: SpecGloas,
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
+    return_self_built_block: bool,
     beacon_api_spec: BeaconAPISpec | None,
 ) -> None:
     def _validate_response(
@@ -86,7 +102,7 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/node/version", url.raw_path):
             return CallbackResult(payload=dict(data=dict(version="beacon-node/test")))
 
-        if re.match(r"/eth/v1/validator/duties/proposer/\d+", url.raw_path):
+        if re.match(r"/eth/v2/validator/duties/proposer/\d+", url.raw_path):
             # This endpoint returns all proposer duties for the epoch
             epoch_no = int(url.raw_path.split("/")[-1])
 
@@ -129,7 +145,9 @@ def _mocked_beacon_node_endpoints(
             headers = kwargs["headers"]
 
             fork_version = beacon_chain.current_fork_version
-            _data = make_block(slot=slot, blinded=execution_payload_blinded)
+            _data = make_block_electra_fulu(
+                slot=slot, blinded=execution_payload_blinded
+            )
 
             # Not correct parsing but sufficient for our purposes
             response_content_type = (
@@ -143,9 +161,9 @@ def _mocked_beacon_node_endpoints(
             headers = {
                 CONTENT_TYPE: response_content_type.value,
                 ETH_CONSENSUS_VERSION: fork_version.value,
-                "Eth-Execution-Payload-Blinded": str(execution_payload_blinded).lower(),
-                "Eth-Execution-Payload-Value": str(exec_payload_value),
-                "Eth-Consensus-Block-Value": str(consensus_block_value),
+                ETH_EXECUTION_PAYLOAD_BLINDED: str(execution_payload_blinded).lower(),
+                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
+                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
             }
 
             if response_content_type == ContentType.OCTET_STREAM:
@@ -174,10 +192,27 @@ def _mocked_beacon_node_endpoints(
             )
             return CallbackResult(body=_data_response(att_data.to_json()))
 
+        if re.match("/eth/v1/validator/payload_attestation_data", url.raw_path):
+            payload_attestation_data = preset_types(
+                Fork.GLOAS
+            ).payload_attestation_data(
+                beacon_block_root="0x" + os.urandom(32).hex(),
+                slot=int(url.query["slot"]),
+                payload_present=True,
+                blob_data_available=True,
+            )
+            return CallbackResult(
+                body=payload_attestation_data.to_json(),
+                headers={
+                    ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
+                },
+            )
+
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
             if beacon_chain.current_fork_version not in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 raise NotImplementedError(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
@@ -257,6 +292,28 @@ def _mocked_beacon_node_endpoints(
 
             return CallbackResult(body=_data_response(contribution.to_json()))
 
+        if re.match("/eth/v1/validator/execution_payload_envelopes/.*", url.raw_path):
+            beacon_block_root = url.raw_path.split("/")[-1]
+            envelope = make_execution_payload_envelope_gloas(
+                beacon_block_root=beacon_block_root
+            )
+            request_headers = kwargs["headers"]
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
+                else ContentType.JSON
+            )
+            headers = {
+                CONTENT_TYPE: response_content_type.value,
+                ETH_CONSENSUS_VERSION: ForkVersion.GLOAS.value,
+            }
+            body = (
+                envelope.to_ssz()
+                if response_content_type is ContentType.OCTET_STREAM
+                else envelope.to_json()
+            )
+            return CallbackResult(body=body, headers=headers)
+
         raise NotImplementedError(
             f"Beacon API response for GET {url} does not have a mock handler",
         )
@@ -306,29 +363,90 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/validator/prepare_beacon_proposer", url.raw_path):
             return CallbackResult(status=200)
 
+        if re.match("/eth/v1/validator/proposer_preferences", url.raw_path):
+            return CallbackResult(status=200)
+
         if re.match("/eth/v1/validator/register_validator", url.raw_path):
             return CallbackResult(status=200)
+
+        if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
+            slot = int(url.raw_path.split("/")[-1])
+            params = kwargs["params"]
+            if params["include_payload"] == "true":
+                raise NotImplementedError
+
+            request_headers = kwargs["headers"]
+            fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
+            builder_index = BUILDER_INDEX_SELF_BUILD if return_self_built_block else 123
+            _data = make_block_gloas(slot=slot, builder_index=builder_index)
+
+            # Not correct parsing but sufficient for our purposes
+            response_content_type = (
+                ContentType.OCTET_STREAM
+                if ContentType.OCTET_STREAM.value in request_headers[ACCEPT]
+                else ContentType.JSON
+            )
+
+            exec_payload_value = random.randint(0, 10_000_000)
+            consensus_block_value = random.randint(0, 10_000_000)
+            headers = {
+                CONTENT_TYPE: response_content_type.value,
+                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
+                ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
+                ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
+            }
+
+            if response_content_type == ContentType.OCTET_STREAM:
+                return CallbackResult(body=_data.to_ssz(), headers=headers)
+
+            return CallbackResult(
+                body=_data_response(
+                    msgspec.json.encode(msgspec.json.decode(_data.to_json())["data"]),
+                    version=fork_version,
+                    execution_payload_included=False,
+                    execution_payload_value=str(exec_payload_value),
+                    consensus_block_value=str(consensus_block_value),
+                ),
+                headers=headers,
+            )
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
             headers = kwargs["headers"]
             fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
 
-            if fork_version not in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-            ):
-                raise NotImplementedError(f"Unsupported fork version {fork_version}")
-
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
-                if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_block_contents.from_json(
-                        _data_response(kwargs["data"])
-                    )
-                else:
-                    _ = preset_types().signed_block_contents.from_ssz(kwargs["data"])
+                object_kind = ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS
+            elif fork_version is ForkVersion.GLOAS:
+                object_kind = ObjectKind.SIGNED_BEACON_BLOCK
+            else:
+                raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
+            signed_block_type = get_ssz_type(
+                Fork[fork_version.name],
+                object_kind,
+                Preset[preset_types().preset.upper()],
+            )
+            if headers[CONTENT_TYPE] == ContentType.JSON.value:
+                _ = signed_block_type.from_json(_data_response(kwargs["data"]))
+            else:
+                _ = signed_block_type.from_ssz(kwargs["data"])
+
+            return CallbackResult(status=200)
+
+        if re.match("/eth/v1/beacon/execution_payload_envelopes", url.raw_path):
+            headers = kwargs["headers"]
+            signed_envelope_type = get_ssz_type(
+                Fork.GLOAS,
+                ObjectKind.SIGNED_EXECUTION_PAYLOAD_ENVELOPE,
+                Preset[preset_types().preset.upper()],
+            )
+            if headers[CONTENT_TYPE] == ContentType.JSON.value:
+                _ = signed_envelope_type.from_json(_data_response(kwargs["data"]))
+            else:
+                _ = signed_envelope_type.from_ssz(kwargs["data"])
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
@@ -344,12 +462,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+                signed_block_type = get_ssz_type(
+                    Fork[fork_version.name],
+                    ObjectKind.SIGNED_BLINDED_BEACON_BLOCK,
+                    Preset[preset_types().preset.upper()],
+                )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = preset_types().signed_blinded_block.from_json(
-                        _data_response(kwargs["data"])
-                    )
+                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
                 else:
-                    _ = preset_types().signed_blinded_block.from_ssz(kwargs["data"])
+                    _ = signed_block_type.from_ssz(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -412,6 +533,7 @@ def _mocked_beacon_node_endpoints(
             if beacon_chain.current_fork_version in (
                 ForkVersion.ELECTRA,
                 ForkVersion.FULU,
+                ForkVersion.GLOAS,
             ):
                 attestations = msgspec.json.decode(
                     kwargs["data"], type=list[msgspec.Raw]
@@ -431,23 +553,6 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/validator/aggregate_and_proofs", url.raw_path):
-            data_list = msgspec.json.decode(kwargs["data"])
-            assert len(data_list) == 1
-            data = data_list[0]
-
-            assert data["message"]["aggregator_index"] == "1"
-            aggregate = data["message"]["aggregate"]
-
-            if beacon_chain.current_fork_version in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-            ):
-                assert aggregate["committee_bits"] == "0x0040000000000000"
-                assert aggregate["aggregation_bits"] == "0x7507"
-            else:
-                raise NotImplementedError(
-                    f"Unsupported fork version {beacon_chain.current_fork_version}"
-                )
             return CallbackResult(status=200)
 
         if re.match(r"/eth/v1/validator/duties/sync/\d+", url.raw_path):
@@ -470,6 +575,35 @@ def _mocked_beacon_node_endpoints(
                     )
                 )
             )
+
+        if re.match(r"/eth/v1/validator/duties/ptc/\d+", url.raw_path):
+            current_slot = beacon_chain.current_slot
+            ptc_duties = []
+            for duty_slot in range(
+                current_slot, current_slot + beacon_chain.SLOTS_PER_EPOCH
+            ):
+                # assign a PTC to a random validator in every slot of this epoch
+                v = random.choice(validators)
+                ptc_duties.append(
+                    SchemaBeaconAPI.PtcDuty(
+                        pubkey=v.pubkey,
+                        validator_index=str(v.index),
+                        slot=str(duty_slot),
+                    )
+                )
+
+            return CallbackResult(
+                body=msgspec.json.encode(
+                    SchemaBeaconAPI.GetPtcDutiesResponse(
+                        dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
+                        execution_optimistic=False,
+                        data=ptc_duties,
+                    )
+                )
+            )
+
+        if re.match("/eth/v1/beacon/pool/payload_attestations", url.raw_path):
+            return CallbackResult(status=200)
 
         if re.match("/eth/v1/validator/sync_committee_subscriptions", url.raw_path):
             return CallbackResult(status=200)

@@ -11,23 +11,49 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
-from spy_ssz import ObjectKind
+from spy_ssz import (
+    ExecutionPayloadEnvelopeGloas,
+    ObjectKind,
+    SignedExecutionPayloadEnvelopeGloas,
+)
 
 from observability import ErrorType, HandledRuntimeError
+from providers import BeaconNode, BidSelector
 from providers._headers import ContentType
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner
+from providers.builder import Builder
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
 )
 from spec import BeaconBlock
+from spec.slot_components import get_slot_component_duration_ms
 from spec.utils import encode_graffiti
+
+# BUILDER_INDEX_SELF_BUILD = UINT64_MAX
+BUILDER_INDEX_SELF_BUILD = 2**64 - 1
 
 
 class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
+
+        self.bid_selector = BidSelector(vero=self.vero)
+
+        # Block production API requests "soft" time out half-way into the attestation
+        # deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain). This ensures
+        # a single slow beacon node does not delay a block proposal too much.
+        # If no block has been produced by the soft timeout, we wait indefinitely for
+        # the first block to be produced by any beacon node, and propose that block.
+        attestation_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._block_production_soft_timeout = 1 / 2 * attestation_due_s
 
         # Proposer duty by epoch
         self.proposer_duties: defaultdict[int, set[SchemaBeaconAPI.ProposerDuty]] = (
@@ -128,17 +154,26 @@ class BlockProposalService(ValidatorDutyService):
             await self._fetch_randao_reveal(
                 slot=slot + 1, pubkey=duty_for_next_slot.pubkey
             )
-            # Call `prepare_beacon_proposer` and `register_validators` one more time
-            # just before a block proposal is scheduled to decrease
-            # the chances of the fee recipient being set incorrectly,
-            # e.g., due to a beacon node restarting.
-            await self.prepare_beacon_proposer()
-            await self.register_validators(
-                current_slot=slot,
-                pubkeys_to_register=[duty_for_next_slot.pubkey],
-            )
+            # Supply connected beacon nodes and builders with
+            # just-in-time information to decrease the chances of
+            # the fee recipient being set incorrectly, e.g., due to
+            # a beacon node restarting.
+            for coro in (
+                self.prepare_beacon_proposer(),
+                self.submit_proposer_preferences(),
+                self.register_validators(
+                    current_slot=slot,
+                    pubkeys_to_register=[duty_for_next_slot.pubkey],
+                ),
+            ):
+                self.task_manager.create_task(coro)
+
+            # Pre-establish connections to builders
+            # to avoid tcp+tls handshake overhead on the get-bid request
+            await self.bid_selector.multi_builder.warm_connections()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
+        self.bid_selector.prune(finished_proposal_slot=slot - 5)
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -146,13 +181,21 @@ class BlockProposalService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
+            self.task_manager.create_task(self.submit_builder_preferences())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadV2Event, _: str
+    ) -> None:
+        event_slot = int(event.data.slot)
+        epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
         if (
-            event.current_duty_dependent_root
-            not in self.proposer_duties_dependent_roots.values()
+            event.data.current_epoch_dependent_root
+            != self.proposer_duties_dependent_roots.get(epoch)
+        ) or (
+            event.data.next_epoch_dependent_root
+            != self.proposer_duties_dependent_roots.get(epoch + 1)
         ):
-            self.logger.info(
+            self.logger.warning(
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.create_task(super().update_duties())
@@ -181,7 +224,7 @@ class BlockProposalService(ValidatorDutyService):
         for epoch in (current_epoch, current_epoch + 1):
             self.logger.debug(f"Updating proposer duties for epoch {epoch}")
 
-            response = await self.multi_beacon_node.get_proposer_duties(
+            response = await self.multi_beacon_node.get_proposer_duties_v2(
                 epoch=epoch,
             )
             fetched_duties = response.data
@@ -203,15 +246,34 @@ class BlockProposalService(ValidatorDutyService):
                 self.logger.info(
                     f"Upcoming block proposal duty at slot {duty.slot} for validator {duty.validator_index}",
                 )
+                self.bid_selector.proposal_slots.add(int(duty.slot))
+
+                self.task_manager.create_task(
+                    self.bid_selector.multi_builder.cache_bid_request_auth_data(
+                        proposer_duty=duty,
+                        signature_provider=self.signature_provider,
+                    )
+                )
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
             )
 
         self._prune_duties()
+        self.task_manager.create_task(self.submit_proposer_preferences())
 
     async def prepare_beacon_proposer(self) -> None:
+        # TODO [remove post-Gloas]
         self.logger.debug("Calling prepare_beacon_proposer")
+
+        if self.beacon_chain.current_fork_version not in (
+            SchemaShared.ForkVersion.ELECTRA,
+            SchemaShared.ForkVersion.FULU,
+        ):
+            self.logger.debug(
+                "Skipping prepare_beacon_proposer - not on ELECTRA/FULU",
+            )
+            return
 
         our_validators = (
             self.validator_status_tracker_service.active_validators
@@ -244,7 +306,14 @@ class BlockProposalService(ValidatorDutyService):
         current_slot: int,
         pubkeys_to_register: list[str] | None = None,
     ) -> None:
+        # TODO [remove post-Gloas]
         if not self.cli_args.use_external_builder:
+            return
+
+        if self.beacon_chain.current_fork_version not in (
+            SchemaShared.ForkVersion.ELECTRA,
+            SchemaShared.ForkVersion.FULU,
+        ):
             return
 
         _batch_size = 512
@@ -317,6 +386,148 @@ class BlockProposalService(ValidatorDutyService):
                 f"Published validator registrations, count: {len(pubkey_batch)}"
             )
 
+    async def submit_builder_preferences(self) -> None:
+        current_slot = self.beacon_chain.current_slot
+        for epoch, proposer_duties in self.proposer_duties.items():
+            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
+                # Pre-Gloas proposal, not submitting preferences
+                continue
+
+            _fork_info = self.beacon_chain.get_fork_info(
+                slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
+            )
+            for duty in proposer_duties:
+                if int(duty.slot) < current_slot:
+                    continue
+
+                if self.cli_args.enable_bid_selection:
+                    # Submit directly to builders
+                    self.task_manager.create_task(
+                        self.bid_selector.multi_builder.submit_builder_preferences(
+                            slot=int(duty.slot),
+                            proposer_pubkey=duty.pubkey,
+                            fork_version=SchemaShared.ForkVersion.GLOAS,
+                        )
+                    )
+                else:
+                    # Submit via beacon nodes
+                    builder_preferences = []
+                    max_exec_payment = str(self.cli_args.builder_max_execution_payment)
+                    for builder in self.bid_selector.multi_builder.builders:
+                        try:
+                            builder_auth = builder.get_signed_builder_request_auth(
+                                slot=int(duty.slot), proposer_pubkey=duty.pubkey
+                            )
+                        except KeyError as e:
+                            self.logger.warning(f"{e!r}")
+                            continue
+
+                        builder_preferences.append(
+                            SchemaBeaconAPI.BuilderPreferencesEntry(
+                                proposer_pubkey=duty.pubkey,
+                                url=str(builder.base_url),
+                                auth=builder_auth,
+                                max_execution_payment=max_exec_payment,
+                            )
+                        )
+                    self.task_manager.create_task(
+                        self.multi_beacon_node.submit_builder_preferences(
+                            slot=int(duty.slot),
+                            proposer_pubkey=duty.pubkey,
+                            fork_version=SchemaShared.ForkVersion.GLOAS,
+                        )
+                    )
+
+    async def submit_proposer_preferences(self) -> None:
+        # Default to values provided via the CLI arguments unless overridden
+        # via the Keymanager API
+        default_fee_recipient = self.cli_args.fee_recipient
+        default_target_gas_limit = str(self.cli_args.gas_limit)
+
+        current_slot = self.beacon_chain.current_slot
+
+        messages_by_epoch = []
+        for epoch, proposer_duties in self.proposer_duties.items():
+            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
+                # Pre-Gloas proposal, not submitting preferences
+                continue
+
+            _fork_info = self.beacon_chain.get_fork_info(
+                slot=self.beacon_chain.SLOTS_PER_EPOCH * epoch
+            )
+            messages_to_sign = []
+            for duty in proposer_duties:
+                if int(duty.slot) < current_slot:
+                    continue
+
+                messages_to_sign.append(
+                    (
+                        duty.pubkey,
+                        SchemaRemoteSigner.ProposerPreferencesSignableMessage(
+                            proposer_preferences=SchemaRemoteSigner.VersionedProposerPreferences(
+                                data=SchemaRemoteSigner.ProposerPreferences(
+                                    dependent_root=self.proposer_duties_dependent_roots[
+                                        epoch
+                                    ],
+                                    proposal_slot=duty.slot,
+                                    validator_index=duty.validator_index,
+                                    fee_recipient=default_fee_recipient
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_fee_recipient_override.get(
+                                        duty.pubkey, default_fee_recipient
+                                    ),
+                                    target_gas_limit=default_target_gas_limit
+                                    if not self.keymanager.enabled
+                                    else self.keymanager.pubkey_to_gas_limit_override.get(
+                                        duty.pubkey, default_target_gas_limit
+                                    ),
+                                ),
+                            ),
+                            fork_info=_fork_info,
+                        ),
+                    )
+                )
+            if len(messages_to_sign) == 0:
+                continue
+            messages_by_epoch.append((epoch, messages_to_sign))
+
+        for epoch, messages_to_sign in messages_by_epoch:
+            signing_results = await asyncio.gather(
+                *(
+                    self.signature_provider.sign(
+                        message=msg,
+                        identifier=pubkey,
+                    )
+                    for pubkey, msg in messages_to_sign
+                ),
+                return_exceptions=True,
+            )
+            signed_preferences = []
+            for (pubkey, msg), result in zip(
+                messages_to_sign, signing_results, strict=True
+            ):
+                if isinstance(result, BaseException):
+                    self.logger.error(
+                        f"Failed to sign proposer preferences for validator {pubkey}, slot {msg.proposer_preferences.data.proposal_slot}: {result!r}"
+                    )
+                    continue
+                signed_msg, signature, _ = result
+                signed_preferences.append(
+                    (signed_msg.proposer_preferences.data, signature)
+                )
+
+            if not signed_preferences:
+                continue
+
+            await self.multi_beacon_node.submit_proposer_preferences(
+                signed_proposer_preferences=signed_preferences,
+                fork_version=SchemaShared.ForkVersion.GLOAS,
+            )
+
+            self.logger.info(
+                f"Submitted proposer preferences for epoch {epoch}, count: {len(signed_preferences)}"
+            )
+
     async def _fetch_randao_reveal(self, slot: int, pubkey: str) -> None:
         self.logger.debug(f"Fetching RANDAO reveal for slot {slot}")
 
@@ -366,10 +577,13 @@ class BlockProposalService(ValidatorDutyService):
                 return self.randao_reveal_cache.pop(cache_key)
 
     async def _produce_block(
-        self, slot: int, duty: SchemaBeaconAPI.ProposerDuty, randao_reveal: str
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        randao_reveal: str,
+        signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
     ) -> tuple[
-        BeaconBlock,
-        SchemaRemoteSigner.BeaconBlockHeader,
+        BeaconBlock, SchemaRemoteSigner.BeaconBlockHeader, BeaconNode, str | None
     ]:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._produce_block",
@@ -385,14 +599,52 @@ class BlockProposalService(ValidatorDutyService):
                     )
                     graffiti = encode_graffiti(kmgr_graffiti_str)
 
-            try:
-                block_contents_or_blinded_block = (
-                    await self.multi_beacon_node.produce_block_v3(
-                        slot=slot,
-                        graffiti=graffiti,
-                        builder_boost_factor=self.cli_args.builder_boost_factor,
-                        randao_reveal=randao_reveal,
+            # TODO [Gloas] keymgr overrides for all these
+            builder_config = SchemaBeaconAPI.BuilderConfig(
+                min_bid=str(self.cli_args.builder_min_bid),
+                builder_boost_factor=str(self.cli_args.builder_boost_factor),
+                builders=[],
+            )
+            for builder in self.bid_selector.multi_builder.builders:
+                try:
+                    builder_auth = builder.get_signed_builder_request_auth(
+                        slot=slot, proposer_pubkey=duty.pubkey
                     )
+                except KeyError as e:
+                    self.logger.warning(f"{e!r}")
+                    continue
+
+                builder_config.builders.append(
+                    SchemaBeaconAPI.BuilderEntry(
+                        url=str(builder.base_url),
+                        auth=builder_auth,
+                        builder_pubkeys=[],
+                        max_execution_payment=str(
+                            self.cli_args.builder_max_execution_payment
+                        ),
+                        min_bid=str(self.cli_args.builder_min_bid),
+                        builder_boost_factor=str(self.cli_args.builder_boost_factor),
+                    )
+                )
+
+            try:
+                soft_timeout = max(
+                    0.0,
+                    self._block_production_soft_timeout
+                    - self.beacon_chain.time_since_slot_start(slot=slot),
+                )
+                (
+                    block_contents_or_blinded_block,
+                    beacon_node,
+                    header_builder_url,
+                ) = await self.multi_beacon_node.produce_block(
+                    slot=slot,
+                    graffiti=graffiti,
+                    builder_config=builder_config,
+                    randao_reveal=randao_reveal,
+                    signed_payload_bid=signed_payload_bid,
+                    fork_version=self.beacon_chain.current_fork_version,
+                    soft_timeout=soft_timeout,
                 )
             except Exception as e:
                 self.logger.exception(
@@ -406,7 +658,12 @@ class BlockProposalService(ValidatorDutyService):
                 block_header = SchemaRemoteSigner.BeaconBlockHeader(
                     **block_contents_or_blinded_block.header_dict()
                 )
-                return block_contents_or_blinded_block, block_header
+                return (
+                    block_contents_or_blinded_block,
+                    block_header,
+                    beacon_node,
+                    header_builder_url,
+                )
 
     async def _sign_block(
         self,
@@ -442,9 +699,11 @@ class BlockProposalService(ValidatorDutyService):
     async def _publish_block(
         self,
         slot: int,
-        fork_version: SchemaBeaconAPI.ForkVersion,
+        fork_version: SchemaShared.ForkVersion,
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
+        header_builder_url: str | None,
+        selected_builder: Builder | None,
     ) -> None:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(
@@ -467,20 +726,31 @@ class BlockProposalService(ValidatorDutyService):
 
                 if (
                     block_contents_or_blinded_block.object_kind
-                    is ObjectKind.BEACON_BLOCK_CONTENTS
+                    is not ObjectKind.BLINDED_BEACON_BLOCK
                 ):
-                    await self.multi_beacon_node.publish_block_v2(
-                        fork_version=fork_version,
-                        signed_block_contents=encoded,
-                        content_type=content_type,
-                    )
+                    publish_coros = [
+                        self.multi_beacon_node.publish_block_v2(
+                            fork_version=fork_version,
+                            data=encoded,
+                            header_builder_url=header_builder_url,
+                            content_type=content_type,
+                        )
+                    ]
+                    if selected_builder:
+                        publish_coros.append(
+                            selected_builder.submit_signed_beacon_block(
+                                fork_version=fork_version,
+                                data=encoded,
+                                content_type=content_type,
+                            )
+                        )
+                    await asyncio.gather(*publish_coros)
                 else:
                     await self.multi_beacon_node.publish_blinded_block_v2(
                         fork_version=fork_version,
                         signed_blinded_beacon_block=encoded,
                         content_type=content_type,
                     )
-
             except Exception as e:
                 self.logger.exception(
                     f"Failed to publish block for slot {slot}: {e!r}",
@@ -495,6 +765,98 @@ class BlockProposalService(ValidatorDutyService):
                     f"Published block for slot {slot}, root {block_root}",
                 )
                 self.metrics.vc_published_blocks_c.inc()
+
+    async def _sign_execution_payload_envelope(
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        execution_payload_envelope: ExecutionPayloadEnvelopeGloas,
+    ) -> SignedExecutionPayloadEnvelopeGloas:
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}._sign_execution_payload_envelope",
+        ):
+            try:
+                _, signature, _ = await self.signature_provider.sign(
+                    message=SchemaRemoteSigner.ExecutionPayloadEnvelopeSignableMessage(
+                        fork_info=self.beacon_chain.get_fork_info(slot=slot),
+                        execution_payload_envelope=(
+                            SchemaRemoteSigner.VersionedExecutionPayloadEnvelope(
+                                data=SchemaRemoteSigner.ExecutionPayloadEnvelope(
+                                    **execution_payload_envelope.to_obj()
+                                )
+                            )
+                        ),
+                    ),
+                    identifier=duty.pubkey,
+                )
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to get signature for execution payload envelope: {e!r}",
+                )
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c, error_type=ErrorType.SIGNATURE
+                ) from None
+            return execution_payload_envelope.sign(signature)
+
+    async def _publish_payload_envelope(
+        self,
+        slot: int,
+        duty: SchemaBeaconAPI.ProposerDuty,
+        beacon_block_root: str,
+        beacon_node: BeaconNode,
+    ) -> None:
+        with self.tracer.start_as_current_span(
+            name=f"{self.__class__.__name__}._publish_payload_envelope",
+        ):
+            try:
+                self.logger.info("Publishing payload envelope")
+                # Only the beacon node that we got the BeaconBlock
+                # from has its associated execution payload envelope cached.
+                # (Unless running in stateless mode which Vero doesn't
+                # support right now)
+                (
+                    fork_version,
+                    execution_payload_envelope,
+                ) = await beacon_node.get_execution_payload_envelope(
+                    slot=slot,
+                    beacon_block_root=beacon_block_root,
+                )
+
+                signed_execution_payload_envelope = (
+                    await self._sign_execution_payload_envelope(
+                        slot=slot,
+                        duty=duty,
+                        execution_payload_envelope=execution_payload_envelope,
+                    )
+                )
+                with signed_execution_payload_envelope:
+                    if self.cli_args.force_json_wire_format:
+                        encoded = signed_execution_payload_envelope.to_json()
+                        content_type = ContentType.JSON
+                    else:
+                        encoded = signed_execution_payload_envelope.to_ssz()
+                        content_type = ContentType.OCTET_STREAM
+
+                # Publish using the beacon node that produced the envelope,
+                # because it also has cached blob data for that envelope.
+                # We could also retrieve the full envelope-contents
+                # for a stateless flow - not implemented right now.
+                await beacon_node.publish_execution_payload_envelope(
+                    signed_execution_payload_envelope=encoded,
+                    fork_version=fork_version,
+                    content_type=content_type,
+                )
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to publish payload envelope for slot {slot}: {e!r}",
+                )
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c,
+                    error_type=ErrorType.PAYLOAD_ENVELOPE_PUBLISH,
+                ) from None
+            else:
+                self.logger.info(f"Published payload envelope for slot {slot}")
+                self.metrics.vc_published_payload_envelopes_c.inc()
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
@@ -521,14 +883,25 @@ class BlockProposalService(ValidatorDutyService):
         ):
             randao_reveal = await self._get_randao_reveal(slot=slot, pubkey=duty.pubkey)
 
+            selected_builder, selected_bid = None, None
+            if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+                selected_builder, selected_bid = await self.bid_selector.get_bid(
+                    slot=slot, proposer_duty=duty
+                )
+
             (
                 block_contents_or_blinded_block,
                 block_header,
+                beacon_node,
+                header_builder_url,
             ) = await self._produce_block(
-                slot=slot, duty=duty, randao_reveal=randao_reveal
+                slot=slot,
+                duty=duty,
+                randao_reveal=randao_reveal,
+                signed_payload_bid=selected_bid,
             )
             try:
-                fork_version = SchemaBeaconAPI.ForkVersion[
+                fork_version = SchemaShared.ForkVersion[
                     block_contents_or_blinded_block.fork.name
                 ]
                 signature = await self._sign_block(
@@ -538,13 +911,42 @@ class BlockProposalService(ValidatorDutyService):
                     block_version=fork_version.value.upper(),
                 )
 
-                await self._publish_block(
-                    slot=slot,
-                    fork_version=fork_version,
-                    signature=signature,
-                    block_contents_or_blinded_block=block_contents_or_blinded_block,
-                )
+                publish_coros = [
+                    self._publish_block(
+                        slot=slot,
+                        fork_version=fork_version,
+                        signature=signature,
+                        block_contents_or_blinded_block=block_contents_or_blinded_block,
+                        header_builder_url=header_builder_url,
+                        selected_builder=selected_builder,
+                    )
+                ]
+                if (
+                    fork_version is SchemaShared.ForkVersion.GLOAS
+                    and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
+                    == BUILDER_INDEX_SELF_BUILD
+                ):
+                    publish_coros.append(
+                        self._publish_payload_envelope(
+                            slot=slot,
+                            duty=duty,
+                            beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
+                            beacon_node=beacon_node,
+                        )
+                    )
+
+                results = await asyncio.gather(*publish_coros, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, BaseException):
+                        self.logger.error(
+                            f"Publication failed for slot {slot}: {result!r}"
+                        )
+                for result in results:
+                    if isinstance(result, BaseException):
+                        raise result
+
             finally:
+                self.bid_selector.prune(finished_proposal_slot=slot)
                 block_contents_or_blinded_block.close()
 
     async def propose_block(self, slot: int) -> None:

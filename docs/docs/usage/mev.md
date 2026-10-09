@@ -1,5 +1,145 @@
 # MEV Configuration
 
+## Post-Gloas
+
+After the Gloas fork, sidecars no longer _need_ to be used. Instead,
+you can use Vero's `--builder-urls` CLI flag to specify a list of
+builder URLs that will be contacted by each connected beacon node
+during block proposal duties.
+
+Besides the existing `--builder-boost-factor` flag, you can also use
+the new `--builder-min-bid` flag to set a minimum accepted bid value,
+and `--builder-max-execution-payment` to set your **trusted** execution
+payment limits.
+
+### MEV and multiple beacon nodes
+
+```mermaid
+flowchart RL
+
+%% VC<->CL
+Lighthouse <--> Vero
+Lodestar <--> Vero
+Teku <--> Vero
+
+%% CL<->EL
+B1(Builder 1) <--> Lighthouse
+B1(Builder 1) <--> Lodestar
+B1(Builder 1) <--> Teku
+
+B2(Builder 2) <--> Lighthouse
+B2(Builder 2) <--> Lodestar
+B2(Builder 2) <--> Teku
+
+B3(Builder 3) <--> Lighthouse
+B3(Builder 3) <--> Lodestar
+B3(Builder 3) <--> Teku
+
+style Vero fill:#11497E,stroke:#000000
+```
+
+<!--
+The section below is commented out since it relies on VC-side bid selection
+-->
+<!--
+After the Gloas fork, Vero can take over some of the MEV-related responsibilities.
+You can opt out of the behavior below by passing the `--disable-bid-selection` CLI flag,
+in which case Vero will behave like a traditional validator client and leave bid
+selection to the connected beacon nodes.
+
+### Bid selection
+
+Based on your preferences (`--builder-urls`, `--builder-boost-factor`,
+`--builder-min-bid`, `--builder-max-execution-payment`) Vero selects
+a bid whenever a block proposal duty is scheduled, looking at bids returned
+directly by builders as well as bids sourced from the connected beacon nodes'
+peer-to-peer network.
+
+```mermaid
+sequenceDiagram
+    actor Vero as Vero
+
+    box Direct builder connections
+        participant B1 as Builder 1
+        participant B2 as Builder 2
+    end
+
+    box P2P network
+        participant PA as P2P Builder A
+    end
+
+    par
+        Vero->>B1: getExecutionPayloadBid
+        Vero->>B2: getExecutionPayloadBid
+        B1->>Vero: ✔ Bid, value 123
+        B2->>Vero: ✔ Bid, value 134
+    end
+
+    PA->>Vero: ✔ Bid, value 99
+
+    Note over Vero: Using best bid with value 134
+```
+
+!!! note "What if there are no bids?"
+
+    If Vero is unable to select a bid, it falls back to traditional
+    validator client behavior, letting the connected beacon nodes
+    select a bid or fall back to building a local payload.
+
+### Block production
+
+Once a bid has been selected, Vero asks the connected beacon nodes
+to produce a block using the selected bid.
+
+Each of the connected beacon nodes then produces a block using the
+selected bid. The blocks returned may differ slightly in value, and Vero
+will again select the block with the highest value. Vero then signs the
+block and publishes it using the connected beacon nodes.
+
+!!! warning
+
+    The beacon nodes may produce a block using a different bid than the one
+    supplied by Vero. This can happen when the beacon node determines the bid
+    to be invalid, or when the beacon node's view of the chain differs and is
+    incompatible with the supplied bid.
+
+```mermaid
+sequenceDiagram
+    participant Vero as Vero
+
+    box Connected beacon nodes
+        participant BA as Beacon node A
+        participant BB as Beacon node B
+        participant BC as Beacon node C
+    end
+
+    par
+        Vero->>BA: produceBlockV4WithBid
+        BA-->>Vero: Block, value 150
+    and
+        Vero->>BB: produceBlockV4WithBid
+        BB-->>Vero: Block, value 152
+    and
+        Vero->>BC: produceBlockV4WithBid
+        BC-->>Vero: Block, value 135
+    end
+
+    Note over Vero: Select highest-value block (152)
+
+    par
+        Vero->>BA: publishBlock
+    and
+        Vero->>BB: publishBlock
+    and
+        Vero->>BC: publishBlock
+    end
+```
+-->
+
+___
+
+## Pre-Gloas
+
 When it comes to MEV, Vero behaves like a traditional validator client – it
 does not communicate directly with MEV relays.
 Instead, connected beacon nodes should handle that role through
@@ -24,7 +164,7 @@ blocks, all you need to do is pass the
 Vero will regularly register its connected validators
 with MEV relays.
 
-## MEV and multiple beacon nodes
+### MEV and multiple beacon nodes
 
 For validator registrations, Vero uses a single beacon node
 to avoid overwhelming MEV relays with duplicate registrations.

@@ -9,9 +9,10 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
+from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaValidator
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared, SchemaValidator
 from services.validator_duty_service import (
     ValidatorDuty,
     ValidatorDutyService,
@@ -27,6 +28,7 @@ from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
+from spec.slot_components import get_slot_component_duration_ms
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
@@ -34,6 +36,43 @@ _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 class SyncCommitteeService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
+
+        self._sync_message_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.SYNC_MESSAGE_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._sync_message_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.SYNC_MESSAGE_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._contribution_due_s = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+        self._contribution_due_s_gloas = (
+            get_slot_component_duration_ms(
+                basis_points=self.spec.CONTRIBUTION_DUE_BPS_GLOAS,
+                slot_duration_ms=self.spec.SLOT_DURATION_MS,
+            )
+            / 1_000
+        )
+
+        self._sync_subcommittee_size_uint = (
+            self.spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
+        )
+        self._sync_subcommittee_size = int(self._sync_subcommittee_size_uint)
+        self._epochs_per_sync_committee_period = int(
+            self.spec.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+        )
 
         # Sync duties by sync committee period
         self.sync_duties: defaultdict[int, list[SchemaBeaconAPI.SyncDuty]] = (
@@ -69,20 +108,33 @@ class SyncCommitteeService(ValidatorDutyService):
         except Exception as e:
             self.logger.warning(f"Failed to cache duties: {e}")
 
+    def compute_sync_period_for_epoch(self, epoch: int) -> int:
+        return epoch // self._epochs_per_sync_committee_period
+
+    def compute_sync_period_for_slot(self, slot: int) -> int:
+        return self.compute_sync_period_for_epoch(
+            epoch=slot // self.beacon_chain.SLOTS_PER_EPOCH,
+        )
+
     def has_duty_for_slot(self, slot: int) -> bool:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
 
-        sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
+        sync_period = self.compute_sync_period_for_epoch(epoch)
 
         return len(self.sync_duties[sync_period]) > 0
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
         # Schedule sync message job at the deadline in case
-        # it is not triggered earlier by a new HeadEvent,
-        # aiming to produce it 1/3 into the slot at the latest.
+        # it is not triggered earlier by a new HeadV2Event,
+        # aiming to produce it self._sync_message_due_s into the slot at the latest.
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+            sync_message_due_s = self._sync_message_due_s_gloas
+        else:
+            sync_message_due_s = self._sync_message_due_s
+
         _produce_deadline = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
-            + self.beacon_chain.SECONDS_PER_INTERVAL,
+            + sync_message_due_s,
             tz=datetime.UTC,
         )
 
@@ -99,9 +151,11 @@ class SyncCommitteeService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
 
-    async def handle_head_event(self, event: SchemaBeaconAPI.HeadEvent, _: str) -> None:
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadV2Event, _: str
+    ) -> None:
         await self.produce_sync_message(
-            duty_slot=int(event.slot),
+            duty_slot=int(event.data.slot),
             head_event=event,
         )
 
@@ -173,7 +227,9 @@ class SyncCommitteeService(ValidatorDutyService):
                     continue
 
                 signed_messages_batch.append(
-                    preset_types().sync_committee_message(
+                    preset_types(
+                        Fork[self.beacon_chain.current_fork_version.name]
+                    ).sync_committee_message(
                         beacon_block_root=beacon_block_root_bytes,
                         slot=duty_slot,
                         validator_index=pubkey_to_validator_index[pubkey],
@@ -220,7 +276,7 @@ class SyncCommitteeService(ValidatorDutyService):
         self,
         duty_slot: int,
         sync_period: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None,
         sync_committee_members: set[SchemaValidator.ValidatorIndexPubkey],
     ) -> None:
         self.logger.debug(
@@ -232,7 +288,7 @@ class SyncCommitteeService(ValidatorDutyService):
         ).observe(self.beacon_chain.time_since_slot_start(slot=duty_slot))
 
         beacon_block_root = (
-            head_event.block if head_event else await self._get_head_block_root()
+            head_event.data.block if head_event else await self._get_head_block_root()
         )
 
         # Use the beacon_block_root later on for sync contribution duties
@@ -258,7 +314,7 @@ class SyncCommitteeService(ValidatorDutyService):
     async def produce_sync_message(
         self,
         duty_slot: int,
-        head_event: SchemaBeaconAPI.HeadEvent | None = None,
+        head_event: SchemaBeaconAPI.HeadV2Event | None = None,
     ) -> None:
         # Using < and not <= on purpose: if a head event comes in late,
         # we still want to produce a sync message for that block root too
@@ -277,7 +333,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         # See https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee
-        sync_period = self.beacon_chain.compute_sync_period_for_slot(duty_slot + 1)
+        sync_period = self.compute_sync_period_for_slot(duty_slot + 1)
 
         sync_committee_members = {
             SchemaValidator.ValidatorIndexPubkey(
@@ -378,10 +434,15 @@ class SyncCommitteeService(ValidatorDutyService):
                 ),
             )
 
-        # Sign and submit aggregated sync committee contributions at 2/3 of the slot
+        # Sign and submit aggregated sync committee contributions
+        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+            contribution_due_s = self._contribution_due_s_gloas
+        else:
+            contribution_due_s = self._contribution_due_s
+
         aggregation_run_time = datetime.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
-            + 2 * self.beacon_chain.SECONDS_PER_INTERVAL,
+            + contribution_due_s,
             tz=datetime.UTC,
         )
         self.scheduler.add_job(
@@ -409,10 +470,12 @@ class SyncCommitteeService(ValidatorDutyService):
             identifiers=identifiers,
         ):
             signed_contribution_and_proofs.append(
-                preset_types().signed_contribution_and_proof(
-                    message=preset_types().contribution_and_proof.from_json(
-                        msg.contribution_and_proof
-                    ),
+                preset_types(
+                    Fork[self.beacon_chain.current_fork_version.name]
+                ).signed_contribution_and_proof(
+                    message=preset_types(
+                        Fork[self.beacon_chain.current_fork_version.name]
+                    ).contribution_and_proof.from_json(msg.contribution_and_proof),
                     signature=sig,
                 )
             )
@@ -494,7 +557,11 @@ class SyncCommitteeService(ValidatorDutyService):
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
                                 contribution_and_proof=msgspec.Raw(
-                                    preset_types()
+                                    preset_types(
+                                        Fork[
+                                            self.beacon_chain.current_fork_version.name
+                                        ]
+                                    )
                                     .contribution_and_proof(
                                         aggregator_index=int(duty.validator_index),
                                         contribution=contribution,
@@ -528,27 +595,21 @@ class SyncCommitteeService(ValidatorDutyService):
         subnets = set()
 
         for idx in indexes_in_committee:
-            subnets.add(
-                idx
-                // int(
-                    self.beacon_chain.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
-                ),
-            )
+            subnets.add(idx // self._sync_subcommittee_size)
 
         return subnets
 
     def _is_aggregator(self, selection_proof: bytes) -> bool:
         modulo = max(
             1,
-            self.beacon_chain.SYNC_COMMITTEE_SIZE
-            // SYNC_COMMITTEE_SUBNET_COUNT
+            self._sync_subcommittee_size_uint
             // TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
         )
         return bytes_to_uint64(hash_function(selection_proof)[0:8]) % modulo == 0
 
     def _prune_duties(self) -> None:
         current_epoch = self.beacon_chain.current_epoch
-        current_sync_period = self.beacon_chain.compute_sync_period_for_epoch(
+        current_sync_period = self.compute_sync_period_for_epoch(
             current_epoch,
         )
         for sync_period in list(self.sync_duties.keys()):
@@ -588,7 +649,7 @@ class SyncCommitteeService(ValidatorDutyService):
         #  ( https://github.com/ethereum/consensus-specs/blob/dev/specs/altair/validator.md#sync-committee )
 
         for epoch in (current_epoch,):
-            sync_period = self.beacon_chain.compute_sync_period_for_epoch(epoch)
+            sync_period = self.compute_sync_period_for_epoch(epoch)
             self.logger.debug(
                 f"Updating sync duties for epoch {epoch} -> sync period {sync_period}",
             )
@@ -605,9 +666,7 @@ class SyncCommitteeService(ValidatorDutyService):
             self.sync_duties[sync_period] = fetched_duties
 
             # Prepare sync committee subnet subscriptions for aggregation duties
-            until_epoch = (
-                sync_period + 1
-            ) * self.beacon_chain.EPOCHS_PER_SYNC_COMMITTEE_PERIOD
+            until_epoch = (sync_period + 1) * self._epochs_per_sync_committee_period
             sync_committee_subscriptions_data = [
                 SchemaBeaconAPI.SubscribeToSyncCommitteeSubnetRequestBody(
                     validator_index=duty.validator_index,

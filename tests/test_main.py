@@ -12,6 +12,7 @@ import pytest
 
 from main import main
 from providers import Vero
+from schemas.shared import ForkVersion
 
 
 @pytest.fixture
@@ -61,6 +62,20 @@ def _profile_program_run() -> Generator[None, None, None]:
     ],
     indirect=True,
 )
+@pytest.mark.parametrize(
+    "fork_version",
+    [
+        pytest.param(ForkVersion.ELECTRA, id="Electra"),
+        pytest.param(ForkVersion.FULU, id="Fulu"),
+        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+    ],
+    indirect=True,
+)
+@pytest.mark.parametrize(
+    "return_self_built_block",
+    [pytest.param(False, id="External builder"), pytest.param(True, id="Self-built")],
+    indirect=True,
+)
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
 @pytest.mark.usefixtures("_profile_program_run")
@@ -68,6 +83,8 @@ def _profile_program_run() -> Generator[None, None, None]:
 async def test_lifecycle(
     vero: Vero,
     enable_keymanager_api: bool,
+    fork_version: ForkVersion,
+    return_self_built_block: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
@@ -95,9 +112,16 @@ async def test_lifecycle(
                 "Updated duties",
                 "Published block for slot",
                 "Published attestations for slot",
+                "Published aggregate and proofs for slot",
                 "Published sync committee messages for slot",
+                "Published sync committee contribution and proofs for slot",
             ]
         )
+
+        if fork_version == ForkVersion.GLOAS:
+            required_log_lines.append("Published PTC attestations for slot")
+            if return_self_built_block:
+                required_log_lines.append("Published payload envelope for slot")
 
     timeout = 5
     start = asyncio.get_running_loop().time()
@@ -118,11 +142,10 @@ async def test_lifecycle(
         f"Log lines not found: {[line for line in required_log_lines if not any(line in m for m in caplog.messages)]}"
     )
 
-    # Make sure no errors occurred
-    err_records = [r for r in caplog.records if r.levelno == logging.ERROR]
-
-    for record in err_records:
-        pytest.fail(f"Error occurred: {record.message}")
+    # Make sure no unexpected errors occurred
+    err_messages = [r.message for r in caplog.records if r.levelno == logging.ERROR]
+    if err_messages:
+        pytest.fail(f"Unexpected errors occurred: {err_messages}")
 
     # Send SIGTERM signal to process to initiate a clean shutdown
     os.kill(os.getpid(), signal.SIGTERM)

@@ -7,12 +7,12 @@ import logging
 from concurrent.futures import ProcessPoolExecutor
 from types import TracebackType
 from typing import Any, Self
-from urllib.parse import urlparse
 
 import aiohttp
 import msgspec.json
 from aiohttp import ClientTimeout
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE, USER_AGENT
+from yarl import URL
 
 from observability import get_service_name, get_service_version
 from observability.api_client import RequestLatency, ServiceType
@@ -83,9 +83,12 @@ class RemoteSigner(SignatureProvider):
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.url = url
-        self.host = urlparse(url).hostname or ""
-        if not self.host:
-            raise ValueError(f"Failed to parse hostname from {self.url}")
+        # netloc without the user+password part to avoid
+        # exposing credentials in telemetry / unexpectedly
+        _netloc = URL(self.url).host_port_subcomponent
+        if not _netloc:
+            raise ValueError(f"Failed to parse netloc from {self.url}")
+        self.netloc = _netloc
 
         self._score = RemoteSigner.MAX_SCORE
         self._run_health_poll = vero is not None
@@ -108,7 +111,7 @@ class RemoteSigner(SignatureProvider):
         }
 
         self._trace_default_request_ctx = dict(
-            host=self.host,
+            netloc=self.netloc,
             service_type=ServiceType.REMOTE_SIGNER.value,
         )
 
@@ -125,14 +128,11 @@ class RemoteSigner(SignatureProvider):
             headers=headers,
             trace_configs=[
                 RequestLatency(
-                    host=self.host,
+                    netloc=self.netloc,
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
             timeout=ClientTimeout(total=10.0),
-            # Default aiohttp read buffer is only 64KB which is not always enough,
-            # resulting in ValueError("Chunk too big")
-            read_bufsize=2**19,
         )
 
         self.high_priority_client_session = aiohttp.ClientSession(
@@ -140,14 +140,11 @@ class RemoteSigner(SignatureProvider):
             headers=headers,
             trace_configs=[
                 RequestLatency(
-                    host=self.host,
+                    netloc=self.netloc,
                     service_type=ServiceType.REMOTE_SIGNER,
                 ),
             ],
             timeout=ClientTimeout(total=5.0),
-            # Default aiohttp read buffer is only 64KB which is not always enough,
-            # resulting in ValueError("Chunk too big")
-            read_bufsize=2**19,
         )
 
         if self._run_health_poll:
@@ -191,7 +188,9 @@ class RemoteSigner(SignatureProvider):
     def score(self, value: int) -> None:
         self._score = max(0, min(value, RemoteSigner.MAX_SCORE))
         if self.metrics:
-            self.metrics.remote_signer_score_g.labels(host=self.host).set(self._score)
+            self.metrics.remote_signer_score_g.labels(netloc=self.netloc).set(
+                self._score
+            )
 
     async def get_public_keys(self) -> list[str]:
         _endpoint = "/api/v1/eth2/publicKeys"
@@ -255,7 +254,7 @@ class RemoteSigner(SignatureProvider):
             if not resp.ok:
                 raise ValueError(
                     "NOK status code received "
-                    f"({resp.status}) from remote signer: "
+                    f"({resp.status}) for {request_type} from remote signer: "
                     f"{await self._read_error_text(resp)}",
                 )
 
@@ -334,7 +333,7 @@ class RemoteSigner(SignatureProvider):
             if resp.status == 404:
                 # Healthcheck endpoint not supported
                 self.logger.warning(
-                    f"Healthcheck endpoint returned 404 status code - disabling healthcheck polling for {self.host}"
+                    f"Healthcheck endpoint returned 404 status code - disabling healthcheck polling for {self.netloc}"
                 )
                 raise HealthcheckEndpointNotSupported
 
@@ -348,7 +347,7 @@ class RemoteSigner(SignatureProvider):
                 self.score += RemoteSigner.SCORE_DELTA_SUCCESS
             else:
                 self.logger.warning(
-                    f"Remote signer ({self.host}) unhealthy: {decoded_response}"
+                    f"Remote signer ({self.netloc}) unhealthy: {decoded_response}"
                 )
                 self.score -= RemoteSigner.SCORE_DELTA_FAILURE
 

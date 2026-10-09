@@ -1,4 +1,3 @@
-import math
 import sys
 from enum import Enum
 
@@ -9,8 +8,8 @@ from prometheus_client import (
     start_http_server,
 )
 
-from spec.base import SpecFulu
-from spec.constants import INTERVALS_PER_SLOT
+from spec.base import SpecGloas
+from spec.slot_components import get_slot_component_duration_ms
 
 from ._vero_info import get_service_commit, get_service_version
 
@@ -22,6 +21,9 @@ class ErrorType(Enum):
     AGGREGATE_ATTESTATION_PUBLISH = "aggregate-attestation-publish"
     BLOCK_PRODUCE = "block-produce"
     BLOCK_PUBLISH = "block-publish"
+    PAYLOAD_ENVELOPE_PUBLISH = "payload-envelope-publish"
+    BUILDER_GET_BID = "builder-get-bid"
+    BUILDER_SUBMIT_BLOCK = "builder-submit-block"
     SYNC_COMMITTEE_CONTRIBUTION_PRODUCE = "sync-committee-contribution-produce"
     SYNC_COMMITTEE_CONTRIBUTION_PUBLISH = "sync-committee-contribution-publish"
     SYNC_COMMITTEE_MESSAGE_PRODUCE = "sync-committee-message-produce"
@@ -39,51 +41,71 @@ class HandledRuntimeError(Exception):
 
 
 def _setup_head_event_time_metric(
-    seconds_per_slot: int,
-    attestation_deadline: float,
-    step_fine: float = 0.25,  # 250 ms
-    step_coarse: float = 1.0,  #   1 s
+    slot_duration_ms: int,
+    attestation_due_ms: int,
+    step_fine_ms: int = 250,
+    step_coarse_ms: int = 1_000,
 ) -> Histogram:
     """
-    For tracking at which point into the slot a head event was received
-    from each connected beacon node.
+    Tracks time into slot (seconds) at which a head event was received.
 
-    Histogram buckets are divided into:
-    *  Fine resolution (step_fine) until `attestation_deadline`
-    *  Coarse resolution (step_coarse) for the rest of the slot
+    Buckets:
+      - fine (step_fine_ms) up to attestation_due_ms (inclusive)
+      - coarse (step_coarse_ms) after that, until slot_duration_ms (inclusive)
     """
+    buckets_ms: list[int] = []
 
-    # Every multiple of step_fine that is <= attestation_deadline
-    k_max = int(attestation_deadline / step_fine)
-    fine_buckets = [round(step_fine * k, 2) for k in range(1, k_max + 1)]
+    # Fine buckets: step_fine_ms, 2*step_fine_ms, ... <= attestation_due_ms
+    k_max = attestation_due_ms // step_fine_ms
+    buckets_ms.extend(step_fine_ms * k for k in range(1, k_max + 1))
 
-    # Add the exact deadline edge if it is not already present
-    if round(attestation_deadline, 2) not in fine_buckets:
-        fine_buckets.append(round(attestation_deadline, 2))
+    # Coarse buckets start: first multiple of step_coarse_ms after due time
+    first_coarse_ms = ((attestation_due_ms // step_coarse_ms) + 1) * step_coarse_ms
 
-    # First coarse edge after the deadline
-    first_coarse = math.ceil(attestation_deadline / step_coarse) * step_coarse
-    if first_coarse in fine_buckets:
-        first_coarse += step_coarse
+    # Add exact deadline edge if not already present.
+    # Skip adding the exact deadline if it is extremely close (<=1ms) to the
+    # first coarse bucket.
+    # The skipping is needed in practice due to the attestation deadline being
+    # 3999ms with 12s slot times because of integer division
+    # in `get_slot_component_duration_ms`. That in turn results in buckets
+    # of 3999 and 4000 which we don't want, they'd contain practically identical
+    # values.
+    if (
+        buckets_ms
+        and buckets_ms[-1] != attestation_due_ms
+        and first_coarse_ms - attestation_due_ms > 1
+    ):
+        buckets_ms.append(attestation_due_ms)
 
-    n_coarse = math.ceil((seconds_per_slot - first_coarse) / step_coarse) + 1
-    coarse_buckets = [round(first_coarse + step_coarse * k, 2) for k in range(n_coarse)]
+    # Add coarse edges: first_coarse_ms, first_coarse_ms + step_coarse_ms, ... <= slot_duration_ms
+    t = first_coarse_ms
+    while t <= slot_duration_ms:
+        # Only append if it increases (protects against overlaps)
+        if t > buckets_ms[-1]:
+            buckets_ms.append(t)
+        t += step_coarse_ms
+
+    # Ensure the exact slot end is present
+    if buckets_ms[-1] != slot_duration_ms:
+        buckets_ms.append(slot_duration_ms)
+
+    buckets_s = [ms / 1000.0 for ms in buckets_ms]
 
     return Histogram(
         "head_event_time",
         "Time into slot at which a head event for the slot was received",
-        labelnames=["host"],
-        buckets=fine_buckets + coarse_buckets,
+        labelnames=["netloc"],
+        buckets=buckets_s,
     )
 
 
 def _setup_duty_time_metrics(
-    seconds_per_slot: int,
+    slot_duration_ms: int,
 ) -> tuple[Histogram, Histogram]:
     buckets = [
         item
         for sublist in [
-            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(seconds_per_slot)
+            [i, i + 0.25, i + 0.5, i + 0.75] for i in range(slot_duration_ms // 1_000)
         ]
         for item in sublist
     ]
@@ -109,7 +131,7 @@ def _setup_duty_time_metrics(
 class Metrics:
     def __init__(
         self,
-        spec: SpecFulu,
+        spec: SpecGloas,
         addr: str,
         port: int,
     ) -> None:
@@ -150,16 +172,19 @@ class Metrics:
         self.vc_processed_beacon_node_events_c = Counter(
             "vc_processed_beacon_node_events",
             "Successfully processed beacon node events",
-            labelnames=["host", "event_type"],
+            labelnames=["netloc", "event_type"],
         )
         self.head_event_time_h = _setup_head_event_time_metric(
-            seconds_per_slot=int(spec.SECONDS_PER_SLOT),
-            attestation_deadline=int(spec.SECONDS_PER_SLOT) / INTERVALS_PER_SLOT,
+            slot_duration_ms=int(spec.SLOT_DURATION_MS),
+            attestation_due_ms=get_slot_component_duration_ms(
+                basis_points=spec.ATTESTATION_DUE_BPS,
+                slot_duration_ms=spec.SLOT_DURATION_MS,
+            ),
         )
 
         # ValidatorDutyService
         self.duty_start_time_h, self.duty_submission_time_h = _setup_duty_time_metrics(
-            seconds_per_slot=int(spec.SECONDS_PER_SLOT)
+            slot_duration_ms=int(spec.SLOT_DURATION_MS)
         )
 
         # AttestationService
@@ -205,6 +230,11 @@ class Metrics:
             "Successfully published blocks",
         )
         self.vc_published_blocks_c.reset()
+        self.vc_published_payload_envelopes_c = Counter(
+            "vc_published_payload_envelopes",
+            "Successfully published payload envelopes",
+        )
+        self.vc_published_payload_envelopes_c.reset()
 
         # SyncCommitteeService
         self.vc_published_sync_committee_messages_c = Counter(
@@ -217,6 +247,13 @@ class Metrics:
             "Successfully published sync committee contributions",
         )
         self.vc_published_sync_committee_contributions_c.reset()
+
+        # PtcService
+        self.vc_published_ptc_attestations_c = Counter(
+            "vc_published_ptc_attestations",
+            "Successfully published PTC attestations",
+        )
+        self.vc_published_ptc_attestations_c.reset()
 
         # ValidatorStatusTrackerService
         self.validator_status_g = Gauge(
@@ -234,23 +271,23 @@ class Metrics:
         self.beacon_node_score_g = Gauge(
             "beacon_node_score",
             "Beacon node score",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )
         self.beacon_node_version_g = Gauge(
             "beacon_node_version",
             "Beacon node version",
-            labelnames=["host", "version"],
+            labelnames=["netloc", "version"],
         )
         self.beacon_node_aggregate_attestation_participant_count_h = Histogram(
             "beacon_node_aggregate_attestation_participant_count",
             "Tracks the number of participants included in aggregates returned by this beacon node.",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=[16, 32, 64, 128, 256, 512, 1_024, 2_048],
         )
         self.beacon_node_sync_contribution_participant_count_h = Histogram(
             "beacon_node_sync_contribution_participant_count",
             "Tracks the number of participants included in sync contributions returned by this beacon node.",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=[8, 16, 32, 64, 128],
         )
         _block_value_buckets = [
@@ -263,19 +300,19 @@ class Metrics:
         self.beacon_node_consensus_block_value_h = Histogram(
             "beacon_node_consensus_block_value",
             "Tracks the value of consensus layer rewards paid to the proposer in the block produced by this beacon node",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=_block_value_buckets,
         )
         self.beacon_node_execution_payload_value_h = Histogram(
             "beacon_node_execution_payload_value",
             "Tracks the value of execution payloads in blocks produced by this beacon node",
-            labelnames=["host"],
+            labelnames=["netloc"],
             buckets=_block_value_buckets,
         )
         self.checkpoint_confirmations_c = Counter(
             "checkpoint_confirmations",
             "Tracks how many times each beacon node confirmed finality checkpoints.",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )
 
         # RemoteSigner
@@ -287,5 +324,5 @@ class Metrics:
         self.remote_signer_score_g = Gauge(
             "remote_signer_score",
             "Remote signer score",
-            labelnames=["host"],
+            labelnames=["netloc"],
         )

@@ -10,9 +10,15 @@ https://docs.nodereal.io/reference/eventstream
 
 from collections.abc import Hashable
 from enum import Enum
-from typing import Self
+from typing import Any, Self
 
 import msgspec
+
+from schemas.shared import (
+    ForkVersion,
+    SignedBuilderRequestAuth,
+    SignedExecutionPayloadBid,
+)
 
 
 class ExecutionOptimisticResponse(msgspec.Struct):
@@ -61,11 +67,6 @@ class BlockRoot(msgspec.Struct):
 class GetBlockRootResponse(ExecutionOptimisticResponse):
     finalized: bool
     data: BlockRoot
-
-
-class ForkVersion(Enum):
-    ELECTRA = "electra"
-    FULU = "fulu"
 
 
 class SubscribeToBeaconCommitteeSubnetRequestBody(msgspec.Struct):
@@ -163,12 +164,59 @@ class GetSyncDutiesResponse(ExecutionOptimisticResponse):
     data: list[SyncDuty]
 
 
+class PtcDuty(msgspec.Struct, frozen=True):
+    pubkey: str
+    validator_index: str
+    slot: str
+
+
+class GetPtcDutiesResponse(ExecutionOptimisticResponse):
+    dependent_root: str
+    data: list[PtcDuty]
+
+
 # Block production
 class ProduceBlockV3Response(msgspec.Struct):
     version: ForkVersion
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
+    data: bytes
+
+
+class BuilderEntry(msgspec.Struct):
+    url: str
+    auth: SignedBuilderRequestAuth
+    builder_pubkeys: list[str]
+    max_execution_payment: str
+    min_bid: str
+    builder_boost_factor: str
+
+
+class BuilderConfig(msgspec.Struct):
+    min_bid: str
+    builder_boost_factor: str
+    builders: list[BuilderEntry]
+
+
+class BuilderPreferencesEntry(msgspec.Struct):
+    proposer_pubkey: str
+    url: str
+    auth: SignedBuilderRequestAuth
+    max_execution_payment: str
+
+
+class ProduceBlockV4Response(msgspec.Struct):
+    version: ForkVersion
+    execution_payload_included: bool
+    execution_payload_value: str
+    consensus_block_value: str
+    builder_url: str | None
+    data: bytes
+
+
+class GetExecutionPayloadEnvelopeResponse(msgspec.Struct):
+    version: ForkVersion
     data: bytes
 
 
@@ -189,15 +237,35 @@ class BeaconNodeEvent(msgspec.Struct):
         raise NotImplementedError
 
 
-class HeadEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
+class HeadV2EventData(msgspec.Struct):
     slot: str
     block: str
-    previous_duty_dependent_root: str
-    current_duty_dependent_root: str
+    state: str
+    payload_status: str
+    epoch_transition: bool
+    current_epoch_dependent_root: str
+    next_epoch_dependent_root: str
+    execution_optimistic: bool
+
+
+class HeadV2Event(BeaconNodeEvent):
+    version: ForkVersion
+    data: HeadV2EventData
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.block
+        return "head_v2 " + self.data.block
+
+
+class ExecutionPayloadAvailableEvent(BeaconNodeEvent):
+    slot: str
+    block_root: str
+
+    @property
+    def dedup_key(self) -> Hashable:
+        # A head event's dedup key is also the block root,
+        # so we need to differentiate by using an event-specific prefix
+        return "epa " + self.block_root
 
 
 class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
@@ -208,7 +276,7 @@ class ChainReorgEvent(BeaconNodeEvent, ExecutionOptimisticResponse):
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.new_head_block
+        return "reorg " + self.new_head_block
 
 
 # Slashing events
@@ -222,7 +290,7 @@ class AttesterSlashingEvent(BeaconNodeEvent):
 
     @property
     def dedup_key(self) -> Hashable:
-        return str(
+        return "att_slash " + str(
             set(self.attestation_1.attesting_indices)
             & set(self.attestation_2.attesting_indices)
         )
@@ -242,4 +310,41 @@ class ProposerSlashingEvent(BeaconNodeEvent):
 
     @property
     def dedup_key(self) -> Hashable:
-        return self.signed_header_1.message.proposer_index
+        return "prop_slash " + self.signed_header_1.message.proposer_index
+
+
+class ExecutionPayloadBidEvent(BeaconNodeEvent):
+    version: ForkVersion
+    data: SignedExecutionPayloadBid
+
+    @property
+    def dedup_key(self) -> Hashable:
+        return "bid " + self.data.message.block_hash + self.data.message.value
+
+
+class PayloadAttributesData(msgspec.Struct):
+    proposer_index: str
+    proposal_slot: str
+    parent_block_root: str
+    parent_block_hash: str
+    payload_attributes: dict[str, Any]
+
+
+class PayloadAttributes(msgspec.Struct):
+    version: ForkVersion
+    data: PayloadAttributesData
+
+
+class PayloadAttributesEvent(BeaconNodeEvent, PayloadAttributes):
+    @property
+    def dedup_key(self) -> Hashable:
+        raise NotImplementedError
+
+
+def is_optimistic(obj: ExecutionOptimisticResponse | BeaconNodeEvent) -> bool:
+    if isinstance(obj, ExecutionOptimisticResponse):
+        return obj.execution_optimistic
+    if isinstance(obj, HeadV2Event):
+        return obj.data.execution_optimistic
+
+    return False
