@@ -172,9 +172,10 @@ class PtcService(ValidatorDutyService):
         self.logger.info(
             f"Published PTC attestations for slot {slot}, count: {len(signed_messages)}",
         )
-        # TODO metric - total count of published PTC messages - for the Vero overview
-        #  Grafana dashboard
-        #  + edit said dashboard
+        # TODO [Gloas] update Grafana dashboard - show PTC attestations
+        self.metrics.vc_published_ptc_attestations_c.inc(
+            amount=len(signed_messages),
+        )
 
     async def attest_if_not_yet_attested(
         self,

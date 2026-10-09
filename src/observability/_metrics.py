@@ -248,6 +248,13 @@ class Metrics:
         )
         self.vc_published_sync_committee_contributions_c.reset()
 
+        # PtcService
+        self.vc_published_ptc_attestations_c = Counter(
+            "vc_published_ptc_attestations",
+            "Successfully published PTC attestations",
+        )
+        self.vc_published_ptc_attestations_c.reset()
+
         # ValidatorStatusTrackerService
         self.validator_status_g = Gauge(
             "validator_status",
