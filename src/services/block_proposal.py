@@ -808,44 +808,55 @@ class BlockProposalService(ValidatorDutyService):
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._publish_payload_envelope",
         ):
-            self.logger.info("Publishing payload envelope")
-            # Only the beacon node that we got the BeaconBlock
-            # from has its associated execution payload envelope.
-            # (Unless running in stateless mode which Vero doesn't
-            # support right now)
-            (
-                fork_version,
-                execution_payload_envelope,
-            ) = await beacon_node.get_execution_payload_envelope(
-                slot=slot,
-                beacon_block_root=beacon_block_root,
-            )
-
-            signed_execution_payload_envelope = (
-                await self._sign_execution_payload_envelope(
+            try:
+                self.logger.info("Publishing payload envelope")
+                # Only the beacon node that we got the BeaconBlock
+                # from has its associated execution payload envelope cached.
+                # (Unless running in stateless mode which Vero doesn't
+                # support right now)
+                (
+                    fork_version,
+                    execution_payload_envelope,
+                ) = await beacon_node.get_execution_payload_envelope(
                     slot=slot,
-                    duty=duty,
-                    execution_payload_envelope=execution_payload_envelope,
+                    beacon_block_root=beacon_block_root,
                 )
-            )
-            with signed_execution_payload_envelope:
-                if self.cli_args.force_json_wire_format:
-                    encoded = signed_execution_payload_envelope.to_json()
-                    content_type = ContentType.JSON
-                else:
-                    encoded = signed_execution_payload_envelope.to_ssz()
-                    content_type = ContentType.OCTET_STREAM
 
-            # Publish using the beacon node that produced the envelope,
-            # because it also has cached blob data for that envelope.
-            # We could also retrieve the full envelope-contents
-            # for a stateless flow - not implemented right now.
-            await beacon_node.publish_execution_payload_envelope(
-                signed_execution_payload_envelope=encoded,
-                fork_version=fork_version,
-                content_type=content_type,
-            )
-            self.logger.info(f"Published payload envelope for slot {slot}")
+                signed_execution_payload_envelope = (
+                    await self._sign_execution_payload_envelope(
+                        slot=slot,
+                        duty=duty,
+                        execution_payload_envelope=execution_payload_envelope,
+                    )
+                )
+                with signed_execution_payload_envelope:
+                    if self.cli_args.force_json_wire_format:
+                        encoded = signed_execution_payload_envelope.to_json()
+                        content_type = ContentType.JSON
+                    else:
+                        encoded = signed_execution_payload_envelope.to_ssz()
+                        content_type = ContentType.OCTET_STREAM
+
+                # Publish using the beacon node that produced the envelope,
+                # because it also has cached blob data for that envelope.
+                # We could also retrieve the full envelope-contents
+                # for a stateless flow - not implemented right now.
+                await beacon_node.publish_execution_payload_envelope(
+                    signed_execution_payload_envelope=encoded,
+                    fork_version=fork_version,
+                    content_type=content_type,
+                )
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to publish payload envelope for slot {slot}: {e!r}",
+                )
+                raise HandledRuntimeError(
+                    errors_counter=self.metrics.errors_c,
+                    error_type=ErrorType.PAYLOAD_ENVELOPE_PUBLISH,
+                ) from None
+            else:
+                self.logger.info(f"Published payload envelope for slot {slot}")
+                self.metrics.vc_published_payload_envelopes_c.inc()
 
     async def _propose_block(
         self, slot: int, duty: SchemaBeaconAPI.ProposerDuty
@@ -966,6 +977,4 @@ class BlockProposalService(ValidatorDutyService):
         try:
             await self._propose_block(slot=slot, duty=duty)
         finally:
-            # TODO take into account we also need to publish the envelope
-            #  when self-building
             self._last_slot_duty_completed_for = slot

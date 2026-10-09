@@ -21,6 +21,7 @@ class ErrorType(Enum):
     AGGREGATE_ATTESTATION_PUBLISH = "aggregate-attestation-publish"
     BLOCK_PRODUCE = "block-produce"
     BLOCK_PUBLISH = "block-publish"
+    PAYLOAD_ENVELOPE_PUBLISH = "payload-envelope-publish"
     BUILDER_GET_BID = "builder-get-bid"
     BUILDER_SUBMIT_BLOCK = "builder-submit-block"
     SYNC_COMMITTEE_CONTRIBUTION_PRODUCE = "sync-committee-contribution-produce"
@@ -229,6 +230,11 @@ class Metrics:
             "Successfully published blocks",
         )
         self.vc_published_blocks_c.reset()
+        self.vc_published_payload_envelopes_c = Counter(
+            "vc_published_payload_envelopes",
+            "Successfully published payload envelopes",
+        )
+        self.vc_published_payload_envelopes_c.reset()
 
         # SyncCommitteeService
         self.vc_published_sync_committee_messages_c = Counter(
