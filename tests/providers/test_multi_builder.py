@@ -314,8 +314,3 @@ async def test_bid_selection_builders(
         else:
             builder, bid = result
             assert bid.total_value == expected_bid_total_value
-
-
-# TODO test SSZ/JSON?
-# TODO SSE bid selection
-# TODO Abstract into BidProvider? BlockProposalService is getting a bit big
