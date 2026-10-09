@@ -227,7 +227,6 @@ class EventConsumerService:
         self.logger.debug(f"Subscribing to events from {beacon_node.netloc}")
 
         topics = [
-            # TODO use head_v2? !!!
             "head_v2",
             "execution_payload_available",
             "chain_reorg",
