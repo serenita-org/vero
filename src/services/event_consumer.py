@@ -151,9 +151,12 @@ class EventConsumerService:
         event_type = type(event).__name__
 
         if isinstance(event, SchemaBeaconAPI.HeadV2Event):
-            self.metrics.head_event_time_h.labels(netloc=beacon_node.netloc).observe(
-                self.beacon_chain.time_since_slot_start(slot=int(event.data.slot))
-            )
+            if event.data.payload_status == "empty":
+                self.metrics.head_event_time_h.labels(
+                    netloc=beacon_node.netloc
+                ).observe(
+                    self.beacon_chain.time_since_slot_start(slot=int(event.data.slot))
+                )
             if not self._has_seen_event(event):
                 self.logger.debug(
                     f"[{beacon_node.netloc}] New head @ {event.data.slot} : {event.data.block}"
