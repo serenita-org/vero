@@ -298,10 +298,7 @@ class Builder(ApiClient):
                     headers=headers,
                 )
         except Exception as e:
-            self.metrics.errors_c.labels(
-                error_type=ErrorType.BUILDER_SUBMIT_BLOCK.value,
-            ).inc()
-            self.logger.error(f"Failed to submit block to {self.base_url}: {e!r}")
+            self.logger.warning(f"Failed to submit block to {self.base_url}: {e!r}")
 
 
 class MultiBuilder:
