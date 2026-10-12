@@ -1125,7 +1125,7 @@ class BeaconNode(ApiClient):
                         # Just a keep-alive message
                         continue
                     self.logger.warning(
-                        f"Unexpected message in beacon node event stream: {decoded!r}",
+                        f"[{self.netloc}] Unexpected message in beacon node event stream: {decoded!r}",
                     )
                     continue
 
@@ -1136,7 +1136,7 @@ class BeaconNode(ApiClient):
                         error_type=ErrorType.EVENT_CONSUMER.value,
                     ).inc()
                     self.logger.exception(
-                        f"Failed to parse event name from {decoded} ({e!r}) "
+                        f"[{self.netloc}] Failed to parse event name from {decoded} ({e!r}) "
                         "-> ignoring event...",
                     )
                     continue
@@ -1149,7 +1149,7 @@ class BeaconNode(ApiClient):
 
                     if not line:
                         raise EOFError(
-                            f"SSE stream ended while reading event {event_name}"
+                            f"[{self.netloc}] SSE stream ended while reading event {event_name}"
                         )
 
                     if line in (b"\n", b"\r\n"):
@@ -1158,7 +1158,7 @@ class BeaconNode(ApiClient):
                     event_data_bytes += len(line)
                     if event_data_bytes > _MAX_SSE_EVENT_BYTES:
                         raise ValueError(
-                            "Beacon node SSE event too large: "
+                            f"[{self.netloc}] Beacon node SSE event too large: "
                             f"more than {_MAX_SSE_EVENT_BYTES} bytes "
                             f"for event {event_name}"
                         )
@@ -1169,7 +1169,7 @@ class BeaconNode(ApiClient):
                     event_struct = _event_name_to_struct_mapping[event_name]
                 except KeyError:
                     raise NotImplementedError(
-                        f"Unable to process event with name {event_name}, event_data: {event_data}!",
+                        f"[{self.netloc}] Unable to process event with name {event_name}, event_data: {event_data}!",
                     ) from None
 
                 event = msgspec.json.decode(
@@ -1177,6 +1177,8 @@ class BeaconNode(ApiClient):
                 )
 
                 if is_optimistic(event):
-                    raise ValueError(f"Execution optimistic for event: {event}")
+                    raise ValueError(
+                        f"[{self.netloc}] Execution optimistic for event: {event}"
+                    )
 
                 yield event
