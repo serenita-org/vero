@@ -153,7 +153,7 @@ class BeaconNode(ApiClient):
     async def _initialize_full(self) -> None:
         # Raise if the spec returned by the beacon node differs
         bn_spec = await self.get_spec()
-        if self.spec != bn_spec and not self._ignore_spec_mismatch:
+        if not self._ignore_spec_mismatch and self.spec != bn_spec:
             msg = f"Spec values returned by beacon node {self.netloc} not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
             for field in fields(self.spec):
                 if getattr(self.spec, field.name) != getattr(bn_spec, field.name):
@@ -244,13 +244,18 @@ class BeaconNode(ApiClient):
         if is_optimistic(response):
             raise ValueError(f"Execution optimistic on {self.netloc}")
 
-    async def get_spec(self) -> SpecGloas:
+    async def get_spec(self) -> SpecGloas | None:
         resp_bytes, _, _ = await self._make_request(
             method="GET",
             endpoint="/eth/v1/config/spec",
         )
 
-        return parse_spec(msgspec.json.decode(resp_bytes)["data"])
+        try:
+            return parse_spec(msgspec.json.decode(resp_bytes)["data"])
+        except ValueError:
+            if self._ignore_spec_mismatch:
+                return None
+            raise
 
     async def update_node_version(self) -> None:
         resp_bytes, _, _ = await self._make_request(
