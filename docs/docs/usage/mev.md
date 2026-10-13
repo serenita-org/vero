@@ -36,6 +36,9 @@ B3(Builder 3) <--> Lodestar
 B3(Builder 3) <--> Teku
 
 style Vero fill:#11497E,stroke:#000000
+style B1 fill:#11497E,stroke:#000000
+style B2 fill:#11497E,stroke:#000000
+style B3 fill:#11497E,stroke:#000000
 ```
 
 <!--
