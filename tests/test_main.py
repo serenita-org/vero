@@ -90,6 +90,9 @@ async def test_lifecycle(
     """
     Sanity check that Vero can start running, perform its duties and shut down cleanly.
     """
+    if return_self_built_block and fork_version != ForkVersion.GLOAS:
+        pytest.skip("Flag only relevant for Gloas")
+
     run_services_task = asyncio.create_task(main(vero=vero))
 
     # Wait for expected log lines to appear
