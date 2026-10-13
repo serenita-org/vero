@@ -42,7 +42,7 @@ def _create_bid(
         pytest.param(None, 0, None, None, id="no-bids"),
     ],
 )
-async def test_get_bid_selects_best_bid(
+async def test_get_best_bid_selects_best_bid(
     vero: Vero,
     direct_value: int | None,
     direct_payment: int,
