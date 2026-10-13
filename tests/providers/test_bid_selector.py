@@ -80,7 +80,7 @@ async def test_get_bid_selects_best_bid(
         ),
         mock.patch.object(selector, "_get_best_p2p_bid", return_value=p2p_bid),
     ):
-        result = await selector.get_bid(slot=1234, proposer_duty=duty)
+        result = await selector.get_best_bid(slot=1234, proposer_duty=duty)
 
     expected_bid = {"direct": direct_bid, "p2p": p2p_bid, None: None}[expected_source]
     _builder, bid = result
@@ -100,7 +100,10 @@ async def test_get_bid_zero_boost_skips_bid_selection(vero: Vero) -> None:
         ) as get_direct_bid,
         mock.patch.object(selector, "_get_best_p2p_bid") as get_p2p_bid,
     ):
-        assert await selector.get_bid(slot=1234, proposer_duty=duty) == (None, None)
+        assert await selector.get_best_bid(slot=1234, proposer_duty=duty) == (
+            None,
+            None,
+        )
 
         get_attributes.assert_not_called()
         get_direct_bid.assert_not_called()

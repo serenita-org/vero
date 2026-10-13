@@ -109,7 +109,7 @@ class BidSelector:
             if int(event.data.message.slot) > finished_proposal_slot
         ]
 
-    async def get_bid(
+    async def get_best_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> tuple[Builder | None, SchemaShared.SignedExecutionPayloadBid | None]:
         if self.bid_selection_disabled:

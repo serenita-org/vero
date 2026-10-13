@@ -885,7 +885,7 @@ class BlockProposalService(ValidatorDutyService):
 
             selected_builder, selected_bid = None, None
             if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
-                selected_builder, selected_bid = await self.bid_selector.get_bid(
+                selected_builder, selected_bid = await self.bid_selector.get_best_bid(
                     slot=slot, proposer_duty=duty
                 )
 
