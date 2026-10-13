@@ -151,6 +151,11 @@ class EventConsumerService:
         event_type = type(event).__name__
 
         if isinstance(event, SchemaBeaconAPI.HeadV2Event):
+            # head_v2 events are emitted twice per slot. Once when the beacon block
+            # is imported, and once more when the payload is validated.
+            # From the VC's point of view, the timing of the first event is important
+            # whereas the second is not that interesting. Therefore, for now, we are
+            # only tracking the timing of these "empty" head events.
             if event.data.payload_status == "empty":
                 self.metrics.head_event_time_h.labels(
                     netloc=beacon_node.netloc
