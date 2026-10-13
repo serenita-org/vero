@@ -470,15 +470,16 @@ class AttestationService(ValidatorDutyService):
         fork_version: SchemaShared.ForkVersion,
     ) -> None:
         signed_aggregate_and_proofs: list[SignedAggregateAndProof] = []
+        fork_types = preset_types(Fork[fork_version.name])
+        agg_and_p_type = fork_types.aggregate_and_proof
+        s_agg_and_p_type = fork_types.signed_aggregate_and_proof
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
             signed_aggregate_and_proofs.append(
-                preset_types(Fork[fork_version.name]).signed_aggregate_and_proof(
-                    message=preset_types(
-                        Fork[fork_version.name]
-                    ).aggregate_and_proof.from_json(msg.aggregate_and_proof.data),
+                s_agg_and_p_type(
+                    message=agg_and_p_type.from_json(msg.aggregate_and_proof.data),
                     signature=sig,
                 )
             )
