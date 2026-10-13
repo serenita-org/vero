@@ -2,7 +2,7 @@
 
 #### `--network`
 
-**[required]** The network to use, one of `mainnet, gnosis, hoodi, chiado, custom`.
+**[required]** The network to use, one of `mainnet`, `gnosis`, `hoodi`, `chiado`, `custom`.
 
 `custom` is a special case where Vero loads the network spec from the file specified using `--network-custom-config-path`
 
