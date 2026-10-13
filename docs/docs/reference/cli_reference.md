@@ -157,6 +157,7 @@ ___
 
 The maximum allowed value of a trusted payment from an external builder bid.
 In GWei. Defaults to `0`.
+<!--
 ___
 
 #### `--builder-bid-request-timeout`
@@ -169,6 +170,7 @@ ___
 
 Disables Vero's own bid selection as well as all direct communication
 with builders, leaving that workload to the connected beacon node(s).
+-->
 ___
 
 #### `--enable-doppelganger-detection`
