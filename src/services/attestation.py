@@ -533,6 +533,8 @@ class AttestationService(ValidatorDutyService):
         _fork_version = self.beacon_chain.current_fork_version
         _sign_and_publish_tasks = []
 
+        agg_and_p_type = preset_types(Fork[_fork_version.name]).aggregate_and_proof
+
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data_root=attestation_data_root,
             slot=slot,
@@ -549,13 +551,11 @@ class AttestationService(ValidatorDutyService):
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
                                 version=self.beacon_chain.current_fork_version.value.upper(),
                                 data=msgspec.Raw(
-                                    preset_types(Fork[_fork_version.name])
-                                    .aggregate_and_proof(
+                                    agg_and_p_type(
                                         aggregator_index=int(duty.validator_index),
                                         aggregate=aggregate,
                                         selection_proof=duty.selection_proof,
-                                    )
-                                    .to_json()
+                                    ).to_json()
                                 ),
                             ),
                         )
