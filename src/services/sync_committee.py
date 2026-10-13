@@ -200,6 +200,10 @@ class SyncCommitteeService(ValidatorDutyService):
             )
             for validator in sync_committee_members
         ]
+        message_type = preset_types(
+            Fork[self.beacon_chain.current_fork_version.name]
+        ).sync_committee_message
+
         async for (
             is_slow_batch,
             signed_results_batch,
@@ -227,9 +231,7 @@ class SyncCommitteeService(ValidatorDutyService):
                     continue
 
                 signed_messages_batch.append(
-                    preset_types(
-                        Fork[self.beacon_chain.current_fork_version.name]
-                    ).sync_committee_message(
+                    message_type(
                         beacon_block_root=beacon_block_root_bytes,
                         slot=duty_slot,
                         validator_index=pubkey_to_validator_index[pubkey],
@@ -465,17 +467,16 @@ class SyncCommitteeService(ValidatorDutyService):
         identifiers: list[str],
     ) -> None:
         signed_contribution_and_proofs: list[SignedContributionAndProof] = []
+        fork_types = preset_types(Fork[self.beacon_chain.current_fork_version.name])
+        contr_and_p_type = fork_types.contribution_and_proof
+        s_contr_and_p_type = fork_types.signed_contribution_and_proof
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
             signed_contribution_and_proofs.append(
-                preset_types(
-                    Fork[self.beacon_chain.current_fork_version.name]
-                ).signed_contribution_and_proof(
-                    message=preset_types(
-                        Fork[self.beacon_chain.current_fork_version.name]
-                    ).contribution_and_proof.from_json(msg.contribution_and_proof),
+                s_contr_and_p_type(
+                    message=contr_and_p_type.from_json(msg.contribution_and_proof),
                     signature=sig,
                 )
             )
@@ -537,6 +538,9 @@ class SyncCommitteeService(ValidatorDutyService):
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         _sign_and_publish_tasks = []
+        contr_and_p_type = preset_types(
+            Fork[self.beacon_chain.current_fork_version.name]
+        ).contribution_and_proof
         async for (
             contribution
         ) in self.multi_beacon_node.get_sync_committee_contributions(
@@ -557,17 +561,11 @@ class SyncCommitteeService(ValidatorDutyService):
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
                                 contribution_and_proof=msgspec.Raw(
-                                    preset_types(
-                                        Fork[
-                                            self.beacon_chain.current_fork_version.name
-                                        ]
-                                    )
-                                    .contribution_and_proof(
+                                    contr_and_p_type(
                                         aggregator_index=int(duty.validator_index),
                                         contribution=contribution,
                                         selection_proof=duty_sp.selection_proof,
-                                    )
-                                    .to_json()
+                                    ).to_json()
                                 ),
                             )
                         )
