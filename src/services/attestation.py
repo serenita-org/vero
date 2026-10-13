@@ -249,6 +249,9 @@ class AttestationService(ValidatorDutyService):
             )
             for duty in duties
         ]
+        single_attestation_type = preset_types(
+            Fork[self.beacon_chain.current_fork_version.name]
+        ).single_attestation
         async for (
             is_slow_batch,
             signed_results_batch,
@@ -277,9 +280,7 @@ class AttestationService(ValidatorDutyService):
 
                 duty = pubkey_to_duty[pubkey]
                 signed_attestations_batch.append(
-                    preset_types(
-                        Fork[self.beacon_chain.current_fork_version.name]
-                    ).single_attestation(
+                    single_attestation_type(
                         committee_index=int(duty.committee_index),
                         attester_index=int(duty.validator_index),
                         data=att_data,
