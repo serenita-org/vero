@@ -422,7 +422,6 @@ class MultiBeaconNode:
             Network.GNOSIS,
             Network.CHIADO,
         ]
-        _compare_consensus_block_value_only = True
 
         while pending and remaining_soft_timeout > 0:
             done, pending = await asyncio.wait(
@@ -467,7 +466,7 @@ class MultiBeaconNode:
             for coro_first in asyncio.as_completed(pending):
                 try:
                     best_block_result = await coro_first
-                    best_block_response, _, _beacon_node = best_block_result
+                    best_block_response, _, _ = best_block_result
 
                     best_block_value = int(best_block_response.consensus_block_value)
                     if _use_payload_value_for_comparison:
