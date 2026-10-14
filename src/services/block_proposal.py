@@ -513,6 +513,9 @@ class BlockProposalService(ValidatorDutyService):
                 messages_to_sign, signing_results, strict=True
             ):
                 if isinstance(result, BaseException):
+                    self.metrics.errors_c.labels(
+                        error_type=ErrorType.SIGNATURE.value
+                    ).inc()
                     self.logger.error(
                         f"Failed to sign proposer preferences for validator {pubkey}, slot {msg.proposer_preferences.data.proposal_slot}: {result!r}"
                     )
