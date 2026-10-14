@@ -159,7 +159,7 @@ class AttestationService(ValidatorDutyService):
             event.data.next_epoch_dependent_root
             != self.attester_duties_dependent_roots.get(epoch + 1)
         ):
-            self.logger.warning(
+            self.logger.info(
                 "Head event duty dependent root mismatch -> updating duties",
             )
             self.task_manager.create_task(super().update_duties())
