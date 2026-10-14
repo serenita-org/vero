@@ -95,10 +95,6 @@ class Builder(ApiClient):
         for cache_key in list(self._bid_request_auth_cache):
             proposal_slot, _ = cache_key
             if proposal_slot <= finished_proposal_slot:
-                # TODO remove logging
-                self.logger.info(
-                    f"Removing auth data for slot {proposal_slot} from cache"
-                )
                 del self._bid_request_auth_cache[cache_key]
 
     async def get_status(self) -> None:
