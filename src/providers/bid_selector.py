@@ -30,7 +30,9 @@ class BidSelector:
         self, event: SchemaBeaconAPI.PayloadAttributesEvent
     ) -> None:
         if int(event.data.proposal_slot) not in self.proposal_slots:
-            self.logger.debug(f"Ignoring payload attributes event: {event}")
+            self.logger.debug(
+                f"Ignoring payload attributes event for non-proposal slot: {event}"
+            )
             return
 
         self.logger.debug(f"Received payload attributes event: {event}")
