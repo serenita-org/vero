@@ -112,6 +112,30 @@ class BidSelector:
             if int(event.data.message.slot) > finished_proposal_slot
         ]
 
+    def _select_best_bid(
+        self,
+        direct_builder: Builder | None,
+        direct_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        p2p_bid: SchemaShared.SignedExecutionPayloadBid | None,
+    ) -> tuple[
+        Builder | None,
+        SchemaShared.SignedExecutionPayloadBid | None,
+        str | None,
+    ]:
+        if direct_bid is None and p2p_bid is None:
+            return None, None, None
+
+        if direct_bid is None:
+            return None, p2p_bid, "p2p"
+
+        if p2p_bid is None:
+            return direct_builder, direct_bid, "direct"
+
+        if direct_bid.total_value >= p2p_bid.total_value:
+            return direct_builder, direct_bid, "direct"
+
+        return None, p2p_bid, "p2p"
+
     async def get_best_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
     ) -> tuple[Builder | None, SchemaShared.SignedExecutionPayloadBid | None]:
@@ -158,12 +182,15 @@ class BidSelector:
             best_p2p_bid_value = f"{best_p2p_bid.total_value:,}"
         self.logger.info(f"Best P2P bid value: {best_p2p_bid_value}")
 
-        # max() returns the first item on ties, so prefer the direct bid.
-        best_bid = max(
-            (best_direct_bid, best_p2p_bid), key=(lambda x: x.total_value if x else -1)
+        builder, bid, source = self._select_best_bid(
+            best_dir_bid_builder,
+            best_direct_bid,
+            best_p2p_bid,
         )
 
-        self.logger.info(f"Selected best bid: {best_bid}")
-        if best_bid == best_direct_bid:
-            return best_dir_bid_builder, best_direct_bid
-        return None, best_bid
+        if bid is None:
+            self.logger.info("No bid selected")
+            return None, None
+
+        self.logger.info(f"Returning best bid ({source}): {bid}")
+        return builder, bid
