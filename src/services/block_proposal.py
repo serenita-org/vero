@@ -952,7 +952,6 @@ class BlockProposalService(ValidatorDutyService):
                         raise result
 
             finally:
-                self.bid_selector.prune(finished_proposal_slot=slot)
                 block_contents_or_blinded_block.close()
 
     async def propose_block(self, slot: int) -> None:
