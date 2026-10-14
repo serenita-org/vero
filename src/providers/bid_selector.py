@@ -114,27 +114,27 @@ class BidSelector:
 
     def _select_best_bid(
         self,
-        direct_builder: Builder | None,
-        direct_bid: SchemaShared.SignedExecutionPayloadBid | None,
         p2p_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        direct_bid: SchemaShared.SignedExecutionPayloadBid | None,
+        direct_bid_builder: Builder | None,
     ) -> tuple[
-        Builder | None,
         SchemaShared.SignedExecutionPayloadBid | None,
         str | None,
+        Builder | None,
     ]:
         if direct_bid is None and p2p_bid is None:
             return None, None, None
 
         if direct_bid is None:
-            return None, p2p_bid, "p2p"
+            return p2p_bid, "p2p", None
 
         if p2p_bid is None:
-            return direct_builder, direct_bid, "direct"
+            return direct_bid, "direct", direct_bid_builder
 
         if direct_bid.total_value >= p2p_bid.total_value:
-            return direct_builder, direct_bid, "direct"
+            return direct_bid, "direct", direct_bid_builder
 
-        return None, p2p_bid, "p2p"
+        return p2p_bid, "p2p", None
 
     async def get_best_bid(
         self, slot: int, proposer_duty: SchemaBeaconAPI.ProposerDuty
@@ -182,10 +182,10 @@ class BidSelector:
             best_p2p_bid_value = f"{best_p2p_bid.total_value:,}"
         self.logger.info(f"Best P2P bid value: {best_p2p_bid_value}")
 
-        builder, bid, source = self._select_best_bid(
-            best_dir_bid_builder,
-            best_direct_bid,
+        bid, source, builder = self._select_best_bid(
             best_p2p_bid,
+            best_direct_bid,
+            best_dir_bid_builder,
         )
 
         if bid is None:
