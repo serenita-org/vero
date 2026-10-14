@@ -3,7 +3,7 @@ import contextlib
 import time
 from collections import defaultdict
 from types import TracebackType
-from typing import Self, Unpack
+from typing import TYPE_CHECKING, Self, Unpack
 
 from opentelemetry import trace
 from opentelemetry.trace import (
@@ -18,9 +18,8 @@ from spy_ssz import (
 )
 
 from observability import ErrorType, HandledRuntimeError
-from providers import BeaconNode, BidSelector
+from providers import BeaconNode, BidSelector, MultiBuilder
 from providers._headers import ContentType
-from providers.builder import Builder
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
 from services.validator_duty_service import (
     ValidatorDuty,
@@ -31,6 +30,9 @@ from spec import BeaconBlock
 from spec.slot_components import get_slot_component_duration_ms
 from spec.utils import encode_graffiti
 
+if TYPE_CHECKING:
+    from providers.builder import Builder
+
 # BUILDER_INDEX_SELF_BUILD = UINT64_MAX
 BUILDER_INDEX_SELF_BUILD = 2**64 - 1
 
@@ -39,7 +41,10 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
-        self.bid_selector = BidSelector(vero=self.vero)
+        self.multi_builder = MultiBuilder(vero=self.vero)
+        self.bid_selector = BidSelector(
+            multi_builder=self.multi_builder, vero=self.vero
+        )
 
         # Block production API requests "soft" time out half-way into the attestation
         # deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain). This ensures
@@ -170,10 +175,11 @@ class BlockProposalService(ValidatorDutyService):
 
             # Pre-establish connections to builders
             # to avoid tcp+tls handshake overhead on the get-bid request
-            await self.bid_selector.multi_builder.warm_connections()
+            await self.multi_builder.warm_connections()
 
         self.task_manager.create_task(self.register_validators(current_slot=slot))
-        self.bid_selector.prune(finished_proposal_slot=slot - 5)
+        self.bid_selector.prune(finished_proposal_slot=slot)
+        self.multi_builder.prune(finished_proposal_slot=slot)
 
         # At the start of every epoch, update duties
         # and prepare the connected beacon nodes for
@@ -249,7 +255,7 @@ class BlockProposalService(ValidatorDutyService):
                 self.bid_selector.proposal_slots.add(int(duty.slot))
 
                 self.task_manager.create_task(
-                    self.bid_selector.multi_builder.cache_bid_request_auth_data(
+                    self.multi_builder.cache_bid_request_auth_data(
                         proposer_duty=duty,
                         signature_provider=self.signature_provider,
                     )
@@ -403,7 +409,7 @@ class BlockProposalService(ValidatorDutyService):
                 if self.cli_args.enable_bid_selection:
                     # Submit directly to builders
                     self.task_manager.create_task(
-                        self.bid_selector.multi_builder.submit_builder_preferences(
+                        self.multi_builder.submit_builder_preferences(
                             slot=int(duty.slot),
                             proposer_pubkey=duty.pubkey,
                             fork_version=SchemaShared.ForkVersion.GLOAS,
@@ -413,7 +419,7 @@ class BlockProposalService(ValidatorDutyService):
                     # Submit via beacon nodes
                     builder_preferences = []
                     max_exec_payment = str(self.cli_args.builder_max_execution_payment)
-                    for builder in self.bid_selector.multi_builder.builders:
+                    for builder in self.multi_builder.builders:
                         try:
                             builder_auth = builder.get_signed_builder_request_auth(
                                 slot=int(duty.slot), proposer_pubkey=duty.pubkey
@@ -605,7 +611,7 @@ class BlockProposalService(ValidatorDutyService):
                 builder_boost_factor=str(self.cli_args.builder_boost_factor),
                 builders=[],
             )
-            for builder in self.bid_selector.multi_builder.builders:
+            for builder in self.multi_builder.builders:
                 try:
                     builder_auth = builder.get_signed_builder_request_auth(
                         slot=slot, proposer_pubkey=duty.pubkey
@@ -703,7 +709,7 @@ class BlockProposalService(ValidatorDutyService):
         signature: str,
         block_contents_or_blinded_block: BeaconBlock,
         header_builder_url: str | None,
-        selected_builder: Builder | None,
+        selected_builder: "Builder | None",
     ) -> None:
         self.logger.info(f"Publishing block for slot {slot}")
         self.metrics.duty_submission_time_h.labels(

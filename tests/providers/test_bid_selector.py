@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from providers import Vero
+from providers import MultiBuilder, Vero
 from providers.bid_selector import BidSelector
 from schemas import SchemaBeaconAPI, SchemaShared
 
@@ -43,13 +43,14 @@ def _create_bid(
     ],
 )
 async def test_get_best_bid_selects_best_bid(
+    multi_builder: MultiBuilder,
     vero: Vero,
     direct_value: int | None,
     direct_payment: int,
     p2p_value: int | None,
     expected_source: str | None,
 ) -> None:
-    selector = BidSelector(vero=vero)
+    selector = BidSelector(multi_builder=multi_builder, vero=vero)
     direct_bid = (
         _create_bid(direct_value, direct_payment) if direct_value is not None else None
     )
@@ -87,8 +88,10 @@ async def test_get_best_bid_selects_best_bid(
     assert bid is expected_bid
 
 
-async def test_get_bid_zero_boost_skips_bid_selection(vero: Vero) -> None:
-    selector = BidSelector(vero=vero)
+async def test_get_bid_zero_boost_skips_bid_selection(
+    multi_builder: MultiBuilder, vero: Vero
+) -> None:
+    selector = BidSelector(multi_builder=multi_builder, vero=vero)
     duty = SchemaBeaconAPI.ProposerDuty(
         pubkey="0x" + "00" * 48, validator_index="1", slot="1234"
     )

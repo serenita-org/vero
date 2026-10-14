@@ -91,6 +91,16 @@ class Builder(ApiClient):
             )
         )
 
+    def prune(self, *, finished_proposal_slot: int) -> None:
+        for cache_key in list(self._bid_request_auth_cache):
+            proposal_slot, _ = cache_key
+            if proposal_slot <= finished_proposal_slot:
+                # TODO remove logging
+                self.logger.info(
+                    f"Removing auth data for slot {proposal_slot} from cache"
+                )
+                del self._bid_request_auth_cache[cache_key]
+
     async def get_status(self) -> None:
         if self.bid_selection_disabled:
             return
@@ -349,6 +359,10 @@ class MultiBuilder:
                 for b in self.builders
             )
         )
+
+    def prune(self, *, finished_proposal_slot: int) -> None:
+        for builder in self.builders:
+            builder.prune(finished_proposal_slot=finished_proposal_slot)
 
     async def submit_builder_preferences(
         self,

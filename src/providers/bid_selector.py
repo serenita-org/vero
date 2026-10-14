@@ -10,11 +10,11 @@ from .builder import Builder, MultiBuilder
 
 
 class BidSelector:
-    def __init__(self, vero: "Vero") -> None:
+    def __init__(self, multi_builder: MultiBuilder, vero: "Vero") -> None:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.beacon_chain = vero.beacon_chain
-        self.multi_builder = MultiBuilder(vero=vero)
+        self.multi_builder = multi_builder
         self.bid_selection_disabled = vero.cli_args.enable_bid_selection is False
         self.cli_args = vero.cli_args
         self._get_bid_soft_timeout = self.cli_args.builder_bid_request_timeout / 1_000
