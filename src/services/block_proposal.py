@@ -945,7 +945,7 @@ class BlockProposalService(ValidatorDutyService):
                 for result in results:
                     if isinstance(result, BaseException):
                         self.logger.error(
-                            f"Publication failed for slot {slot}: {result!r}"
+                            f"Publication coroutine failed for slot {slot}: {result!r}"
                         )
                 for result in results:
                     if isinstance(result, BaseException):
