@@ -409,8 +409,6 @@ async def test_produce_best_block(
             )
             assert content_type == ContentType.JSON
             assert bn.netloc == best_bn_netloc
-            # this test is currently failing with produceBlockV4
-            # because we hardcoded execution_payload_value to 0 there for now
             assert (
                 int(full_response.consensus_block_value)
                 + int(full_response.execution_payload_value)
