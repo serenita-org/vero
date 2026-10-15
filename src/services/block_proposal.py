@@ -101,6 +101,10 @@ class BlockProposalService(ValidatorDutyService):
         except Exception as e:
             self.logger.warning(f"Failed to cache duties: {e}")
 
+        await self.multi_builder.__aexit__(
+            exc_type=exc_type, exc_val=exc_val, exc_tb=exc_tb
+        )
+
     @property
     def next_duty_slot(self) -> int | None:
         # In case a duty for the current slot has not finished yet, it is still
