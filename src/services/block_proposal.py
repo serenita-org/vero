@@ -262,12 +262,15 @@ class BlockProposalService(ValidatorDutyService):
                 )
                 self.bid_selector.proposal_slots.add(int(duty.slot))
 
-                self.task_manager.create_task(
+            await asyncio.gather(
+                *(
                     self.multi_builder.cache_bid_request_auth_data(
                         proposer_duty=duty,
                         signature_provider=self.signature_provider,
                     )
+                    for duty in self.proposer_duties[epoch]
                 )
+            )
 
             self.logger.debug(
                 f"Updated duties for epoch {epoch} -> {len(self.proposer_duties[epoch])}",
