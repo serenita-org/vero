@@ -174,6 +174,7 @@ class BlockProposalService(ValidatorDutyService):
             for coro in (
                 self.prepare_beacon_proposer(),
                 self.submit_proposer_preferences(),
+                self.submit_builder_preferences(),
                 self.register_validators(
                     current_slot=slot,
                     pubkeys_to_register=[duty_for_next_slot.pubkey],
@@ -195,7 +196,6 @@ class BlockProposalService(ValidatorDutyService):
         if is_new_epoch:
             self.task_manager.create_task(super().update_duties())
             self.task_manager.create_task(self.prepare_beacon_proposer())
-            self.task_manager.create_task(self.submit_builder_preferences())
 
     async def handle_head_event(
         self, event: SchemaBeaconAPI.HeadV2Event, _: str
@@ -275,6 +275,7 @@ class BlockProposalService(ValidatorDutyService):
 
         self._prune_duties()
         self.task_manager.create_task(self.submit_proposer_preferences())
+        self.task_manager.create_task(self.submit_builder_preferences())
 
     async def prepare_beacon_proposer(self) -> None:
         # TODO [remove post-Gloas]
