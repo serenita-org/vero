@@ -111,7 +111,7 @@ def _create_att_data_callback(
             Checkpoint(epoch=0, root=ROOT_0),
             Checkpoint(epoch=1, root=ROOT_1),
             [
-                "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
+                "Produced AttestationData without head event using ['beacon-node-a:1234', 'beacon-node-b:1234']",
             ],
             id="success: identical head, source, target",
         ),
@@ -189,7 +189,7 @@ def _create_att_data_callback(
             Checkpoint(epoch=0, root=ROOT_0),
             Checkpoint(epoch=1, root=ROOT_1),
             [
-                "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
+                "Produced AttestationData without head event using ['beacon-node-a:1234', 'beacon-node-b:1234']",
             ],
             id="success: delayed consensus",
         ),
@@ -257,7 +257,7 @@ def _create_att_data_callback(
             Checkpoint(epoch=1, root=ROOT_1),
             Checkpoint(epoch=2, root=EPOCH_1_LAST_SLOT_ROOT),
             [
-                "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
+                "Produced AttestationData without head event using ['beacon-node-b:1234', 'beacon-node-c:1234']",
             ],
             id="success: late block proposal on epoch transition",
         ),
@@ -503,7 +503,7 @@ async def test_produce_attestation_data_without_head_event(
                     f"att_data.source={Checkpoint(epoch=2, root=ROOT_2)}, "
                     f"att_data.target={Checkpoint(epoch=3, root=ROOT_3)}"
                 ),
-                "Produced AttestationData without head event using ['beacon-node-a', 'beacon-node-b']",
+                "Produced AttestationData without head event using ['beacon-node-a:1234', 'beacon-node-b:1234']",
             ],
             id="success: delayed consensus - slow head processing",
         ),
@@ -534,7 +534,7 @@ async def test_produce_attestation_data_without_head_event(
             Checkpoint(epoch=3, root=ROOT_3),
             [
                 "Timed out waiting for AttestationData matching head block root: 0x000000000000000000000000000000000000000000000000000000000000aaaa",
-                "Produced AttestationData without head event using ['beacon-node-b', 'beacon-node-c']",
+                "Produced AttestationData without head event using ['beacon-node-b:1234', 'beacon-node-c:1234']",
             ],
             id="success: head-emitting node stops responding, no further confirmations, fallback succeeds",
         ),

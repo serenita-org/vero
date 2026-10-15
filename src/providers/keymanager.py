@@ -455,3 +455,6 @@ class Keymanager(SignatureProvider):
         return [
             row for (row,) in self.db.fetch_all("SELECT pubkey FROM keymanager_data;")
         ]
+
+
+# TODO [Gloas] Keymanager API changes

@@ -8,11 +8,17 @@ from aiohttp.hdrs import CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
 
 from providers import BeaconNode, MultiBeaconNode, Vero
-from providers._headers import ETH_CONSENSUS_VERSION, ContentType
-from schemas import SchemaBeaconAPI
+from providers._headers import (
+    ETH_CONSENSUS_BLOCK_VALUE,
+    ETH_CONSENSUS_VERSION,
+    ETH_EXECUTION_PAYLOAD_BLINDED,
+    ETH_EXECUTION_PAYLOAD_VALUE,
+    ContentType,
+)
+from schemas import SchemaBeaconAPI, SchemaShared
 from spec.base import Version
 from spec.common import Uint64
-from tests.ssz_objects import ZERO_SIGNATURE, make_block
+from tests.ssz_objects import make_block_electra_fulu
 
 
 @pytest.mark.parametrize(
@@ -23,12 +29,12 @@ async def test_produce_block_v3_response(
     response_content_type: ContentType,
     vero: Vero,
 ) -> None:
-    block = make_block(slot=1, blinded=False)
+    block = make_block_electra_fulu(slot=1, blinded=False)
     block_data = (
         block.to_json() if response_content_type == ContentType.JSON else block.to_ssz()
     )
     api_response = SchemaBeaconAPI.ProduceBlockV3Response(
-        version=SchemaBeaconAPI.ForkVersion.FULU,
+        version=SchemaShared.ForkVersion.FULU,
         # Use different values here vs headers below
         # to test that Vero considers the header
         # values as the source of truth
@@ -56,9 +62,9 @@ async def test_produce_block_v3_response(
     response_headers = {
         CONTENT_TYPE: response_content_type.value,
         ETH_CONSENSUS_VERSION: api_response.version.value,
-        "Eth-Execution-Payload-Blinded": "false",
-        "Eth-Execution-Payload-Value": "3",
-        "Eth-Consensus-Block-Value": "4",
+        ETH_EXECUTION_PAYLOAD_BLINDED: "false",
+        ETH_EXECUTION_PAYLOAD_VALUE: "3",
+        ETH_CONSENSUS_BLOCK_VALUE: "4",
     }
 
     with aioresponses() as mocked_responses:
@@ -73,11 +79,11 @@ async def test_produce_block_v3_response(
         )
         beacon_node._force_json_wire_format = response_content_type == ContentType.JSON
         try:
-            response, content_type = await beacon_node.produce_block_v3(
+            response, content_type, _ = await beacon_node.produce_block_v3(
                 slot=1,
                 graffiti=b"",
-                builder_boost_factor=90,
-                randao_reveal=ZERO_SIGNATURE,
+                builder_boost_factor="90",
+                randao_reveal="0x" + "00" * 96,
             )
         finally:
             await beacon_node.client_session.close()
@@ -150,7 +156,7 @@ async def test_initialize_spec_mismatch(
             with pytest.raises(
                 ValueError,
                 match=re.escape(
-                    "Spec values returned by beacon node beacon-node-a not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
+                    "Spec values returned by beacon node beacon-node-a:1234 not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
                 ),
             ):
                 await bn._initialize_full()

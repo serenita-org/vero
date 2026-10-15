@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 class ValidatorDuty(Enum):
     ATTESTATION = "attestation"
     ATTESTATION_AGGREGATION = "attestation-aggregation"
+    PTC_ATTESTATION = "ptc-attestation"
     BLOCK_PROPOSAL = "block-proposal"
     SYNC_COMMITTEE_MESSAGE = "sync-committee-message"
     SYNC_COMMITTEE_CONTRIBUTION = "sync-committee-contribution"
@@ -62,6 +63,7 @@ class ValidatorDutyService:
         self.metrics = vero.metrics
         self.cli_args = vero.cli_args
         self.spec = vero.spec
+        self.vero = vero
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
@@ -97,7 +99,7 @@ class ValidatorDutyService:
         raise NotImplementedError
 
     async def handle_head_event(
-        self, event: SchemaBeaconAPI.HeadEvent, beacon_node_host: str
+        self, event: SchemaBeaconAPI.HeadV2Event, beacon_node_netloc: str
     ) -> None:
         raise NotImplementedError
 
@@ -141,6 +143,9 @@ class ValidatorDutyService:
         self.logger.info("Validator duty completed")
 
     async def on_new_slot(self, slot: int, is_new_epoch: bool) -> None:
+        raise NotImplementedError
+
+    def _prune_duties(self) -> None:
         raise NotImplementedError
 
     async def _update_duties(self) -> None:

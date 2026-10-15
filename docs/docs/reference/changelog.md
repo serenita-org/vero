@@ -4,6 +4,10 @@
 
 #### Features
 
+- Add support for the Gloas fork
+- Add `--builder-urls` flag
+- Add `--builder-min-bid` flag
+- Add `--builder-max-execution-payment` flag
 - Replace the SSZ library with spy-ssz ([#333](https://github.com/serenita-org/vero/pull/333))
 
 #### Bugfixes

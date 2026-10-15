@@ -1,15 +1,23 @@
-from typing import Any
+from typing import Any, cast
 
 import msgspec
 from spy_ssz import (
-    Attestation,
-    AttestationData,
     Bitfield,
-    SyncCommitteeContribution,
+    ExecutionPayloadEnvelopeGloas,
+    Fork,
+    ObjectKind,
+    Preset,
+    get_ssz_type,
     load_preset,
 )
 
-from spec import BeaconBlock, preset_types
+from spec import (
+    Attestation,
+    AttestationData,
+    BeaconBlock,
+    SyncCommitteeContribution,
+    preset_types,
+)
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 
 BYTES_PER_BLS_SIGNATURE = 96
@@ -80,9 +88,8 @@ def make_contribution(**overrides: Any) -> SyncCommitteeContribution:
     return contribution_type.from_json(msgspec.json.encode(value))
 
 
-def _block_body(*, blinded: bool) -> dict[str, Any]:
-    block_types = preset_types()
-    preset_config = load_preset(block_types.block_contents.expected_preset)
+def _block_body_electra_fulu(*, blinded: bool) -> dict[str, Any]:
+    preset_config = load_preset(Preset[preset_types().preset.upper()])
     execution_common = {
         "parent_hash": ZERO_ROOT,
         "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
@@ -135,17 +142,144 @@ def _block_body(*, blinded: bool) -> dict[str, Any]:
     }
 
 
-def make_block(*, slot: int, blinded: bool) -> BeaconBlock:
+def make_block_electra_fulu(*, slot: int, blinded: bool) -> BeaconBlock:
     block_types = preset_types()
     block = {
         "slot": str(slot),
         "proposer_index": "123",
         "parent_root": "0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
         "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
-        "body": _block_body(blinded=blinded),
+        "body": _block_body_electra_fulu(blinded=blinded),
     }
+    block_type = get_ssz_type(
+        Fork.FULU,
+        ObjectKind.BLINDED_BEACON_BLOCK
+        if blinded
+        else ObjectKind.BEACON_BLOCK_CONTENTS,
+        Preset[block_types.preset.upper()],
+    )
     if blinded:
-        return block_types.blinded_block.from_json(msgspec.json.encode({"data": block}))
-    return block_types.block_contents.from_json(
-        msgspec.json.encode({"data": {"block": block, "kzg_proofs": [], "blobs": []}})
+        return cast(
+            "BeaconBlock",
+            block_type.from_json(msgspec.json.encode({"data": block})),
+        )
+    return cast(
+        "BeaconBlock",
+        block_type.from_json(
+            msgspec.json.encode(
+                {"data": {"block": block, "kzg_proofs": [], "blobs": []}}
+            )
+        ),
+    )
+
+
+def _block_body_gloas(*, builder_index: int) -> dict[str, Any]:
+    preset_config = load_preset(Preset[preset_types().preset.upper()])
+    return {
+        "randao_reveal": ZERO_SIGNATURE,
+        "eth1_data": {
+            "deposit_root": ZERO_ROOT,
+            "deposit_count": "0",
+            "block_hash": ZERO_ROOT,
+        },
+        "graffiti": ZERO_ROOT,
+        "proposer_slashings": [],
+        "attester_slashings": [],
+        "attestations": [],
+        "deposits": [],
+        "voluntary_exits": [],
+        "sync_aggregate": {
+            "sync_committee_bits": Bitfield.bitvector(
+                preset_config.sync_committee_size
+            ).to_hex(),
+            "sync_committee_signature": ZERO_SIGNATURE,
+        },
+        "bls_to_execution_changes": [],
+        "signed_execution_payload_bid": {
+            "message": {
+                "parent_block_hash": ZERO_ROOT,
+                "parent_block_root": ZERO_ROOT,
+                "block_hash": ZERO_ROOT,
+                "prev_randao": ZERO_ROOT,
+                "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
+                "gas_limit": "0",
+                "builder_index": str(builder_index),
+                "slot": "1234",
+                "value": "54321",
+                "execution_payment": "0",
+                "blob_kzg_commitments": [],
+                "execution_requests_root": ZERO_ROOT,
+            },
+            "signature": ZERO_SIGNATURE,
+        },
+        "payload_attestations": [],
+        "parent_execution_requests": {
+            "deposits": [],
+            "withdrawals": [],
+            "consolidations": [],
+            "builder_deposits": [],
+            "builder_exits": [],
+        },
+    }
+
+
+def make_block_gloas(*, slot: int, builder_index: int) -> BeaconBlock:
+    block = {
+        "slot": str(slot),
+        "proposer_index": "123",
+        "parent_root": "0xcbe950dda3533e3c257fd162b33d791f9073eb42e4da21def569451e9323c33e",
+        "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
+        "body": _block_body_gloas(builder_index=builder_index),
+    }
+    block_type = get_ssz_type(Fork.GLOAS, ObjectKind.BEACON_BLOCK)
+    return cast(
+        "BeaconBlock",
+        block_type.from_json(msgspec.json.encode({"data": block})),
+    )
+
+
+def make_execution_payload_envelope_gloas(
+    *, beacon_block_root: str = ZERO_ROOT
+) -> ExecutionPayloadEnvelopeGloas:
+    envelope_type = get_ssz_type(
+        Fork.GLOAS,
+        ObjectKind.EXECUTION_PAYLOAD_ENVELOPE,
+        Preset[preset_types().preset.upper()],
+    )
+    envelope = {
+        "payload": {
+            "parent_hash": ZERO_ROOT,
+            "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
+            "state_root": ZERO_ROOT,
+            "receipts_root": ZERO_ROOT,
+            "logs_bloom": "0x" + "00" * BYTES_PER_LOGS_BLOOM,
+            "prev_randao": ZERO_ROOT,
+            "block_number": "0",
+            "gas_limit": "0",
+            "gas_used": "0",
+            "timestamp": "0",
+            "extra_data": "0x",
+            "base_fee_per_gas": "0",
+            "block_hash": ZERO_ROOT,
+            "transactions": [],
+            "withdrawals": [],
+            "blob_gas_used": "0",
+            "excess_blob_gas": "0",
+            "block_access_list": "0x",
+            "slot_number": "0",
+        },
+        "execution_requests": {
+            "deposits": [],
+            "withdrawals": [],
+            "consolidations": [],
+            "builder_deposits": [],
+            "builder_exits": [],
+        },
+        "builder_index": "0",
+        "beacon_block_root": beacon_block_root,
+        "parent_beacon_block_root": ZERO_ROOT,
+    }
+    return cast(
+        "ExecutionPayloadEnvelopeGloas",
+        envelope_type.from_json(msgspec.json.encode({"data": envelope})),
     )

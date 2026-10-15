@@ -1,6 +1,8 @@
 from .attestation_data_provider import AttestationDataProvider
 from .beacon_chain import BeaconChain
 from .beacon_node import BeaconNode
+from .bid_selector import BidSelector
+from .builder import MultiBuilder
 from .db.db import DB
 from .doppelganger_detector import DoppelgangerDetector
 from .duty_cache import DutyCache
@@ -15,10 +17,12 @@ __all__ = [
     "AttestationDataProvider",
     "BeaconChain",
     "BeaconNode",
+    "BidSelector",
     "DoppelgangerDetector",
     "DutyCache",
     "Keymanager",
     "MultiBeaconNode",
+    "MultiBuilder",
     "RemoteSigner",
     "SignatureProvider",
     "Vero",

@@ -21,7 +21,9 @@ def _validate(schema: Mapping[str, Any], value: object) -> None:
 def _wire_value(value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_wire_value(item) for item in value]
-    return value if isinstance(value, bool) else str(value)
+    if isinstance(value, bool):
+        raise TypeError("HTTP header values must be serialized strings, not booleans")
+    return str(value)
 
 
 def _headers(
@@ -60,6 +62,17 @@ def _validate_parameters(
         name: str = parameter["name"]
         return name.lower() if location == "header" else name
 
+    normalized_values = dict(values)
+    for parameter in parameters:
+        parameter_key = key(parameter)
+        value = normalized_values.get(parameter_key)
+        if (
+            parameter["schema"].get("type") == "boolean"
+            and isinstance(value, str)
+            and value.lower() in ("true", "false")
+        ):
+            normalized_values[parameter_key] = value.lower() == "true"
+
     _validate(
         {
             "type": "object",
@@ -73,8 +86,20 @@ def _validate_parameters(
             ],
             "additionalProperties": location == "header",
         },
-        values,
+        normalized_values,
     )
+
+
+def _query_parameter_value(parameter: Mapping[str, Any], url: URL) -> object:
+    name = parameter["name"]
+    schema = parameter["schema"]
+    if schema.get("type") == "array":
+        return list(url.query.getall(name))
+
+    value = url.query[name]
+    if schema.get("type") == "boolean" and value.lower() in ("true", "false"):
+        return value.lower() == "true"
+    return value
 
 
 def _validate_response_headers(
@@ -128,11 +153,7 @@ class BeaconAPISpec:
         for parameter in operation.get("parameters", []):
             name = parameter["name"]
             if parameter["in"] == "query" and name in url.query:
-                query[name] = (
-                    list(url.query.getall(name))
-                    if parameter["schema"].get("type") == "array"
-                    else url.query[name]
-                )
+                query[name] = _query_parameter_value(parameter, url)
 
         for location, values in (
             ("path", dict(path_parameters)),

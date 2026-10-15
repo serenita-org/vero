@@ -10,6 +10,7 @@ from providers import (
 from services import (
     AttestationService,
     BlockProposalService,
+    PtcService,
     SyncCommitteeService,
     ValidatorStatusTrackerService,
 )
@@ -54,3 +55,10 @@ def sync_committee_service(
     validator_duty_service_options: ValidatorDutyServiceOptions,
 ) -> SyncCommitteeService:
     return SyncCommitteeService(**validator_duty_service_options)
+
+
+@pytest.fixture
+def ptc_service(
+    validator_duty_service_options: ValidatorDutyServiceOptions,
+) -> PtcService:
+    return PtcService(**validator_duty_service_options)

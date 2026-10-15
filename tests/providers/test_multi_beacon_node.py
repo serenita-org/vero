@@ -5,10 +5,12 @@ when multiple beacon nodes are provided to it. That includes:
 - requesting sync committee contributions from all beacon nodes and returning the best one
 """
 
+import asyncio
 import contextlib
 import os
 import re
 from functools import partial
+from unittest.mock import AsyncMock
 
 import msgspec
 import pytest
@@ -18,8 +20,9 @@ from spy_ssz import Bitfield
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
-from schemas import SchemaBeaconAPI
-from spec.base import SpecFulu
+from schemas import SchemaShared
+from spec import PayloadAttestationData
+from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from tests.ssz_objects import (
     make_attestation,
@@ -145,7 +148,7 @@ async def test_initialize(
 )
 async def test_initialize_retry_logic(
     beacon_chain: BeaconChain,
-    spec: SpecFulu,
+    spec: SpecGloas,
     cli_args: CLIArgs,
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
@@ -288,6 +291,7 @@ async def test_get_aggregate_attestation(
     best_aggregate_score: int,
     beacon_chain: BeaconChain,
     multi_beacon_node: MultiBeaconNode,
+    spec: SpecGloas,
     cli_args: CLIArgs,
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
@@ -297,8 +301,7 @@ async def test_get_aggregate_attestation(
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
                 bitlist_length = (
-                    beacon_chain.MAX_VALIDATORS_PER_COMMITTEE
-                    * beacon_chain.MAX_COMMITTEES_PER_SLOT
+                    spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
                 )
                 aggregation_bits = [False] * 10
                 for idx in range(number_of_attesting_indices):
@@ -308,7 +311,7 @@ async def test_get_aggregate_attestation(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
                             {
-                                "version": SchemaBeaconAPI.ForkVersion.FULU,
+                                "version": SchemaShared.ForkVersion.FULU,
                                 "data": msgspec.Raw(
                                     make_attestation(
                                         aggregation_bits=_bits,
@@ -410,7 +413,7 @@ async def test_get_sync_committee_contribution(
     best_contribution_score: int,
     multi_beacon_node: MultiBeaconNode,
     cli_args: CLIArgs,
-    spec: SpecFulu,
+    spec: SpecGloas,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
@@ -474,3 +477,178 @@ async def test_get_sync_committee_contribution(
             assert (
                 sum(returned_contribution.aggregation_bits) == best_contribution_score
             )
+
+
+@pytest.mark.parametrize(
+    "cli_args",
+    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(3)]}],
+    indirect=True,
+)
+class TestProducePayloadAttestationData:
+    @pytest.fixture
+    def payload_data(self) -> PayloadAttestationData:
+        return PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=True,
+            blob_data_available=True,
+        )
+
+    @pytest.fixture
+    def node_requests(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        monkeypatch: pytest.MonkeyPatch,
+        payload_data: PayloadAttestationData,
+    ) -> tuple[AsyncMock, AsyncMock, AsyncMock]:
+        first_request = AsyncMock(return_value=payload_data)
+        second_request = AsyncMock(return_value=payload_data)
+        third_request = AsyncMock(return_value=payload_data)
+        requests = (first_request, second_request, third_request)
+        for node, request in zip(multi_beacon_node.beacon_nodes, requests, strict=True):
+            monkeypatch.setattr(node, "produce_payload_attestation_data", request)
+        return requests
+
+    @pytest.mark.parametrize(
+        ("payload_present", "blob_data_available"),
+        [
+            pytest.param(True, True, id="payload-and-blobs-available"),
+            pytest.param(False, True, id="late-payload"),
+            pytest.param(True, False, id="blobs-unavailable"),
+            pytest.param(False, False, id="payload-and-blobs-unavailable"),
+        ],
+    )
+    async def test_epa_queries_only_emitter(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_present: bool,
+        blob_data_available: bool,
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_response = PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=payload_present,
+            blob_data_available=blob_data_available,
+        )
+        emitter_request.return_value = emitter_response
+
+        result = await multi_beacon_node.produce_payload_attestation_data(
+            slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+        )
+
+        assert result is emitter_response
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    async def test_epa_empty_response_does_not_fall_back(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_request.return_value = None
+
+        result = await multi_beacon_node.produce_payload_attestation_data(
+            slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+        )
+
+        assert result is None
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    async def test_epa_error_does_not_fall_back(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_request.side_effect = RuntimeError("Emitter unavailable")
+
+        with pytest.raises(RuntimeError, match="Emitter unavailable"):
+            await multi_beacon_node.produce_payload_attestation_data(
+                slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+            )
+
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    @pytest.mark.parametrize("block_seen", [True, False], ids=["data", "no-block"])
+    async def test_deadline_uses_first_response(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_data: PayloadAttestationData,
+        block_seen: bool,
+    ) -> None:
+        slow_request, fast_request, other_request = node_requests
+        expected_response = payload_data if block_seen else None
+        fast_request.return_value = expected_response
+
+        async def wait_forever(*, slot: int) -> None:
+            await asyncio.Event().wait()
+
+        slow_request.side_effect = wait_forever
+        other_request.side_effect = wait_forever
+
+        async with asyncio.timeout(1):
+            result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is expected_response
+        for request in node_requests:
+            request.assert_awaited_once_with(slot=123)
+
+    async def test_deadline_accepts_negative_data(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, _, _ = node_requests
+        negative_data = PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=False,
+            blob_data_available=False,
+        )
+        first_request.return_value = negative_data
+
+        result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is negative_data
+
+    @pytest.mark.parametrize("block_seen", [True, False], ids=["data", "no-block"])
+    async def test_deadline_skips_request_errors(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_data: PayloadAttestationData,
+        block_seen: bool,
+    ) -> None:
+        first_request, second_request, third_request = node_requests
+        first_request.side_effect = RuntimeError("Node unavailable")
+        expected_response = payload_data if block_seen else None
+        second_request.return_value = expected_response
+        third_request.side_effect = RuntimeError("Another node unavailable")
+
+        result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is expected_response
+        first_request.assert_awaited_once_with(slot=123)
+        second_request.assert_awaited_once_with(slot=123)
+
+    async def test_deadline_fails_when_all_nodes_error(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        for request in node_requests:
+            request.side_effect = RuntimeError("Node unavailable")
+
+        with pytest.raises(
+            RuntimeError, match="Failed to get a response from all beacon nodes"
+        ):
+            await multi_beacon_node.produce_payload_attestation_data(slot=123)

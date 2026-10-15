@@ -17,6 +17,11 @@
   text-align: center;
 }
 
+/* To avoid breaking up things like `--builder-urls` into multiple lines */
+.md-typeset :not(pre) > code {
+  white-space: nowrap;
+}
+
 /*
 Some of the admonitions' default colors clashed with Serenita colors
 so those are replaced here.
