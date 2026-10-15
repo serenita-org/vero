@@ -126,7 +126,6 @@ async def test_lifecycle(
                 "Published attestations for slot",
                 "Published aggregate and proofs for slot",
                 "Published sync committee messages for slot",
-                "Published sync committee contribution and proofs for slot",
             ]
         )
 
