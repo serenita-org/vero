@@ -100,6 +100,23 @@ class PtcService(ValidatorDutyService):
             payload_available_event=event,
         )
 
+    async def handle_head_event(
+        self, event: SchemaBeaconAPI.HeadV2Event, _: str
+    ) -> None:
+        event_slot = int(event.data.slot)
+        epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
+        if (
+            event.data.current_epoch_dependent_root
+            != self.ptc_duties_dependent_roots.get(epoch)
+        ) or (
+            event.data.next_epoch_dependent_root
+            != self.ptc_duties_dependent_roots.get(epoch + 1)
+        ):
+            self.logger.info(
+                "Head event duty dependent root mismatch -> updating duties",
+            )
+            self.task_manager.create_task(super().update_duties())
+
     def _get_duties_for_slot(self, slot: int) -> set[SchemaBeaconAPI.PtcDuty]:
         epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
         slot_ptc_duties = {

@@ -53,6 +53,7 @@ def _register_event_handlers(
         attestation_service,
         block_proposal_service,
         sync_committee_service,
+        ptc_service,
     ):
         event_consumer_service.add_head_event_handler(
             event_handler=head_handler_service.handle_head_event,
