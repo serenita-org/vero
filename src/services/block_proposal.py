@@ -445,6 +445,9 @@ class BlockProposalService(ValidatorDutyService):
                                 max_execution_payment=max_exec_payment,
                             )
                         )
+                    if not builder_preferences:
+                        continue
+
                     self.task_manager.create_task(
                         self.multi_beacon_node.submit_builder_preferences(
                             builder_preferences=builder_preferences,
