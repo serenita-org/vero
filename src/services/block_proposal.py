@@ -438,8 +438,7 @@ class BlockProposalService(ValidatorDutyService):
                         )
                     self.task_manager.create_task(
                         self.multi_beacon_node.submit_builder_preferences(
-                            slot=int(duty.slot),
-                            proposer_pubkey=duty.pubkey,
+                            builder_preferences=builder_preferences,
                             fork_version=SchemaShared.ForkVersion.GLOAS,
                         )
                     )
