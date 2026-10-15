@@ -109,6 +109,10 @@ class PtcService(ValidatorDutyService):
     ) -> None:
         event_slot = int(event.data.slot)
         epoch = event_slot // self.beacon_chain.SLOTS_PER_EPOCH
+
+        if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
+            return
+
         if (
             event.data.current_epoch_dependent_root
             != self.ptc_duties_dependent_roots.get(epoch)
