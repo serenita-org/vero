@@ -46,11 +46,15 @@ class BlockProposalService(ValidatorDutyService):
             multi_builder=self.multi_builder, vero=self.vero
         )
 
-        # Block production API requests "soft" time out half-way into the attestation
-        # deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain). This ensures
-        # a single slow beacon node does not delay a block proposal too much.
+        # Block production API requests "soft" time out half-way into the
+        # pre-Gloas attestation deadline (e.g. 2s for Ethereum, 0.83s for Gnosis Chain).
+        # This ensures a single slow beacon node does not delay a block proposal too
+        # much.
         # If no block has been produced by the soft timeout, we wait indefinitely for
         # the first block to be produced by any beacon node, and propose that block.
+        # Why not adjust it to the smaller ATTESTATION_DUE_BPS_GLOAS post-Gloas?
+        # Because the beacon block gets _much_ smaller in Gloas
+        # so we can afford to publish it slightly later than the half-way point.
         attestation_due_s = (
             get_slot_component_duration_ms(
                 basis_points=self.spec.ATTESTATION_DUE_BPS,
