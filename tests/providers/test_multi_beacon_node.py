@@ -57,8 +57,8 @@ async def test_produce_payload_attestation_data(
     responses: list[str | None],
     expected_response: str | None,
 ) -> None:
-    # After an EPA event, skip empty responses and wait for payload attestation
-    # data; otherwise, accept the first successful response, even if it is None.
+    # After an EPA event, skip empty responses and wait for positive payload
+    # attestation data; otherwise, accept the first successful response, even if it is None.
     # In both cases, tolerate node errors and cancel any outstanding requests.
     slot = 123
     data = PayloadAttestationData(
@@ -105,6 +105,68 @@ async def test_produce_payload_attestation_data(
         assert any(task.cancelled() for task in node_tasks)
     if "error" in responses:
         assert any("Beacon node unavailable" in message for message in caplog.messages)
+
+
+@pytest.mark.parametrize(
+    "cli_args",
+    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(2)]}],
+    indirect=True,
+)
+@pytest.mark.parametrize("epa_event_received", [False, True])
+@pytest.mark.parametrize(
+    ("payload_present", "blob_data_available"),
+    [(False, False), (False, True), (True, False)],
+)
+@pytest.mark.parametrize("positive_response_available", [False, True])
+async def test_payload_attestation_negative_response_first(
+    multi_beacon_node: MultiBeaconNode,
+    monkeypatch: pytest.MonkeyPatch,
+    epa_event_received: bool,
+    payload_present: bool,
+    blob_data_available: bool,
+    positive_response_available: bool,
+) -> None:
+    # A node still missing the payload or blobs can respond before the node that
+    # emitted the EPA event. Its negative response must not win the early vote;
+    # wait for positive data, or return None if no node provides it.
+    negative_data = PayloadAttestationData(
+        slot=123,
+        beacon_block_root="0x" + "12" * 32,
+        payload_present=payload_present,
+        blob_data_available=blob_data_available,
+    )
+    positive_data = PayloadAttestationData(
+        slot=123,
+        beacon_block_root="0x" + "12" * 32,
+        payload_present=True,
+        blob_data_available=True,
+    )
+
+    async def respond_later(*, slot: int) -> PayloadAttestationData | None:
+        assert slot == 123
+        await asyncio.sleep(0.01)
+        return positive_data if positive_response_available else None
+
+    fast_node, slow_node = multi_beacon_node.initialized_beacon_nodes
+    monkeypatch.setattr(
+        fast_node,
+        "produce_payload_attestation_data",
+        AsyncMock(return_value=negative_data),
+    )
+    monkeypatch.setattr(
+        slow_node,
+        "produce_payload_attestation_data",
+        AsyncMock(side_effect=respond_later),
+    )
+
+    result = await multi_beacon_node.produce_payload_attestation_data(
+        slot=123, epa_event_received=epa_event_received
+    )
+    if epa_event_received:
+        assert result is (positive_data if positive_response_available else None)
+    else:
+        # At the deadline, negative availability data remains a valid response.
+        assert result is negative_data
 
 
 @pytest.mark.parametrize(

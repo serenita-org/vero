@@ -886,10 +886,15 @@ class MultiBeaconNode:
                 self.logger.warning(f"Failed to get a response from beacon node: {e!r}")
                 continue
 
-            if epa_event_received and pa_data is None:
-                # We expect to get payload attestation data from (at least)
-                # the beacon node that emitted the EPA event.
-                # If we receive None from another beacon node, ignore it.
+            if epa_event_received and (
+                pa_data is None
+                or not pa_data.payload_present
+                or not pa_data.blob_data_available
+            ):
+                # The node that emitted the EPA event has the payload and blobs.
+                # Other nodes may not have received them yet, so ignore their
+                # empty or negative responses when attesting in reaction to
+                # an EPA event.
                 continue
 
             pa_data_to_return = pa_data
@@ -897,9 +902,6 @@ class MultiBeaconNode:
 
         for task in tasks:
             task.cancel()
-
-        if epa_event_received and pa_data_to_return is None:
-            self.logger.warning("No payload attestation data received from any node")
 
         return pa_data_to_return
 

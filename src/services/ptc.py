@@ -150,7 +150,7 @@ class PtcService(ValidatorDutyService):
             if payload_available_event is not None:
                 # We received an EPA event for this slot, but no payload attestation data.
                 self.logger.warning(
-                    "No payload attestation data received from any node"
+                    "No positive payload attestation data received from any node despite EPA event"
                 )
             return
 
