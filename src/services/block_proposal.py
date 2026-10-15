@@ -479,7 +479,7 @@ class BlockProposalService(ValidatorDutyService):
             )
             messages_to_sign = []
             for duty in proposer_duties:
-                if int(duty.slot) < current_slot:
+                if int(duty.slot) <= current_slot:
                     continue
 
                 messages_to_sign.append(
