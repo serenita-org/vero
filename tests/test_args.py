@@ -90,6 +90,47 @@ MINIMUM_ARG_LIST = [
         ),
         pytest.param(
             [
+                *MINIMUM_ARG_LIST,
+                "--beacon-node-urls=http://BEACON-NODE:5052,http://beacon-node:5052/",
+            ],
+            "Beacon node URLs must have unique normalized host/port identities",
+            {},
+            [],
+            id="--beacon-node-urls invalid input - duplicate normalized identity",
+        ),
+        pytest.param(
+            [
+                *MINIMUM_ARG_LIST,
+                "--beacon-node-urls-proposal=http://beacon-node,http://beacon-node:80",
+            ],
+            "Proposal beacon node URLs must have unique normalized host/port identities",
+            {},
+            [],
+            id="--beacon-node-urls-proposal invalid input - duplicate normalized identity",
+        ),
+        pytest.param(
+            [
+                *MINIMUM_ARG_LIST,
+                "--beacon-node-urls=http://beacon-node:5052,http://beacon-node:5053",
+                "--beacon-node-urls-proposal=http://beacon-node:5052,http://beacon-node:5053",
+            ],
+            None,
+            {
+                "beacon_node_urls": [
+                    "http://beacon-node:5052",
+                    "http://beacon-node:5053",
+                ],
+                "beacon_node_urls_proposal": [
+                    "http://beacon-node:5052",
+                    "http://beacon-node:5053",
+                ],
+                "attestation_consensus_threshold": 2,
+            },
+            [],
+            id="Beacon node URLs valid input - same-host-different-ports",
+        ),
+        pytest.param(
+            [
                 "--beacon-node-urls-proposal=http://beacon-node-prop:5052",
                 *MINIMUM_ARG_LIST,
             ],

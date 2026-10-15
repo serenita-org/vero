@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import msgspec
+from yarl import URL
 
 from observability import get_service_version
 from spec.configs import Network
@@ -59,6 +60,14 @@ def _validate_comma_separated_strings(
     if len(items) != len(set(items)):
         raise ValueError(f"{entity_name}s must have unique values: {items}")
     return items
+
+
+def _validate_unique_beacon_node_identities(urls: list[str], entity_name: str) -> None:
+    identities = {URL(url).host_port_subcomponent for url in urls}
+    if len(identities) != len(urls):
+        raise ValueError(
+            f"{entity_name} must have unique normalized host/port identities"
+        )
 
 
 def _process_attestation_consensus_threshold(
@@ -361,6 +370,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 min_values_required=1,
             )
         ]
+        _validate_unique_beacon_node_identities(beacon_node_urls, "Beacon node URLs")
         beacon_node_urls_proposal = [
             _validate_url(url)
             for url in _validate_comma_separated_strings(
@@ -369,6 +379,9 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
                 min_values_required=0,
             )
         ]
+        _validate_unique_beacon_node_identities(
+            beacon_node_urls_proposal, "Proposal beacon node URLs"
+        )
 
         builder_urls = [
             _validate_url(url)
