@@ -829,11 +829,27 @@ class BlockProposalService(ValidatorDutyService):
         duty: SchemaBeaconAPI.ProposerDuty,
         beacon_block_root: str,
         beacon_node: BeaconNode,
+        block_publication_task: asyncio.Task[None],
     ) -> None:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._publish_payload_envelope",
         ):
             try:
+                # The envelope may be cached before the beacon node has imported
+                # its beacon block, but some clients require that import even to fetch
+                # it.
+                # Keep the wait bounded so a slow block publication response does not
+                # prevent us from attempting to publish the envelope in time.
+                try:
+                    await asyncio.wait_for(
+                        asyncio.shield(block_publication_task), timeout=1.0
+                    )
+                except TimeoutError:
+                    self.logger.warning(
+                        f"Block publication still pending for slot {slot} after 1s; "
+                        "attempting payload envelope publication"
+                    )
+
                 self.logger.info("Publishing payload envelope")
                 # Only the beacon node that we got the BeaconBlock
                 # from has its associated execution payload envelope cached.
@@ -936,7 +952,7 @@ class BlockProposalService(ValidatorDutyService):
                     block_version=fork_version.value.upper(),
                 )
 
-                publish_coros = [
+                block_publication_task = asyncio.create_task(
                     self._publish_block(
                         slot=slot,
                         fork_version=fork_version,
@@ -945,22 +961,26 @@ class BlockProposalService(ValidatorDutyService):
                         header_builder_url=header_builder_url,
                         selected_builder=selected_builder,
                     )
-                ]
+                )
+                publish_tasks = [block_publication_task]
                 if (
                     fork_version is SchemaShared.ForkVersion.GLOAS
                     and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
                     == BUILDER_INDEX_SELF_BUILD
                 ):
-                    publish_coros.append(
-                        self._publish_payload_envelope(
-                            slot=slot,
-                            duty=duty,
-                            beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
-                            beacon_node=beacon_node,
+                    publish_tasks.append(
+                        asyncio.create_task(
+                            self._publish_payload_envelope(
+                                slot=slot,
+                                duty=duty,
+                                beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
+                                beacon_node=beacon_node,
+                                block_publication_task=block_publication_task,
+                            )
                         )
                     )
 
-                results = await asyncio.gather(*publish_coros, return_exceptions=True)
+                results = await asyncio.gather(*publish_tasks, return_exceptions=True)
                 for result in results:
                     if isinstance(result, BaseException):
                         self.logger.error(

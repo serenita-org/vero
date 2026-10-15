@@ -1,7 +1,9 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
+from observability import HandledRuntimeError
 from providers import BeaconChain, Keymanager, Vero
 from schemas import SchemaBeaconAPI
 from schemas.shared import ForkVersion
@@ -165,12 +167,15 @@ async def test_publish_block(
     ],
     indirect=True,
 )
+@pytest.mark.parametrize("block_publication_outcome", ["success", "timeout", "failure"])
 async def test_publish_payload_envelope(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
     fork_version: ForkVersion,
     caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    block_publication_outcome: str,
 ) -> None:
     slot = beacon_chain.current_slot + 1
     duty = SchemaBeaconAPI.ProposerDuty(
@@ -179,14 +184,51 @@ async def test_publish_payload_envelope(
         slot=str(slot),
     )
 
-    await block_proposal_service._publish_payload_envelope(
-        slot=slot,
-        duty=duty,
-        beacon_block_root=ZERO_ROOT,
-        beacon_node=block_proposal_service.multi_beacon_node.beacon_nodes[0],
-    )
+    beacon_node = block_proposal_service.multi_beacon_node.beacon_nodes[0]
+    fetch_envelope = AsyncMock(wraps=beacon_node.get_execution_payload_envelope)
+    monkeypatch.setattr(beacon_node, "get_execution_payload_envelope", fetch_envelope)
+    block_publication_started = asyncio.Event()
+    finish_block_publication = asyncio.Event()
 
-    assert any("Published payload envelope" in m for m in caplog.messages)
+    async def publish_block() -> None:
+        block_publication_started.set()
+        await finish_block_publication.wait()
+        if block_publication_outcome == "failure":
+            raise RuntimeError("Block publication failed")
+
+    block_task = asyncio.create_task(publish_block())
+    envelope_task = asyncio.create_task(
+        block_proposal_service._publish_payload_envelope(
+            slot=slot,
+            duty=duty,
+            beacon_block_root=ZERO_ROOT,
+            beacon_node=beacon_node,
+            block_publication_task=block_task,
+        )
+    )
+    try:
+        await block_publication_started.wait()
+        await asyncio.sleep(0)
+        fetch_envelope.assert_not_awaited()
+        if block_publication_outcome != "timeout":
+            finish_block_publication.set()
+
+        if block_publication_outcome == "failure":
+            with pytest.raises(HandledRuntimeError):
+                await envelope_task
+            fetch_envelope.assert_not_awaited()
+        else:
+            await envelope_task
+            fetch_envelope.assert_awaited_once()
+            assert any("Published payload envelope" in m for m in caplog.messages)
+            if block_publication_outcome == "timeout":
+                assert not block_task.done()
+                assert any(
+                    "Block publication still pending" in m for m in caplog.messages
+                )
+    finally:
+        finish_block_publication.set()
+        await asyncio.gather(block_task, envelope_task, return_exceptions=True)
 
 
 @pytest.mark.parametrize(
