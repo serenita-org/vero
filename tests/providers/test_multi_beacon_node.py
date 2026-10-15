@@ -32,144 +32,6 @@ from tests.ssz_objects import (
 
 
 @pytest.mark.parametrize(
-    "cli_args",
-    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(3)]}],
-    indirect=True,
-)
-@pytest.mark.parametrize("epa_event_received", [False, True])
-@pytest.mark.parametrize(
-    ("responses", "expected_response"),
-    [
-        pytest.param([None, "data", "pending"], "event-dependent", id="empty-first"),
-        pytest.param(["data", None, "pending"], "data", id="data-first"),
-        pytest.param(["error", "data", "pending"], "data", id="error-first"),
-        pytest.param(["error", None, "data"], "event-dependent", id="error-then-empty"),
-        pytest.param([None, None, None], None, id="all-empty"),
-        pytest.param(["error", None, "error"], None, id="empty-and-errors"),
-        pytest.param(["error", "error", "error"], None, id="all-errors"),
-    ],
-)
-async def test_produce_payload_attestation_data(
-    multi_beacon_node: MultiBeaconNode,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-    epa_event_received: bool,
-    responses: list[str | None],
-    expected_response: str | None,
-) -> None:
-    # After an EPA event, skip empty responses and wait for positive payload
-    # attestation data; otherwise, accept the first successful response, even if it is None.
-    # In both cases, tolerate node errors and cancel any outstanding requests.
-    slot = 123
-    data = PayloadAttestationData(
-        slot=slot,
-        beacon_block_root="0x" + "12" * 32,
-        payload_present=True,
-        blob_data_available=True,
-    )
-    requests: list[AsyncMock] = []
-    node_tasks: list[asyncio.Task[object]] = []
-
-    async def respond(index: int, *, slot: int) -> PayloadAttestationData | None:
-        assert slot == 123
-        task = asyncio.current_task()
-        assert task is not None
-        node_tasks.append(task)
-        # Complete in a different order from the configured node order.
-        # The last response can remain blocked to verify early cancellation.
-        if responses[index] == "pending":
-            await asyncio.Event().wait()
-        await asyncio.sleep(index * 0.01)
-        if responses[index] == "error":
-            raise RuntimeError("Beacon node unavailable")
-        return data if responses[index] == "data" else None
-
-    for index, node in enumerate(reversed(multi_beacon_node.initialized_beacon_nodes)):
-        request = AsyncMock(side_effect=partial(respond, index))
-        monkeypatch.setattr(node, "produce_payload_attestation_data", request)
-        requests.append(request)
-
-    async with asyncio.timeout(1):
-        result = await multi_beacon_node.produce_payload_attestation_data(
-            slot=slot, epa_event_received=epa_event_received
-        )
-    await asyncio.gather(*node_tasks, return_exceptions=True)
-
-    if expected_response == "event-dependent":
-        expected_response = "data" if epa_event_received else None
-    assert result is (data if expected_response == "data" else None)
-    for request in requests:
-        request.assert_awaited_once_with(slot=slot)
-    assert all(task.done() for task in node_tasks)
-    if "pending" in responses:
-        assert any(task.cancelled() for task in node_tasks)
-    if "error" in responses:
-        assert any("Beacon node unavailable" in message for message in caplog.messages)
-
-
-@pytest.mark.parametrize(
-    "cli_args",
-    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(2)]}],
-    indirect=True,
-)
-@pytest.mark.parametrize("epa_event_received", [False, True])
-@pytest.mark.parametrize(
-    ("payload_present", "blob_data_available"),
-    [(False, False), (False, True), (True, False)],
-)
-@pytest.mark.parametrize("positive_response_available", [False, True])
-async def test_payload_attestation_negative_response_first(
-    multi_beacon_node: MultiBeaconNode,
-    monkeypatch: pytest.MonkeyPatch,
-    epa_event_received: bool,
-    payload_present: bool,
-    blob_data_available: bool,
-    positive_response_available: bool,
-) -> None:
-    # A node still missing the payload or blobs can respond before the node that
-    # emitted the EPA event. Its negative response must not win the early vote;
-    # wait for positive data, or return None if no node provides it.
-    negative_data = PayloadAttestationData(
-        slot=123,
-        beacon_block_root="0x" + "12" * 32,
-        payload_present=payload_present,
-        blob_data_available=blob_data_available,
-    )
-    positive_data = PayloadAttestationData(
-        slot=123,
-        beacon_block_root="0x" + "12" * 32,
-        payload_present=True,
-        blob_data_available=True,
-    )
-
-    async def respond_later(*, slot: int) -> PayloadAttestationData | None:
-        assert slot == 123
-        await asyncio.sleep(0.01)
-        return positive_data if positive_response_available else None
-
-    fast_node, slow_node = multi_beacon_node.initialized_beacon_nodes
-    monkeypatch.setattr(
-        fast_node,
-        "produce_payload_attestation_data",
-        AsyncMock(return_value=negative_data),
-    )
-    monkeypatch.setattr(
-        slow_node,
-        "produce_payload_attestation_data",
-        AsyncMock(side_effect=respond_later),
-    )
-
-    result = await multi_beacon_node.produce_payload_attestation_data(
-        slot=123, epa_event_received=epa_event_received
-    )
-    if epa_event_received:
-        assert result is (positive_data if positive_response_available else None)
-    else:
-        # At the deadline, negative availability data remains a valid response.
-        assert result is negative_data
-
-
-@pytest.mark.parametrize(
     argnames=(
         "cli_args",
         "beacon_node_availabilities",
@@ -615,3 +477,178 @@ async def test_get_sync_committee_contribution(
             assert (
                 sum(returned_contribution.aggregation_bits) == best_contribution_score
             )
+
+
+@pytest.mark.parametrize(
+    "cli_args",
+    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(3)]}],
+    indirect=True,
+)
+class TestProducePayloadAttestationData:
+    @pytest.fixture
+    def payload_data(self) -> PayloadAttestationData:
+        return PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=True,
+            blob_data_available=True,
+        )
+
+    @pytest.fixture
+    def node_requests(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        monkeypatch: pytest.MonkeyPatch,
+        payload_data: PayloadAttestationData,
+    ) -> tuple[AsyncMock, AsyncMock, AsyncMock]:
+        first_request = AsyncMock(return_value=payload_data)
+        second_request = AsyncMock(return_value=payload_data)
+        third_request = AsyncMock(return_value=payload_data)
+        requests = (first_request, second_request, third_request)
+        for node, request in zip(multi_beacon_node.beacon_nodes, requests, strict=True):
+            monkeypatch.setattr(node, "produce_payload_attestation_data", request)
+        return requests
+
+    @pytest.mark.parametrize(
+        ("payload_present", "blob_data_available"),
+        [
+            pytest.param(True, True, id="payload-and-blobs-available"),
+            pytest.param(False, True, id="late-payload"),
+            pytest.param(True, False, id="blobs-unavailable"),
+            pytest.param(False, False, id="payload-and-blobs-unavailable"),
+        ],
+    )
+    async def test_epa_queries_only_emitter(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_present: bool,
+        blob_data_available: bool,
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_response = PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=payload_present,
+            blob_data_available=blob_data_available,
+        )
+        emitter_request.return_value = emitter_response
+
+        result = await multi_beacon_node.produce_payload_attestation_data(
+            slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+        )
+
+        assert result is emitter_response
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    async def test_epa_empty_response_does_not_fall_back(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_request.return_value = None
+
+        result = await multi_beacon_node.produce_payload_attestation_data(
+            slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+        )
+
+        assert result is None
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    async def test_epa_error_does_not_fall_back(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, emitter_request, third_request = node_requests
+        emitter_request.side_effect = RuntimeError("Emitter unavailable")
+
+        with pytest.raises(RuntimeError, match="Emitter unavailable"):
+            await multi_beacon_node.produce_payload_attestation_data(
+                slot=123, beacon_node=multi_beacon_node.beacon_nodes[1]
+            )
+
+        emitter_request.assert_awaited_once_with(slot=123)
+        first_request.assert_not_awaited()
+        third_request.assert_not_awaited()
+
+    @pytest.mark.parametrize("block_seen", [True, False], ids=["data", "no-block"])
+    async def test_deadline_uses_first_response(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_data: PayloadAttestationData,
+        block_seen: bool,
+    ) -> None:
+        slow_request, fast_request, other_request = node_requests
+        expected_response = payload_data if block_seen else None
+        fast_request.return_value = expected_response
+
+        async def wait_forever(*, slot: int) -> None:
+            await asyncio.Event().wait()
+
+        slow_request.side_effect = wait_forever
+        other_request.side_effect = wait_forever
+
+        async with asyncio.timeout(1):
+            result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is expected_response
+        for request in node_requests:
+            request.assert_awaited_once_with(slot=123)
+
+    async def test_deadline_accepts_negative_data(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        first_request, _, _ = node_requests
+        negative_data = PayloadAttestationData(
+            slot=123,
+            beacon_block_root="0x" + "12" * 32,
+            payload_present=False,
+            blob_data_available=False,
+        )
+        first_request.return_value = negative_data
+
+        result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is negative_data
+
+    @pytest.mark.parametrize("block_seen", [True, False], ids=["data", "no-block"])
+    async def test_deadline_skips_request_errors(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+        payload_data: PayloadAttestationData,
+        block_seen: bool,
+    ) -> None:
+        first_request, second_request, third_request = node_requests
+        first_request.side_effect = RuntimeError("Node unavailable")
+        expected_response = payload_data if block_seen else None
+        second_request.return_value = expected_response
+        third_request.side_effect = RuntimeError("Another node unavailable")
+
+        result = await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+        assert result is expected_response
+        first_request.assert_awaited_once_with(slot=123)
+        second_request.assert_awaited_once_with(slot=123)
+
+    async def test_deadline_fails_when_all_nodes_error(
+        self,
+        multi_beacon_node: MultiBeaconNode,
+        node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
+    ) -> None:
+        for request in node_requests:
+            request.side_effect = RuntimeError("Node unavailable")
+
+        with pytest.raises(
+            RuntimeError, match="Failed to get a response from all beacon nodes"
+        ):
+            await multi_beacon_node.produce_payload_attestation_data(slot=123)

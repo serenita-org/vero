@@ -206,17 +206,18 @@ class MultiBeaconNode:
             for bn in self.initialized_beacon_nodes
         ]
 
-        for coro in asyncio.as_completed(tasks):
-            try:
-                resp = await coro
-            except Exception as e:
-                self.logger.warning(f"Failed to get a response from beacon node: {e!r}")
-                continue
-            else:
-                # Successful response -> cancel other pending tasks
-                for task in tasks:
-                    task.cancel()
-                return resp
+        try:
+            for coro in asyncio.as_completed(tasks):
+                try:
+                    return await coro
+                except Exception as e:
+                    self.logger.warning(
+                        f"Failed to get a response from beacon node: {e!r}"
+                    )
+        finally:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         raise RuntimeError(
             f"Failed to get a response from all beacon nodes for {func_name}",
@@ -867,43 +868,21 @@ class MultiBeaconNode:
     async def produce_payload_attestation_data(
         self,
         slot: int,
-        epa_event_received: bool,
+        beacon_node: BeaconNode | None = None,
     ) -> PayloadAttestationData | None:
-        tasks = [
-            asyncio.create_task(
-                bn.produce_payload_attestation_data(
-                    slot=slot,
-                )
-            )
-            for bn in self.initialized_beacon_nodes
-        ]
+        """
+        Use the EPA event-emitting node, or the first successful response if no event
+        was received.
+        """
+        if beacon_node is not None:
+            return await beacon_node.produce_payload_attestation_data(slot=slot)
 
-        pa_data_to_return = None
-        for result in asyncio.as_completed(tasks):
-            try:
-                pa_data = await result
-            except Exception as e:
-                self.logger.warning(f"Failed to get a response from beacon node: {e!r}")
-                continue
-
-            if epa_event_received and (
-                pa_data is None
-                or not pa_data.payload_present
-                or not pa_data.blob_data_available
-            ):
-                # The node that emitted the EPA event has the payload and blobs.
-                # Other nodes may not have received them yet, so ignore their
-                # empty or negative responses when attesting in reaction to
-                # an EPA event.
-                continue
-
-            pa_data_to_return = pa_data
-            break
-
-        for task in tasks:
-            task.cancel()
-
-        return pa_data_to_return
+        return cast(
+            "PayloadAttestationData | None",
+            await self._get_first_beacon_node_response(
+                func_name="produce_payload_attestation_data", slot=slot
+            ),
+        )
 
     async def publish_payload_attestation_messages(
         self,

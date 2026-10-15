@@ -30,7 +30,7 @@ class EventConsumerService:
         ] = []
         self.execution_payload_available_event_handlers: list[
             Callable[
-                [SchemaBeaconAPI.ExecutionPayloadAvailableEvent],
+                [SchemaBeaconAPI.ExecutionPayloadAvailableEvent, BeaconNode],
                 Coroutine[Any, Any, None],
             ]
         ] = []
@@ -77,7 +77,8 @@ class EventConsumerService:
     def add_execution_payload_available_event_handler(
         self,
         event_handler: Callable[
-            [SchemaBeaconAPI.ExecutionPayloadAvailableEvent], Coroutine[Any, Any, None]
+            [SchemaBeaconAPI.ExecutionPayloadAvailableEvent, BeaconNode],
+            Coroutine[Any, Any, None],
         ],
     ) -> None:
         self.execution_payload_available_event_handlers.append(event_handler)
@@ -178,7 +179,7 @@ class EventConsumerService:
                 )
                 for epa_handler in self.execution_payload_available_event_handlers:
                     self.task_manager.create_task(
-                        epa_handler(event),
+                        epa_handler(event, beacon_node),
                         name=f"{self.__class__.__name__}.handler-{event_type}-{epa_handler.__name__}-{uuid4().hex}",
                     )
         elif isinstance(event, SchemaBeaconAPI.ChainReorgEvent):

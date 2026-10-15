@@ -10,6 +10,7 @@ from apscheduler.jobstores.base import JobLookupError
 from spy_ssz import Fork
 
 from observability import ErrorType
+from providers import BeaconNode
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDutyService,
@@ -88,7 +89,9 @@ class PtcService(ValidatorDutyService):
             self.task_manager.create_task(super().update_duties())
 
     async def handle_execution_payload_available_event(
-        self, event: SchemaBeaconAPI.ExecutionPayloadAvailableEvent
+        self,
+        event: SchemaBeaconAPI.ExecutionPayloadAvailableEvent,
+        beacon_node: BeaconNode,
     ) -> None:
         # Ignore the event if we've already started attesting
         if int(event.slot) <= self._last_slot_duty_started_for:
@@ -98,6 +101,7 @@ class PtcService(ValidatorDutyService):
         await self.attest_if_not_yet_attested(
             slot=int(event.slot),
             payload_available_event=event,
+            beacon_node=beacon_node,
         )
 
     async def handle_head_event(
@@ -131,6 +135,7 @@ class PtcService(ValidatorDutyService):
         self,
         slot: int,
         payload_available_event: SchemaBeaconAPI.ExecutionPayloadAvailableEvent | None,
+        beacon_node: BeaconNode | None,
         duties: set[SchemaBeaconAPI.PtcDuty],
     ) -> None:
         self.logger.debug(
@@ -141,16 +146,16 @@ class PtcService(ValidatorDutyService):
         payload_att_data = (
             await self.multi_beacon_node.produce_payload_attestation_data(
                 slot=slot,
-                epa_event_received=payload_available_event is not None,
+                beacon_node=beacon_node,
             )
         )
 
         if payload_att_data is None:
-            # No block has been seen for the slot -> no payload attestation to cast
+            # No usable data was returned -> no payload attestation to cast.
             if payload_available_event is not None:
                 # We received an EPA event for this slot, but no payload attestation data.
                 self.logger.warning(
-                    "No positive payload attestation data received from any node despite EPA event"
+                    "No payload attestation data received from EPA-emitting node"
                 )
             return
 
@@ -207,6 +212,7 @@ class PtcService(ValidatorDutyService):
         slot: int,
         payload_available_event: SchemaBeaconAPI.ExecutionPayloadAvailableEvent
         | None = None,
+        beacon_node: BeaconNode | None = None,
     ) -> None:
         """
         We either
@@ -239,6 +245,7 @@ class PtcService(ValidatorDutyService):
                 await self._attest(
                     slot=slot,
                     payload_available_event=payload_available_event,
+                    beacon_node=beacon_node,
                     duties=duties,
                 )
             finally:
