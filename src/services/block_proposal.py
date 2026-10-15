@@ -443,6 +443,8 @@ class BlockProposalService(ValidatorDutyService):
                         )
                     )
 
+                self.logger.info(f"Submitted builder preferences for slot {duty.slot}")
+
     async def submit_proposer_preferences(self) -> None:
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
