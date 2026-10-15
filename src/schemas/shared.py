@@ -44,4 +44,4 @@ class SignedExecutionPayloadBid(msgspec.Struct):
 
     @property
     def total_value_wei(self) -> int:
-        return int(1e9 * self.total_value)
+        return self.total_value * 10**9
