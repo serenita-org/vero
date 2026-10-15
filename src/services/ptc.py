@@ -10,7 +10,7 @@ from apscheduler.jobstores.base import JobLookupError
 from spy_ssz import Fork
 
 from observability import ErrorType
-from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared
+from schemas import SchemaBeaconAPI, SchemaRemoteSigner
 from services.validator_duty_service import (
     ValidatorDutyService,
     ValidatorDutyServiceOptions,
@@ -239,11 +239,11 @@ class PtcService(ValidatorDutyService):
             )
             return
 
-        if self.beacon_chain.current_fork_version != SchemaShared.ForkVersion.GLOAS:
-            return
-
         current_epoch = self.beacon_chain.current_epoch
         for epoch in (current_epoch, current_epoch + 1):
+            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
+                continue
+
             self.logger.debug(f"Updating PTC duties for epoch {epoch}")
 
             response = await self.multi_beacon_node.get_ptc_duties(
