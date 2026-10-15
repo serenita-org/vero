@@ -139,11 +139,19 @@ class PtcService(ValidatorDutyService):
         self._last_slot_duty_started_for = slot
 
         payload_att_data = (
-            await self.multi_beacon_node.produce_payload_attestation_data(slot=slot)
+            await self.multi_beacon_node.produce_payload_attestation_data(
+                slot=slot,
+                epa_event_received=payload_available_event is not None,
+            )
         )
 
         if payload_att_data is None:
             # No block has been seen for the slot -> no payload attestation to cast
+            if payload_available_event is not None:
+                # We received an EPA event for this slot, but no payload attestation data.
+                self.logger.warning(
+                    "No payload attestation data received from any node"
+                )
             return
 
         # Sign and publish as signed messages become available.

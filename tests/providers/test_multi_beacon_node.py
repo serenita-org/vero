@@ -5,10 +5,12 @@ when multiple beacon nodes are provided to it. That includes:
 - requesting sync committee contributions from all beacon nodes and returning the best one
 """
 
+import asyncio
 import contextlib
 import os
 import re
 from functools import partial
+from unittest.mock import AsyncMock
 
 import msgspec
 import pytest
@@ -19,6 +21,7 @@ from spy_ssz import Bitfield
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaShared
+from spec import PayloadAttestationData
 from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
 from tests.ssz_objects import (
@@ -26,6 +29,82 @@ from tests.ssz_objects import (
     make_attestation_data,
     make_contribution,
 )
+
+
+@pytest.mark.parametrize(
+    "cli_args",
+    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(3)]}],
+    indirect=True,
+)
+@pytest.mark.parametrize("epa_event_received", [False, True])
+@pytest.mark.parametrize(
+    ("responses", "expected_response"),
+    [
+        pytest.param([None, "data", "pending"], "event-dependent", id="empty-first"),
+        pytest.param(["data", None, "pending"], "data", id="data-first"),
+        pytest.param(["error", "data", "pending"], "data", id="error-first"),
+        pytest.param(["error", None, "data"], "event-dependent", id="error-then-empty"),
+        pytest.param([None, None, None], None, id="all-empty"),
+        pytest.param(["error", None, "error"], None, id="empty-and-errors"),
+        pytest.param(["error", "error", "error"], None, id="all-errors"),
+    ],
+)
+async def test_produce_payload_attestation_data(
+    multi_beacon_node: MultiBeaconNode,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    epa_event_received: bool,
+    responses: list[str | None],
+    expected_response: str | None,
+) -> None:
+    # After an EPA event, skip empty responses and wait for payload attestation
+    # data; otherwise, accept the first successful response, even if it is None.
+    # In both cases, tolerate node errors and cancel any outstanding requests.
+    slot = 123
+    data = PayloadAttestationData(
+        slot=slot,
+        beacon_block_root="0x" + "12" * 32,
+        payload_present=True,
+        blob_data_available=True,
+    )
+    requests: list[AsyncMock] = []
+    node_tasks: list[asyncio.Task[object]] = []
+
+    async def respond(index: int, *, slot: int) -> PayloadAttestationData | None:
+        assert slot == 123
+        task = asyncio.current_task()
+        assert task is not None
+        node_tasks.append(task)
+        # Complete in a different order from the configured node order.
+        # The last response can remain blocked to verify early cancellation.
+        if responses[index] == "pending":
+            await asyncio.Event().wait()
+        await asyncio.sleep(index * 0.01)
+        if responses[index] == "error":
+            raise RuntimeError("Beacon node unavailable")
+        return data if responses[index] == "data" else None
+
+    for index, node in enumerate(reversed(multi_beacon_node.initialized_beacon_nodes)):
+        request = AsyncMock(side_effect=partial(respond, index))
+        monkeypatch.setattr(node, "produce_payload_attestation_data", request)
+        requests.append(request)
+
+    async with asyncio.timeout(1):
+        result = await multi_beacon_node.produce_payload_attestation_data(
+            slot=slot, epa_event_received=epa_event_received
+        )
+    await asyncio.gather(*node_tasks, return_exceptions=True)
+
+    if expected_response == "event-dependent":
+        expected_response = "data" if epa_event_received else None
+    assert result is (data if expected_response == "data" else None)
+    for request in requests:
+        request.assert_awaited_once_with(slot=slot)
+    assert all(task.done() for task in node_tasks)
+    if "pending" in responses:
+        assert any(task.cancelled() for task in node_tasks)
+    if "error" in responses:
+        assert any("Beacon node unavailable" in message for message in caplog.messages)
 
 
 @pytest.mark.parametrize(

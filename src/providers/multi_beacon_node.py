@@ -867,14 +867,41 @@ class MultiBeaconNode:
     async def produce_payload_attestation_data(
         self,
         slot: int,
+        epa_event_received: bool,
     ) -> PayloadAttestationData | None:
-        return cast(
-            "PayloadAttestationData | None",
-            await self._get_first_beacon_node_response(
-                func_name="produce_payload_attestation_data",
-                slot=slot,
-            ),
-        )
+        tasks = [
+            asyncio.create_task(
+                bn.produce_payload_attestation_data(
+                    slot=slot,
+                )
+            )
+            for bn in self.initialized_beacon_nodes
+        ]
+
+        pa_data_to_return = None
+        for result in asyncio.as_completed(tasks):
+            try:
+                pa_data = await result
+            except Exception as e:
+                self.logger.warning(f"Failed to get a response from beacon node: {e!r}")
+                continue
+
+            if epa_event_received and pa_data is None:
+                # We expect to get payload attestation data from (at least)
+                # the beacon node that emitted the EPA event.
+                # If we receive None from another beacon node, ignore it.
+                continue
+
+            pa_data_to_return = pa_data
+            break
+
+        for task in tasks:
+            task.cancel()
+
+        if epa_event_received and pa_data_to_return is None:
+            self.logger.warning("No payload attestation data received from any node")
+
+        return pa_data_to_return
 
     async def publish_payload_attestation_messages(
         self,
