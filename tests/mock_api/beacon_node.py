@@ -58,7 +58,7 @@ def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
 
 
 @pytest.fixture
-def return_self_built_block(request: pytest.FixtureRequest) -> bool:
+def return_self_built_payload(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
 
 
@@ -69,7 +69,7 @@ def _mocked_beacon_node_endpoints(
     beacon_chain: BeaconChain,
     mocked_responses: aioresponses,
     execution_payload_blinded: bool,
-    return_self_built_block: bool,
+    return_self_built_payload: bool,
     beacon_api_spec: BeaconAPISpec | None,
 ) -> None:
     def _validate_response(
@@ -377,7 +377,9 @@ def _mocked_beacon_node_endpoints(
 
             request_headers = kwargs["headers"]
             fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
-            builder_index = BUILDER_INDEX_SELF_BUILD if return_self_built_block else 123
+            builder_index = (
+                BUILDER_INDEX_SELF_BUILD if return_self_built_payload else 123
+            )
             _data = make_block_gloas(slot=slot, builder_index=builder_index)
 
             # Not correct parsing but sufficient for our purposes

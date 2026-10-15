@@ -63,18 +63,30 @@ def _profile_program_run() -> Generator[None, None, None]:
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "fork_version",
+    ("fork_version", "return_self_built_payload"),
     [
-        pytest.param(ForkVersion.ELECTRA, id="Electra"),
-        pytest.param(ForkVersion.FULU, id="Fulu"),
-        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+        pytest.param(
+            ForkVersion.ELECTRA,
+            False,
+            id="Electra",
+        ),
+        pytest.param(
+            ForkVersion.FULU,
+            False,
+            id="Fulu",
+        ),
+        pytest.param(
+            ForkVersion.GLOAS,
+            False,
+            id="Gloas-External-builder-payload",
+        ),
+        pytest.param(
+            ForkVersion.GLOAS,
+            True,
+            id="Gloas-Self-built-payload",
+        ),
     ],
-    indirect=True,
-)
-@pytest.mark.parametrize(
-    "return_self_built_block",
-    [pytest.param(False, id="External builder"), pytest.param(True, id="Self-built")],
-    indirect=True,
+    indirect=["fork_version", "return_self_built_payload"],
 )
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
@@ -84,15 +96,12 @@ async def test_lifecycle(
     vero: Vero,
     enable_keymanager_api: bool,
     fork_version: ForkVersion,
-    return_self_built_block: bool,
+    return_self_built_payload: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """
     Sanity check that Vero can start running, perform its duties and shut down cleanly.
     """
-    if return_self_built_block and fork_version != ForkVersion.GLOAS:
-        pytest.skip("Flag only relevant for Gloas")
-
     run_services_task = asyncio.create_task(main(vero=vero))
 
     # Wait for expected log lines to appear
@@ -123,7 +132,7 @@ async def test_lifecycle(
 
         if fork_version == ForkVersion.GLOAS:
             required_log_lines.append("Published PTC attestations for slot")
-            if return_self_built_block:
+            if return_self_built_payload:
                 required_log_lines.append("Published payload envelope for slot")
 
     timeout = 5
