@@ -266,6 +266,10 @@ class PtcService(ValidatorDutyService):
                 del self.ptc_duties_dependent_roots[epoch]
 
     async def _update_duties(self) -> None:
+        current_epoch = self.beacon_chain.current_epoch
+        if current_epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
+            return
+
         _validator_indices = (
             self.validator_status_tracker_service.active_or_pending_indices
         )
@@ -275,11 +279,7 @@ class PtcService(ValidatorDutyService):
             )
             return
 
-        current_epoch = self.beacon_chain.current_epoch
         for epoch in (current_epoch, current_epoch + 1):
-            if epoch < self.beacon_chain.GLOAS_FORK_EPOCH:
-                continue
-
             self.logger.debug(f"Updating PTC duties for epoch {epoch}")
 
             response = await self.multi_beacon_node.get_ptc_duties(
