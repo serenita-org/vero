@@ -2,6 +2,10 @@
 
 ## Upcoming release
 
+#### Features
+
+- Use Lodestar-Z for SSZ encoding, decoding, and hash tree roots via `ssz-z-python`
+
 ___
 
 ## [yanked] v1.5.0-rc.0 { id="v1.5.0-rc.0" }

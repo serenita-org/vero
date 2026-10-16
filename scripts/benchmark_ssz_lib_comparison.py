@@ -2,7 +2,9 @@ import logging
 import time
 from pathlib import Path
 
-from spy_ssz import ElectraSignedBeaconBlock
+from ssz_z import get_type
+
+SIGNED_BLOCK = get_type("SignedBeaconBlock", fork="electra")
 
 BLOCKS_DIR = Path("/tmp/beacon_blocks")  # noqa: S108
 
@@ -19,21 +21,18 @@ def benchmark_json(json_blocks: list[bytes]) -> None:
     encode_seconds = 0.0
     for block_json in json_blocks:
         started = time.perf_counter()
-        decoded = ElectraSignedBeaconBlock.from_json(block_json)
+        decoded = SIGNED_BLOCK.load_json(block_json, wrapped=True)
         decode_seconds += time.perf_counter() - started
-        try:
-            started = time.perf_counter()
-            decoded.to_json()
-            encode_seconds += time.perf_counter() - started
-        finally:
-            decoded.close()
+        started = time.perf_counter()
+        decoded.to_json()
+        encode_seconds += time.perf_counter() - started
 
     logger.info(
-        "spy-ssz JSON decode: %.2f ms/block",
+        "Lodestar-Z JSON decode: %.2f ms/block",
         1000 * decode_seconds / len(json_blocks),
     )
     logger.info(
-        "spy-ssz JSON encode: %.2f ms/block",
+        "Lodestar-Z JSON encode: %.2f ms/block",
         1000 * encode_seconds / len(json_blocks),
     )
 
@@ -47,22 +46,19 @@ def benchmark_ssz(ssz_blocks: list[bytes]) -> None:
     encode_seconds = 0.0
     for block_ssz in ssz_blocks:
         started = time.perf_counter()
-        decoded = ElectraSignedBeaconBlock.from_ssz(block_ssz)
+        decoded = SIGNED_BLOCK.load_ssz(block_ssz)
         decode_seconds += time.perf_counter() - started
-        try:
-            started = time.perf_counter()
-            encoded = decoded.to_ssz()
-            encode_seconds += time.perf_counter() - started
-        finally:
-            decoded.close()
+        started = time.perf_counter()
+        encoded = decoded.to_ssz()
+        encode_seconds += time.perf_counter() - started
         assert block_ssz == encoded  # noqa: S101
 
     logger.info(
-        "spy-ssz SSZ decode: %.2f ms/block",
+        "Lodestar-Z SSZ load/validate: %.2f ms/block",
         1000 * decode_seconds / len(ssz_blocks),
     )
     logger.info(
-        "spy-ssz SSZ encode: %.2f ms/block",
+        "Lodestar-Z SSZ export: %.2f ms/block",
         1000 * encode_seconds / len(ssz_blocks),
     )
 

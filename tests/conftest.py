@@ -7,7 +7,7 @@ from unittest import mock
 
 import prometheus_client
 import pytest
-from spy_ssz import Fork
+from spec.ssz import Fork
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability

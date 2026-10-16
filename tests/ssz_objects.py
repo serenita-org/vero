@@ -1,15 +1,8 @@
-from typing import Any, cast
+from collections.abc import Iterable
+from typing import Any
 
 import msgspec
-from spy_ssz import (
-    Bitfield,
-    ExecutionPayloadEnvelopeGloas,
-    Fork,
-    ObjectKind,
-    Preset,
-    get_ssz_type,
-    load_preset,
-)
+from ssz_z import get_type
 
 from spec import (
     Attestation,
@@ -19,6 +12,7 @@ from spec import (
     preset_types,
 )
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
+from spec.ssz import ExecutionPayloadEnvelope, Fork, SSZCodec, bind_type
 
 BYTES_PER_BLS_SIGNATURE = 96
 BYTES_PER_EXECUTION_ADDRESS = 20
@@ -42,54 +36,47 @@ def attestation_data_obj(**overrides: Any) -> dict[str, Any]:
 
 
 def make_attestation_data(**overrides: Any) -> AttestationData:
-    attestation_data_type: type[AttestationData] = preset_types().attestation_data
+    attestation_data_type: SSZCodec[AttestationData] = preset_types().attestation_data
     return attestation_data_type.from_json(
         msgspec.json.encode(attestation_data_obj(**overrides))
     )
 
 
 def make_attestation(**overrides: Any) -> Attestation:
-    attestation_type: type[Attestation] = preset_types().attestation
-    preset_config = load_preset(attestation_type.expected_preset)
+    attestation_type: SSZCodec[Attestation] = preset_types().attestation
+    preset_config = preset_constants()
     value: dict[str, Any] = {
         "aggregation_bits": "0x01",
         "data": attestation_data_obj(),
         "signature": ZERO_SIGNATURE,
-        "committee_bits": Bitfield.bitvector(
-            preset_config.max_committees_per_slot
-        ).to_hex(),
+        "committee_bits": bitvector(preset_config["max_committees_per_slot"]),
     }
     value.update(overrides)
-    for field in ("aggregation_bits", "committee_bits"):
-        if isinstance(value[field], Bitfield):
-            value[field] = value[field].to_hex()
     if isinstance(value["data"], AttestationData):
         value["data"] = msgspec.Raw(value["data"].to_json())
     return attestation_type.from_json(msgspec.json.encode(value))
 
 
 def make_contribution(**overrides: Any) -> SyncCommitteeContribution:
-    contribution_type: type[SyncCommitteeContribution] = (
+    contribution_type: SSZCodec[SyncCommitteeContribution] = (
         preset_types().sync_committee_contribution
     )
-    preset_config = load_preset(contribution_type.expected_preset)
+    preset_config = preset_constants()
     value: dict[str, Any] = {
         "slot": "0",
         "beacon_block_root": ZERO_ROOT,
         "subcommittee_index": "0",
-        "aggregation_bits": Bitfield.bitvector(
-            preset_config.sync_committee_size // SYNC_COMMITTEE_SUBNET_COUNT
-        ).to_hex(),
+        "aggregation_bits": bitvector(
+            preset_config["sync_committee_size"] // SYNC_COMMITTEE_SUBNET_COUNT
+        ),
         "signature": ZERO_SIGNATURE,
     }
     value.update(overrides)
-    if isinstance(value["aggregation_bits"], Bitfield):
-        value["aggregation_bits"] = value["aggregation_bits"].to_hex()
     return contribution_type.from_json(msgspec.json.encode(value))
 
 
 def _block_body_electra_fulu(*, blinded: bool) -> dict[str, Any]:
-    preset_config = load_preset(Preset[preset_types().preset.upper()])
+    preset_config = preset_constants()
     execution_common = {
         "parent_hash": ZERO_ROOT,
         "fee_recipient": "0x" + "00" * BYTES_PER_EXECUTION_ADDRESS,
@@ -130,9 +117,7 @@ def _block_body_electra_fulu(*, blinded: bool) -> dict[str, Any]:
         "deposits": [],
         "voluntary_exits": [],
         "sync_aggregate": {
-            "sync_committee_bits": Bitfield.bitvector(
-                preset_config.sync_committee_size
-            ).to_hex(),
+            "sync_committee_bits": bitvector(preset_config["sync_committee_size"]),
             "sync_committee_signature": ZERO_SIGNATURE,
         },
         "execution_payload_header" if blinded else "execution_payload": execution,
@@ -151,30 +136,19 @@ def make_block_electra_fulu(*, slot: int, blinded: bool) -> BeaconBlock:
         "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
         "body": _block_body_electra_fulu(blinded=blinded),
     }
-    block_type = get_ssz_type(
-        Fork.FULU,
-        ObjectKind.BLINDED_BEACON_BLOCK
-        if blinded
-        else ObjectKind.BEACON_BLOCK_CONTENTS,
-        Preset[block_types.preset.upper()],
+    block_type = bind_type(
+        "BlindedBeaconBlock" if blinded else "BeaconBlockContents",
+        BeaconBlock,
+        fork=Fork.FULU,
+        preset=block_types.preset,
     )
     if blinded:
-        return cast(
-            "BeaconBlock",
-            block_type.from_json(msgspec.json.encode({"data": block})),
-        )
-    return cast(
-        "BeaconBlock",
-        block_type.from_json(
-            msgspec.json.encode(
-                {"data": {"block": block, "kzg_proofs": [], "blobs": []}}
-            )
-        ),
-    )
+        return block_type.from_json(block)
+    return block_type.from_json({"block": block, "kzg_proofs": [], "blobs": []})
 
 
 def _block_body_gloas(*, builder_index: int) -> dict[str, Any]:
-    preset_config = load_preset(Preset[preset_types().preset.upper()])
+    preset_config = preset_constants()
     return {
         "randao_reveal": ZERO_SIGNATURE,
         "eth1_data": {
@@ -189,9 +163,7 @@ def _block_body_gloas(*, builder_index: int) -> dict[str, Any]:
         "deposits": [],
         "voluntary_exits": [],
         "sync_aggregate": {
-            "sync_committee_bits": Bitfield.bitvector(
-                preset_config.sync_committee_size
-            ).to_hex(),
+            "sync_committee_bits": bitvector(preset_config["sync_committee_size"]),
             "sync_committee_signature": ZERO_SIGNATURE,
         },
         "bls_to_execution_changes": [],
@@ -231,20 +203,20 @@ def make_block_gloas(*, slot: int, builder_index: int) -> BeaconBlock:
         "state_root": "0xd9f5a83718a7657f50bc3c5be8c2b2fd7f051f44d2962efdde1e30cee881e7f6",
         "body": _block_body_gloas(builder_index=builder_index),
     }
-    block_type = get_ssz_type(Fork.GLOAS, ObjectKind.BEACON_BLOCK)
-    return cast(
-        "BeaconBlock",
-        block_type.from_json(msgspec.json.encode({"data": block})),
+    block_type = bind_type(
+        "BeaconBlock", BeaconBlock, fork=Fork.GLOAS, preset=preset_types().preset
     )
+    return block_type.from_json(block)
 
 
 def make_execution_payload_envelope_gloas(
     *, beacon_block_root: str = ZERO_ROOT
-) -> ExecutionPayloadEnvelopeGloas:
-    envelope_type = get_ssz_type(
-        Fork.GLOAS,
-        ObjectKind.EXECUTION_PAYLOAD_ENVELOPE,
-        Preset[preset_types().preset.upper()],
+) -> ExecutionPayloadEnvelope:
+    envelope_type = bind_type(
+        "ExecutionPayloadEnvelope",
+        ExecutionPayloadEnvelope,
+        fork=Fork.GLOAS,
+        preset=preset_types().preset,
     )
     envelope = {
         "payload": {
@@ -279,7 +251,31 @@ def make_execution_payload_envelope_gloas(
         "beacon_block_root": beacon_block_root,
         "parent_beacon_block_root": ZERO_ROOT,
     }
-    return cast(
-        "ExecutionPayloadEnvelopeGloas",
-        envelope_type.from_json(msgspec.json.encode({"data": envelope})),
-    )
+    return envelope_type.from_json(envelope)
+
+
+def preset_constants() -> dict[str, int]:
+    codec = get_type("Attestation", fork="fulu", preset=preset_types().preset)
+    sync = get_type("SyncAggregate", fork="fulu", preset=preset_types().preset)
+    return {
+        "max_committees_per_slot": codec.schema["fields"]["committee_bits"]["length"],
+        "sync_committee_size": sync.schema["fields"]["sync_committee_bits"]["length"],
+    }
+
+
+def bitvector(length: int, values: Iterable[bool | int] = ()) -> str:
+    bits = list(values)
+    if len(bits) > length:
+        raise ValueError("too many bits")
+    data = bytearray((length + 7) // 8)
+    for index, bit in enumerate(bits):
+        if bit:
+            data[index // 8] |= 1 << (index % 8)
+    return "0x" + data.hex()
+
+
+def bitlist(limit: int, values: Iterable[bool | int] = ()) -> str:
+    bits = list(values)
+    if len(bits) > limit:
+        raise ValueError("too many bits")
+    return bitvector(len(bits) + 1, [*bits, True])
