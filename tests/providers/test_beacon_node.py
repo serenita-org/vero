@@ -95,7 +95,7 @@ async def test_produce_block_v3_response(
     assert response.data is response_body
     assert content_type == response_content_type
     parsed_block = MultiBeaconNode._parse_block_response(response, content_type)
-    assert parsed_block.block.slot == 1
+    assert parsed_block.slot == 1
 
 
 @pytest.mark.parametrize(

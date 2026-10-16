@@ -9,7 +9,6 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from schemas import SchemaBeaconAPI, SchemaRemoteSigner, SchemaShared, SchemaValidator
@@ -29,6 +28,7 @@ from spec.constants import (
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
 from spec.slot_components import get_slot_component_duration_ms
+from spec.ssz import Fork
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 

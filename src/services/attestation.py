@@ -10,7 +10,6 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from providers import AttestationDataProvider
@@ -32,6 +31,7 @@ from spec.common import (
 )
 from spec.constants import TARGET_AGGREGATORS_PER_COMMITTEE
 from spec.slot_components import get_slot_component_duration_ms
+from spec.ssz import Fork
 
 _PRODUCE_JOB_ID = "AttestationService.attest_if_not_yet_attested-slot-{duty_slot}"
 

@@ -14,7 +14,7 @@ dependencies = [
     "pyroscope-io>=0.8.8",
     "pyroscope-otel>=0.4.0",
     "pyyaml>=6.0.2",
-    "spy-ssz",
+    "ssz-z-python",
 ]
 
 [dependency-groups]
@@ -63,7 +63,7 @@ exclude-newer = "7 days"
 # My fork only contains a very minimal patch that makes aioresponses compatible with
 # aiohttp>3.14
 aioresponses = { git = "https://github.com/eth2353/aioresponses", rev = "b3e8f869b1da9901144988d3bc41f9bc03d6e395" }
-spy-ssz = { git = "https://github.com/eth2353/spy-ssz", rev = "612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00" }
+ssz-z-python = { git = "https://github.com/eth2353/ssz-z-python", rev = "dde4f1a8a5130bef8300606ea28da9abe0b34c3f" }
 
 [tool.uv.pip]
 generate-hashes = true

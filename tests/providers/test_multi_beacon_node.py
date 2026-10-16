@@ -16,15 +16,17 @@ import msgspec
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
 from aioresponses import CallbackResult, aioresponses
-from spy_ssz import Bitfield
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaShared
-from spec import PayloadAttestationData
+from spec import PayloadAttestationData, preset_types
 from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
+from spec.ssz import Fork
 from tests.ssz_objects import (
+    bitlist,
+    bitvector,
     make_attestation,
     make_attestation_data,
     make_contribution,
@@ -306,7 +308,7 @@ async def test_get_aggregate_attestation(
                 aggregation_bits = [False] * 10
                 for idx in range(number_of_attesting_indices):
                     aggregation_bits[idx] = True
-                agg_bits_to_return = Bitfield.bitlist(bitlist_length, aggregation_bits)
+                agg_bits_to_return = bitlist(bitlist_length, aggregation_bits)
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
@@ -425,7 +427,7 @@ async def test_get_sync_committee_contribution(
                 aggregation_bits = [False] * bitlist_size
                 for idx in range(number_of_root_matching_indices):
                     aggregation_bits[idx] = True
-                agg_bits_to_return = Bitfield.bitvector(bitlist_size, aggregation_bits)
+                agg_bits_to_return = bitvector(bitlist_size, aggregation_bits)
                 _callback = partial(
                     lambda _bits, *args, **kwargs: CallbackResult(
                         body=msgspec.json.encode(
@@ -487,7 +489,7 @@ async def test_get_sync_committee_contribution(
 class TestProducePayloadAttestationData:
     @pytest.fixture
     def payload_data(self) -> PayloadAttestationData:
-        return PayloadAttestationData(
+        return preset_types(Fork.GLOAS).payload_attestation_data(
             slot=123,
             beacon_block_root="0x" + "12" * 32,
             payload_present=True,
@@ -526,7 +528,7 @@ class TestProducePayloadAttestationData:
         blob_data_available: bool,
     ) -> None:
         first_request, emitter_request, third_request = node_requests
-        emitter_response = PayloadAttestationData(
+        emitter_response = preset_types(Fork.GLOAS).payload_attestation_data(
             slot=123,
             beacon_block_root="0x" + "12" * 32,
             payload_present=payload_present,
@@ -608,7 +610,7 @@ class TestProducePayloadAttestationData:
         node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
     ) -> None:
         first_request, _, _ = node_requests
-        negative_data = PayloadAttestationData(
+        negative_data = preset_types(Fork.GLOAS).payload_attestation_data(
             slot=123,
             beacon_block_root="0x" + "12" * 32,
             payload_present=False,

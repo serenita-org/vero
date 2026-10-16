@@ -7,7 +7,6 @@ from typing import Self, Unpack
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from spy_ssz import Fork
 
 from observability import ErrorType
 from providers import BeaconNode
@@ -18,6 +17,7 @@ from services.validator_duty_service import (
 )
 from spec import preset_types
 from spec.slot_components import get_slot_component_duration_ms
+from spec.ssz import Fork
 
 _PRODUCE_JOB_ID = "PtcService.attest_if_not_yet_attested-slot-{duty_slot}"
 
@@ -166,7 +166,14 @@ class PtcService(ValidatorDutyService):
         # Sign and publish as signed messages become available.
         message = SchemaRemoteSigner.PayloadAttestationSignableMessage(
             fork_info=self.beacon_chain.get_fork_info(slot=slot),
-            payload_attestation_message=msgspec.Raw(payload_att_data.to_json()),
+            payload_attestation_message=msgspec.Raw(
+                msgspec.json.encode(
+                    {
+                        "version": "gloas",
+                        "data": msgspec.Raw(payload_att_data.to_json()),
+                    }
+                )
+            ),
         )
         signing_coros = [
             self.signature_provider.sign(

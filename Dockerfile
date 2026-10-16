@@ -9,7 +9,7 @@ FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
 WORKDIR /vero
 
-# Install native build tools needed by Rust crates with C/asm deps
+# Install native build tools needed by the Zig SSZ library and its assembly backend
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 
