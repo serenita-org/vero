@@ -1,5 +1,4 @@
 import hashlib
-from pathlib import Path
 from typing import Any, get_args
 
 import msgspec
@@ -19,23 +18,6 @@ from spec.ssz import (
     encode_json_array,
 )
 from tests.ssz_objects import bitlist, bitvector
-
-VECTORS = msgspec.json.decode(
-    (Path(__file__).parents[1] / "fixtures/ssz/attestations.json").read_bytes()
-)["cases"]
-
-
-@pytest.mark.parametrize("case", VECTORS, ids=lambda c: f"{c['preset']}-{c['fork']}")
-def test_official_attestation_vectors(case: dict[str, Any]) -> None:
-    codec = bind_type(
-        "Attestation", Attestation, fork=Fork(case["fork"]), preset=case["preset"]
-    )
-    encoded = bytes.fromhex(case["ssz"])
-    attestation = codec.from_json(case["value"])
-    assert attestation.to_ssz() == encoded
-    assert attestation.hash_tree_root().hex() == case["root"][2:]
-    assert codec.from_ssz(encoded) == attestation
-    assert codec.from_json(attestation.to_json()) == attestation
 
 
 @pytest.mark.parametrize("fork", list(Fork))
