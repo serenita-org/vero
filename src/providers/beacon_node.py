@@ -164,6 +164,23 @@ class BeaconNode(ApiClient):
                     )
             raise ValueError(msg)
 
+        # The gas limit schedule is advisory, so differences must not prevent
+        # initialization. Still surface them so operators can spot stale configs.
+        configured_schedule = sorted(
+            self.spec.GAS_LIMIT_SCHEDULE, key=lambda entry: entry.EPOCH
+        )
+        returned_schedule = sorted(
+            bn_spec.GAS_LIMIT_SCHEDULE if bn_spec is not None else [],
+            key=lambda entry: entry.EPOCH,
+        )
+        if configured_schedule != returned_schedule:
+            self.logger.warning(
+                f"GAS_LIMIT_SCHEDULE returned by beacon node {self.netloc} is missing "
+                f"or differs from Vero's configured schedule. "
+                f"Vero will continue using its configured schedule: {configured_schedule}; "
+                f"beacon node schedule: {returned_schedule}"
+            )
+
         # Regularly refresh the version of the beacon node
         self.scheduler.add_job(
             self.update_node_version,

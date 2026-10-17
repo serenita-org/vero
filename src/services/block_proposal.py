@@ -357,7 +357,6 @@ class BlockProposalService(ValidatorDutyService):
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
         default_fee_recipient = self.cli_args.fee_recipient
-        default_gas_limit = str(self.cli_args.gas_limit)
 
         for i in range(0, len(pubkeys_to_register), _batch_size):
             pubkey_batch = pubkeys_to_register[i : i + _batch_size]
@@ -373,10 +372,8 @@ class BlockProposalService(ValidatorDutyService):
                                     else self.keymanager.pubkey_to_fee_recipient_override.get(
                                         pubkey, default_fee_recipient
                                     ),
-                                    gas_limit=default_gas_limit
-                                    if not self.keymanager.enabled
-                                    else self.keymanager.pubkey_to_gas_limit_override.get(
-                                        pubkey, default_gas_limit
+                                    gas_limit=self.keymanager.get_effective_gas_limit(
+                                        pubkey=pubkey, slot=current_slot
                                     ),
                                     timestamp=str(_timestamp),
                                     pubkey=pubkey,
@@ -464,7 +461,6 @@ class BlockProposalService(ValidatorDutyService):
         # Default to values provided via the CLI arguments unless overridden
         # via the Keymanager API
         default_fee_recipient = self.cli_args.fee_recipient
-        default_target_gas_limit = str(self.cli_args.gas_limit)
 
         current_slot = self.beacon_chain.current_slot
 
@@ -498,10 +494,8 @@ class BlockProposalService(ValidatorDutyService):
                                     else self.keymanager.pubkey_to_fee_recipient_override.get(
                                         duty.pubkey, default_fee_recipient
                                     ),
-                                    target_gas_limit=default_target_gas_limit
-                                    if not self.keymanager.enabled
-                                    else self.keymanager.pubkey_to_gas_limit_override.get(
-                                        duty.pubkey, default_target_gas_limit
+                                    target_gas_limit=self.keymanager.get_effective_gas_limit(
+                                        pubkey=duty.pubkey, slot=int(duty.slot)
                                     ),
                                 ),
                             ),

@@ -23,7 +23,7 @@ class CLIArgs(msgspec.Struct, kw_only=True):
     fee_recipient: str
     data_dir: str
     graffiti: bytes
-    gas_limit: int
+    gas_limit: int | None
     use_external_builder: bool
     builder_urls: list[str]
     builder_boost_factor: int
@@ -106,10 +106,7 @@ def _process_fee_recipient(input_string: str) -> str:
         return input_string.lower()
 
 
-def _process_gas_limit(input_value: int | None, network: Network) -> int:
-    if input_value is not None:
-        return input_value
-
+def get_default_gas_limit(network: Network) -> int:
     _defaults = {
         Network.MAINNET: 60_000_000,
         Network.GNOSIS: 17_000_000,
@@ -215,7 +212,7 @@ def get_parser() -> argparse.ArgumentParser:
         type=int,
         required=False,
         default=None,
-        help="The gas limit value to pass on to external block builders during validator registrations. See the docs for more details.",
+        help="The gas limit preference for validator registrations and proposer preferences. Defaults to the active gas limit schedule after Gloas, or the network default. See the docs for more details.",
     )
     # TODO [post-Gloas] remove this flag
     parser.add_argument(
@@ -414,9 +411,7 @@ def parse_cli_args(args: Sequence[str]) -> CLIArgs:
             fee_recipient=_process_fee_recipient(parsed_args.fee_recipient),
             data_dir=parsed_args.data_dir,
             graffiti=encode_graffiti(parsed_args.graffiti),
-            gas_limit=_process_gas_limit(
-                input_value=parsed_args.gas_limit, network=network
-            ),
+            gas_limit=parsed_args.gas_limit,
             use_external_builder=parsed_args.use_external_builder,
             builder_urls=builder_urls,
             builder_boost_factor=parsed_args.builder_boost_factor,

@@ -1,11 +1,15 @@
 from typing import Any
 
 import msgspec.json
+import pytest
 from aiohttp.test_utils import TestClient
 from aiohttp.web_app import Application
 
-from providers import Keymanager
+from providers import BeaconChain, Keymanager
 from schemas import SchemaKeymanagerAPI
+from spec.base import GasLimitScheduleEntry
+from spec.common import Uint64
+from spec.configs import Network
 
 
 async def test_gas_limit_lifecycle(
@@ -104,3 +108,43 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
     assert resp.status == 404
     data = await resp.json()
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
+
+
+async def test_gas_limit_schedule_lifecycle(
+    keymanager: Keymanager,
+    test_client: TestClient[Any, Application],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pubkey = "0x" + "a" * 96
+    keymanager.cli_args.gas_limit = None
+    keymanager.cli_args.network = Network.HOODI
+    keymanager.vero.spec.GAS_LIMIT_SCHEDULE = [
+        GasLimitScheduleEntry(Uint64(10), Uint64(75_000_000)),
+        GasLimitScheduleEntry(Uint64(11), Uint64(90_000_000)),
+    ]
+    await keymanager.import_remote_keys(
+        [SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever")]
+    )
+    slot = 10 * keymanager.beacon_chain.SLOTS_PER_EPOCH - 1
+    monkeypatch.setattr(BeaconChain, "current_slot", property(lambda self: slot))
+    endpoint = f"/eth/v1/validator/{pubkey}/gas_limit"
+
+    async def get_gas_limit() -> str:
+        resp = await test_client.get(endpoint)
+        assert resp.status == 200
+        response = msgspec.json.decode(
+            await resp.text(), type=SchemaKeymanagerAPI.ListGasLimitResponse
+        )
+        return response.data.gas_limit
+
+    assert await get_gas_limit() == "60000000"
+    slot += 1
+    assert await get_gas_limit() == "75000000"
+    resp = await test_client.post(endpoint, json={"gas_limit": "100000000"})
+    assert resp.status == 202
+    assert await get_gas_limit() == "100000000"
+    slot += keymanager.beacon_chain.SLOTS_PER_EPOCH
+    assert await get_gas_limit() == "100000000"
+    resp = await test_client.delete(endpoint)
+    assert resp.status == 204
+    assert await get_gas_limit() == "90000000"

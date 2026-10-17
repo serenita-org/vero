@@ -5,6 +5,7 @@
 #### Features
 
 - Add support for the Gloas fork
+- Add support for [EIP-8261](https://eips.ethereum.org/EIPS/eip-8261): use scheduled gas limit defaults after Gloas while honoring explicit operator settings
 - Add `--builder-urls` flag
 - Add `--builder-min-bid` flag
 - Add `--builder-max-execution-payment` flag
