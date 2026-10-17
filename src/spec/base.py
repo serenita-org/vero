@@ -132,9 +132,7 @@ class SpecGloas:
     PTC_SIZE: Uint64
 
     # Advisory and optional: beacon nodes need not support this parameter.
-    GAS_LIMIT_SCHEDULE: list[GasLimitScheduleEntry] = field(
-        default_factory=list, compare=False
-    )
+    GAS_LIMIT_SCHEDULE: list[GasLimitScheduleEntry] = field(compare=False)
 
     def get_scheduled_gas_limit(self, epoch: int) -> int | None:
         if epoch < self.GLOAS_FORK_EPOCH:
@@ -150,6 +148,8 @@ class SpecGloas:
     def from_obj(cls, obj: dict[str, Any]) -> Self:
         values: dict[str, Any] = {}
         for spec_field in fields(cls):
+            # Unlike scalar spec fields, EIP-8261's advisory schedule is a list
+            # and may be omitted; treat an absent schedule as empty.
             if spec_field.name == "GAS_LIMIT_SCHEDULE":
                 values[spec_field.name] = [
                     GasLimitScheduleEntry.from_obj(entry)
