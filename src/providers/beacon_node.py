@@ -1128,6 +1128,7 @@ class BeaconNode(ApiClient):
                 sock_read=_TIMEOUT_EVENTS_SOCK_READ,
             ),
         ) as resp:
+            await self._raise_for_status(resp)
 
             async def read_line() -> bytes:
                 return await resp.content.readline(
