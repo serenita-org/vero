@@ -138,7 +138,7 @@ ___
 
 #### `--builder-urls`
 
-**[required]** A comma-separated list of external builder URLs, e.g. `https://builder-a.com,https://builder-b.net`.
+A comma-separated list of external builder URLs to contact directly for bids, e.g. `https://builder-a.com,https://builder-b.net`.
 ___
 
 #### `--builder-boost-factor`
