@@ -2,6 +2,12 @@
 
 ## Upcoming release
 
+___
+
+## v1.5.0-rc.0 { id="v1.5.0-rc.0" }
+
+<small>October 19, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.5.0-rc.0){:target="_blank"}
+
 #### Features
 
 - Add support for the Gloas fork
@@ -9,7 +15,6 @@
 - Add `--builder-urls` flag
 - Add `--builder-min-bid` flag
 - Add `--builder-max-execution-payment` flag
-- Replace the Grandine SSZ library bindings with spy-ssz ([#333](https://github.com/serenita-org/vero/pull/333))
 
 #### Bugfixes
 
