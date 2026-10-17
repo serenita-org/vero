@@ -105,15 +105,24 @@ ___
 
 #### `--gas-limit`
 
-The gas limit value passed on to external block builders
-during validator registrations.
+The gas limit preference used for validator registrations (pre-Gloas) and proposer preferences (post-Gloas).
 
 Can be set individually for each validator through the [Keymanager API](../usage/keymanager_api.md).
 
-!!! note ""
+When this flag is omitted, Vero follows the optional `GAS_LIMIT_SCHEDULE` in the
+network configuration after Gloas, as described in [EIP-8261](https://eips.ethereum.org/EIPS/eip-8261).
+The latest entry at or before the proposal's epoch supplies the default. Vero
+selects the value for each duty, including future duties, without requiring a restart.
+Before Gloas, or when no entry is active, Vero uses the network defaults below.
 
-    This setting does _not_ affect the gas limit value
-    of the connected CL or EL clients.
+At beacon-node initialization, Vero warns if the node returns a missing or different
+gas limit schedule. Initialization continues using Vero's configured schedule.
+
+An explicit `--gas-limit` or per-validator Keymanager setting takes precedence
+over the schedule. Values above the active recommendation produce a warning and
+are still honored. Deleting a Keymanager override restores the CLI preference,
+or the scheduled/network default if the flag is omitted. The Keymanager gas limit
+GET endpoint reports the effective preference for the current slot.
 
 ??? note "Default values"
 

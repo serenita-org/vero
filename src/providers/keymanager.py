@@ -8,6 +8,7 @@ from sqlite3 import IntegrityError
 from types import TracebackType
 from typing import Self
 
+from args import get_default_gas_limit
 from schemas import SchemaRemoteSigner
 from schemas.keymanager_api import (
     DeleteStatus,
@@ -225,8 +226,30 @@ class Keymanager(SignatureProvider):
 
         # If the gas limit value was not overridden, return
         # the default gas limit
-        gas_limit = res[0] or str(self.cli_args.gas_limit)
+        gas_limit = self.get_effective_gas_limit(
+            pubkey=pubkey, slot=self.beacon_chain.current_slot
+        )
         return ValidatorGasLimit(pubkey=pubkey, gas_limit=gas_limit)
+
+    def get_effective_gas_limit(self, pubkey: Pubkey, slot: int) -> UInt64String:
+        epoch = slot // self.beacon_chain.SLOTS_PER_EPOCH
+        scheduled = self.vero.spec.get_scheduled_gas_limit(epoch)
+        configured = self.cli_args.gas_limit
+        if pubkey in self.pubkey_to_gas_limit_override:
+            configured = int(self.pubkey_to_gas_limit_override[pubkey])
+
+        if configured is None and scheduled is not None:
+            return str(scheduled)
+        if configured is not None and scheduled is not None and configured > scheduled:
+            self.logger.warning(
+                f"Configured gas limit {configured} for validator {pubkey} exceeds "
+                f"the recommended maximum of {scheduled} at epoch {epoch}"
+            )
+        return str(
+            configured
+            if configured is not None
+            else get_default_gas_limit(self.cli_args.network)
+        )
 
     def set_gas_limit(self, pubkey: Pubkey, gas_limit: UInt64String) -> None:
         _, rowcount = self.db.fetch_one(

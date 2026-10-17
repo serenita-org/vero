@@ -1,4 +1,4 @@
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any, Self
 
 from spec.common import Bytes4, Root, Uint64
@@ -46,6 +46,22 @@ class Genesis:
         return {
             field.name: _to_obj(getattr(self, field.name)) for field in fields(self)
         }
+
+
+@dataclass
+class GasLimitScheduleEntry:
+    EPOCH: Uint64
+    GAS_LIMIT: Uint64
+
+    @classmethod
+    def from_obj(cls, obj: dict[str, Any]) -> Self:
+        return cls(
+            EPOCH=Uint64.from_obj(obj["EPOCH"]),
+            GAS_LIMIT=Uint64.from_obj(obj["GAS_LIMIT"]),
+        )
+
+    def to_obj(self) -> dict[str, str]:
+        return {"EPOCH": self.EPOCH.to_obj(), "GAS_LIMIT": self.GAS_LIMIT.to_obj()}
 
 
 @dataclass
@@ -115,16 +131,39 @@ class SpecGloas:
     PAYLOAD_ATTESTATION_DUE_BPS: Uint64
     PTC_SIZE: Uint64
 
+    # Advisory and optional: beacon nodes need not support this parameter.
+    GAS_LIMIT_SCHEDULE: list[GasLimitScheduleEntry] = field(
+        default_factory=list, compare=False
+    )
+
+    def get_scheduled_gas_limit(self, epoch: int) -> int | None:
+        if epoch < self.GLOAS_FORK_EPOCH:
+            return None
+        active_entry = max(
+            (entry for entry in self.GAS_LIMIT_SCHEDULE if epoch >= entry.EPOCH),
+            key=lambda entry: entry.EPOCH,
+            default=None,
+        )
+        return int(active_entry.GAS_LIMIT) if active_entry is not None else None
+
     @classmethod
     def from_obj(cls, obj: dict[str, Any]) -> Self:
         values: dict[str, Any] = {}
-        for field in fields(cls):
-            if field.name not in obj:
-                raise ValueError(f"Required field {field.name!r} missing from spec")
-            values[field.name] = (
-                Version(obj[field.name])
-                if field.name.endswith("FORK_VERSION")
-                else Uint64.from_obj(obj[field.name])
+        for spec_field in fields(cls):
+            if spec_field.name == "GAS_LIMIT_SCHEDULE":
+                values[spec_field.name] = [
+                    GasLimitScheduleEntry.from_obj(entry)
+                    for entry in obj.get(spec_field.name, [])
+                ]
+                continue
+            if spec_field.name not in obj:
+                raise ValueError(
+                    f"Required field {spec_field.name!r} missing from spec"
+                )
+            values[spec_field.name] = (
+                Version(obj[spec_field.name])
+                if spec_field.name.endswith("FORK_VERSION")
+                else Uint64.from_obj(obj[spec_field.name])
             )
         return cls(**values)
 
@@ -134,5 +173,5 @@ class SpecGloas:
         }
 
 
-def parse_spec(data: dict[str, str]) -> SpecGloas:
+def parse_spec(data: dict[str, Any]) -> SpecGloas:
     return SpecGloas.from_obj(data)

@@ -9,6 +9,9 @@ from schemas import SchemaBeaconAPI
 from schemas.shared import ForkVersion
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
+from spec.base import GasLimitScheduleEntry
+from spec.common import Uint64
+from spec.configs import Network
 from tests.ssz_objects import ZERO_ROOT
 
 
@@ -67,6 +70,108 @@ async def test_register_validators(
     await block_proposal_service.register_validators(
         current_slot=beacon_chain.current_slot
     )
+
+
+@pytest.mark.parametrize("enable_keymanager_api", [False, True], indirect=True)
+@pytest.mark.parametrize("configured", [None, 60_000_000, 90_000_000])
+async def test_proposer_preferences_gas_limit_schedule(
+    block_proposal_service: BlockProposalService,
+    beacon_chain: BeaconChain,
+    vero: Vero,
+    random_active_validator: ValidatorIndexPubkey,
+    enable_keymanager_api: bool,
+    configured: int | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vero.cli_args.gas_limit = configured
+    vero.spec.GAS_LIMIT_SCHEDULE = [
+        GasLimitScheduleEntry(Uint64(10), Uint64(60_000_000)),
+        GasLimitScheduleEntry(Uint64(11), Uint64(75_000_000)),
+    ]
+    slots_per_epoch = beacon_chain.SLOTS_PER_EPOCH
+    current_slot = 10 * slots_per_epoch - 1
+    monkeypatch.setattr(
+        BeaconChain, "current_slot", property(lambda self: current_slot)
+    )
+    sign = AsyncMock(wraps=block_proposal_service.signature_provider.sign)
+    submit = AsyncMock()
+    monkeypatch.setattr(block_proposal_service.signature_provider, "sign", sign)
+    monkeypatch.setattr(
+        block_proposal_service.multi_beacon_node, "submit_proposer_preferences", submit
+    )
+
+    for epoch in (10, 11):
+        block_proposal_service.proposer_duties[epoch].add(
+            SchemaBeaconAPI.ProposerDuty(
+                pubkey=random_active_validator.pubkey,
+                validator_index=str(random_active_validator.index),
+                slot=str(epoch * slots_per_epoch),
+            )
+        )
+        block_proposal_service.proposer_duties_dependent_roots[epoch] = ZERO_ROOT
+
+    await block_proposal_service.submit_proposer_preferences()
+    assert sign.await_count == 2
+    assert submit.await_count == 2
+    preferences = {
+        int(
+            call.kwargs["message"].proposer_preferences.data.proposal_slot
+        ): call.kwargs["message"].proposer_preferences.data.target_gas_limit
+        for call in sign.await_args_list
+    }
+    assert preferences == {
+        10 * slots_per_epoch: str(configured if configured is not None else 60_000_000),
+        11 * slots_per_epoch: str(configured if configured is not None else 75_000_000),
+    }
+
+    if enable_keymanager_api:
+        # A per-validator override takes precedence over both CLI and schedule.
+        block_proposal_service.keymanager.set_gas_limit(
+            random_active_validator.pubkey, "50000000"
+        )
+        sign.reset_mock()
+        await block_proposal_service.submit_proposer_preferences()
+        assert sign.await_count == 2
+        assert all(
+            call.kwargs["message"].proposer_preferences.data.target_gas_limit
+            == "50000000"
+            for call in sign.await_args_list
+        )
+
+
+@pytest.mark.parametrize("fork_version", [ForkVersion.FULU], indirect=True)
+@pytest.mark.parametrize("enable_keymanager_api", [False, True], indirect=True)
+async def test_pre_gloas_registration_ignores_gas_limit_schedule(
+    block_proposal_service: BlockProposalService,
+    beacon_chain: BeaconChain,
+    vero: Vero,
+    random_active_validator: ValidatorIndexPubkey,
+    fork_version: ForkVersion,
+    enable_keymanager_api: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    vero.cli_args.use_external_builder = True
+    vero.cli_args.network = Network.HOODI
+    vero.cli_args.gas_limit = None
+    vero.spec.GLOAS_FORK_EPOCH = Uint64(10)
+    vero.spec.GAS_LIMIT_SCHEDULE = [
+        GasLimitScheduleEntry(Uint64(0), Uint64(75_000_000))
+    ]
+    sign = AsyncMock(wraps=block_proposal_service.signature_provider.sign)
+    submit = AsyncMock()
+    monkeypatch.setattr(block_proposal_service.signature_provider, "sign", sign)
+    monkeypatch.setattr(
+        block_proposal_service.multi_beacon_node, "register_validator", submit
+    )
+    await block_proposal_service.register_validators(
+        current_slot=10 * beacon_chain.SLOTS_PER_EPOCH - 1,
+        pubkeys_to_register=[random_active_validator.pubkey],
+    )
+    sign.assert_awaited_once()
+    assert (
+        sign.call_args.kwargs["message"].validator_registration.gas_limit == "60000000"
+    )
+    submit.assert_awaited_once()
 
 
 @pytest.mark.parametrize(
