@@ -61,6 +61,7 @@ if TYPE_CHECKING:
 
 _TIMEOUT_DEFAULT_SOCK_CONNECT = 1
 _TIMEOUT_DEFAULT_TOTAL = 10
+_TIMEOUT_EVENTS_SOCK_READ = 30
 _MAX_SSE_EVENT_BYTES = 16 * 2**20  # 16 MiB
 
 
@@ -1105,8 +1106,10 @@ class BeaconNode(ApiClient):
             params={"topics": topics},
             headers={"accept": "text/event-stream"},
             timeout=ClientTimeout(
-                sock_connect=1, sock_read=None
-            ),  # sock_read defaults to 5 minutes
+                total=None,
+                sock_connect=_TIMEOUT_DEFAULT_SOCK_CONNECT,
+                sock_read=_TIMEOUT_EVENTS_SOCK_READ,
+            ),
         ) as resp:
 
             async def read_line() -> bytes:
