@@ -8,7 +8,7 @@ participants:
     use_remote_signer: true
 
 network_params:
-  fulu_fork_epoch: 1
+  gloas_fork_epoch: 1
   slot_duration_ms: 3000
 
 additional_services:
