@@ -46,4 +46,10 @@ MIGRATIONS = [
         ],
         bump_version=True,
     ),
+    DbMigration(
+        version=3,
+        description="Persist per-validator builder configuration",
+        statements=["ALTER TABLE keymanager_data ADD COLUMN builder_config TEXT;"],
+        bump_version=True,
+    ),
 ]

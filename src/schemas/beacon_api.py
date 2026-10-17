@@ -184,6 +184,19 @@ class ProduceBlockV3Response(msgspec.Struct):
     data: bytes
 
 
+class BuilderPublicKey(msgspec.Struct):
+    pubkey: str
+
+
+class StateBuilder(msgspec.Struct):
+    index: str
+    builder: BuilderPublicKey
+
+
+class GetStateBuildersResponse(ExecutionOptimisticResponse):
+    data: list[StateBuilder]
+
+
 class BuilderEntry(msgspec.Struct):
     url: str
     auth: SignedBuilderRequestAuth

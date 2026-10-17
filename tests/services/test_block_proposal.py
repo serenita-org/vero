@@ -277,3 +277,150 @@ async def test_block_proposal_beacon_node_urls_proposal(
         assert any(_override_log_string in m for m in caplog.messages)
     else:
         assert all(_override_log_string not in m for m in caplog.messages)
+
+
+@pytest.mark.parametrize("enable_keymanager_api", [True], indirect=True)
+@pytest.mark.parametrize("local_selection", [True, False])
+async def test_builder_config_reaches_block_production(
+    block_proposal_service: BlockProposalService,
+    keymanager: Keymanager,
+    random_active_validator: ValidatorIndexPubkey,
+    local_selection: bool,
+) -> None:
+    from unittest import mock
+
+    from schemas.keymanager_api import BuilderConfig, BuilderEntry
+    from tests.ssz_objects import make_block_gloas
+
+    service = block_proposal_service
+    pubkey = random_active_validator.pubkey
+    builder_pubkey = "0x" + "ab" * 48
+    keymanager.set_builder_config(
+        pubkey,
+        BuilderConfig(
+            min_bid="33",
+            builder_boost_factor="120",
+            builders=[
+                BuilderEntry(
+                    url="https://custom.example",
+                    auth_data="0xaabb",
+                    builder_pubkeys=[builder_pubkey],
+                    min_bid="44",
+                    builder_boost_factor="150",
+                    max_execution_payment="12",
+                )
+            ],
+        ),
+    )
+    duty = SchemaBeaconAPI.ProposerDuty(
+        pubkey=pubkey, validator_index=str(random_active_validator.index), slot="123"
+    )
+    block = make_block_gloas(slot=123, builder_index=2**64 - 1)
+    try:
+        with (
+            mock.patch.object(
+                service.cli_args, "enable_bid_selection", local_selection
+            ),
+            mock.patch.object(
+                service.multi_beacon_node,
+                "get_builders",
+                return_value={builder_pubkey: "42"},
+            ),
+            mock.patch.object(
+                service.multi_beacon_node,
+                "produce_block",
+                return_value=(block, service.multi_beacon_node.best_beacon_node, None),
+            ) as produce,
+        ):
+            await service._produce_block(
+                slot=123,
+                duty=duty,
+                randao_reveal="0x" + "00" * 96,
+                signed_payload_bid=None,
+            )
+        config = produce.call_args.kwargs["builder_config"]
+        assert config.min_bid == "33"
+        assert config.builder_boost_factor == "120"
+        if local_selection:
+            # Vero has already selected or rejected the direct bids. Do not give
+            # beacon nodes another chance to accept the rejected ones.
+            assert config.builders == []
+            return
+        assert len(config.builders) == 1
+        entry = config.builders[0]
+        assert entry.url == "https://custom.example"
+        assert entry.auth.message.data == "0xaabb"
+        assert entry.auth.message.slot == "123"
+        assert entry.builder_pubkeys == [builder_pubkey]
+        assert entry.min_bid == "44"
+        assert entry.builder_boost_factor == "150"
+        assert entry.max_execution_payment == "12"
+    finally:
+        await service.multi_builder.__aexit__(None, None, None)
+
+
+@pytest.mark.parametrize("enable_keymanager_api", [True], indirect=True)
+@pytest.mark.parametrize("local_selection", [True, False])
+async def test_builder_preferences_use_per_key_entries(
+    block_proposal_service: BlockProposalService,
+    keymanager: Keymanager,
+    random_active_validator: ValidatorIndexPubkey,
+    local_selection: bool,
+) -> None:
+    from unittest import mock
+
+    from schemas.keymanager_api import BuilderConfig, BuilderEntry
+
+    service = block_proposal_service
+    pubkey = random_active_validator.pubkey
+    keymanager.set_builder_config(
+        pubkey,
+        BuilderConfig(
+            builders=[
+                BuilderEntry(
+                    url="https://custom.example",
+                    auth_data="0xaabb",
+                    max_execution_payment="12",
+                )
+            ]
+        ),
+    )
+    slot = service.beacon_chain.current_slot + 1
+    epoch = slot // service.beacon_chain.SLOTS_PER_EPOCH
+    service.proposer_duties[epoch] = {
+        SchemaBeaconAPI.ProposerDuty(
+            pubkey=pubkey,
+            validator_index=str(random_active_validator.index),
+            slot=str(slot),
+        )
+    }
+    try:
+        with (
+            mock.patch.object(
+                service.cli_args, "enable_bid_selection", local_selection
+            ),
+            mock.patch.object(service.beacon_chain, "GLOAS_FORK_EPOCH", 0),
+            mock.patch.object(
+                service.multi_builder, "submit_builder_preferences"
+            ) as direct,
+            mock.patch.object(
+                service.multi_beacon_node, "submit_builder_preferences"
+            ) as delegated,
+        ):
+            await service.submit_builder_preferences()
+            await asyncio.sleep(0)
+        if local_selection:
+            direct.assert_awaited_once_with(
+                slot=slot, proposer_pubkey=pubkey, fork_version=ForkVersion.GLOAS
+            )
+            delegated.assert_not_awaited()
+        else:
+            direct.assert_not_awaited()
+            delegated.assert_awaited_once()
+            entries = delegated.call_args.kwargs["builder_preferences"]
+            assert len(entries) == 1
+            assert entries[0].url == "https://custom.example"
+            assert entries[0].auth.message.data == "0xaabb"
+            assert entries[0].max_execution_payment == "12"
+    finally:
+        await service.multi_builder.__aexit__(None, None, None)

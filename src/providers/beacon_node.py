@@ -435,6 +435,19 @@ class BeaconNode(ApiClient):
             for v in resp_decoded.data
         ]
 
+    async def get_builders(self, request_data: bytes) -> dict[str, str]:
+        resp_bytes, _, _ = await self._make_request(
+            method="POST",
+            endpoint="/eth/v1/beacon/states/{state_id}/builders",
+            formatted_endpoint_string_params=dict(state_id="head"),
+            data=request_data,
+        )
+        response = msgspec.json.decode(
+            resp_bytes, type=SchemaBeaconAPI.GetStateBuildersResponse
+        )
+        self._raise_if_optimistic(response)
+        return {b.builder.pubkey.lower(): b.index for b in response.data}
+
     async def get_attester_duties(
         self,
         epoch: int,

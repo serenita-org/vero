@@ -8,9 +8,12 @@ from sqlite3 import IntegrityError
 from types import TracebackType
 from typing import Self
 
+import msgspec.json
+
 from args import get_default_gas_limit
 from schemas import SchemaRemoteSigner
 from schemas.keymanager_api import (
+    BuilderConfig,
     DeleteStatus,
     DeleteStatusMessage,
     EthAddress,
@@ -18,6 +21,7 @@ from schemas.keymanager_api import (
     ImportStatusMessage,
     Pubkey,
     RemoteKey,
+    ResolvedBuilderConfig,
     SignedVoluntaryExit,
     UInt64String,
     ValidatorFeeRecipient,
@@ -27,6 +31,7 @@ from schemas.keymanager_api import (
 )
 from spec.utils import decode_graffiti
 
+from .builder_config import resolve_builder_config
 from .db.db import DB
 from .multi_beacon_node import MultiBeaconNode
 from .remote_signer import RemoteSigner
@@ -60,6 +65,7 @@ class Keymanager(SignatureProvider):
         self.pubkey_to_fee_recipient_override: dict[str, EthAddress] = {}
         self.pubkey_to_gas_limit_override: dict[str, UInt64String] = {}
         self.pubkey_to_graffiti_override: dict[str, str] = {}
+        self.pubkey_to_builder_config: dict[str, BuilderConfig] = {}
 
         self.process_pool_executor = process_pool_executor
 
@@ -71,6 +77,12 @@ class Keymanager(SignatureProvider):
             self.pubkey_to_fee_recipient_override = self._load_fee_recipient_override()
             self.pubkey_to_gas_limit_override = self._load_gas_limit_override()
             self.pubkey_to_graffiti_override = self._load_graffiti_override()
+            self.pubkey_to_builder_config = {
+                pk: msgspec.json.decode(config, type=BuilderConfig)
+                for pk, config in self.db.fetch_all(
+                    "SELECT pubkey, builder_config FROM keymanager_data WHERE builder_config IS NOT NULL;"
+                )
+            }
 
             # Spin up API app
             from api.keymanager import start_server
@@ -299,6 +311,38 @@ class Keymanager(SignatureProvider):
         with contextlib.suppress(KeyError):
             del self.pubkey_to_graffiti_override[pubkey]
 
+    def resolve_builder_config(self, pubkey: Pubkey) -> ResolvedBuilderConfig:
+        return resolve_builder_config(
+            self.pubkey_to_builder_config.get(pubkey, BuilderConfig()), self.cli_args
+        )
+
+    def get_builder_config(self, pubkey: Pubkey) -> ResolvedBuilderConfig:
+        row, _ = self.db.fetch_one(
+            "SELECT pubkey FROM keymanager_data WHERE pubkey=?;", (pubkey,)
+        )
+        if row is None:
+            raise PubkeyNotFound(pubkey)
+        return self.resolve_builder_config(pubkey)
+
+    def set_builder_config(self, pubkey: Pubkey, config: BuilderConfig) -> None:
+        # Resolve and validate the entire document before changing stored state.
+        resolve_builder_config(config, self.cli_args)
+        _, rowcount = self.db.fetch_one(
+            "UPDATE keymanager_data SET builder_config=? WHERE pubkey=?;",
+            (msgspec.json.encode(config).decode(), pubkey),
+        )
+        if rowcount == 0:
+            raise PubkeyNotFound(pubkey)
+        self.pubkey_to_builder_config[pubkey] = config
+
+    def delete_builder_config(self, pubkey: Pubkey) -> None:
+        _, rowcount = self.db.fetch_one(
+            "UPDATE keymanager_data SET builder_config=NULL WHERE pubkey=?;", (pubkey,)
+        )
+        if rowcount == 0:
+            raise PubkeyNotFound(pubkey)
+        self.pubkey_to_builder_config.pop(pubkey, None)
+
     def list_remote_keys(self) -> list[RemoteKey]:
         return [
             RemoteKey(pk, signer.url)
@@ -313,8 +357,8 @@ class Keymanager(SignatureProvider):
         for remote_key in remote_keys:
             try:
                 self.db.fetch_one(
-                    "INSERT INTO keymanager_data VALUES (?, ?, ?, ?, ?);",
-                    (remote_key.pubkey, remote_key.url, None, None, None),
+                    "INSERT INTO keymanager_data (pubkey, url) VALUES (?, ?);",
+                    (remote_key.pubkey, remote_key.url),
                 )
             except Exception as e:
                 if (
@@ -360,6 +404,7 @@ class Keymanager(SignatureProvider):
                     response_status = DeleteStatus.NOT_FOUND
                 else:
                     response_status = DeleteStatus.DELETED
+                    self.pubkey_to_builder_config.pop(pubkey, None)
                 message = ""
             finally:
                 delete_status_messages.append(
@@ -478,6 +523,3 @@ class Keymanager(SignatureProvider):
         return [
             row for (row,) in self.db.fetch_all("SELECT pubkey FROM keymanager_data;")
         ]
-
-
-# TODO [Gloas] Keymanager API changes
