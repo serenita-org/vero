@@ -8,7 +8,7 @@ import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
-from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
+from ssz_z import get_type
 from yarl import URL
 
 from providers import BeaconChain
@@ -30,10 +30,13 @@ from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
 )
+from spec.ssz import Fork
 from tests.beacon_api_spec import BeaconAPISpec
 from tests.ssz_objects import (
     BYTES_PER_BLS_SIGNATURE,
     ZERO_ROOT,
+    bitlist,
+    bitvector,
     make_attestation,
     make_attestation_data,
     make_block_electra_fulu,
@@ -202,7 +205,9 @@ def _mocked_beacon_node_endpoints(
                 blob_data_available=True,
             )
             return CallbackResult(
-                body=payload_attestation_data.to_json(),
+                body=_data_response(
+                    payload_attestation_data.to_json(), version="gloas"
+                ),
                 headers={
                     ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
                 },
@@ -222,9 +227,7 @@ def _mocked_beacon_node_endpoints(
 
             committee_bits = [False] * spec.MAX_COMMITTEES_PER_SLOT
             committee_bits[int(url.query["committee_index"])] = True
-            _committee_bits = Bitfield.bitvector(
-                spec.MAX_COMMITTEES_PER_SLOT, committee_bits
-            )
+            _committee_bits = bitvector(spec.MAX_COMMITTEES_PER_SLOT, committee_bits)
             _agg_bitlist_size = (
                 spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
             )
@@ -232,7 +235,7 @@ def _mocked_beacon_node_endpoints(
             # -> a smaller agg bits bitlist is fine for testing purposes too
             _agg_bits = [1, 0, 1, 0, 1, 1, 1, 0, 1, 1]
             aggregate_attestation = make_attestation(
-                aggregation_bits=Bitfield.bitlist(_agg_bitlist_size, _agg_bits),
+                aggregation_bits=bitlist(_agg_bitlist_size, _agg_bits),
                 data=msgspec.Raw(
                     make_attestation_data(
                         slot=int(url.query["slot"]),
@@ -283,7 +286,7 @@ def _mocked_beacon_node_endpoints(
                 slot=int(url.query["slot"]),
                 beacon_block_root=url.query["beacon_block_root"],
                 subcommittee_index=int(url.query["subcommittee_index"]),
-                aggregation_bits=Bitfield.bitvector(
+                aggregation_bits=bitvector(
                     sync_subcommittee_size,
                     (random.choice([0, 1]) for _ in range(sync_subcommittee_size)),
                 ),
@@ -310,7 +313,7 @@ def _mocked_beacon_node_endpoints(
             body = (
                 envelope.to_ssz()
                 if response_content_type is ContentType.OCTET_STREAM
-                else envelope.to_json()
+                else _data_response(envelope.to_json(), version="gloas")
             )
             return CallbackResult(body=body, headers=headers)
 
@@ -404,7 +407,7 @@ def _mocked_beacon_node_endpoints(
 
             return CallbackResult(
                 body=_data_response(
-                    msgspec.json.encode(msgspec.json.decode(_data.to_json())["data"]),
+                    _data.to_json(),
                     version=fork_version,
                     execution_payload_included=False,
                     execution_payload_value=str(exec_payload_value),
@@ -420,35 +423,33 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
-                object_kind = ObjectKind.SIGNED_BEACON_BLOCK_CONTENTS
+                type_name = "SignedBeaconBlockContents"
             elif fork_version is ForkVersion.GLOAS:
-                object_kind = ObjectKind.SIGNED_BEACON_BLOCK
+                type_name = "SignedBeaconBlock"
             else:
                 raise NotImplementedError(f"Unsupported fork version {fork_version}")
 
-            signed_block_type = get_ssz_type(
-                Fork[fork_version.name],
-                object_kind,
-                Preset[preset_types().preset.upper()],
+            signed_block_type = get_type(
+                type_name, fork=fork_version.value, preset=preset_types().preset
             )
             if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                _ = signed_block_type.from_json(_data_response(kwargs["data"]))
+                _ = signed_block_type.from_json(kwargs["data"])
             else:
-                _ = signed_block_type.from_ssz(kwargs["data"])
+                _ = signed_block_type.deserialize(kwargs["data"])
 
             return CallbackResult(status=200)
 
         if re.match("/eth/v1/beacon/execution_payload_envelopes", url.raw_path):
             headers = kwargs["headers"]
-            signed_envelope_type = get_ssz_type(
-                Fork.GLOAS,
-                ObjectKind.SIGNED_EXECUTION_PAYLOAD_ENVELOPE,
-                Preset[preset_types().preset.upper()],
+            signed_envelope_type = get_type(
+                "SignedExecutionPayloadEnvelope",
+                fork="gloas",
+                preset=preset_types().preset,
             )
             if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                _ = signed_envelope_type.from_json(_data_response(kwargs["data"]))
+                _ = signed_envelope_type.from_json(kwargs["data"])
             else:
-                _ = signed_envelope_type.from_ssz(kwargs["data"])
+                _ = signed_envelope_type.deserialize(kwargs["data"])
             return CallbackResult(status=200)
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
@@ -464,15 +465,15 @@ def _mocked_beacon_node_endpoints(
             assert fork_version == beacon_chain.current_fork_version
 
             if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
-                signed_block_type = get_ssz_type(
-                    Fork[fork_version.name],
-                    ObjectKind.SIGNED_BLINDED_BEACON_BLOCK,
-                    Preset[preset_types().preset.upper()],
+                signed_block_type = get_type(
+                    "SignedBlindedBeaconBlock",
+                    fork=fork_version.value,
+                    preset=preset_types().preset,
                 )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = signed_block_type.from_json(_data_response(kwargs["data"]))
+                    _ = signed_block_type.from_json(kwargs["data"])
                 else:
-                    _ = signed_block_type.from_ssz(kwargs["data"])
+                    _ = signed_block_type.deserialize(kwargs["data"])
 
             return CallbackResult(status=200)
 
@@ -548,8 +549,9 @@ def _mocked_beacon_node_endpoints(
                     f"Unsupported fork version {beacon_chain.current_fork_version}"
                 )
 
-            assert attestation.data.beacon_block_root == bytes.fromhex(
-                "9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
+            assert (
+                attestation.to_obj()["data"]["beacon_block_root"]
+                == "0x9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
             )
 
             return CallbackResult(status=200)

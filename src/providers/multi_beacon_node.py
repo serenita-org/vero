@@ -43,13 +43,6 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 import msgspec
 from opentelemetry import trace
-from spy_ssz import (
-    Fork,
-    ObjectKind,
-    Preset,
-    encode_json_array,
-    get_ssz_type,
-)
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaShared, SchemaValidator
@@ -69,6 +62,7 @@ from spec import (
 )
 from spec.configs import Network
 from spec.preset import PayloadAttestationMessage
+from spec.ssz import Fork, bind_type, encode_json_array
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
@@ -307,34 +301,23 @@ class MultiBeaconNode:
         ),
         content_type: ContentType,
     ) -> BeaconBlock:
-        # TODO perf
-        #  profiling indicates this function takes a bit of time
-        #  Maybe we don't need to actually fully parse the full block though?
-        #  (similar thing applies to to_obj when publishing the block).
-        #  (No need to SSZ (de)serialize all of it)
-        #  Another idea - add the param local_blinded / blinded_local
-        #  to the request, that way all returned blocks are blinded
-        #  and much smaller! See https://github.com/ChainSafe/lodestar/issues/6219
-        #  (probably not all CLs support this but still...)
-        #  That would help a bit since we wouldn't be deserializing
-        #  the execution payload - transactions.
-
         try:
-            object_kind = ObjectKind.BEACON_BLOCK
+            name = "BeaconBlock"
             if isinstance(response, SchemaBeaconAPI.ProduceBlockV3Response):
-                object_kind = (
-                    ObjectKind.BLINDED_BEACON_BLOCK
+                name = (
+                    "BlindedBeaconBlock"
                     if response.execution_payload_blinded
-                    else ObjectKind.BEACON_BLOCK_CONTENTS
+                    else "BeaconBlockContents"
                 )
-            block_cls = get_ssz_type(
-                Fork[response.version.name],
-                object_kind,
-                Preset[preset_types().preset.upper()],
+            block_codec = bind_type(
+                name,
+                BeaconBlock,
+                fork=Fork[response.version.name],
+                preset=preset_types().preset,
             )
             if content_type == ContentType.JSON:
-                return cast("BeaconBlock", block_cls.from_json(response.data))
-            return cast("BeaconBlock", block_cls.from_ssz(response.data))
+                return block_codec.from_json(response.data, wrapped=True)
+            return block_codec.from_ssz(response.data)
         except (KeyError, NotImplementedError) as e:
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"

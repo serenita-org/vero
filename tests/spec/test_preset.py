@@ -1,9 +1,9 @@
 from typing import get_args
 
 import pytest
-from spy_ssz import Fork
 
 from spec import Preset, initialize_preset, preset_types
+from spec.ssz import Fork
 
 
 @pytest.mark.parametrize("preset", get_args(Preset))
@@ -19,17 +19,17 @@ def test_initialize_preset_selects_one_coherent_type_bundle(
         assert types.preset == preset
         assert types.fork is fork
         assert {
-            types.attestation.expected_preset.name.lower(),
-            types.aggregate_and_proof.expected_preset.name.lower(),
-            types.sync_committee_contribution.expected_preset.name.lower(),
-            types.contribution_and_proof.expected_preset.name.lower(),
-            types.single_attestation.expected_preset.name.lower(),
-            types.sync_committee_message.expected_preset.name.lower(),
-            types.signed_aggregate_and_proof.expected_preset.name.lower(),
-            types.signed_contribution_and_proof.expected_preset.name.lower(),
+            types.attestation.preset,
+            types.aggregate_and_proof.preset,
+            types.sync_committee_contribution.preset,
+            types.contribution_and_proof.preset,
+            types.single_attestation.preset,
+            types.sync_committee_message.preset,
+            types.signed_aggregate_and_proof.preset,
+            types.signed_contribution_and_proof.preset,
         } == {preset}
 
-        with pytest.raises(ValueError, match="status=MALFORMED_INPUT"):
+        with pytest.raises(ValueError, match="missing fields"):
             types.attestation_data.from_json(b"{}")
     finally:
         initialize_preset("mainnet")

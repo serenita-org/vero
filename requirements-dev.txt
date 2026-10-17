@@ -200,9 +200,7 @@ cffi==2.1.0 \
     --hash=sha256:f146d154428a2523f9cc7936c02353c2459b8f6cf07d3cd1ee1c0a611109c5d5 \
     --hash=sha256:f9912624a0c0b834b7520d7769b3644453aabc0a7e1c839da7359f050750e9bc \
     --hash=sha256:ff067a8d8d880e7809e4ac88eb009bb848870115317b306666502ccad30b147f
-    # via
-    #   pyroscope-io
-    #   spy-ssz
+    # via pyroscope-io
 cfgv==3.5.0 \
     --hash=sha256:a8dc6b26ad22ff227d2634a65cb388215ce6cc96bbcc5cfde7641ae87e8dacc0 \
     --hash=sha256:d5b1034354820651caa73ede66a6294d6e95c1b00acc5e9b098e917404669132
@@ -625,9 +623,7 @@ msgspec==0.21.1 \
     --hash=sha256:f60800e6299b798142dc40b0644da77ceac5ea0568be58228417eae14135c847 \
     --hash=sha256:f7b27d1a8ead2b6f5b0c4f2d07b8be1ccfcc041c8a0e704781edebe3ae13c484 \
     --hash=sha256:fab48eb45fdbfbdb2c0edfec00ffc53b6b6085beefc6b50b61e01659f9f8757f
-    # via
-    #   spy-ssz
-    #   vero
+    # via vero
 multidict==6.7.1 \
     --hash=sha256:03ede2a6ffbe8ef936b92cb4529f27f42be7f56afcdab5ab739cd5f27fb1cbf9 \
     --hash=sha256:0458c978acd8e6ea53c81eefaddbbee9c6c5e591f41b3f5e8e194780fe026581 \
@@ -999,7 +995,6 @@ pyyaml==6.0.3 \
     #   pre-commit
     #   pymdown-extensions
     #   pyyaml-env-tag
-    #   spy-ssz
     #   vero
 pyyaml-env-tag==1.1 \
     --hash=sha256:17109e1a528561e32f026364712fee1264bc2ea6715120891174ed1b980d2e04 \
@@ -1112,7 +1107,7 @@ six==1.17.0 \
     --hash=sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274 \
     --hash=sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81
     # via python-dateutil
-spy-ssz @ git+https://github.com/eth2353/spy-ssz@612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00
+ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@dde4f1a8a5130bef8300606ea28da9abe0b34c3f
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \

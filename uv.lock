@@ -1572,14 +1572,9 @@ wheels = [
 ]
 
 [[package]]
-name = "spy-ssz"
-version = "0.1.0"
-source = { git = "https://github.com/eth2353/spy-ssz?rev=612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00#612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00" }
-dependencies = [
-    { name = "cffi" },
-    { name = "msgspec" },
-    { name = "pyyaml" },
-]
+name = "ssz-z-python"
+version = "0.2.0"
+source = { git = "https://github.com/eth2353/ssz-z-python?rev=dde4f1a8a5130bef8300606ea28da9abe0b34c3f#dde4f1a8a5130bef8300606ea28da9abe0b34c3f" }
 
 [[package]]
 name = "typing-extensions"
@@ -1634,7 +1629,7 @@ dependencies = [
     { name = "pyroscope-io" },
     { name = "pyroscope-otel" },
     { name = "pyyaml" },
-    { name = "spy-ssz" },
+    { name = "ssz-z-python" },
 ]
 
 [package.dev-dependencies]
@@ -1660,7 +1655,7 @@ requires-dist = [
     { name = "pyroscope-io", specifier = ">=0.8.8" },
     { name = "pyroscope-otel", specifier = ">=0.4.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
-    { name = "spy-ssz", git = "https://github.com/eth2353/spy-ssz?rev=612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00" },
+    { name = "ssz-z-python", git = "https://github.com/eth2353/ssz-z-python?rev=dde4f1a8a5130bef8300606ea28da9abe0b34c3f" },
 ]
 
 [package.metadata.requires-dev]

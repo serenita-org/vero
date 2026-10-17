@@ -11,11 +11,6 @@ from opentelemetry.trace import (
     SpanContext,
     TraceFlags,
 )
-from spy_ssz import (
-    ExecutionPayloadEnvelopeGloas,
-    ObjectKind,
-    SignedExecutionPayloadEnvelopeGloas,
-)
 
 from observability import ErrorType, HandledRuntimeError
 from providers import BeaconNode, BidSelector, MultiBuilder
@@ -28,6 +23,7 @@ from services.validator_duty_service import (
 )
 from spec import BeaconBlock
 from spec.slot_components import get_slot_component_duration_ms
+from spec.ssz import ExecutionPayloadEnvelope, SSZObject
 from spec.utils import encode_graffiti
 
 if TYPE_CHECKING:
@@ -739,20 +735,17 @@ class BlockProposalService(ValidatorDutyService):
             name=f"{self.__class__.__name__}._publish_block",
         ):
             try:
-                with block_contents_or_blinded_block.sign(
+                signed_object = block_contents_or_blinded_block.sign(
                     signature=signature
-                ) as signed_object:
-                    if self.cli_args.force_json_wire_format:
-                        encoded = signed_object.to_json()
-                        content_type = ContentType.JSON
-                    else:
-                        encoded = signed_object.to_ssz()
-                        content_type = ContentType.OCTET_STREAM
+                )
+                if self.cli_args.force_json_wire_format:
+                    encoded = signed_object.to_json()
+                    content_type = ContentType.JSON
+                else:
+                    encoded = signed_object.to_ssz()
+                    content_type = ContentType.OCTET_STREAM
 
-                if (
-                    block_contents_or_blinded_block.object_kind
-                    is not ObjectKind.BLINDED_BEACON_BLOCK
-                ):
+                if not block_contents_or_blinded_block.blinded:
                     publish_coros = [
                         self.multi_beacon_node.publish_block_v2(
                             fork_version=fork_version,
@@ -795,8 +788,8 @@ class BlockProposalService(ValidatorDutyService):
         self,
         slot: int,
         duty: SchemaBeaconAPI.ProposerDuty,
-        execution_payload_envelope: ExecutionPayloadEnvelopeGloas,
-    ) -> SignedExecutionPayloadEnvelopeGloas:
+        execution_payload_envelope: ExecutionPayloadEnvelope,
+    ) -> SSZObject:
         with self.tracer.start_as_current_span(
             name=f"{self.__class__.__name__}._sign_execution_payload_envelope",
         ):
@@ -870,13 +863,12 @@ class BlockProposalService(ValidatorDutyService):
                         execution_payload_envelope=execution_payload_envelope,
                     )
                 )
-                with signed_execution_payload_envelope:
-                    if self.cli_args.force_json_wire_format:
-                        encoded = signed_execution_payload_envelope.to_json()
-                        content_type = ContentType.JSON
-                    else:
-                        encoded = signed_execution_payload_envelope.to_ssz()
-                        content_type = ContentType.OCTET_STREAM
+                if self.cli_args.force_json_wire_format:
+                    encoded = signed_execution_payload_envelope.to_json()
+                    content_type = ContentType.JSON
+                else:
+                    encoded = signed_execution_payload_envelope.to_ssz()
+                    content_type = ContentType.OCTET_STREAM
 
                 # Publish using the beacon node that produced the envelope,
                 # because it also has cached blob data for that envelope.
@@ -941,57 +933,53 @@ class BlockProposalService(ValidatorDutyService):
                 randao_reveal=randao_reveal,
                 signed_payload_bid=selected_bid,
             )
-            try:
-                fork_version = SchemaShared.ForkVersion[
-                    block_contents_or_blinded_block.fork.name
-                ]
-                signature = await self._sign_block(
+            fork_version = SchemaShared.ForkVersion[
+                block_contents_or_blinded_block.fork.name
+            ]
+            signature = await self._sign_block(
+                slot=slot,
+                duty=duty,
+                block_header=block_header,
+                block_version=fork_version.value.upper(),
+            )
+
+            block_publication_task = asyncio.create_task(
+                self._publish_block(
                     slot=slot,
-                    duty=duty,
-                    block_header=block_header,
-                    block_version=fork_version.value.upper(),
+                    fork_version=fork_version,
+                    signature=signature,
+                    block_contents_or_blinded_block=block_contents_or_blinded_block,
+                    header_builder_url=header_builder_url,
+                    selected_builder=selected_builder,
                 )
-
-                block_publication_task = asyncio.create_task(
-                    self._publish_block(
-                        slot=slot,
-                        fork_version=fork_version,
-                        signature=signature,
-                        block_contents_or_blinded_block=block_contents_or_blinded_block,
-                        header_builder_url=header_builder_url,
-                        selected_builder=selected_builder,
-                    )
-                )
-                publish_tasks = [block_publication_task]
-                if (
-                    fork_version is SchemaShared.ForkVersion.GLOAS
-                    and block_contents_or_blinded_block.body.signed_execution_payload_bid.message.builder_index
-                    == BUILDER_INDEX_SELF_BUILD
-                ):
-                    publish_tasks.append(
-                        asyncio.create_task(
-                            self._publish_payload_envelope(
-                                slot=slot,
-                                duty=duty,
-                                beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
-                                beacon_node=beacon_node,
-                                block_publication_task=block_publication_task,
-                            )
+            )
+            publish_tasks = [block_publication_task]
+            if (
+                fork_version is SchemaShared.ForkVersion.GLOAS
+                and block_contents_or_blinded_block.builder_index
+                == BUILDER_INDEX_SELF_BUILD
+            ):
+                publish_tasks.append(
+                    asyncio.create_task(
+                        self._publish_payload_envelope(
+                            slot=slot,
+                            duty=duty,
+                            beacon_block_root=block_contents_or_blinded_block.block_hash_tree_root(),
+                            beacon_node=beacon_node,
+                            block_publication_task=block_publication_task,
                         )
                     )
+                )
 
-                results = await asyncio.gather(*publish_tasks, return_exceptions=True)
-                for result in results:
-                    if isinstance(result, BaseException):
-                        self.logger.error(
-                            f"Publication coroutine failed for slot {slot}: {result!r}"
-                        )
-                for result in results:
-                    if isinstance(result, BaseException):
-                        raise result
-
-            finally:
-                block_contents_or_blinded_block.close()
+            results = await asyncio.gather(*publish_tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, BaseException):
+                    self.logger.error(
+                        f"Publication coroutine failed for slot {slot}: {result!r}"
+                    )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
 
     async def propose_block(self, slot: int) -> None:
         if (

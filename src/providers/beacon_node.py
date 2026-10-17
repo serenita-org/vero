@@ -6,20 +6,13 @@ import datetime
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
-from typing import TYPE_CHECKING, Literal, Self, Unpack, cast
+from typing import TYPE_CHECKING, Literal, Self, Unpack
 
 import msgspec
 from aiohttp import ClientResponse, ClientTimeout
 from aiohttp.client import _RequestOptions
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
 from opentelemetry.trace import SpanKind
-from spy_ssz import (
-    ExecutionPayloadEnvelopeGloas,
-    Fork,
-    ObjectKind,
-    Preset,
-    get_ssz_type,
-)
 from yarl import URL
 
 from observability import (
@@ -53,6 +46,7 @@ from spec import (
 )
 from spec.base import SpecGloas, parse_spec
 from spec.slot_components import get_slot_component_duration_ms
+from spec.ssz import ExecutionPayloadEnvelope, Fork, bind_type
 
 from ._api_client import ApiClient
 
@@ -986,7 +980,7 @@ class BeaconNode(ApiClient):
         self,
         slot: int,
         beacon_block_root: str,
-    ) -> tuple[SchemaShared.ForkVersion, ExecutionPayloadEnvelopeGloas]:
+    ) -> tuple[SchemaShared.ForkVersion, ExecutionPayloadEnvelope]:
         accept_header = (
             ContentType.JSON.value
             if self._force_json_wire_format
@@ -1026,21 +1020,22 @@ class BeaconNode(ApiClient):
                 ) from None
 
             fork_version = SchemaShared.ForkVersion(resp.headers[ETH_CONSENSUS_VERSION])
-            payload_cls = get_ssz_type(
-                Fork[fork_version.name],
-                ObjectKind.EXECUTION_PAYLOAD_ENVELOPE,
-                Preset[preset_types().preset.upper()],
+            payload_cls = bind_type(
+                "ExecutionPayloadEnvelope",
+                ExecutionPayloadEnvelope,
+                fork=Fork[fork_version.name],
+                preset=preset_types().preset,
             )
 
             if response_content_type is ContentType.JSON:
-                envelope = payload_cls.from_json(resp_bytes)
+                envelope = payload_cls.from_json(resp_bytes, wrapped=True)
             elif response_content_type is ContentType.OCTET_STREAM:
                 envelope = payload_cls.from_ssz(resp_bytes)
             else:
                 raise NotImplementedError(
                     f"Unsupported content type: {response_content_type}"
                 )
-            return fork_version, cast("ExecutionPayloadEnvelopeGloas", envelope)
+            return fork_version, envelope
 
     async def publish_execution_payload_envelope(
         self,
