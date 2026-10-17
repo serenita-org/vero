@@ -2,9 +2,10 @@ from unittest import mock
 
 import pytest
 
-from providers import MultiBuilder, Vero
+from providers import Keymanager, MultiBuilder, SignatureProvider, Vero
 from providers.bid_selector import BidSelector
 from schemas import SchemaBeaconAPI, SchemaShared
+from schemas.validator import ValidatorIndexPubkey
 
 
 def _create_bid(
@@ -111,3 +112,133 @@ async def test_get_bid_zero_boost_skips_bid_selection(
         get_attributes.assert_not_called()
         get_direct_bid.assert_not_called()
         get_p2p_bid.assert_not_called()
+
+
+@pytest.mark.parametrize("p2p_available", [True, False])
+async def test_bid_comparison_defaults_to_no_trusted_payment(
+    multi_builder: MultiBuilder, vero: Vero, p2p_available: bool
+) -> None:
+    selector = BidSelector(multi_builder, vero)
+    direct = _create_bid(1_000, 1_000)
+    p2p = _create_bid(2, 0) if p2p_available else None
+    bid, source, _ = selector._select_best_bid(p2p, direct, None)
+    assert bid is p2p
+    assert source == ("p2p" if p2p_available else None)
+
+
+@pytest.mark.parametrize("enable_keymanager_api", [True], indirect=True)
+@pytest.mark.parametrize(
+    (
+        "direct_value",
+        "payment",
+        "entry_boost",
+        "key_boost",
+        "p2p_value",
+        "expected_source",
+    ),
+    [
+        (100, 0, "200", "100", 150, "direct"),
+        (100, 0, "50", "100", 90, "p2p"),
+        (100, 1000, "100", "100", 200, "p2p"),
+        (300, 1000, "100", "100", 200, "p2p"),
+        (100, 0, "200", "0", 10, "direct"),
+    ],
+)
+async def test_per_key_bid_weighting(
+    multi_builder: MultiBuilder,
+    vero: Vero,
+    keymanager: Keymanager,
+    signature_provider: SignatureProvider,
+    validators: list[ValidatorIndexPubkey],
+    direct_value: int,
+    payment: int,
+    entry_boost: str,
+    key_boost: str,
+    p2p_value: int,
+    expected_source: str | None,
+) -> None:
+    from schemas.keymanager_api import BuilderConfig, BuilderEntry
+
+    pubkey = validators[0].pubkey
+    multi_builder.keymanager = keymanager
+    keymanager.set_builder_config(
+        pubkey,
+        BuilderConfig(
+            builder_boost_factor=key_boost,
+            builders=[
+                BuilderEntry(
+                    url="https://builder.example",
+                    max_execution_payment="0",
+                    builder_boost_factor=entry_boost,
+                )
+            ],
+        ),
+    )
+    builder, _ = multi_builder.get_builder_entries(pubkey)[0]
+    selector = BidSelector(multi_builder, vero)
+    direct = _create_bid(direct_value, payment)
+    p2p = _create_bid(p2p_value, 0)
+    duty = SchemaBeaconAPI.ProposerDuty(pubkey=pubkey, validator_index="1", slot="1234")
+    attributes = SchemaBeaconAPI.PayloadAttributesData(
+        proposer_index="1",
+        proposal_slot="1234",
+        parent_block_root=p2p.message.parent_block_root,
+        parent_block_hash=p2p.message.parent_block_hash,
+        payload_attributes={},
+    )
+    with (
+        mock.patch.object(
+            selector, "_get_payload_attributes_data", return_value=attributes
+        ),
+        mock.patch.object(
+            multi_builder, "get_execution_payload_bid", return_value=(builder, direct)
+        ),
+        mock.patch.object(selector, "_get_best_p2p_bid", return_value=p2p),
+    ):
+        _, selected = await selector.get_best_bid(1234, duty)
+    assert selected is {"direct": direct, "p2p": p2p, None: None}[expected_source]
+    if selected is not None:
+        assert selector.selected_bid_boost_factors[(1234, pubkey)] == (
+            entry_boost if expected_source == "direct" else key_boost
+        )
+
+
+@pytest.mark.parametrize("enable_keymanager_api", [True], indirect=True)
+async def test_p2p_filter_uses_current_per_key_defaults(
+    multi_builder: MultiBuilder,
+    vero: Vero,
+    keymanager: Keymanager,
+    signature_provider: SignatureProvider,
+    validators: list[ValidatorIndexPubkey],
+) -> None:
+    from schemas.keymanager_api import BuilderConfig
+
+    pubkey = validators[0].pubkey
+    multi_builder.keymanager = keymanager
+    selector = BidSelector(multi_builder, vero)
+    selector.proposal_slots.add(1234)
+    vero.cli_args.builder_min_bid = 100
+    bid = _create_bid(50, 0)
+    recipient = "0x" + "ab" * 20
+    bid.message.fee_recipient = recipient
+    await selector.handle_bid_event(
+        SchemaBeaconAPI.ExecutionPayloadBidEvent(
+            version=SchemaShared.ForkVersion.GLOAS,
+            data=bid,
+        )
+    )
+    keymanager.set_builder_config(pubkey, BuilderConfig(min_bid="40", builders=[]))
+    keymanager.set_fee_recipient(pubkey, recipient)
+    duty = SchemaBeaconAPI.ProposerDuty(pubkey=pubkey, validator_index="1", slot="1234")
+    selector.payload_attributes_events_store[(1234, "1")] = (
+        SchemaBeaconAPI.PayloadAttributesData(
+            proposer_index="1",
+            proposal_slot="1234",
+            parent_block_root=bid.message.parent_block_root,
+            parent_block_hash=bid.message.parent_block_hash,
+            payload_attributes={},
+        )
+    )
+    assert (await selector.get_best_bid(1234, duty))[1] is bid
+    keymanager.set_builder_config(pubkey, BuilderConfig(min_bid="60", builders=[]))
+    assert (await selector.get_best_bid(1234, duty))[1] is None

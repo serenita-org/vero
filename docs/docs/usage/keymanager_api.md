@@ -9,14 +9,15 @@ Support table
 for the most up-to-date information.
 
 Through these API endpoints, node operators can add and remove
-validator keys, override the fee recipient, graffiti, and gas limit
+validator keys, override the fee recipient, graffiti, gas limit, and builder
 settings on a per-validator basis, all without needing to restart
 the validator client.
 
 ## Vero support for the Keymanager API
 
-As of `v1.1.0`, Vero supports the following Keymanager API endpoints:
+Vero supports the following Keymanager API endpoints:
 
+- [Builder Config](https://ethereum.github.io/keymanager-APIs/#/Builder%20Config){:target="_blank"}
 - [Fee Recipient](https://ethereum.github.io/keymanager-APIs/#/Fee%20Recipient){:target="_blank"}
 - [Gas Limit](https://ethereum.github.io/keymanager-APIs/#/Gas%20Limit){:target="_blank"}
 - [Graffiti](https://ethereum.github.io/keymanager-APIs/#/Graffiti){:target="_blank"}
@@ -91,3 +92,54 @@ address for specific validators.
 
 Refer to the [Keymanager API spec](https://ethereum.github.io/keymanager-APIs/){:target="_blank"}
 for details on available endpoints and parameters.
+
+## Per-validator builder configuration
+
+Use `/eth/v1/validator/{pubkey}/builder_config` to configure how a validator
+sources builder bids. These settings are persisted and apply without restarting Vero,
+both when Vero selects bids itself and when selection is delegated to beacon nodes.
+Builder entries and their bid limits apply to Gloas proposals.
+
+- `GET` returns the fully resolved configuration, including defaults from the CLI.
+- `POST` replaces the validator's entire configuration and returns `202`.
+- `DELETE` restores the CLI defaults and returns `204`.
+
+For example, this configuration sets a minimum bid of 10,000,000 Gwei and uses
+one builder, with a maximum execution payment of 250,000,000 Gwei:
+
+```json
+{
+  "min_bid": "10000000",
+  "builder_boost_factor": "100",
+  "builders": [
+    {
+      "url": "https://builder.example.com",
+      "max_execution_payment": "250000000"
+    }
+  ]
+}
+```
+
+Omitted `min_bid` and `builder_boost_factor` values inherit the CLI settings.
+Individual builder entries can override those values; otherwise they inherit the
+validator's values. An omitted `max_execution_payment` inherits
+`--builder-max-execution-payment`. All numeric values are uint64 decimal strings.
+The maximum execution payment defaults to `0`. When Vero selects bids, it rejects
+any bid whose trusted execution payment exceeds this limit, regardless of its
+in-protocol payment. A payment equal to the limit is accepted, and accepted bids
+are valued at their full in-protocol plus execution payment before applying the
+boost factor. This is intentionally stricter than the Keymanager API's scoring-cap
+semantics. If bid selection is delegated to beacon nodes, Vero forwards the limits
+and those nodes enforce their own selection policy.
+
+Omitting `builders` uses `--builder-urls`, while `"builders": []` disables direct
+builder bids for this validator. P2P bids remain available and follow the validator's
+top-level minimum bid and boost factor. Posting `{}` or deleting the configuration
+restores all CLI defaults. Reposting a resolved `GET` response's `data` fixes its
+values instead of continuing to inherit changes to defaults.
+
+Each entry can include opaque hex-encoded `auth_data` and a `builder_pubkeys`
+allowlist. Authentication defaults to the builder URL's hostname; an omitted or
+empty allowlist accepts any builder. The same URL can appear more than once with
+different authentication data. Duplicate URL and authentication pairs are rejected,
+including pairs differing only in the hex letter case of `auth_data`.

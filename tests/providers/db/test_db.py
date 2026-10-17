@@ -10,7 +10,7 @@ def test_db_run_migrations_empty_db(tmp_path: Path) -> None:
     with DB(data_dir=str(tmp_path)) as db:
         assert db.current_version == -1
         db.run_migrations()
-        assert db.current_version == 2
+        assert db.current_version == 3
         assert db.current_version == max(m.version for m in MIGRATIONS)
 
 
@@ -50,7 +50,16 @@ def test_db_run_migrations_with_data_in_db(tmp_path: Path) -> None:
                 """INSERT INTO keymanager_data VALUES (?, ?, ?, ?, ?)""", data
             )
 
-        # Add data to tables here when you introduce new tables in a DB migration
+        db.run_migrations()
+        assert (
+            db.fetch_all(
+                "SELECT pubkey, url, fee_recipient, gas_limit, graffiti FROM keymanager_data;"
+            )
+            == data
+        )
+        assert db.fetch_all("SELECT builder_config FROM keymanager_data;") == [
+            (None,)
+        ] * len(data)
 
         assert db.current_version == max(m.version for m in MIGRATIONS)
 

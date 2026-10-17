@@ -41,7 +41,12 @@ class BlockProposalService(ValidatorDutyService):
     def __init__(self, **kwargs: Unpack[ValidatorDutyServiceOptions]) -> None:
         super().__init__(**kwargs)
 
-        self.multi_builder = MultiBuilder(vero=self.vero)
+        self.multi_builder = MultiBuilder(
+            vero=self.vero,
+            keymanager=self.keymanager,
+            multi_beacon_node=self.multi_beacon_node,
+            signature_provider=self.signature_provider,
+        )
         self.bid_selector = BidSelector(
             multi_builder=self.multi_builder, vero=self.vero
         )
@@ -415,6 +420,10 @@ class BlockProposalService(ValidatorDutyService):
                 if int(duty.slot) < current_slot:
                     continue
 
+                await self.multi_builder.cache_bid_request_auth_data(
+                    proposer_duty=duty,
+                    signature_provider=self.signature_provider,
+                )
                 if self.cli_args.enable_bid_selection:
                     # Submit directly to builders
                     self.task_manager.create_task(
@@ -427,8 +436,9 @@ class BlockProposalService(ValidatorDutyService):
                 else:
                     # Submit via beacon nodes
                     builder_preferences = []
-                    max_exec_payment = str(self.cli_args.builder_max_execution_payment)
-                    for builder in self.multi_builder.builders:
+                    for builder, entry in self.multi_builder.get_builder_entries(
+                        duty.pubkey
+                    ):
                         try:
                             builder_auth = builder.get_signed_builder_request_auth(
                                 slot=int(duty.slot), proposer_pubkey=duty.pubkey
@@ -440,9 +450,9 @@ class BlockProposalService(ValidatorDutyService):
                         builder_preferences.append(
                             SchemaBeaconAPI.BuilderPreferencesEntry(
                                 proposer_pubkey=duty.pubkey,
-                                url=str(builder.base_url),
+                                url=entry.url,
                                 auth=builder_auth,
-                                max_execution_payment=max_exec_payment,
+                                max_execution_payment=entry.max_execution_payment,
                             )
                         )
                     if not builder_preferences:
@@ -618,31 +628,49 @@ class BlockProposalService(ValidatorDutyService):
                     )
                     graffiti = encode_graffiti(kmgr_graffiti_str)
 
-            # TODO [Gloas] keymgr overrides for all these
+            config = self.multi_builder.get_config(duty.pubkey)
             builder_config = SchemaBeaconAPI.BuilderConfig(
-                min_bid=str(self.cli_args.builder_min_bid),
-                builder_boost_factor=str(self.cli_args.builder_boost_factor),
+                min_bid=config.min_bid,
+                builder_boost_factor=config.builder_boost_factor,
                 builders=[],
             )
-            for builder in self.multi_builder.builders:
-                try:
-                    builder_auth = builder.get_signed_builder_request_auth(
-                        slot=slot, proposer_pubkey=duty.pubkey
+            # When Vero selects bids, a missing selected bid must not let beacon
+            # nodes re-fetch and select a builder bid that Vero already rejected.
+            if (
+                self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS
+                and not self.cli_args.enable_bid_selection
+            ):
+                await self.multi_builder.cache_bid_request_auth_data(
+                    proposer_duty=duty,
+                    signature_provider=self.signature_provider,
+                    load_builder_indices=False,
+                    config=config,
+                )
+                for builder, entry in self.multi_builder.get_builder_entries(
+                    duty.pubkey, config
+                ):
+                    try:
+                        builder_auth = builder.get_signed_builder_request_auth(
+                            slot=slot, proposer_pubkey=duty.pubkey
+                        )
+                    except KeyError as e:
+                        self.logger.warning(f"{e!r}")
+                        continue
+                    builder_config.builders.append(
+                        SchemaBeaconAPI.BuilderEntry(
+                            url=entry.url,
+                            auth=builder_auth,
+                            builder_pubkeys=entry.builder_pubkeys,
+                            max_execution_payment=entry.max_execution_payment,
+                            min_bid=entry.min_bid,
+                            builder_boost_factor=entry.builder_boost_factor,
+                        )
                     )
-                except KeyError as e:
-                    self.logger.warning(f"{e!r}")
-                    continue
-
-                builder_config.builders.append(
-                    SchemaBeaconAPI.BuilderEntry(
-                        url=str(builder.base_url),
-                        auth=builder_auth,
-                        builder_pubkeys=[],
-                        max_execution_payment=str(
-                            self.cli_args.builder_max_execution_payment
-                        ),
-                        min_bid=str(self.cli_args.builder_min_bid),
-                        builder_boost_factor=str(self.cli_args.builder_boost_factor),
+            if signed_payload_bid is not None:
+                builder_config.builder_boost_factor = (
+                    self.bid_selector.selected_bid_boost_factors.get(
+                        (slot, duty.pubkey),
+                        config.builder_boost_factor,
                     )
                 )
 

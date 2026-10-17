@@ -272,6 +272,15 @@ class MultiBeaconNode:
         )
         return resp
 
+    async def get_builders(self, pubkeys: list[str]) -> dict[str, str]:
+        if not pubkeys:
+            return {}
+        response: dict[str, str] = await self._get_first_beacon_node_response(
+            func_name="get_builders",
+            request_data=self._json_encoder.encode({"ids": pubkeys}),
+        )
+        return response
+
     async def get_proposer_duties_v2(
         self,
         **kwargs: Any,

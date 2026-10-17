@@ -6,6 +6,7 @@ import msgspec
 import pytest
 from aiohttp.hdrs import CONTENT_TYPE
 from aioresponses import CallbackResult, aioresponses
+from yarl import URL
 
 from providers import BeaconNode, MultiBeaconNode, Vero
 from providers._headers import (
@@ -162,3 +163,36 @@ async def test_initialize_spec_mismatch(
                 await bn._initialize_full()
 
         await bn.client_session.close()
+
+
+@pytest.mark.parametrize("optimistic", [True, False])
+async def test_get_builder_indices(
+    multi_beacon_node: MultiBeaconNode,
+    optimistic: bool,
+) -> None:
+    pubkey = "0x" + "ab" * 48
+    beacon_node = multi_beacon_node.best_beacon_node
+    url = str(beacon_node.base_url.join(URL("/eth/v1/beacon/states/head/builders")))
+    with aioresponses() as responses:
+        responses.post(
+            url,
+            payload={
+                "execution_optimistic": optimistic,
+                "finalized": False,
+                "data": [
+                    {
+                        "index": "42",
+                        "status": "active",
+                        "builder": {"pubkey": pubkey.upper().replace("0X", "0x")},
+                    }
+                ],
+            },
+        )
+        if optimistic:
+            with pytest.raises(ValueError, match="optimistic"):
+                await beacon_node.get_builders(msgspec.json.encode({"ids": [pubkey]}))
+        else:
+            assert await multi_beacon_node.get_builders([pubkey]) == {pubkey: "42"}
+        request = next(iter(responses.requests.values()))[0]
+        assert msgspec.json.decode(request.kwargs["data"]) == {"ids": [pubkey]}
+        assert await multi_beacon_node.get_builders([]) == {}

@@ -1,5 +1,4 @@
 import asyncio
-import ipaddress
 import logging
 from time import time_ns
 from types import TracebackType
@@ -15,6 +14,11 @@ from yarl import URL
 from observability import ErrorType
 from observability.api_client import ServiceType
 from schemas import SchemaBeaconAPI, SchemaBuilderAPI, SchemaRemoteSigner, SchemaShared
+from schemas.keymanager_api import (
+    BuilderConfig,
+    ResolvedBuilderConfig,
+    ResolvedBuilderEntry,
+)
 
 from ._api_client import ApiClient
 from ._headers import (
@@ -23,31 +27,27 @@ from ._headers import (
     X_TIMEOUT_MS,
     ContentType,
 )
+from .builder_config import (
+    bid_score,
+    get_default_auth_data as get_default_auth_data,
+    resolve_builder_config,
+)
 
 if TYPE_CHECKING:
     from providers import SignatureProvider
 
+    from .keymanager import Keymanager
+    from .multi_beacon_node import MultiBeaconNode
     from .vero import Vero
 
 _MAX_RESPONSE_BYTES = 64 * 2**20  # 64 MiB
 _MAX_ERROR_RESPONSE_BYTES = 1 * 2**20  # 1 MiB
 
 
-def get_default_auth_data(url: URL) -> bytes:
-    host = url.host
-    if host is None:
-        raise ValueError(f"No host in URL: {url}")
-
-    if ":" in host:  # IPv6 literal
-        host = f"[{ipaddress.IPv6Address(host).compressed}]"
-
-    return host.encode("ascii")
-
-
 class Builder(ApiClient):
-    def __init__(self, base_url: str, vero: "Vero"):
+    def __init__(self, base_url: str, vero: "Vero", auth_data: str | None = None):
         super().__init__(
-            base_url=base_url,
+            base_url=URL(base_url).with_path(URL(base_url).path.rstrip("/") + "/"),
             metrics=vero.metrics,
             service_type=ServiceType.BUILDER,
             timeout=ClientTimeout(total=10.0),
@@ -55,6 +55,8 @@ class Builder(ApiClient):
 
         self.bid_selection_disabled = vero.cli_args.enable_bid_selection is False
         self.cli_args = vero.cli_args
+        self.url = base_url
+        self.auth_data = auth_data or "0x" + get_default_auth_data(self.base_url).hex()
 
         self._bid_request_auth_cache: dict[
             tuple[int, str], SchemaShared.SignedBuilderRequestAuth
@@ -75,8 +77,7 @@ class Builder(ApiClient):
             message=SchemaRemoteSigner.BuilderRequestAuthSignableMessage(
                 builder_request_auth=SchemaRemoteSigner.VersionedBuilderRequestAuth(
                     data=SchemaShared.BuilderRequestAuth(
-                        # TODO [Gloas] support variable data from Keymgr API
-                        data="0x" + get_default_auth_data(url=self.base_url).hex(),
+                        data=self.auth_data,
                         slot=proposer_duty.slot,
                     ),
                 ),
@@ -96,6 +97,10 @@ class Builder(ApiClient):
             proposal_slot, _ = cache_key
             if proposal_slot <= finished_proposal_slot:
                 del self._bid_request_auth_cache[cache_key]
+
+    @property
+    def has_pending_auth(self) -> bool:
+        return bool(self._bid_request_auth_cache)
 
     async def get_status(self) -> None:
         if self.bid_selection_disabled:
@@ -125,6 +130,7 @@ class Builder(ApiClient):
         slot: int,
         proposer_pubkey: str,
         fork_version: SchemaShared.ForkVersion,
+        max_execution_payment: str | None = None,
     ) -> None:
         if self.bid_selection_disabled:
             return
@@ -136,7 +142,9 @@ class Builder(ApiClient):
 
         data = SchemaBuilderAPI.BuilderPreferencesRequest(
             preferences=SchemaBuilderAPI.BuilderPreferences(
-                max_execution_payment=str(self.cli_args.builder_max_execution_payment),
+                max_execution_payment=max_execution_payment
+                if max_execution_payment is not None
+                else str(self.cli_args.builder_max_execution_payment),
             ),
             auth=self.get_signed_builder_request_auth(
                 slot=slot,
@@ -163,6 +171,9 @@ class Builder(ApiClient):
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
         hard_timeout: float,
+        config: ResolvedBuilderEntry | None = None,
+        allowed_builder_indices: set[str] | None = None,
+        fee_recipient: str | None = None,
     ) -> tuple[Self, SchemaShared.SignedExecutionPayloadBid] | None:
         if self.bid_selection_disabled:
             return None
@@ -245,20 +256,32 @@ class Builder(ApiClient):
                 raise ValueError(
                     f"Parent root mismatch in bid from {self.base_url}: {bid.message.parent_block_root} != {parent_root}"
                 )
-            if bid.message.fee_recipient.lower() != self.cli_args.fee_recipient:
+            fee_recipient = fee_recipient or self.cli_args.fee_recipient
+            if bid.message.fee_recipient.lower() != fee_recipient.lower():
                 raise ValueError(
-                    f"Fee recipient mismatch in bid from {self.base_url}: {bid.message.fee_recipient} != {self.cli_args.fee_recipient}"
+                    f"Fee recipient mismatch in bid from {self.base_url}: {bid.message.fee_recipient} != {fee_recipient}"
                 )
             if (
-                int(bid.message.execution_payment)
-                > self.cli_args.builder_max_execution_payment
+                allowed_builder_indices is not None
+                and bid.message.builder_index not in allowed_builder_indices
             ):
                 raise ValueError(
-                    f"Invalid execution payment in bid from {self.base_url}. {int(bid.message.execution_payment):,} exceeds configured max execution payment {self.cli_args.builder_max_execution_payment:,}"
+                    f"Bid from {self.base_url} has an unapproved builder index"
                 )
 
+            max_payment = (
+                int(config.max_execution_payment)
+                if config
+                else self.cli_args.builder_max_execution_payment
+            )
+            if int(bid.message.execution_payment) > max_payment:
+                raise ValueError(
+                    f"Invalid execution payment in bid from {self.base_url}. "
+                    f"{int(bid.message.execution_payment):,} exceeds configured max execution payment {max_payment:,}"
+                )
             _bid_total_value = bid.total_value
-            if _bid_total_value < self.cli_args.builder_min_bid:
+            min_bid = int(config.min_bid) if config else self.cli_args.builder_min_bid
+            if _bid_total_value < min_bid:
                 self.logger.debug(
                     f"Ignoring bid event with value {_bid_total_value:,} below configured min bid"
                 )
@@ -308,10 +331,59 @@ class Builder(ApiClient):
 
 
 class MultiBuilder:
-    def __init__(self, vero: "Vero"):
+    def __init__(
+        self,
+        vero: "Vero",
+        keymanager: "Keymanager | None" = None,
+        multi_beacon_node: "MultiBeaconNode | None" = None,
+        signature_provider: "SignatureProvider | None" = None,
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.tracer = trace.get_tracer(self.__class__.__name__)
+        self.vero = vero
+        self.keymanager = keymanager
+        self.multi_beacon_node = multi_beacon_node
+        self.signature_provider = signature_provider
         self.builders = [Builder(url, vero=vero) for url in vero.cli_args.builder_urls]
+        self._builder_clients = {(b.url, b.auth_data): b for b in self.builders}
+        self._builder_indices: dict[str, str] = {}
+
+    def get_config(self, pubkey: str) -> ResolvedBuilderConfig:
+        if self.keymanager is not None:
+            return self.keymanager.resolve_builder_config(pubkey)
+        return resolve_builder_config(BuilderConfig(), self.vero.cli_args)
+
+    def get_builder_entries(
+        self, pubkey: str, config: ResolvedBuilderConfig | None = None
+    ) -> list[tuple[Builder, ResolvedBuilderEntry]]:
+        result = []
+        for entry in (
+            config if config is not None else self.get_config(pubkey)
+        ).builders:
+            identity = (entry.url, entry.auth_data)
+            builder = self._builder_clients.get(identity)
+            if builder is None:
+                builder = Builder(entry.url, vero=self.vero, auth_data=entry.auth_data)
+                self._builder_clients[identity] = builder
+                self.builders.append(builder)
+            result.append((builder, entry))
+        return result
+
+    def get_fee_recipient(self, pubkey: str) -> str:
+        if self.keymanager is not None:
+            return self.keymanager.pubkey_to_fee_recipient_override.get(
+                pubkey, self.vero.cli_args.fee_recipient
+            )
+        return self.vero.cli_args.fee_recipient
+
+    async def _load_builder_indices(self, entries: list[ResolvedBuilderEntry]) -> None:
+        missing = {
+            pk.lower() for e in entries for pk in e.builder_pubkeys
+        } - self._builder_indices.keys()
+        if missing and self.multi_beacon_node is not None:
+            self._builder_indices.update(
+                await self.multi_beacon_node.get_builders(sorted(missing))
+            )
 
     async def __aenter__(self) -> Self:
         return self
@@ -345,20 +417,52 @@ class MultiBuilder:
         self,
         proposer_duty: SchemaBeaconAPI.ProposerDuty,
         signature_provider: "SignatureProvider",
+        *,
+        load_builder_indices: bool = True,
+        config: ResolvedBuilderConfig | None = None,
     ) -> None:
-        await asyncio.gather(
+        entries = self.get_builder_entries(proposer_duty.pubkey, config)
+        results = await asyncio.gather(
             *(
                 b.cache_bid_request_auth_data(
                     proposer_duty=proposer_duty,
                     signature_provider=signature_provider,
                 )
-                for b in self.builders
-            )
+                for b, _ in entries
+            ),
+            return_exceptions=True,
         )
+        for (builder, _), result in zip(entries, results, strict=True):
+            if isinstance(result, BaseException):
+                self.logger.warning(
+                    f"Failed to sign builder authentication for {builder.base_url}: {result!r}"
+                )
+        if not load_builder_indices or not self.vero.cli_args.enable_bid_selection:
+            return
+        try:
+            await self._load_builder_indices([entry for _, entry in entries])
+        except Exception as e:
+            self.logger.warning(f"Failed to load builder indices: {e!r}")
 
     def prune(self, *, finished_proposal_slot: int) -> None:
         for builder in self.builders:
             builder.prune(finished_proposal_slot=finished_proposal_slot)
+        # Retire clients removed by configuration changes once their duties finish.
+        configured = {
+            (url, "0x" + get_default_auth_data(URL(url)).hex())
+            for url in self.vero.cli_args.builder_urls
+        }
+        if self.keymanager is not None:
+            for pubkey in self.keymanager.pubkey_to_builder_config:
+                configured.update(
+                    (entry.url, entry.auth_data)
+                    for entry in self.get_config(pubkey).builders
+                )
+        for identity, builder in list(self._builder_clients.items()):
+            if identity not in configured and not builder.has_pending_auth:
+                self.vero.task_manager.create_task(builder.client_session.close())
+                self.builders.remove(builder)
+                del self._builder_clients[identity]
 
     async def submit_builder_preferences(
         self,
@@ -366,19 +470,21 @@ class MultiBuilder:
         proposer_pubkey: str,
         fork_version: SchemaShared.ForkVersion,
     ) -> None:
+        entries = self.get_builder_entries(proposer_pubkey)
         results = await asyncio.gather(
             *(
                 b.submit_builder_preferences(
                     slot=slot,
                     proposer_pubkey=proposer_pubkey,
                     fork_version=fork_version,
+                    max_execution_payment=entry.max_execution_payment,
                 )
-                for b in self.builders
+                for b, entry in entries
             ),
             return_exceptions=True,
         )
         submitted_count = 0
-        for builder, result in zip(self.builders, results, strict=True):
+        for builder, result in zip((b for b, _ in entries), results, strict=True):
             if isinstance(result, BaseException):
                 self.logger.error(
                     f"Failed to submit builder preferences for slot {slot} to {builder.base_url}: {result!r}"
@@ -386,7 +492,7 @@ class MultiBuilder:
             else:
                 submitted_count += 1
         self.logger.info(
-            f"Submitted builder preferences for slot {slot} to {submitted_count}/{len(self.builders)} builders"
+            f"Submitted builder preferences for slot {slot} to {submitted_count}/{len(entries)} builders"
         )
 
     async def get_execution_payload_bid(
@@ -398,6 +504,7 @@ class MultiBuilder:
         fork_version: SchemaShared.ForkVersion,
         soft_timeout: float,
         hard_timeout: float,
+        config: ResolvedBuilderConfig | None = None,
     ) -> tuple[Builder, SchemaShared.SignedExecutionPayloadBid] | None:
         """Gets the get execution payload bid response from all builders and returns
         the best one by its reported value.
@@ -410,8 +517,21 @@ class MultiBuilder:
 
         Note: Bears similarities with the MultiBeaconNode._produce_best_block function.
         """
-        if len(self.builders) == 0:
+        config = config if config is not None else self.get_config(proposer_pubkey)
+        if self.signature_provider is not None:
+            await self.cache_bid_request_auth_data(
+                SchemaBeaconAPI.ProposerDuty(
+                    pubkey=proposer_pubkey, validator_index="0", slot=str(slot)
+                ),
+                self.signature_provider,
+                load_builder_indices=False,
+                config=config,
+            )
+        entries = self.get_builder_entries(proposer_pubkey, config)
+        if not entries:
             return None
+        config_by_builder = dict(entries)
+        fee_recipient = self.get_fee_recipient(proposer_pubkey)
 
         if fork_version != SchemaShared.ForkVersion.GLOAS:
             raise NotImplementedError
@@ -430,9 +550,18 @@ class MultiBuilder:
                         fork_version=fork_version,
                         soft_timeout=soft_timeout,
                         hard_timeout=hard_timeout,
+                        config=entry,
+                        allowed_builder_indices={
+                            self._builder_indices[pk.lower()]
+                            for pk in entry.builder_pubkeys
+                            if pk.lower() in self._builder_indices
+                        }
+                        if entry.builder_pubkeys
+                        else None,
+                        fee_recipient=fee_recipient,
                     )
                 )
-                for builder in self.builders
+                for builder, entry in entries
             }
             start_time = asyncio.get_running_loop().time()
             remaining_soft_timeout = soft_timeout
@@ -440,6 +569,7 @@ class MultiBuilder:
             best_builder = None
             best_bid = None
             best_bid_value_gwei = -1
+            best_bid_score = (-1, -1)
 
             while pending and remaining_soft_timeout > 0:
                 done, pending = await asyncio.wait(
@@ -460,8 +590,11 @@ class MultiBuilder:
                         continue
 
                     builder, bid = result
+                    entry = config_by_builder[builder]
                     bid_value_gwei = bid.total_value
-                    if bid_value_gwei > best_bid_value_gwei:
+                    score = bid_score(bid_value_gwei, int(entry.builder_boost_factor))
+                    if score > best_bid_score:
+                        best_bid_score = score
                         best_builder = builder
                         best_bid = bid
                         best_bid_value_gwei = bid_value_gwei
