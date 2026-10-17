@@ -111,12 +111,7 @@ Can be set individually for each validator through the [Keymanager API](../usage
 
 When this flag is omitted, Vero follows the optional `GAS_LIMIT_SCHEDULE` in the
 network configuration after Gloas, as described in [EIP-8261](https://eips.ethereum.org/EIPS/eip-8261).
-The latest entry at or before the proposal's epoch supplies the default. Vero
-selects the value for each duty, including future duties, without requiring a restart.
 Before Gloas, or when no entry is active, Vero uses the network defaults below.
-
-At beacon-node initialization, Vero warns if the node returns a missing or different
-gas limit schedule. Initialization continues using Vero's configured schedule.
 
 An explicit `--gas-limit` or per-validator Keymanager setting takes precedence
 over the schedule. Values above the active recommendation produce a warning and
