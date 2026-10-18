@@ -1,6 +1,6 @@
 import asyncio
 import contextlib
-import datetime
+import datetime as dt
 from collections import defaultdict
 from collections.abc import AsyncIterator
 from types import TracebackType
@@ -132,10 +132,10 @@ class SyncCommitteeService(ValidatorDutyService):
         else:
             sync_message_due_s = self._sync_message_due_s
 
-        _produce_deadline = datetime.datetime.fromtimestamp(
+        _produce_deadline = dt.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
             + sync_message_due_s,
-            tz=datetime.UTC,
+            tz=dt.UTC,
         )
 
         self.scheduler.add_job(
@@ -442,10 +442,10 @@ class SyncCommitteeService(ValidatorDutyService):
         else:
             contribution_due_s = self._contribution_due_s
 
-        aggregation_run_time = datetime.datetime.fromtimestamp(
+        aggregation_run_time = dt.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(duty_slot)
             + contribution_due_s,
-            tz=datetime.UTC,
+            tz=dt.UTC,
         )
         self.scheduler.add_job(
             self.aggregate_sync_messages,

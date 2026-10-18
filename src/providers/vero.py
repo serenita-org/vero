@@ -1,5 +1,5 @@
 import asyncio
-import datetime
+import datetime as dt
 import logging
 from typing import TYPE_CHECKING
 
@@ -36,7 +36,7 @@ class Vero:
         )
         self.shutdown_event = asyncio.Event()
         self.scheduler = AsyncIOScheduler(
-            timezone=datetime.UTC,
+            timezone=dt.UTC,
             job_defaults=dict(
                 coalesce=True,  # default value
                 max_instances=1,  # default value

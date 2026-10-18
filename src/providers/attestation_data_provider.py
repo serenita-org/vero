@@ -1,5 +1,5 @@
 import asyncio
-import datetime
+import datetime as dt
 import logging
 from typing import TYPE_CHECKING
 
@@ -33,7 +33,7 @@ class AttestationDataProvider:
             self.prune,
             "interval",
             minutes=10,
-            next_run_time=datetime.datetime.now(tz=datetime.UTC),
+            next_run_time=dt.datetime.now(tz=dt.UTC),
             id=f"{self.__class__.__name__}.prune",
         )
 

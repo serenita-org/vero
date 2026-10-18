@@ -1,6 +1,6 @@
 import asyncio
 import contextlib
-import datetime
+import datetime as dt
 from collections import defaultdict
 from types import TracebackType
 from typing import Self, Unpack
@@ -69,10 +69,10 @@ class PtcService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new ExecutionPayloadAvailableEvent,
         # aiming to attest self._payload_attestation_due_s into the slot at the latest.
-        _produce_deadline = datetime.datetime.fromtimestamp(
+        _produce_deadline = dt.datetime.fromtimestamp(
             timestamp=self.beacon_chain.get_timestamp_for_slot(slot)
             + self._payload_attestation_due_s,
-            tz=datetime.UTC,
+            tz=dt.UTC,
         )
 
         self.scheduler.add_job(
