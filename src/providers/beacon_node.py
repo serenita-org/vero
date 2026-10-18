@@ -2,7 +2,7 @@
 
 import asyncio
 import contextlib
-import datetime
+import datetime as dt
 import warnings
 from collections.abc import AsyncIterable
 from dataclasses import fields
@@ -187,7 +187,7 @@ class BeaconNode(ApiClient):
             self.update_node_version,
             "interval",
             minutes=10,
-            next_run_time=datetime.datetime.now(tz=datetime.UTC),
+            next_run_time=dt.datetime.now(tz=dt.UTC),
             id=f"{self.__class__.__name__}.update_node_version-{self.base_url}",
         )
 
