@@ -1,11 +1,11 @@
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 
 import pytest
-from aioresponses import aioresponses
+from aiointercept import aiointercept
 
 
 @pytest.fixture
-def mocked_responses() -> Generator[aioresponses, None, None]:
-    # Passthrough for requests to Keymanager API
-    with aioresponses(passthrough=["http://127.0.0.1"]) as m:
+async def mocked_responses() -> AsyncGenerator[aiointercept, None]:
+    # Requests to Keymanager API use bare IP addresses and bypass interception
+    async with aiointercept(mock_external_urls=True) as m:
         yield m

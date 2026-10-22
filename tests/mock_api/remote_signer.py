@@ -4,7 +4,7 @@ from typing import Any
 
 import msgspec.json
 import pytest
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 from yarl import URL
 
 from schemas.remote_signer import HealthCheckResponse
@@ -19,7 +19,7 @@ def remote_signer_url() -> str:
 @pytest.fixture
 def _mocked_remote_signer_endpoints(
     validators: list[ValidatorIndexPubkey],
-    mocked_responses: aioresponses,
+    mocked_responses: aiointercept,
 ) -> None:
     def _mocked_pubkeys_endpoint(url: URL, **kwargs: Any) -> CallbackResult:
         return CallbackResult(payload=[v.pubkey for v in validators])

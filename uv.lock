@@ -163,12 +163,17 @@ wheels = [
 ]
 
 [[package]]
-name = "aioresponses"
-version = "0.0.1.dev376"
-source = { git = "https://github.com/eth2353/aioresponses?rev=b3e8f869b1da9901144988d3bc41f9bc03d6e395#b3e8f869b1da9901144988d3bc41f9bc03d6e395" }
+name = "aiointercept"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
-    { name = "packaging" },
+    { name = "multidict" },
+    { name = "yarl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2c/88/0e6de3b67ecb42e8e4451f5f3c57ccb5f8e4b6cde657d197e22600dad4f0/aiointercept-1.0.0.tar.gz", hash = "sha256:99c52ba2d6c282f1e0cbeba2225279eca581cf24b6a3c893929bacf8774e8f70", size = 188546, upload-time = "2026-10-12T16:36:48.385Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6a/28/042b1a6e3e70043919cd197a5a99af0eec510d6d87a8ddb175c350590984/aiointercept-1.0.0-py3-none-any.whl", hash = "sha256:1c6b5543a611d29cc899f6c9b117ad61cb657dd2fb8c95ab8199cb8a5842b616", size = 20301, upload-time = "2026-10-12T16:36:47.208Z" },
 ]
 
 [[package]]
@@ -1957,7 +1962,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "aioresponses" },
+    { name = "aiointercept" },
     { name = "jsonschema" },
     { name = "mkdocs-material" },
     { name = "pre-commit" },
@@ -1983,7 +1988,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "aioresponses", git = "https://github.com/eth2353/aioresponses?rev=b3e8f869b1da9901144988d3bc41f9bc03d6e395" },
+    { name = "aiointercept", specifier = ">=1.0.0" },
     { name = "jsonschema", specifier = ">=4.25.1" },
     { name = "mkdocs-material", specifier = ">=9.6.20" },
     { name = "pre-commit", specifier = ">=4.1.0" },

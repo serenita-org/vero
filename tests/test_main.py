@@ -1,11 +1,8 @@
 import asyncio
-import cProfile
 import logging
 import os
-import pstats
 import signal
 import time
-from _lsprof import profiler_entry
 from collections.abc import Generator
 
 import pytest
@@ -23,30 +20,14 @@ def _profile_program_run() -> Generator[None, None, None]:
         yield
         return
 
-    def is_idle_stat(stat: profiler_entry) -> bool:
-        """
-        Some stats are treated as 'idle time' when evaluating CPU usage,
-        since the program is waiting on I/O and not actively consuming CPU.
-        """
-        if isinstance(stat.code, str):
-            return any(
-                substr in stat.code
-                for substr in (
-                    "of 'select.kqueue' objects>",
-                    "of 'select.poll' objects>",
-                )
-            )
-        return False
-
-    prof = cProfile.Profile()
-    with prof:
-        start_wall_time = time.perf_counter()
-        yield
-        wall_time = time.perf_counter() - start_wall_time
-
-    idle_time = sum(s.totaltime for s in prof.getstats() if is_idle_stat(s))
-    adjusted_cpu_time = pstats.Stats(prof).total_tt - idle_time  # type: ignore[attr-defined]
-    cpu_utilization = adjusted_cpu_time / wall_time
+    # The mock HTTP server runs in another thread. Measure this thread's CPU
+    # time so socket waits and the mock server's work do not count as Vero CPU.
+    start_wall_time = time.perf_counter()
+    start_cpu_time = time.thread_time()
+    yield
+    wall_time = time.perf_counter() - start_wall_time
+    cpu_time = time.thread_time() - start_cpu_time
+    cpu_utilization = cpu_time / wall_time
 
     # Vero should be able to perform all its duties without
     # keeping the event loop busy 100% of the time, even with
