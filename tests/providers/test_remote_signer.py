@@ -2,7 +2,7 @@ import asyncio
 import re
 
 import pytest
-from aioresponses import aioresponses
+from aiointercept import aiointercept
 
 from providers import RemoteSigner, Vero
 
@@ -11,7 +11,7 @@ async def test_remote_signer_healthcheck_not_supported(
     vero: Vero, caplog: pytest.LogCaptureFixture
 ) -> None:
     signer_url = "http://signer:9000"
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         m.get(re.compile(f"{signer_url}/healthcheck"), status=404)
         async with RemoteSigner(url=signer_url, vero=vero, process_pool_executor=None):
             assert len(vero.task_manager._tasks) == 1

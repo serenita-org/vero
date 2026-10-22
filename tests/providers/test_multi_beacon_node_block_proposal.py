@@ -10,7 +10,7 @@ from typing import Any, TypedDict
 
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode
@@ -340,7 +340,7 @@ async def test_produce_best_block(
     """Tests that the multi-beacon requests blocks from all beacon nodes
     and returns the one with the highest value.
     """
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for sequence in bn_response_sequences:
             bn_netloc = sequence["netloc"]
             url_regex_to_mock = re.compile(

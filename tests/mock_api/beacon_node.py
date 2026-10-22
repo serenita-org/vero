@@ -7,7 +7,7 @@ from typing import Any
 import msgspec
 import pytest
 from aiohttp.hdrs import ACCEPT, CONTENT_TYPE
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 from spy_ssz import Bitfield, Fork, ObjectKind, Preset, get_ssz_type
 from yarl import URL
 
@@ -67,7 +67,7 @@ def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
     spec: SpecGloas,
     beacon_chain: BeaconChain,
-    mocked_responses: aioresponses,
+    mocked_responses: aiointercept,
     execution_payload_blinded: bool,
     return_self_built_payload: bool,
     beacon_api_spec: BeaconAPISpec | None,
@@ -76,12 +76,13 @@ def _mocked_beacon_node_endpoints(
         method: str, url: URL, response: CallbackResult
     ) -> CallbackResult:
         if beacon_api_spec is not None:
+            assert isinstance(response.body, (str, bytes))
             beacon_api_spec.validate_response(
                 method,
                 url,
                 status=response.status,
                 headers=response.headers,
-                content_type=response.content_type,
+                content_type=response.content_type or ContentType.JSON.value,
                 body=response.body,
                 payload=response.payload,
             )
@@ -371,7 +372,7 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
             slot = int(url.raw_path.split("/")[-1])
-            params = kwargs["params"]
+            params = url.query
             if params["include_payload"] == "true":
                 raise NotImplementedError
 

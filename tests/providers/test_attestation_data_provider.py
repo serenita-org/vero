@@ -7,7 +7,7 @@ from typing import Any
 
 import msgspec.json
 import pytest
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 
 from args import CLIArgs
 from providers import AttestationDataProvider, BeaconChain, MultiBeaconNode, Vero
@@ -295,7 +295,7 @@ async def test_produce_attestation_data_without_head_event(
 ) -> None:
     await beacon_chain.wait_for_next_slot()
 
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for host, callbacks in att_data_callbacks_by_bn_host.items():
             url_re = re.compile(
                 rf"http://{host}:1234/eth/v1/validator/attestation_data.*"
@@ -303,7 +303,7 @@ async def test_produce_attestation_data_without_head_event(
             for cb in callbacks:
                 kwargs = dict(
                     callback=cb if not isinstance(cb, Exception) else None,
-                    exception=cb if isinstance(cb, Exception) else None,
+                    exception=isinstance(cb, Exception),
                 )
                 m.get(url=url_re, **kwargs)
 
@@ -602,7 +602,7 @@ async def test_produce_attestation_data_with_head_event(
 ) -> None:
     await beacon_chain.wait_for_next_slot()
 
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for host, callbacks in att_data_callbacks_by_bn_host.items():
             for cb in callbacks:
                 m.get(

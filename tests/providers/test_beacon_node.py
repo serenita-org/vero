@@ -5,7 +5,7 @@ from copy import copy
 import msgspec
 import pytest
 from aiohttp.hdrs import CONTENT_TYPE
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 
 from providers import BeaconNode, MultiBeaconNode, Vero
 from providers._headers import (
@@ -67,7 +67,7 @@ async def test_produce_block_v3_response(
         ETH_CONSENSUS_BLOCK_VALUE: "4",
     }
 
-    with aioresponses() as mocked_responses:
+    async with aiointercept(mock_external_urls=True) as mocked_responses:
         mocked_responses.get(
             re.compile(r"http://beacon-node-a:1234/eth/v3/validator/blocks/1.*"),
             body=response_body,
@@ -92,7 +92,7 @@ async def test_produce_block_v3_response(
     assert response.execution_payload_blinded is False
     assert response.execution_payload_value == "3"
     assert response.consensus_block_value == "4"
-    assert response.data is response_body
+    assert response.data == response_body
     assert content_type == response_content_type
     parsed_block = MultiBeaconNode._parse_block_response(response, content_type)
     assert parsed_block.block.slot == 1
@@ -128,8 +128,8 @@ async def test_initialize_spec_mismatch(
     vero: Vero,
 ) -> None:
     """The BeaconNode should fail to initialize on a spec mismatch."""
-    with contextlib.ExitStack() as stack:
-        m = stack.enter_context(aioresponses())
+    async with contextlib.AsyncExitStack() as stack:
+        m = await stack.enter_async_context(aiointercept(mock_external_urls=True))
 
         spec_to_return = vero.spec
         if spec_mismatch:

@@ -6,7 +6,7 @@ import msgspec.json
 import pytest
 from _pytest.raises import RaisesExc
 from aiohttp import ClientConnectionError
-from aioresponses import aioresponses
+from aiointercept import aiointercept
 
 from providers import BeaconNode, DoppelgangerDetector, Vero
 from providers.doppelganger_detector import DoppelgangersDetected
@@ -81,7 +81,7 @@ def test_process_liveness_data(
             b"",
             pytest.raises(
                 ClientConnectionError,
-                match="Connection refused: POST http://beacon-node-a:1234/eth/v1/validator/liveness/123",
+                match="Server disconnected",
             ),
             None,
             id="bn not reachable",
@@ -107,7 +107,7 @@ async def test_fetch_liveness_data(
         validator_status_tracker_service=None,  # type: ignore[arg-type]
     )
 
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         if bn_reachable:
             m.post(
                 url=re.compile(
