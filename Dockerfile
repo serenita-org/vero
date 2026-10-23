@@ -14,7 +14,7 @@ WORKDIR /vero
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential git
 
 # Install and compile dependencies
-RUN --mount=from=uv-image,source=/usr/local/bin/uv,target=/usr/local/bin/uv \
+RUN --mount=from=uv-image,source=/uv,target=/usr/local/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
