@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator, Iterable
 from enum import Enum
 from types import TracebackType
@@ -149,23 +150,19 @@ class ValidatorDutyService:
         # Calls self._update_duties, retrying until it succeeds, with backoff
 
         if self._update_duties_lock.locked():
-            # Duties already being updated
-            self.logger.debug("Duties already being updated, returning...")
+            self.logger.debug("Duties are already being updated, returning...")
             return
 
         async with self._update_duties_lock:
             self.logger.info("Updating duties")
-            epoch_at_start = self.beacon_chain.current_epoch
-
             # Backoff parameters
             initial_delay = 1.0  # Starting delay between API calls
             max_delay = 10.0  # Maximum delay between API calls
             current_delay = initial_delay
 
-            while self.beacon_chain.current_epoch == epoch_at_start:
+            while True:
                 try:
                     await self._update_duties()
-                    break
                 except Exception as e:
                     self.metrics.errors_c.labels(
                         error_type=ErrorType.DUTIES_UPDATE.value
@@ -174,11 +171,22 @@ class ValidatorDutyService:
                         f"Failed to update duties: {e!r}",
                     )
 
-                    # Wait for the current delay before retrying again
+                    # Let the next epoch's scheduled update take over rather than
+                    # holding the lock throughout a backoff that crosses the
+                    # epoch boundary
+                    next_epoch = self.beacon_chain.current_epoch + 1
+                    next_epoch_start = self.beacon_chain.get_timestamp_for_slot(
+                        self.beacon_chain.compute_start_slot_at_epoch(next_epoch)
+                    )
+                    if current_delay >= (next_epoch_start - time.time()):
+                        return
+
                     await asyncio.sleep(current_delay)
 
                     # Increase the delay for the next iteration, up to the max
                     current_delay = min(current_delay * 2, max_delay)
+                else:
+                    return
 
     async def _iter_fast_then_slow_task_batches(
         self,
