@@ -60,7 +60,7 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 "tests/conftest.py" = ["F401", "F403", "F811", "I"]
 
 [tool.uv]
-required-version = "~=0.13.0"
+required-version = "~=0.13.5"
 exclude-newer = "7 days"
 # eMudhra CA compromise requires latest packages that ship with bundled certificates
 exclude-newer-package = { certifi = "0 days", grpcio = "0 days", virtualenv = "0 days" }
