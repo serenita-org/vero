@@ -74,3 +74,36 @@ async def test_initialize_spec_mismatch(
                 await bn._initialize_full()
 
         await bn.client_session.close()
+
+
+@pytest.mark.parametrize(
+    "cli_args",
+    [
+        pytest.param({"ignore_spec_mismatch": False}, id="strict"),
+        pytest.param({"ignore_spec_mismatch": True}, id="ignored"),
+    ],
+    indirect=True,
+)
+async def test_initialize_unparseable_spec(vero: Vero) -> None:
+    """Spec parsing errors should only prevent initialization in strict mode."""
+    spec_data = vero.spec.to_obj()
+    spec_data["SLOTS_PER_EPOCH"] = "invalid"
+
+    bn = BeaconNode(base_url="http://beacon-node-a:1234", vero=vero)
+    try:
+        with aioresponses() as m:
+            m.get(
+                "http://beacon-node-a:1234/eth/v1/config/spec",
+                payload=dict(data=spec_data),
+            )
+
+            if vero.cli_args.ignore_spec_mismatch:
+                await bn._initialize_full()
+                assert bn.initialized is True
+                assert bn.spec is vero.spec
+            else:
+                with pytest.raises(ValueError, match="invalid"):
+                    await bn._initialize_full()
+                assert bn.initialized is False
+    finally:
+        await bn.client_session.close()
