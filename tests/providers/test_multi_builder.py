@@ -6,7 +6,7 @@ from typing import Any
 
 import msgspec
 import pytest
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 
 from args import CLIArgs
 from providers import BeaconChain, MultiBuilder
@@ -257,7 +257,7 @@ async def test_bid_selection_builders(
                 signature="0x" + "00" * 96,
             )
         )
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for builder_response in builder_responses:
             base_url = builder_response.base_url
             url_regex_to_mock = re.compile(

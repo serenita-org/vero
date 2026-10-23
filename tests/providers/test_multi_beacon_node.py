@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock
 import msgspec
 import pytest
 from aiohttp.web_exceptions import HTTPRequestTimeout
-from aioresponses import CallbackResult, aioresponses
+from aiointercept import CallbackResult, aiointercept
 from spy_ssz import Bitfield
 
 from args import CLIArgs
@@ -85,7 +85,7 @@ async def test_initialize(
     assert len(cli_args.beacon_node_urls) == len(beacon_node_availabilities)
 
     async with contextlib.AsyncExitStack() as exit_stack:
-        m = exit_stack.enter_context(aioresponses())
+        m = await exit_stack.enter_async_context(aiointercept(mock_external_urls=True))
 
         for bn_url, beacon_node_available in zip(
             cli_args.beacon_node_urls,
@@ -109,7 +109,7 @@ async def test_initialize(
                 # Fail the first request made during initialization
                 m.get(
                     url=re.compile(rf"{bn_url}/eth/v1/config/spec"),
-                    exception=ValueError("Beacon node unavailable"),
+                    exception=True,
                 )
 
         mbn_base = MultiBeaconNode(vero=vero)
@@ -159,7 +159,7 @@ async def test_initialize_retry_logic(
     ERROR-level messages in the logs.
     """
     async with contextlib.AsyncExitStack() as exit_stack:
-        m = exit_stack.enter_context(aioresponses())
+        m = await exit_stack.enter_async_context(aiointercept(mock_external_urls=True))
 
         # Mock responses.
         # Beacon node A and B are online right away and stay online.
@@ -189,7 +189,8 @@ async def test_initialize_retry_logic(
             # Fail the first request made during initialization, making the first init fail
             m.get(
                 url=re.compile(rf"{_url}/eth/v1/config/spec"),
-                exception=ValueError("Beacon node unavailable"),
+                status=503,
+                body="Beacon node unavailable",
             )
 
             # After the first init fails, the rest of the responses should return fine
@@ -198,7 +199,6 @@ async def test_initialize_retry_logic(
                 callback=lambda *args, **kwargs: CallbackResult(
                     payload=dict(data=spec.to_obj()),
                 ),
-                repeat=True,
             )
             m.get(
                 url=re.compile(rf"{_url}/eth/v1/node/version"),
@@ -216,9 +216,13 @@ async def test_initialize_retry_logic(
 
         # First init of beacon-node-c will fail, causing the MultiBeaconNode
         # initialization to fail at first too.
-        assert (
-            "Failed to initialize beacon node at http://beacon-node-c:1234: ValueError('Beacon node unavailable'). Retrying in 0.1 seconds."
-            in caplog.messages
+        assert any(
+            message.startswith(
+                "Failed to initialize beacon node at http://beacon-node-c:1234:"
+            )
+            and "BeaconNodeNotReady" in message
+            and message.endswith("Retrying in 0.1 seconds.")
+            for message in caplog.messages
         )
         assert (
             "Failed to fully initialize a sufficient amount of beacon nodes - 2/3 initialized (required: 3)"
@@ -297,7 +301,7 @@ async def test_get_aggregate_attestation(
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
     """
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for number_of_attesting_indices in numbers_of_attesting_indices:
             if isinstance(number_of_attesting_indices, int):
                 bitlist_length = (
@@ -333,7 +337,7 @@ async def test_get_aggregate_attestation(
                     url=re.compile(
                         r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
                     ),
-                    exception=number_of_attesting_indices,
+                    exception=True,
                 )
             else:
                 raise NotImplementedError
@@ -418,7 +422,7 @@ async def test_get_sync_committee_contribution(
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
     """
-    with aioresponses() as m:
+    async with aiointercept(mock_external_urls=True) as m:
         for number_of_root_matching_indices in numbers_of_root_matching_indices:
             if isinstance(number_of_root_matching_indices, int):
                 bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
@@ -451,7 +455,7 @@ async def test_get_sync_committee_contribution(
                     url=re.compile(
                         r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution",
                     ),
-                    exception=number_of_root_matching_indices,
+                    exception=True,
                 )
             else:
                 raise NotImplementedError
@@ -652,3 +656,33 @@ class TestProducePayloadAttestationData:
             RuntimeError, match="Failed to get a response from all beacon nodes"
         ):
             await multi_beacon_node.produce_payload_attestation_data(slot=123)
+
+
+async def test_attestation_data_cancellation_closes_pending_requests(
+    multi_beacon_node: MultiBeaconNode,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def pending_request(*, slot: int) -> None:
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    monkeypatch.setattr(
+        multi_beacon_node.beacon_nodes[0], "produce_attestation_data", pending_request
+    )
+    task = asyncio.create_task(
+        multi_beacon_node.produce_attestation_data_without_head_event(slot=123)
+    )
+    try:
+        await asyncio.wait_for(started.wait(), timeout=1)
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    assert cancelled.is_set()
