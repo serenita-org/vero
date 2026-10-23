@@ -4,7 +4,7 @@
 
 ___
 
-## v1.5.0-rc.0 { id="v1.5.0-rc.0" }
+## [yanked] v1.5.0-rc.0 { id="v1.5.0-rc.0" }
 
 <small>October 19, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.5.0-rc.0){:target="_blank"}
 
@@ -18,6 +18,18 @@ ___
 
 #### Bugfixes
 
+- Fix race condition in duties update logic ([#339](https://github.com/serenita-org/vero/pull/339))
+- Fix voluntary exit signature domain in Keymanager API ([#336](https://github.com/serenita-org/vero/pull/336))
+
+___
+
+## v1.4.2 { id="v1.4.2" }
+
+<small>October 23, 2026</small>&nbsp;&nbsp;&nbsp;[:octicons-mark-github-16: GitHub Release](https://github.com/serenita-org/vero/releases/tag/v1.4.2){:target="_blank"}
+
+#### Bugfixes
+
+- fix: honor `--ignore-spec-mismatch` when beacon spec parsing fails ([#368](https://github.com/serenita-org/vero/pull/368))
 - Fix race condition in duties update logic ([#339](https://github.com/serenita-org/vero/pull/339))
 - Fix voluntary exit signature domain in Keymanager API ([#336](https://github.com/serenita-org/vero/pull/336))
 
