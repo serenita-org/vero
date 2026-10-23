@@ -112,6 +112,7 @@ class MultiBeaconNode:
         self._skip_init = skip_init
         self._init_timeout = 300
         self._shutdown_event = vero.shutdown_event
+        self._request_cleanups: set[asyncio.Future[list[Any]]] = set()
 
         self._json_encoder = msgspec.json.Encoder()
 
@@ -158,6 +159,7 @@ class MultiBeaconNode:
         )
 
     async def _close_client_sessions(self) -> None:
+        await asyncio.gather(*self._request_cleanups)
         all_beacon_nodes = self.beacon_nodes + self.beacon_nodes_proposal
         await asyncio.gather(
             *[
@@ -581,45 +583,56 @@ class MultiBeaconNode:
                 for bn in self.initialized_beacon_nodes
             ]
 
-            for coro in asyncio.as_completed(tasks):
-                try:
-                    netloc, att_data = await coro
-                except Exception as e:
-                    # We can tolerate some attestation data production failures
-                    self.logger.warning(
-                        f"Failed to produce attestation data: {e!r}",
-                    )
-                    continue
+            try:
+                for coro in asyncio.as_completed(tasks):
+                    try:
+                        netloc, att_data = await coro
+                    except Exception as e:
+                        # We can tolerate some attestation data production failures
+                        self.logger.warning(
+                            f"Failed to produce attestation data: {e!r}",
+                        )
+                        continue
 
-                prev_att_data = netloc_to_att_data.get(netloc)
+                    prev_att_data = netloc_to_att_data.get(netloc)
 
-                if att_data == prev_att_data:
-                    # This netloc has already returned the same AttestationData in the past,
-                    # no need to process it
-                    continue
+                    if att_data == prev_att_data:
+                        # This netloc has already returned the same AttestationData in the past,
+                        # no need to process it
+                        continue
 
-                # New AttestationData has arrived from this netloc
-                self.logger.debug(f"AttestationData received from {netloc}: {att_data}")
-                netloc_to_att_data[netloc] = att_data
-                att_data_counter[att_data] += 1
-                if prev_att_data is not None:
-                    att_data_counter[prev_att_data] -= 1
-
-                # Check if we reached the threshold for consensus
-                if att_data_counter[att_data] >= self._attestation_consensus_threshold:
-                    # Cancel pending tasks
-                    for task in tasks:
-                        task.cancel()
-
-                    contributing_netlocs = [
-                        n for n, ad in netloc_to_att_data.items() if ad == att_data
-                    ]
-
+                    # New AttestationData has arrived from this netloc
                     self.logger.debug(
-                        f"Produced AttestationData without head event using {contributing_netlocs}"
+                        f"AttestationData received from {netloc}: {att_data}"
                     )
+                    netloc_to_att_data[netloc] = att_data
+                    att_data_counter[att_data] += 1
+                    if prev_att_data is not None:
+                        att_data_counter[prev_att_data] -= 1
 
-                    return att_data
+                    # Check if we reached the threshold for consensus
+                    if (
+                        att_data_counter[att_data]
+                        >= self._attestation_consensus_threshold
+                    ):
+                        contributing_netlocs = [
+                            n for n, ad in netloc_to_att_data.items() if ad == att_data
+                        ]
+
+                        self.logger.debug(
+                            f"Produced AttestationData without head event using {contributing_netlocs}"
+                        )
+
+                        return att_data
+
+            finally:
+                for task in tasks:
+                    task.cancel()
+                # Don't await cancellation cleanup on the attestation hot path
+                # -> we want to attest as early as possible
+                cleanup = asyncio.gather(*tasks, return_exceptions=True)
+                self._request_cleanups.add(cleanup)
+                cleanup.add_done_callback(self._request_cleanups.discard)
 
             # If no consensus has been reached in this round,
             # rate-limit so we don't spam requests too quickly.
