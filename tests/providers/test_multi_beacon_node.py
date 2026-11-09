@@ -18,7 +18,6 @@ from aiohttp.web_exceptions import HTTPRequestTimeout
 from aiointercept import CallbackResult, aiointercept
 from spy_ssz import Bitfield
 
-from args import CLIArgs
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaShared
 from spec import PayloadAttestationData
@@ -33,82 +32,64 @@ from tests.ssz_objects import (
 
 @pytest.mark.parametrize(
     argnames=(
-        "cli_args",
+        "beacon_node_mocks",
         "beacon_node_availabilities",
         "expected_initialization_success",
     ),
     argvalues=[
         pytest.param(
-            {
-                "beacon_node_urls": ["http://beacon-node-a:1234"],
-            },
+            1,
             [True],
             True,
             id="1/1 available beacon nodes",
         ),
         pytest.param(
-            {
-                "beacon_node_urls": [
-                    "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
-                ],
-            },
+            3,
             [True, False, True],
             True,
             id="2/3 available beacon nodes",
         ),
         pytest.param(
-            {
-                "beacon_node_urls": [
-                    "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
-                ],
-            },
+            3,
             [True, False, False],
             False,
             id="1/3 available beacon nodes -> init fails",
         ),
     ],
-    indirect=["cli_args"],
+    indirect=["beacon_node_mocks"],
 )
 async def test_initialize(
     beacon_node_availabilities: list[bool],
     expected_initialization_success: bool,
-    cli_args: CLIArgs,
+    beacon_node_mocks: list[aiointercept],
     vero: Vero,
 ) -> None:
     """Tests that the multi-beacon node is able to initialize if enough
     of its supplied beacon nodes are available.
     """
-    assert len(cli_args.beacon_node_urls) == len(beacon_node_availabilities)
-
     async with contextlib.AsyncExitStack() as exit_stack:
-        m = await exit_stack.enter_async_context(aiointercept(mock_external_urls=True))
-
-        for bn_url, beacon_node_available in zip(
-            cli_args.beacon_node_urls,
+        for server, beacon_node_available in zip(
+            beacon_node_mocks,
             beacon_node_availabilities,
             strict=True,
         ):
             if beacon_node_available:
-                m.get(
-                    url=re.compile(rf"{bn_url}/eth/v1/config/spec"),
+                server.get(
+                    url=f"{server.server_url}/eth/v1/config/spec",
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=vero.spec.to_obj()),
                     ),
                 )
-                m.get(
-                    url=re.compile(rf"{bn_url}/eth/v1/node/version"),
+                server.get(
+                    url=f"{server.server_url}/eth/v1/node/version",
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=dict(version="beacon-node/test")),
                     ),
                 )
             else:
                 # Fail the first request made during initialization
-                m.get(
-                    url=re.compile(rf"{bn_url}/eth/v1/config/spec"),
+                server.get(
+                    url=f"{server.server_url}/eth/v1/config/spec",
                     exception=True,
                 )
 
@@ -128,15 +109,11 @@ async def test_initialize(
 
 
 @pytest.mark.parametrize(
-    argnames="cli_args",
+    argnames=("beacon_node_mocks", "cli_args"),
     argvalues=[
         pytest.param(
+            3,
             {
-                "beacon_node_urls": [
-                    "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
-                ],
                 # Set the consensus threshold to 3/3, requiring all beacon nodes
                 # to initialize successfully
                 "attestation_consensus_threshold": 3,
@@ -144,12 +121,12 @@ async def test_initialize(
             id="1 bn offline at first, with 3/3 threshold",
         ),
     ],
-    indirect=["cli_args"],
+    indirect=True,
 )
 async def test_initialize_retry_logic(
     beacon_chain: BeaconChain,
     spec: SpecGloas,
-    cli_args: CLIArgs,
+    beacon_node_mocks: list[aiointercept],
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -159,54 +136,33 @@ async def test_initialize_retry_logic(
     ERROR-level messages in the logs.
     """
     async with contextlib.AsyncExitStack() as exit_stack:
-        m = await exit_stack.enter_async_context(aiointercept(mock_external_urls=True))
-
         # Mock responses.
         # Beacon node A and B are online right away and stay online.
         # Beacon node C is offline at first but becomes available later.
         # This means the very first initialization fails, and
         # the next one succeeds.
-        online_bn_urls = vero.cli_args.beacon_node_urls[:2]
-        initially_offline_bn_urls = vero.cli_args.beacon_node_urls[2:3]
+        *online_servers, initially_offline_server = beacon_node_mocks
+        initially_offline_url = initially_offline_server.server_url
 
-        for _url in online_bn_urls:
-            m.get(
-                url=re.compile(rf"{_url}/eth/v1/config/spec"),
-                callback=lambda *args, **kwargs: CallbackResult(
-                    payload=dict(data=spec.to_obj()),
-                ),
-                repeat=True,
-            )
-            m.get(
-                url=re.compile(rf"{_url}/eth/v1/node/version"),
-                callback=lambda *args, **kwargs: CallbackResult(
-                    payload=dict(data=dict(version="vero/test")),
-                ),
-                repeat=True,
-            )
-
-        for _url in initially_offline_bn_urls:
-            # Fail the first request made during initialization, making the first init fail
-            m.get(
-                url=re.compile(rf"{_url}/eth/v1/config/spec"),
-                status=503,
-                body="Beacon node unavailable",
-            )
-
-            # After the first init fails, the rest of the responses should return fine
-            m.get(
-                url=re.compile(rf"{_url}/eth/v1/config/spec"),
+        for server in online_servers:
+            server.get(
+                url=f"{server.server_url}/eth/v1/config/spec",
                 callback=lambda *args, **kwargs: CallbackResult(
                     payload=dict(data=spec.to_obj()),
                 ),
             )
-            m.get(
-                url=re.compile(rf"{_url}/eth/v1/node/version"),
-                callback=lambda *args, **kwargs: CallbackResult(
-                    payload=dict(data=dict(version="vero/test")),
-                ),
-                repeat=True,
-            )
+
+        initially_offline_server.get(
+            url=f"{initially_offline_url}/eth/v1/config/spec",
+            status=503,
+            body="Beacon node unavailable",
+        )
+        initially_offline_server.get(
+            url=f"{initially_offline_url}/eth/v1/config/spec",
+            callback=lambda *args, **kwargs: CallbackResult(
+                payload=dict(data=spec.to_obj()),
+            ),
+        )
         mbn_base = MultiBeaconNode(vero=vero)
         mbn_base._init_timeout = 1
         for bn in mbn_base.beacon_nodes:
@@ -218,7 +174,7 @@ async def test_initialize_retry_logic(
         # initialization to fail at first too.
         assert any(
             message.startswith(
-                "Failed to initialize beacon node at http://beacon-node-c:1234:"
+                f"Failed to initialize beacon node at {initially_offline_url}:"
             )
             and "BeaconNodeNotReady" in message
             and message.endswith("Retrying in 0.1 seconds.")
@@ -230,7 +186,7 @@ async def test_initialize_retry_logic(
         )
         # The next requests to beacon-node-c succeed though, allowing it to initialize
         # successfully on the second attempt.
-        assert "Initialized beacon node at http://beacon-node-c:1234" in caplog.messages
+        assert f"Initialized beacon node at {initially_offline_url}" in caplog.messages
         # This then allows the MultiBeaconNode to initialize as well.
         assert "Successfully initialized 3/3 beacon nodes" in caplog.messages
         assert len(mbn_base.initialized_beacon_nodes) == 3
@@ -275,19 +231,8 @@ async def test_initialize_retry_logic(
     ],
 )
 @pytest.mark.parametrize(
-    argnames="cli_args",
-    argvalues=[
-        pytest.param(
-            {
-                "beacon_node_urls": [
-                    "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
-                ],
-            },
-            id="3 beacon nodes",
-        )
-    ],
+    "beacon_node_mocks",
+    [3],
     indirect=True,
 )
 async def test_get_aggregate_attestation(
@@ -296,71 +241,64 @@ async def test_get_aggregate_attestation(
     beacon_chain: BeaconChain,
     multi_beacon_node: MultiBeaconNode,
     spec: SpecGloas,
-    cli_args: CLIArgs,
+    beacon_node_mocks: list[aiointercept],
 ) -> None:
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
     """
-    async with aiointercept(mock_external_urls=True) as m:
-        for number_of_attesting_indices in numbers_of_attesting_indices:
-            if isinstance(number_of_attesting_indices, int):
-                bitlist_length = (
-                    spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
-                )
-                aggregation_bits = [False] * 10
-                for idx in range(number_of_attesting_indices):
-                    aggregation_bits[idx] = True
-                agg_bits_to_return = Bitfield.bitlist(bitlist_length, aggregation_bits)
-                _callback = partial(
-                    lambda _bits, *args, **kwargs: CallbackResult(
-                        body=msgspec.json.encode(
-                            {
-                                "version": SchemaShared.ForkVersion.FULU,
-                                "data": msgspec.Raw(
-                                    make_attestation(
-                                        aggregation_bits=_bits,
-                                    ).to_json()
-                                ),
-                            }
-                        ),
+    for server, number_of_attesting_indices in zip(
+        beacon_node_mocks, numbers_of_attesting_indices, strict=True
+    ):
+        url = re.compile(
+            rf"{re.escape(server.server_url)}/eth/v2/validator/aggregate_attestation\?"
+        )
+        if isinstance(number_of_attesting_indices, int):
+            bitlist_length = (
+                spec.MAX_VALIDATORS_PER_COMMITTEE * spec.MAX_COMMITTEES_PER_SLOT
+            )
+            aggregation_bits = [False] * 10
+            for idx in range(number_of_attesting_indices):
+                aggregation_bits[idx] = True
+            agg_bits_to_return = Bitfield.bitlist(bitlist_length, aggregation_bits)
+            _callback = partial(
+                lambda _bits, *args, **kwargs: CallbackResult(
+                    body=msgspec.json.encode(
+                        {
+                            "version": SchemaShared.ForkVersion.FULU,
+                            "data": msgspec.Raw(
+                                make_attestation(
+                                    aggregation_bits=_bits,
+                                ).to_json()
+                            ),
+                        }
                     ),
-                    agg_bits_to_return,
-                )
-                m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
-                    ),
-                    callback=_callback,
-                )
-            elif isinstance(number_of_attesting_indices, Exception):
-                m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v2/validator/aggregate_attestation",
-                    ),
-                    exception=True,
-                )
-            else:
-                raise NotImplementedError
-
-        if all(isinstance(n, Exception) for n in numbers_of_attesting_indices):
-            with pytest.raises(
-                RuntimeError,
-                match="Failed to get a response from all beacon nodes",
-            ):
-                _ = await multi_beacon_node.get_aggregate_attestation_v2(
-                    attestation_data_root="0x"
-                    + make_attestation_data().hash_tree_root().hex(),
-                    slot=beacon_chain.current_slot,
-                    committee_index=3,
-                )
+                ),
+                agg_bits_to_return,
+            )
+            server.get(url, callback=_callback)
+        elif isinstance(number_of_attesting_indices, Exception):
+            server.get(url, exception=True)
         else:
-            returned_aggregate = await multi_beacon_node.get_aggregate_attestation_v2(
+            raise NotImplementedError
+
+    if all(isinstance(n, Exception) for n in numbers_of_attesting_indices):
+        with pytest.raises(
+            RuntimeError,
+            match="Failed to get a response from all beacon nodes",
+        ):
+            _ = await multi_beacon_node.get_aggregate_attestation_v2(
                 attestation_data_root="0x"
                 + make_attestation_data().hash_tree_root().hex(),
                 slot=beacon_chain.current_slot,
                 committee_index=3,
             )
-            assert sum(returned_aggregate.aggregation_bits) == best_aggregate_score
+    else:
+        returned_aggregate = await multi_beacon_node.get_aggregate_attestation_v2(
+            attestation_data_root="0x" + make_attestation_data().hash_tree_root().hex(),
+            slot=beacon_chain.current_slot,
+            committee_index=3,
+        )
+        assert sum(returned_aggregate.aggregation_bits) == best_aggregate_score
 
 
 @pytest.mark.parametrize(
@@ -397,95 +335,74 @@ async def test_get_aggregate_attestation(
     ],
 )
 @pytest.mark.parametrize(
-    argnames="cli_args",
-    argvalues=[
-        pytest.param(
-            {
-                "beacon_node_urls": [
-                    "http://beacon-node-a:1234",
-                    "http://beacon-node-b:1234",
-                    "http://beacon-node-c:1234",
-                ],
-            },
-            id="3 beacon nodes",
-        )
-    ],
+    "beacon_node_mocks",
+    [3],
     indirect=True,
 )
 async def test_get_sync_committee_contribution(
     numbers_of_root_matching_indices: list[Exception | int],
     best_contribution_score: int,
     multi_beacon_node: MultiBeaconNode,
-    cli_args: CLIArgs,
+    beacon_node_mocks: list[aiointercept],
     spec: SpecGloas,
 ) -> None:
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
     """
-    async with aiointercept(mock_external_urls=True) as m:
-        for number_of_root_matching_indices in numbers_of_root_matching_indices:
-            if isinstance(number_of_root_matching_indices, int):
-                bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
-                aggregation_bits = [False] * bitlist_size
-                for idx in range(number_of_root_matching_indices):
-                    aggregation_bits[idx] = True
-                agg_bits_to_return = Bitfield.bitvector(bitlist_size, aggregation_bits)
-                _callback = partial(
-                    lambda _bits, *args, **kwargs: CallbackResult(
-                        body=msgspec.json.encode(
-                            {
-                                "data": msgspec.Raw(
-                                    make_contribution(
-                                        aggregation_bits=_bits,
-                                    ).to_json()
-                                )
-                            }
-                        ),
+    for server, number_of_root_matching_indices in zip(
+        beacon_node_mocks, numbers_of_root_matching_indices, strict=True
+    ):
+        url = re.compile(
+            rf"{re.escape(server.server_url)}/eth/v1/validator/sync_committee_contribution\?"
+        )
+        if isinstance(number_of_root_matching_indices, int):
+            bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
+            aggregation_bits = [False] * bitlist_size
+            for idx in range(number_of_root_matching_indices):
+                aggregation_bits[idx] = True
+            agg_bits_to_return = Bitfield.bitvector(bitlist_size, aggregation_bits)
+            _callback = partial(
+                lambda _bits, *args, **kwargs: CallbackResult(
+                    body=msgspec.json.encode(
+                        {
+                            "data": msgspec.Raw(
+                                make_contribution(
+                                    aggregation_bits=_bits,
+                                ).to_json()
+                            )
+                        }
                     ),
-                    agg_bits_to_return,
-                )
-                m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution",
-                    ),
-                    callback=_callback,
-                )
-            elif isinstance(number_of_root_matching_indices, Exception):
-                m.get(
-                    url=re.compile(
-                        r"http://beacon-node-\w:1234/eth/v1/validator/sync_committee_contribution",
-                    ),
-                    exception=True,
-                )
-            else:
-                raise NotImplementedError
-
-        if all(isinstance(n, Exception) for n in numbers_of_root_matching_indices):
-            with pytest.raises(
-                RuntimeError,
-                match="Failed to get a response from all beacon nodes",
-            ):
-                _ = await multi_beacon_node.get_sync_committee_contribution(
-                    slot=123,
-                    subcommittee_index=1,
-                    beacon_block_root="0x" + os.urandom(32).hex(),
-                )
+                ),
+                agg_bits_to_return,
+            )
+            server.get(url, callback=_callback)
+        elif isinstance(number_of_root_matching_indices, Exception):
+            server.get(url, exception=True)
         else:
-            returned_contribution = (
-                await multi_beacon_node.get_sync_committee_contribution(
-                    slot=123,
-                    subcommittee_index=1,
-                    beacon_block_root="0x" + os.urandom(32).hex(),
-                )
+            raise NotImplementedError
+
+    if all(isinstance(n, Exception) for n in numbers_of_root_matching_indices):
+        with pytest.raises(
+            RuntimeError,
+            match="Failed to get a response from all beacon nodes",
+        ):
+            _ = await multi_beacon_node.get_sync_committee_contribution(
+                slot=123,
+                subcommittee_index=1,
+                beacon_block_root="0x" + os.urandom(32).hex(),
             )
-            assert (
-                sum(returned_contribution.aggregation_bits) == best_contribution_score
-            )
+    else:
+        returned_contribution = await multi_beacon_node.get_sync_committee_contribution(
+            slot=123,
+            subcommittee_index=1,
+            beacon_block_root="0x" + os.urandom(32).hex(),
+        )
+        assert sum(returned_contribution.aggregation_bits) == best_contribution_score
 
 
 @pytest.mark.parametrize(
-    "cli_args",
-    [{"beacon_node_urls": [f"http://beacon-node-{i}:1234" for i in range(3)]}],
+    "beacon_node_mocks",
+    [3],
     indirect=True,
 )
 class TestProducePayloadAttestationData:

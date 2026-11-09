@@ -1,4 +1,3 @@
-import contextlib
 import re
 from copy import copy
 
@@ -28,6 +27,7 @@ from tests.ssz_objects import make_block_electra_fulu
 async def test_produce_block_v3_response(
     response_content_type: ContentType,
     vero: Vero,
+    beacon_node_mocks: list[aiointercept],
 ) -> None:
     block = make_block_electra_fulu(slot=1, blinded=False)
     block_data = (
@@ -67,26 +67,28 @@ async def test_produce_block_v3_response(
         ETH_CONSENSUS_BLOCK_VALUE: "4",
     }
 
-    async with aiointercept(mock_external_urls=True) as mocked_responses:
-        mocked_responses.get(
-            re.compile(r"http://beacon-node-a:1234/eth/v3/validator/blocks/1.*"),
-            body=response_body,
-            headers=response_headers,
+    mocked_responses = beacon_node_mocks[0]
+    mocked_responses.get(
+        re.compile(
+            rf"{re.escape(mocked_responses.server_url)}/eth/v3/validator/blocks/1\?"
+        ),
+        body=response_body,
+        headers=response_headers,
+    )
+    beacon_node = BeaconNode(
+        base_url=mocked_responses.server_url,
+        vero=vero,
+    )
+    beacon_node._force_json_wire_format = response_content_type == ContentType.JSON
+    try:
+        response, content_type, _ = await beacon_node.produce_block_v3(
+            slot=1,
+            graffiti=b"",
+            builder_boost_factor="90",
+            randao_reveal="0x" + "00" * 96,
         )
-        beacon_node = BeaconNode(
-            base_url="http://beacon-node-a:1234",
-            vero=vero,
-        )
-        beacon_node._force_json_wire_format = response_content_type == ContentType.JSON
-        try:
-            response, content_type, _ = await beacon_node.produce_block_v3(
-                slot=1,
-                graffiti=b"",
-                builder_boost_factor="90",
-                randao_reveal="0x" + "00" * 96,
-            )
-        finally:
-            await beacon_node.client_session.close()
+    finally:
+        await beacon_node.client_session.close()
 
     assert response.version == api_response.version
     assert response.execution_payload_blinded is False
@@ -126,39 +128,38 @@ async def test_produce_block_v3_response(
 async def test_initialize_spec_mismatch(
     spec_mismatch: bool,
     vero: Vero,
+    beacon_node_mocks: list[aiointercept],
 ) -> None:
     """The BeaconNode should fail to initialize on a spec mismatch."""
-    async with contextlib.AsyncExitStack() as stack:
-        m = await stack.enter_async_context(aiointercept(mock_external_urls=True))
+    m = beacon_node_mocks[0]
+    spec_to_return = vero.spec
+    if spec_mismatch:
+        spec_to_return = copy(vero.spec)
+        spec_to_return.SLOTS_PER_EPOCH = Uint64(5)
+        spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
 
-        spec_to_return = vero.spec
-        if spec_mismatch:
-            spec_to_return = copy(vero.spec)
-            spec_to_return.SLOTS_PER_EPOCH = Uint64(5)
-            spec_to_return.ELECTRA_FORK_VERSION = Version("0x00abcdef")
+    m.get(
+        url=f"{m.server_url}/eth/v1/config/spec",
+        callback=lambda *args, **kwargs: CallbackResult(
+            payload=dict(data=spec_to_return.to_obj()),
+        ),
+    )
 
-        m.get(
-            url=re.compile(r"http://beacon-node-\w:1234/eth/v1/config/spec"),
-            callback=lambda *args, **kwargs: CallbackResult(
-                payload=dict(data=spec_to_return.to_obj()),
+    bn = BeaconNode(
+        base_url=m.server_url,
+        vero=vero,
+    )
+    if not spec_mismatch or vero.cli_args.ignore_spec_mismatch:
+        # No mismatch, or mismatch explicitly ignored -> init should not raise
+        await bn._initialize_full()
+        assert bn.initialized is True
+    else:
+        with pytest.raises(
+            ValueError,
+            match=re.escape(
+                f"Spec values returned by beacon node {bn.netloc} not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
             ),
-        )
-
-        bn = BeaconNode(
-            base_url="http://beacon-node-a:1234",
-            vero=vero,
-        )
-        if not spec_mismatch or vero.cli_args.ignore_spec_mismatch:
-            # No mismatch, or mismatch explicitly ignored -> init should not raise
+        ):
             await bn._initialize_full()
-            assert bn.initialized is True
-        else:
-            with pytest.raises(
-                ValueError,
-                match=re.escape(
-                    "Spec values returned by beacon node beacon-node-a:1234 not equal to hardcoded spec values. Use the `--ignore-spec-mismatch` flag to ignore this error."
-                ),
-            ):
-                await bn._initialize_full()
 
-        await bn.client_session.close()
+    await bn.client_session.close()

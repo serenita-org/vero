@@ -7,6 +7,7 @@ from schemas.keymanager_api import RemoteKey
 
 async def test_keymanager_memory_usage(
     keymanager: Keymanager,
+    remote_signer_url: str,
 ) -> None:
     """
     We load 1,000 keys with random metadata into Keymanager
@@ -22,8 +23,8 @@ async def test_keymanager_memory_usage(
         remote_keys=[
             RemoteKey(
                 pubkey=pk,
-                # Limit the number of unique signers to 100
-                url=f"http://signer-{idx % 100}",
+                # Use 100 distinct signer URLs on the same loopback server.
+                url=f"{remote_signer_url}/signer-{idx % 100}/",
             )
             for idx, pk in enumerate(pubkeys)
         ]
@@ -53,10 +54,11 @@ async def test_keymanager_memory_usage(
 
 async def test_retired_signer_is_closed(
     keymanager: Keymanager,
+    remote_signer_url: str,
 ) -> None:
     pubkey = "0x" + "1" * 96
     await keymanager.import_remote_keys(
-        remote_keys=[RemoteKey(pubkey=pubkey, url="http://signer-1")]
+        remote_keys=[RemoteKey(pubkey=pubkey, url=remote_signer_url)]
     )
 
     signer = keymanager.pubkey_to_remote_signer[pubkey]

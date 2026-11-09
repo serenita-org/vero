@@ -8,7 +8,6 @@ import msgspec
 import pytest
 from aiointercept import CallbackResult, aiointercept
 
-from args import CLIArgs
 from providers import BeaconChain, MultiBuilder
 from providers._headers import ETH_CONSENSUS_VERSION
 from schemas import SchemaBuilderAPI, SchemaShared
@@ -16,7 +15,6 @@ from schemas import SchemaBuilderAPI, SchemaShared
 
 @dataclass
 class BuilderResponse:
-    base_url: str
     status_code: int = 200
     response: SchemaBuilderAPI.GetExecutionPayloadBidResponse | None = None
     exception: Exception | None = None
@@ -51,21 +49,18 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=123),
                     ),
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=234),
                     ),
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=321),
@@ -78,15 +73,12 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     status_code=204,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     status_code=204,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     status_code=204,
                 ),
             ],
@@ -96,18 +88,15 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     response=None,
                     exception=TimeoutError(),
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     status_code=500,
                     response=None,
                     exception=None,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=123),
@@ -120,17 +109,14 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     exception=TimeoutError(),
                     delay=0.15,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     exception=TimeoutError(),
                     delay=0.15,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     exception=TimeoutError(),
                     delay=0.15,
                 ),
@@ -141,7 +127,6 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=4),
@@ -149,7 +134,6 @@ def _create_bid(
                     delay=0.2,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=5),
@@ -157,7 +141,6 @@ def _create_bid(
                     delay=0.2,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=1),
@@ -171,7 +154,6 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=1),
@@ -179,7 +161,6 @@ def _create_bid(
                     delay=0.21,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=2),
@@ -187,7 +168,6 @@ def _create_bid(
                     delay=0.21,
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=3),
@@ -201,21 +181,18 @@ def _create_bid(
         pytest.param(
             [
                 BuilderResponse(
-                    base_url="https://builder-1",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=2),
                     ),
                 ),
                 BuilderResponse(
-                    base_url="https://builder-2",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=3),
                     ),
                 ),
                 BuilderResponse(
-                    base_url="https://builder-3",
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
                         version=SchemaShared.ForkVersion.GLOAS,
                         data=_create_bid(value=1, execution_payment=3),
@@ -227,28 +204,13 @@ def _create_bid(
         ),
     ],
 )
-@pytest.mark.parametrize(
-    argnames="cli_args",
-    argvalues=[
-        pytest.param(
-            {
-                "builder_urls": [
-                    "https://builder-1",
-                    "https://builder-2",
-                    "https://builder-3",
-                ],
-            },
-            id="3 builders",
-        ),
-    ],
-    indirect=True,
-)
+@pytest.mark.parametrize("builder_mocks", [3], indirect=True)
 async def test_bid_selection_builders(
     builder_responses: list[BuilderResponse],
     expected_bid_total_value: int,
     beacon_chain: BeaconChain,
     multi_builder: MultiBuilder,
-    cli_args: CLIArgs,
+    builder_mocks: list[aiointercept],
 ) -> None:
     for builder in multi_builder.builders:
         builder._bid_request_auth_cache[(123, "0x9abc")] = (
@@ -257,60 +219,58 @@ async def test_bid_selection_builders(
                 signature="0x" + "00" * 96,
             )
         )
-    async with aiointercept(mock_external_urls=True) as m:
-        for builder_response in builder_responses:
-            base_url = builder_response.base_url
-            url_regex_to_mock = re.compile(
-                rf"^{base_url}/eth/v1/builder/execution_payload_bid/.+",
-            )
-
-            async def _f(
-                _response: SchemaBuilderAPI.GetExecutionPayloadBidResponse | None,
-                _status_code: int,
-                _exception: Exception | None,
-                _delay: float,
-                *args: Any,
-                **kwargs: Any,
-            ) -> CallbackResult:
-                await asyncio.sleep(_delay)
-                if _exception:
-                    raise _exception
-
-                _body, _headers = b"", {}
-                if _response:
-                    _body = msgspec.json.encode(_response)
-                    _headers = {
-                        ETH_CONSENSUS_VERSION: _response.version.value.lower(),
-                    }
-                return CallbackResult(
-                    status=_status_code,
-                    body=_body,
-                    headers=_headers,
-                )
-
-            _callback = partial(
-                _f,
-                builder_response.response,
-                builder_response.status_code,
-                builder_response.exception,
-                builder_response.delay,
-            )
-            m.post(
-                url=url_regex_to_mock,
-                callback=_callback,
-            )
-
-        result = await multi_builder.get_execution_payload_bid(
-            slot=123,
-            parent_hash="0x" + "aa" * 32,
-            parent_root="0x" + "bb" * 32,
-            proposer_pubkey="0x9abc",
-            fork_version=beacon_chain.current_fork_version,
-            soft_timeout=0.1,
-            hard_timeout=0.2,
+    for server, builder_response in zip(builder_mocks, builder_responses, strict=True):
+        url_regex_to_mock = re.compile(
+            rf"{re.escape(server.server_url)}/eth/v1/builder/execution_payload_bid/.+",
         )
-        if result is None:
-            assert expected_bid_total_value is None
-        else:
-            builder, bid = result
-            assert bid.total_value == expected_bid_total_value
+
+        async def _f(
+            _response: SchemaBuilderAPI.GetExecutionPayloadBidResponse | None,
+            _status_code: int,
+            _exception: Exception | None,
+            _delay: float,
+            *args: Any,
+            **kwargs: Any,
+        ) -> CallbackResult:
+            await asyncio.sleep(_delay)
+            if _exception:
+                raise _exception
+
+            _body, _headers = b"", {}
+            if _response:
+                _body = msgspec.json.encode(_response)
+                _headers = {
+                    ETH_CONSENSUS_VERSION: _response.version.value.lower(),
+                }
+            return CallbackResult(
+                status=_status_code,
+                body=_body,
+                headers=_headers,
+            )
+
+        _callback = partial(
+            _f,
+            builder_response.response,
+            builder_response.status_code,
+            builder_response.exception,
+            builder_response.delay,
+        )
+        server.post(
+            url=url_regex_to_mock,
+            callback=_callback,
+        )
+
+    result = await multi_builder.get_execution_payload_bid(
+        slot=123,
+        parent_hash="0x" + "aa" * 32,
+        parent_root="0x" + "bb" * 32,
+        proposer_pubkey="0x9abc",
+        fork_version=beacon_chain.current_fork_version,
+        soft_timeout=0.1,
+        hard_timeout=0.2,
+    )
+    if result is None:
+        assert expected_bid_total_value is None
+    else:
+        builder, bid = result
+        assert bid.total_value == expected_bid_total_value

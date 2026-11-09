@@ -13,7 +13,9 @@ from spec.configs import Network
 
 
 async def test_gas_limit_lifecycle(
-    keymanager: Keymanager, test_client: TestClient[Any, Application]
+    keymanager: Keymanager,
+    test_client: TestClient[Any, Application],
+    remote_signer_url: str,
 ) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
@@ -22,7 +24,7 @@ async def test_gas_limit_lifecycle(
         data=msgspec.json.encode(
             SchemaKeymanagerAPI.ImportRemoteKeysRequest(
                 remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever"),
+                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url),
                 ]
             )
         ),
@@ -114,6 +116,7 @@ async def test_gas_limit_schedule_lifecycle(
     keymanager: Keymanager,
     test_client: TestClient[Any, Application],
     monkeypatch: pytest.MonkeyPatch,
+    remote_signer_url: str,
 ) -> None:
     pubkey = "0x" + "a" * 96
     keymanager.cli_args.gas_limit = None
@@ -123,7 +126,7 @@ async def test_gas_limit_schedule_lifecycle(
         GasLimitScheduleEntry(Uint64(11), Uint64(90_000_000)),
     ]
     await keymanager.import_remote_keys(
-        [SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever")]
+        [SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url)]
     )
     slot = 10 * keymanager.beacon_chain.SLOTS_PER_EPOCH - 1
     monkeypatch.setattr(BeaconChain, "current_slot", property(lambda self: slot))

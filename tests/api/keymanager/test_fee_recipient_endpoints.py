@@ -11,6 +11,7 @@ from schemas import SchemaKeymanagerAPI
 async def test_fee_recipient_lifecycle(
     keymanager: Keymanager,
     test_client: TestClient[Any, Application],
+    remote_signer_url: str,
 ) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
@@ -19,7 +20,7 @@ async def test_fee_recipient_lifecycle(
         data=msgspec.json.encode(
             SchemaKeymanagerAPI.ImportRemoteKeysRequest(
                 remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever"),
+                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url),
                 ]
             )
         ),

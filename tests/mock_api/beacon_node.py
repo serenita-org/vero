@@ -57,11 +57,6 @@ def _data_response(data: bytes, **metadata: Any) -> bytes:
     return msgspec.json.encode({**metadata, "data": msgspec.Raw(data)})
 
 
-@pytest.fixture(scope="session")
-def beacon_node_url() -> str:
-    return "http://beacon-node-1:1234"
-
-
 @pytest.fixture
 def execution_payload_blinded(request: pytest.FixtureRequest) -> bool:
     return getattr(request, "param", False)
@@ -77,7 +72,8 @@ def _mocked_beacon_node_endpoints(
     validators: list[ValidatorIndexPubkey],
     spec: SpecGloas,
     beacon_chain: BeaconChain,
-    mocked_responses: aiointercept,
+    beacon_node_mocks: list[aiointercept],
+    proposal_beacon_node_mocks: list[aiointercept],
     execution_payload_blinded: bool,
     return_self_built_payload: bool,
     beacon_api_spec: BeaconAPISpec | None,
@@ -652,20 +648,20 @@ def _mocked_beacon_node_endpoints(
             "POST", url, _mocked_beacon_api_endpoints_post(url, **kwargs)
         )
 
-    mocked_responses.get(
-        url=re.compile(
-            r"http://beacon-node-[\w\-]+:1234/eth/v1/events",
-        ),
-        callback=_mocked_event_stream,
-        repeat=True,
-    )
-    mocked_responses.get(
-        url=re.compile(r"http://beacon-node-[\w\-]+:1234/eth/"),
-        callback=_mocked_beacon_api_endpoints_get_validated,
-        repeat=True,
-    )
-    mocked_responses.post(
-        url=re.compile(r"http://beacon-node-[\w\-]+:1234/eth/"),
-        callback=_mocked_beacon_api_endpoints_post_validated,
-        repeat=True,
-    )
+    for server in [*beacon_node_mocks, *proposal_beacon_node_mocks]:
+        base_url = re.escape(server.server_url)
+        server.get(
+            url=re.compile(rf"{base_url}/eth/v1/events(?:\?|$)"),
+            callback=_mocked_event_stream,
+            repeat=True,
+        )
+        server.get(
+            url=re.compile(rf"{base_url}/eth/"),
+            callback=_mocked_beacon_api_endpoints_get_validated,
+            repeat=True,
+        )
+        server.post(
+            url=re.compile(rf"{base_url}/eth/"),
+            callback=_mocked_beacon_api_endpoints_post_validated,
+            repeat=True,
+        )

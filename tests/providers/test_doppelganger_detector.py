@@ -1,4 +1,3 @@
-import asyncio
 import re
 from contextlib import AbstractContextManager, nullcontext as does_not_raise
 
@@ -94,33 +93,35 @@ async def test_fetch_liveness_data(
     expectation: AbstractContextManager[RaisesExc[RuntimeError] | does_not_raise[None]],
     expected_return_value: set[int] | None,
     vero: Vero,
+    beacon_node_mocks: list[aiointercept],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    m = beacon_node_mocks[0]
     detector = DoppelgangerDetector(
         beacon_chain=None,  # type: ignore[arg-type]
         beacon_nodes=[
             BeaconNode(
-                base_url="http://beacon-node-a:1234",
+                base_url=m.server_url,
                 vero=vero,
             )
         ],
         validator_status_tracker_service=None,  # type: ignore[arg-type]
     )
 
-    async with aiointercept(mock_external_urls=True) as m:
-        if bn_reachable:
-            m.post(
-                url=re.compile(
-                    r"http://beacon-node-a:1234/eth/v1/validator/liveness/\d+"
-                ),
-                body=response_data,
-            )
+    if bn_reachable:
+        m.post(
+            url=re.compile(
+                rf"{re.escape(m.server_url)}/eth/v1/validator/liveness/\d+$"
+            ),
+            body=response_data,
+        )
 
+    try:
         with expectation:
             return_value = await detector._fetch_liveness_data(
                 epoch=123,
                 validator_indices=[1, 2, 3],
             )
             assert expected_return_value == return_value
-
-    await asyncio.gather(*[bn.client_session.close() for bn in detector.beacon_nodes])
+    finally:
+        await detector.beacon_nodes[0].client_session.close()
