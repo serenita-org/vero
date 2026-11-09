@@ -2,6 +2,7 @@ import asyncio
 import os
 import random
 import re
+from collections.abc import Mapping
 from typing import Any
 
 import msgspec
@@ -43,6 +44,15 @@ from tests.ssz_objects import (
 )
 
 
+def _json_response(
+    body: bytes = b"", *, headers: Mapping[str, str] | None = None
+) -> CallbackResult:
+    return CallbackResult(
+        body=body,
+        headers={**(headers or {}), CONTENT_TYPE: ContentType.JSON.value},
+    )
+
+
 def _data_response(data: bytes, **metadata: Any) -> bytes:
     return msgspec.json.encode({**metadata, "data": msgspec.Raw(data)})
 
@@ -75,16 +85,17 @@ def _mocked_beacon_node_endpoints(
     def _validate_response(
         method: str, url: URL, response: CallbackResult
     ) -> CallbackResult:
+        body = response.body
+        assert isinstance(body, (str, bytes))
+        assert response.payload is None
+        headers = response.headers
+        assert headers is not None, f"Missing response headers for {method} {url}"
+        assert isinstance(headers.get(CONTENT_TYPE), str), (
+            f"Missing or invalid {CONTENT_TYPE} response header for {method} {url}"
+        )
         if beacon_api_spec is not None:
-            assert isinstance(response.body, (str, bytes))
             beacon_api_spec.validate_response(
-                method,
-                url,
-                status=response.status,
-                headers=response.headers,
-                content_type=response.content_type or ContentType.JSON.value,
-                body=response.body,
-                payload=response.payload,
+                method, url, status=response.status, headers=headers, body=body
             )
         return response
 
@@ -98,10 +109,12 @@ def _mocked_beacon_node_endpoints(
 
     def _mocked_beacon_api_endpoints_get(url: URL, **kwargs: Any) -> CallbackResult:
         if re.match("/eth/v1/config/spec", url.raw_path):
-            return CallbackResult(payload=dict(data=spec.to_obj()))
+            return _json_response(msgspec.json.encode({"data": spec.to_obj()}))
 
         if re.match("/eth/v1/node/version", url.raw_path):
-            return CallbackResult(payload=dict(data=dict(version="beacon-node/test")))
+            return _json_response(
+                msgspec.json.encode({"data": {"version": "beacon-node/test"}})
+            )
 
         if re.match(r"/eth/v2/validator/duties/proposer/\d+", url.raw_path):
             # This endpoint returns all proposer duties for the epoch
@@ -131,14 +144,14 @@ def _mocked_beacon_node_endpoints(
                         ),
                     )
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetProposerDutiesResponse(
                         dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
                         execution_optimistic=False,
                         data=proposer_duties,
                     )
-                ),
+                )
             )
 
         if re.match("/eth/v3/validator/blocks/.*", url.raw_path):
@@ -191,7 +204,7 @@ def _mocked_beacon_node_endpoints(
                     "root": ZERO_ROOT,
                 },
             )
-            return CallbackResult(body=_data_response(att_data.to_json()))
+            return _json_response(_data_response(att_data.to_json()))
 
         if re.match("/eth/v1/validator/payload_attestation_data", url.raw_path):
             payload_attestation_data = preset_types(
@@ -202,8 +215,8 @@ def _mocked_beacon_node_endpoints(
                 payload_present=True,
                 blob_data_available=True,
             )
-            return CallbackResult(
-                body=payload_attestation_data.to_json(),
+            return _json_response(
+                payload_attestation_data.to_json(),
                 headers={
                     ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
                 },
@@ -253,8 +266,8 @@ def _mocked_beacon_node_endpoints(
                 committee_bits=_committee_bits,
             )
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetAggregatedAttestationV2Response(
                         version=fork_version,
                         data=msgspec.Raw(aggregate_attestation.to_json()),
@@ -264,8 +277,8 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/beacon/blocks/head/root", url.raw_path):
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetBlockRootResponse(
                         execution_optimistic=False,
                         finalized=False,
@@ -291,7 +304,7 @@ def _mocked_beacon_node_endpoints(
                 signature="0x" + os.urandom(BYTES_PER_BLS_SIGNATURE).hex(),
             )
 
-            return CallbackResult(body=_data_response(contribution.to_json()))
+            return _json_response(_data_response(contribution.to_json()))
 
         if re.match("/eth/v1/validator/execution_payload_envelopes/.*", url.raw_path):
             beacon_block_root = url.raw_path.split("/")[-1]
@@ -351,8 +364,8 @@ def _mocked_beacon_node_endpoints(
                     )
                 )
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetStateValidatorsResponse(
                         execution_optimistic=False,
                         finalized=False,
@@ -362,13 +375,13 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/validator/prepare_beacon_proposer", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/validator/proposer_preferences", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/validator/register_validator", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v4/validator/blocks/.*", url.raw_path):
             slot = int(url.raw_path.split("/")[-1])
@@ -437,7 +450,7 @@ def _mocked_beacon_node_endpoints(
             else:
                 _ = signed_block_type.from_ssz(kwargs["data"])
 
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/beacon/execution_payload_envelopes", url.raw_path):
             headers = kwargs["headers"]
@@ -450,7 +463,7 @@ def _mocked_beacon_node_endpoints(
                 _ = signed_envelope_type.from_json(_data_response(kwargs["data"]))
             else:
                 _ = signed_envelope_type.from_ssz(kwargs["data"])
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
             headers = kwargs["headers"]
@@ -475,7 +488,7 @@ def _mocked_beacon_node_endpoints(
                 else:
                     _ = signed_block_type.from_ssz(kwargs["data"])
 
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match(r"/eth/v1/validator/duties/attester/\d+", url.raw_path):
             epoch_no = int(url.raw_path.split("/")[-1])
@@ -515,8 +528,8 @@ def _mocked_beacon_node_endpoints(
                     ),
                 )
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetAttesterDutiesResponse(
                         dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
                         execution_optimistic=False,
@@ -530,7 +543,7 @@ def _mocked_beacon_node_endpoints(
                 kwargs["data"].decode(),
                 type=list[SchemaBeaconAPI.SubscribeToBeaconCommitteeSubnetRequestBody],
             )
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v2/beacon/pool/attestations", url.raw_path):
             if beacon_chain.current_fork_version in (
@@ -553,10 +566,10 @@ def _mocked_beacon_node_endpoints(
                 "9f19cc6499596bdf19be76d80b878ee3326e68cf2ed69cbada9a1f4fe13c51b3"
             )
 
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v2/validator/aggregate_and_proofs", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match(r"/eth/v1/validator/duties/sync/\d+", url.raw_path):
             # This endpoint returns only duties for the validators
@@ -570,8 +583,8 @@ def _mocked_beacon_node_endpoints(
                 for v in validators
             ]
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetSyncDutiesResponse(
                         execution_optimistic=False,
                         data=sync_duties,
@@ -595,8 +608,8 @@ def _mocked_beacon_node_endpoints(
                     )
                 )
 
-            return CallbackResult(
-                body=msgspec.json.encode(
+            return _json_response(
+                msgspec.json.encode(
                     SchemaBeaconAPI.GetPtcDutiesResponse(
                         dependent_root="0xab09edd9380f8451c3ff5c809821174a36dce606fea8b5ea35ea936915dbf889",
                         execution_optimistic=False,
@@ -606,16 +619,16 @@ def _mocked_beacon_node_endpoints(
             )
 
         if re.match("/eth/v1/beacon/pool/payload_attestations", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/validator/sync_committee_subscriptions", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/beacon/pool/sync_committees", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         if re.match("/eth/v1/validator/contribution_and_proofs", url.raw_path):
-            return CallbackResult(status=200)
+            return _json_response()
 
         raise NotImplementedError(
             f"Beacon API response for POST {url} does not have a mock handler",

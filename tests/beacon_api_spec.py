@@ -11,42 +11,22 @@ from yarl import URL
 
 from providers._headers import ContentType
 
-_JSON = ContentType.JSON.value
-
 
 def _validate(schema: Mapping[str, Any], value: object) -> None:
     Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
 
 
-def _wire_value(value: object) -> object:
-    if isinstance(value, (list, tuple)):
-        return [_wire_value(item) for item in value]
-    if isinstance(value, bool):
-        raise TypeError("HTTP header values must be serialized strings, not booleans")
-    return str(value)
-
-
-def _headers(
-    values: Mapping[str, object] | None, *, wire_values: bool = False
-) -> dict[str, object]:
-    return {
-        name.lower(): _wire_value(value) if wire_values else value
-        for name, value in (values or {}).items()
-    }
-
-
-def _media_type(headers: Mapping[str, object], default: str) -> str:
-    return str(headers.get(CONTENT_TYPE.lower(), default)).split(";", maxsplit=1)[0]
-
-
 def _validate_content(
-    content: Mapping[str, Any], media_type: str, value: object
+    content: Mapping[str, Any], headers: Mapping[str, str], body: str | bytes
 ) -> None:
+    name = CONTENT_TYPE.lower()
+    assert name in headers, f"Missing {CONTENT_TYPE} header"
+    media_type = headers[name].split(";", maxsplit=1)[0]
     assert media_type in content, (
         f"{media_type} is not one of the declared content types {tuple(content)}"
     )
-    if media_type == _JSON:
-        _validate(content[media_type]["schema"], value)
+    if media_type == ContentType.JSON.value:
+        _validate(content[media_type]["schema"], msgspec.json.decode(body))
 
 
 def _validate_parameters(
@@ -103,10 +83,10 @@ def _query_parameter_value(parameter: Mapping[str, Any], url: URL) -> object:
 
 
 def _validate_response_headers(
-    definitions: Mapping[str, Any], values: Mapping[str, object]
+    definitions: Mapping[str, Any], values: Mapping[str, str]
 ) -> None:
     for name, definition in definitions.items():
-        value = values.get(name.lower())
+        value: str | bool | None = values.get(name.lower())
         if definition.get("required", False):
             assert value is not None, f"Missing required response header {name}"
         if value is None:
@@ -147,7 +127,8 @@ class BeaconAPISpec:
         self, method: str, url: URL, request: Mapping[str, Any]
     ) -> None:
         operation, path_parameters = self.operation_for(method, url.path)
-        headers = _headers(request.get("headers"), wire_values=True)
+        request_headers: Mapping[str, str] = request["headers"]
+        headers = {name.lower(): value for name, value in request_headers.items()}
         query: dict[str, object] = {}
 
         for parameter in operation.get("parameters", []):
@@ -169,9 +150,7 @@ class BeaconAPISpec:
             return
 
         assert data is not None
-        media_type = _media_type(headers, _JSON)
-        value = msgspec.json.decode(data) if media_type == _JSON else data
-        _validate_content(request_body["content"], media_type, value)
+        _validate_content(request_body["content"], headers, data)
 
     def validate_response(
         self,
@@ -179,30 +158,19 @@ class BeaconAPISpec:
         url: URL,
         *,
         status: int,
-        headers: Mapping[str, object] | None,
-        content_type: str,
+        headers: Mapping[str, str],
         body: str | bytes,
-        payload: object | None,
     ) -> None:
         operation, _ = self.operation_for(method, url.path)
         response = operation["responses"].get(str(status))
         assert response is not None, f"Unexpected response status {status}"
 
-        response_headers = _headers(headers)
+        response_headers = {name.lower(): value for name, value in headers.items()}
         _validate_response_headers(response.get("headers", {}), response_headers)
 
         content = response.get("content")
         if content is None:
-            assert payload is None
             assert body in ("", b"")
             return
 
-        media_type = _media_type(response_headers, content_type)
-        value = (
-            payload
-            if payload is not None
-            else msgspec.json.decode(body)
-            if media_type == _JSON
-            else body
-        )
-        _validate_content(content, media_type, value)
+        _validate_content(content, response_headers, body)
