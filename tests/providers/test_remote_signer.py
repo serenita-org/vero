@@ -22,8 +22,8 @@ async def test_remote_signer_healthcheck_not_supported(
             )
             assert not poll_health_task.done()
 
-            # Yield to event loop to allow the healthcheck task to start running
-            await asyncio.sleep(0.001)
+            # Wait for the polling task to process the HTTP response and exit.
+            await asyncio.wait_for(poll_health_task, timeout=0.5)
 
             # The endpoint returning 404 should disable the task
             assert any(
