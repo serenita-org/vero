@@ -107,15 +107,10 @@ class ApiClient:
         if "raise_for_status" not in kwargs:
             kwargs["raise_for_status"] = self._raise_for_status
 
-        # Intentionally setting full URL here
-        # for testing reasons - we need
-        # the full URL available there
-        url = self.base_url.join(URL(endpoint))
-
-        self.logger.debug(f"Making {method} request to {url}")
+        self.logger.debug("%s %s%s", method, self.netloc, endpoint)
         async with self.client_session.request(
             method=method,
-            url=url,
+            url=endpoint,
             **kwargs,
         ) as resp:
             # The naive `resp.content_type` approach defaults to
