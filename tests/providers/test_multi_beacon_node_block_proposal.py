@@ -325,9 +325,9 @@ async def test_produce_best_block(
     and returns the one with the highest value.
     """
     for sequence in bn_response_sequences:
-        server = beacon_nodes_by_name[sequence["node_name"]]
+        server_mock = beacon_nodes_by_name[sequence["node_name"]]
         url_regex_to_mock = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v4/validator/blocks/\d+\?",
+            rf"{re.escape(server_mock.server_url)}/eth/v4/validator/blocks/\d+\?",
         )
 
         for r in sequence["responses"]:
@@ -361,7 +361,7 @@ async def test_produce_best_block(
                 exception,
                 delay,
             )
-            server.post(
+            server_mock.post(
                 url=url_regex_to_mock,
                 callback=_callback,
             )

@@ -297,15 +297,15 @@ async def test_produce_attestation_data_without_head_event(
     await beacon_chain.wait_for_next_slot()
 
     for name, callbacks in att_data_callbacks_by_node.items():
-        server = beacon_nodes_by_name[name]
+        server_mock = beacon_nodes_by_name[name]
         url = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v1/validator/attestation_data\?"
+            rf"{re.escape(server_mock.server_url)}/eth/v1/validator/attestation_data\?"
         )
         for callback in callbacks:
             if isinstance(callback, Exception):
-                server.get(url, exception=True)
+                server_mock.get(url, exception=True)
             else:
-                server.get(url, callback=callback)
+                server_mock.get(url, callback=callback)
 
     slot = beacon_chain.current_slot
     next_slot_start_ts = beacon_chain.get_timestamp_for_slot(slot + 1)
@@ -593,12 +593,12 @@ async def test_produce_attestation_data_with_head_event(
     await beacon_chain.wait_for_next_slot()
 
     for name, callbacks in att_data_callbacks_by_node.items():
-        server = beacon_nodes_by_name[name]
+        server_mock = beacon_nodes_by_name[name]
         url = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v1/validator/attestation_data\?"
+            rf"{re.escape(server_mock.server_url)}/eth/v1/validator/attestation_data\?"
         )
         for callback in callbacks:
-            server.get(url, callback=callback)
+            server_mock.get(url, callback=callback)
 
     slot = beacon_chain.current_slot
     next_slot_start_ts = beacon_chain.get_timestamp_for_slot(slot + 1)
@@ -617,8 +617,8 @@ async def test_produce_attestation_data_with_head_event(
         assert att_data.target == expected_att_data_target
 
     netlocs = {
-        name: URL(server.server_url).host_port_subcomponent
-        for name, server in beacon_nodes_by_name.items()
+        name: URL(server_mock.server_url).host_port_subcomponent
+        for name, server_mock in beacon_nodes_by_name.items()
     }
     for template in expected_log_messages:
         message = template.format(**netlocs)

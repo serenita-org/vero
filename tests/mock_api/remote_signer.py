@@ -14,8 +14,8 @@ from schemas.validator import ValidatorIndexPubkey
 
 @pytest.fixture
 async def remote_signer_mock() -> AsyncGenerator[aiointercept, None]:
-    async with aiointercept() as server:
-        yield server
+    async with aiointercept() as server_mock:
+        yield server_mock
 
 
 @pytest.fixture

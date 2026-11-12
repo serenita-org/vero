@@ -219,9 +219,11 @@ async def test_bid_selection_builders(
                 signature="0x" + "00" * 96,
             )
         )
-    for server, builder_response in zip(builder_mocks, builder_responses, strict=True):
+    for server_mock, builder_response in zip(
+        builder_mocks, builder_responses, strict=True
+    ):
         url_regex_to_mock = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v1/builder/execution_payload_bid/.+",
+            rf"{re.escape(server_mock.server_url)}/eth/v1/builder/execution_payload_bid/.+",
         )
 
         async def _f(
@@ -255,7 +257,7 @@ async def test_bid_selection_builders(
             builder_response.exception,
             builder_response.delay,
         )
-        server.post(
+        server_mock.post(
             url=url_regex_to_mock,
             callback=_callback,
         )

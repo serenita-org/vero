@@ -648,19 +648,19 @@ def _mocked_beacon_node_endpoints(
             "POST", url, _mocked_beacon_api_endpoints_post(url, **kwargs)
         )
 
-    for server in [*beacon_node_mocks, *proposal_beacon_node_mocks]:
-        base_url = re.escape(server.server_url)
-        server.get(
+    for server_mock in [*beacon_node_mocks, *proposal_beacon_node_mocks]:
+        base_url = re.escape(server_mock.server_url)
+        server_mock.get(
             url=re.compile(rf"{base_url}/eth/v1/events(?:\?|$)"),
             callback=_mocked_event_stream,
             repeat=True,
         )
-        server.get(
+        server_mock.get(
             url=re.compile(rf"{base_url}/eth/"),
             callback=_mocked_beacon_api_endpoints_get_validated,
             repeat=True,
         )
-        server.post(
+        server_mock.post(
             url=re.compile(rf"{base_url}/eth/"),
             callback=_mocked_beacon_api_endpoints_post_validated,
             repeat=True,

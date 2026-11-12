@@ -68,28 +68,28 @@ async def test_initialize(
     of its supplied beacon nodes are available.
     """
     async with contextlib.AsyncExitStack() as exit_stack:
-        for server, beacon_node_available in zip(
+        for server_mock, beacon_node_available in zip(
             beacon_node_mocks,
             beacon_node_availabilities,
             strict=True,
         ):
             if beacon_node_available:
-                server.get(
-                    url=f"{server.server_url}/eth/v1/config/spec",
+                server_mock.get(
+                    url=f"{server_mock.server_url}/eth/v1/config/spec",
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=vero.spec.to_obj()),
                     ),
                 )
-                server.get(
-                    url=f"{server.server_url}/eth/v1/node/version",
+                server_mock.get(
+                    url=f"{server_mock.server_url}/eth/v1/node/version",
                     callback=lambda *args, **kwargs: CallbackResult(
                         payload=dict(data=dict(version="beacon-node/test")),
                     ),
                 )
             else:
                 # Fail the first request made during initialization
-                server.get(
-                    url=f"{server.server_url}/eth/v1/config/spec",
+                server_mock.get(
+                    url=f"{server_mock.server_url}/eth/v1/config/spec",
                     exception=True,
                 )
 
@@ -141,23 +141,23 @@ async def test_initialize_retry_logic(
         # Beacon node C is offline at first but becomes available later.
         # This means the very first initialization fails, and
         # the next one succeeds.
-        *online_servers, initially_offline_server = beacon_node_mocks
-        initially_offline_url = initially_offline_server.server_url
+        *online_server_mocks, initially_offline_server_mock = beacon_node_mocks
+        initially_offline_url = initially_offline_server_mock.server_url
 
-        for server in online_servers:
-            server.get(
-                url=f"{server.server_url}/eth/v1/config/spec",
+        for server_mock in online_server_mocks:
+            server_mock.get(
+                url=f"{server_mock.server_url}/eth/v1/config/spec",
                 callback=lambda *args, **kwargs: CallbackResult(
                     payload=dict(data=spec.to_obj()),
                 ),
             )
 
-        initially_offline_server.get(
+        initially_offline_server_mock.get(
             url=f"{initially_offline_url}/eth/v1/config/spec",
             status=503,
             body="Beacon node unavailable",
         )
-        initially_offline_server.get(
+        initially_offline_server_mock.get(
             url=f"{initially_offline_url}/eth/v1/config/spec",
             callback=lambda *args, **kwargs: CallbackResult(
                 payload=dict(data=spec.to_obj()),
@@ -246,11 +246,11 @@ async def test_get_aggregate_attestation(
     """Tests that the multi-beacon requests aggregate attestations from all beacon nodes
     and returns the one with the highest value.
     """
-    for server, number_of_attesting_indices in zip(
+    for server_mock, number_of_attesting_indices in zip(
         beacon_node_mocks, numbers_of_attesting_indices, strict=True
     ):
         url = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v2/validator/aggregate_attestation\?"
+            rf"{re.escape(server_mock.server_url)}/eth/v2/validator/aggregate_attestation\?"
         )
         if isinstance(number_of_attesting_indices, int):
             bitlist_length = (
@@ -275,9 +275,9 @@ async def test_get_aggregate_attestation(
                 ),
                 agg_bits_to_return,
             )
-            server.get(url, callback=_callback)
+            server_mock.get(url, callback=_callback)
         elif isinstance(number_of_attesting_indices, Exception):
-            server.get(url, exception=True)
+            server_mock.get(url, exception=True)
         else:
             raise NotImplementedError
 
@@ -349,11 +349,11 @@ async def test_get_sync_committee_contribution(
     """Tests that the multi-beacon requests sync committee contributions from all beacon nodes
     and returns the one with the highest value.
     """
-    for server, number_of_root_matching_indices in zip(
+    for server_mock, number_of_root_matching_indices in zip(
         beacon_node_mocks, numbers_of_root_matching_indices, strict=True
     ):
         url = re.compile(
-            rf"{re.escape(server.server_url)}/eth/v1/validator/sync_committee_contribution\?"
+            rf"{re.escape(server_mock.server_url)}/eth/v1/validator/sync_committee_contribution\?"
         )
         if isinstance(number_of_root_matching_indices, int):
             bitlist_size = spec.SYNC_COMMITTEE_SIZE // SYNC_COMMITTEE_SUBNET_COUNT
@@ -375,9 +375,9 @@ async def test_get_sync_committee_contribution(
                 ),
                 agg_bits_to_return,
             )
-            server.get(url, callback=_callback)
+            server_mock.get(url, callback=_callback)
         elif isinstance(number_of_root_matching_indices, Exception):
-            server.get(url, exception=True)
+            server_mock.get(url, exception=True)
         else:
             raise NotImplementedError
 
