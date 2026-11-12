@@ -32,7 +32,7 @@ def _profile_program_run() -> Generator[None, None, None]:
     # Vero should be able to perform all its duties without
     # keeping the event loop busy 100% of the time, even with
     # the very short 1s slot time in the test config.
-    assert 0.02 < cpu_utilization < 0.5
+    assert 0.02 < cpu_utilization < 0.3
 
 
 @pytest.mark.parametrize(
