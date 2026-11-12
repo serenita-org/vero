@@ -20,7 +20,6 @@ from spy_ssz import (
     Preset,
     get_ssz_type,
 )
-from yarl import URL
 
 from observability import (
     ErrorType,
@@ -1119,7 +1118,7 @@ class BeaconNode(ApiClient):
         )
 
         async with self.client_session.get(
-            url=self.base_url.join(URL("/eth/v1/events")),
+            url="/eth/v1/events",
             params={"topics": topics},
             headers={"accept": "text/event-stream"},
             timeout=ClientTimeout(

@@ -232,14 +232,11 @@ async def test_publish_payload_envelope(
 
 
 @pytest.mark.parametrize(
-    "beacon_node_urls_proposal",
+    "proposal_beacon_node_mocks",
     [
-        pytest.param([], id="No proposal beacon nodes specified"),
+        pytest.param(0, id="No proposal beacon nodes specified"),
         pytest.param(
-            [
-                "http://beacon-node-proposal-1:1234",
-                "http://beacon-node-proposal-2:1234",
-            ],
+            2,
             id="Beacon nodes explicitly specified for block proposals",
         ),
     ],

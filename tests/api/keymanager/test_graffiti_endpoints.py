@@ -9,7 +9,9 @@ from schemas import SchemaKeymanagerAPI
 
 
 async def test_graffiti_lifecycle(
-    keymanager: Keymanager, test_client: TestClient[Any, Application]
+    keymanager: Keymanager,
+    test_client: TestClient[Any, Application],
+    remote_signer_url: str,
 ) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
@@ -18,7 +20,7 @@ async def test_graffiti_lifecycle(
         data=msgspec.json.encode(
             SchemaKeymanagerAPI.ImportRemoteKeysRequest(
                 remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever"),
+                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url),
                 ]
             )
         ),
@@ -104,7 +106,9 @@ async def test_nonexistent_pubkey(test_client: TestClient[Any, Application]) -> 
     assert data["message"] == f"PubkeyNotFound('{nonexistent_pubkey}')"
 
 
-async def test_set_emoji(test_client: TestClient[Any, Application]) -> None:
+async def test_set_emoji(
+    test_client: TestClient[Any, Application], remote_signer_url: str
+) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
     resp = await test_client.post(
@@ -112,7 +116,7 @@ async def test_set_emoji(test_client: TestClient[Any, Application]) -> None:
         data=msgspec.json.encode(
             SchemaKeymanagerAPI.ImportRemoteKeysRequest(
                 remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever"),
+                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url),
                 ]
             )
         ),
@@ -139,7 +143,9 @@ async def test_set_emoji(test_client: TestClient[Any, Application]) -> None:
 
 
 async def test_set_graffiti_too_long(
-    keymanager: Keymanager, test_client: TestClient[Any, Application]
+    keymanager: Keymanager,
+    test_client: TestClient[Any, Application],
+    remote_signer_url: str,
 ) -> None:
     # Import a key
     pubkey = "0x" + "a" * 96
@@ -148,7 +154,7 @@ async def test_set_graffiti_too_long(
         data=msgspec.json.encode(
             SchemaKeymanagerAPI.ImportRemoteKeysRequest(
                 remote_keys=[
-                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url="http://whatever"),
+                    SchemaKeymanagerAPI.RemoteKey(pubkey=pubkey, url=remote_signer_url),
                 ]
             )
         ),

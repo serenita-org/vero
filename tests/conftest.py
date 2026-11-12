@@ -32,7 +32,15 @@ from spec.configs import Network
 from spec.utils import encode_graffiti
 
 # A few more global fixtures defined separately
-from tests.mock_api.base import *
+from tests.mock_api.base import (
+    beacon_node_mocks,
+    beacon_node_urls,
+    beacon_node_urls_proposal,
+    beacon_nodes_by_name,
+    builder_mocks,
+    builder_urls,
+    proposal_beacon_node_mocks,
+)
 from tests.mock_api.beacon_node import *
 from tests.mock_api.beacon_node import (
     _mocked_beacon_node_endpoints,
@@ -56,11 +64,6 @@ def beacon_api_spec(pytestconfig: pytest.Config) -> BeaconAPISpec | None:
     return BeaconAPISpec(spec_path) if spec_path is not None else None
 
 
-@pytest.fixture(scope="session")
-def beacon_node_urls_proposal(request: pytest.FixtureRequest) -> list[str]:
-    return getattr(request, "param", [])
-
-
 @pytest.fixture
 def enable_keymanager_api(request: pytest.FixtureRequest) -> bool:
     # Default to false if not otherwise requested through indirect parametrization
@@ -70,19 +73,20 @@ def enable_keymanager_api(request: pytest.FixtureRequest) -> bool:
 @pytest.fixture
 def cli_args(
     remote_signer_url: str,
-    beacon_node_url: str,
+    beacon_node_urls: list[str],
     beacon_node_urls_proposal: list[str],
+    builder_urls: list[str],
     enable_keymanager_api: bool,
     tmp_path: Path,
     request: pytest.FixtureRequest,
 ) -> CLIArgs:
     # CLI args can be overridden through indirect parametrization
     indirect_params = getattr(request, "param", {})
-    beacon_node_urls = indirect_params.get("beacon_node_urls", [beacon_node_url])
+    beacon_node_urls = indirect_params.get("beacon_node_urls", beacon_node_urls)
     attestation_consensus_threshold = indirect_params.get(
         "attestation_consensus_threshold", None
     )
-    builder_urls = indirect_params.get("builder_urls", [])
+    builder_urls = indirect_params.get("builder_urls", builder_urls)
     ignore_spec_mismatch = indirect_params.get("ignore_spec_mismatch", False)
     force_json_wire_format = indirect_params.get("force_json_wire_format", False)
 

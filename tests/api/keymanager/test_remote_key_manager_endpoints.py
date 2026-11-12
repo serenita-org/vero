@@ -10,6 +10,7 @@ from schemas import SchemaKeymanagerAPI
 
 async def test_remote_keymanager_lifecycle(
     test_client: TestClient[Any, Application],
+    remote_signer_url: str,
 ) -> None:
     # List the keys - there should be 0 at this point
     resp = await test_client.get("/eth/v1/remotekeys")
@@ -21,8 +22,8 @@ async def test_remote_keymanager_lifecycle(
 
     # Import some keys
     keys_to_add = [
-        SchemaKeymanagerAPI.RemoteKey(pubkey="0x" + "a" * 96, url="http://whatever"),
-        SchemaKeymanagerAPI.RemoteKey(pubkey="0x" + "b" * 96, url="http://whatever"),
+        SchemaKeymanagerAPI.RemoteKey(pubkey="0x" + "a" * 96, url=remote_signer_url),
+        SchemaKeymanagerAPI.RemoteKey(pubkey="0x" + "b" * 96, url=remote_signer_url),
     ]
     resp = await test_client.post(
         "/eth/v1/remotekeys",
