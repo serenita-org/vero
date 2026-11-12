@@ -56,3 +56,9 @@ repos:
       - id: uv-export
         name: export dev dependencies -> requirements-dev.txt
         args: ["--dev", "--output-file=requirements-dev.txt"]
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.32.0
+    hooks:
+      - id: zizmor
+        args: [--no-progress, --fix]

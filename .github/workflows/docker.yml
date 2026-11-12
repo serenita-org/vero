@@ -10,7 +10,7 @@ on:
 
 jobs:
   verify-spec-values:
-    uses: ./.github/workflows/verify-spec-values.yml
+    uses: $/.github/workflows/verify-spec-values.yml
 
   build-and-push:
     # Ensure spec values are up-to-date before building an image
