@@ -35,9 +35,9 @@ repos:
           aiosignal==1.4.0,
           msgspec==0.22.0,
           prometheus-client==0.26.0,
-          pytest==9.1.1,
+          pytest==9.2.0,
           "spy-ssz @ git+https://github.com/eth2353/spy-ssz.git@612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00",
-          types-PyYAML==6.0.12.20260906,
+          types-PyYAML==6.0.12.20261113,
           ]
 
   - repo: https://github.com/hadolint/hadolint

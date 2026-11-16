@@ -56,8 +56,6 @@ ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM
 [tool.uv]
 required-version = "~=0.13.5"
 exclude-newer = "7 days"
-# eMudhra CA compromise requires latest packages that ship with bundled certificates
-exclude-newer-package = { certifi = "0 days", grpcio = "0 days", virtualenv = "0 days" }
 
 [tool.uv.sources]
 spy-ssz = { git = "https://github.com/eth2353/spy-ssz", rev = "612c3f73c54ff2a8cbc374f5c4af7b9d7aa24d00" }
