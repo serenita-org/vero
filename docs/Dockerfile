@@ -1,4 +1,4 @@
-FROM squidfunk/mkdocs-material:9.7.7@sha256:51b87149d227691486b5f08993d28c65ca7e4990010664b697265b8e6fcd5287 AS build
+FROM squidfunk/mkdocs-material:9.8.1@sha256:f797da217ff01b20b298d2185eb9d88fb81f5a322c439eba854f2e4de8a48e65 AS build
 
 WORKDIR /tmp
 
