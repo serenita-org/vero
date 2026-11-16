@@ -8,6 +8,8 @@ from providers.builder import Builder, get_default_auth_data
 @pytest.mark.parametrize(
     argnames=("builder_url", "expected_auth_data"),
     argvalues=[
+        # Test cases defined in the builder-specs
+        # https://github.com/ethereum/builder-specs/blob/main/specs/gloas/validator.md#default-auth-data
         pytest.param(
             URL("https://builder.example.com/"),
             b"builder.example.com",
@@ -35,6 +37,25 @@ from providers.builder import Builder, get_default_auth_data
         pytest.param(
             URL("https://[::ffff:192.0.2.1]/"),
             b"[::ffff:c000:201]",
+        ),
+        # Additional regression cases beyond the upstream examples ensure that
+        # IPv4-mapped IPv6 addresses consistently use hexadecimal groups across
+        # Python versions, including equivalent input forms and boundary values.
+        pytest.param(
+            URL("https://[::ffff:c000:201]/"),
+            b"[::ffff:c000:201]",
+        ),
+        pytest.param(
+            URL("https://[::ffff:0.0.0.0]/"),
+            b"[::ffff:0:0]",
+        ),
+        pytest.param(
+            URL("https://[::ffff:0.0.0.1]/"),
+            b"[::ffff:0:1]",
+        ),
+        pytest.param(
+            URL("https://[::ffff:255.255.255.255]/"),
+            b"[::ffff:ffff:ffff]",
         ),
     ],
 )
