@@ -39,7 +39,15 @@ def get_default_auth_data(url: URL) -> bytes:
         raise ValueError(f"No host in URL: {url}")
 
     if ":" in host:  # IPv6 literal
-        host = f"[{ipaddress.IPv6Address(host).compressed}]"
+        address = ipaddress.IPv6Address(host)
+        mapped = address.ipv4_mapped
+        if mapped is not None:
+            # Auth data requires hex groups; newer Python versions use mixed notation.
+            value = int(mapped)
+            host = f"::ffff:{value >> 16:x}:{value & 0xFFFF:x}"
+        else:
+            host = address.compressed
+        host = f"[{host}]"
 
     return host.encode("ascii")
 
