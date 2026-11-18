@@ -19,10 +19,10 @@ from aiointercept import CallbackResult, aiointercept
 
 from providers import BeaconChain, MultiBeaconNode, Vero
 from schemas import SchemaShared
+from schemas.shared import Fork
 from spec import PayloadAttestationData, preset_types
 from spec.base import SpecGloas
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
-from spec.ssz import Fork
 from tests.ssz_objects import (
     bitlist,
     bitvector,
@@ -266,7 +266,7 @@ async def test_get_aggregate_attestation(
                 lambda _bits, *args, **kwargs: CallbackResult(
                     body=msgspec.json.encode(
                         {
-                            "version": SchemaShared.ForkVersion.FULU,
+                            "version": SchemaShared.Fork.FULU,
                             "data": msgspec.Raw(
                                 make_attestation(
                                     aggregation_bits=_bits,

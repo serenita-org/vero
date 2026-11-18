@@ -22,7 +22,7 @@ from providers._headers import (
     ContentType,
 )
 from schemas import SchemaBeaconAPI
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from schemas.validator import ValidatorIndexPubkey
 from services.block_proposal import BUILDER_INDEX_SELF_BUILD
 from spec import preset_types
@@ -31,7 +31,6 @@ from spec.constants import (
     SYNC_COMMITTEE_SUBNET_COUNT,
     TARGET_AGGREGATORS_PER_COMMITTEE,
 )
-from spec.ssz import Fork
 from tests.beacon_api_spec import BeaconAPISpec
 from tests.ssz_objects import (
     BYTES_PER_BLS_SIGNATURE,
@@ -157,7 +156,7 @@ def _mocked_beacon_node_endpoints(
             slot = int(url.raw_path.split("/")[-1])
             headers = kwargs["headers"]
 
-            fork_version = beacon_chain.current_fork_version
+            fork = beacon_chain.current_fork
             _data = make_block_electra_fulu(
                 slot=slot, blinded=execution_payload_blinded
             )
@@ -173,7 +172,7 @@ def _mocked_beacon_node_endpoints(
             consensus_block_value = random.randint(0, 10_000_000)
             headers = {
                 CONTENT_TYPE: response_content_type.value,
-                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_CONSENSUS_VERSION: fork.value,
                 ETH_EXECUTION_PAYLOAD_BLINDED: str(execution_payload_blinded).lower(),
                 ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
                 ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
@@ -185,7 +184,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(
                 body=_data_response(
                     _data.to_json(),
-                    version=fork_version,
+                    version=fork,
                     execution_payload_blinded=execution_payload_blinded,
                     execution_payload_value=str(exec_payload_value),
                     consensus_block_value=str(consensus_block_value),
@@ -216,24 +215,22 @@ def _mocked_beacon_node_endpoints(
             )
             return _json_response(
                 _data_response(
-                    payload_attestation_data.to_json(), version=ForkVersion.GLOAS.value
+                    payload_attestation_data.to_json(), version=Fork.GLOAS.value
                 ),
-                headers={
-                    ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
-                },
+                headers={ETH_CONSENSUS_VERSION: beacon_chain.current_fork.value},
             )
 
         if re.match("/eth/v2/validator/aggregate_attestation", url.raw_path):
-            if beacon_chain.current_fork_version not in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-                ForkVersion.GLOAS,
+            if beacon_chain.current_fork not in (
+                Fork.ELECTRA,
+                Fork.FULU,
+                Fork.GLOAS,
             ):
                 raise NotImplementedError(
-                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                    f"Unsupported fork {beacon_chain.current_fork}"
                 )
 
-            fork_version = beacon_chain.current_fork_version
+            fork = beacon_chain.current_fork
 
             committee_bits = [False] * spec.MAX_COMMITTEES_PER_SLOT
             committee_bits[int(url.query["committee_index"])] = True
@@ -268,11 +265,11 @@ def _mocked_beacon_node_endpoints(
             return _json_response(
                 msgspec.json.encode(
                     SchemaBeaconAPI.GetAggregatedAttestationV2Response(
-                        version=fork_version,
+                        version=fork,
                         data=msgspec.Raw(aggregate_attestation.to_json()),
                     )
                 ),
-                headers={ETH_CONSENSUS_VERSION: fork_version.value},
+                headers={ETH_CONSENSUS_VERSION: fork.value},
             )
 
         if re.match("/eth/v1/beacon/blocks/head/root", url.raw_path):
@@ -318,12 +315,12 @@ def _mocked_beacon_node_endpoints(
             )
             headers = {
                 CONTENT_TYPE: response_content_type.value,
-                ETH_CONSENSUS_VERSION: ForkVersion.GLOAS.value,
+                ETH_CONSENSUS_VERSION: Fork.GLOAS.value,
             }
             body = (
                 envelope.to_ssz()
                 if response_content_type is ContentType.OCTET_STREAM
-                else _data_response(envelope.to_json(), version=ForkVersion.GLOAS.value)
+                else _data_response(envelope.to_json(), version=Fork.GLOAS.value)
             )
             return CallbackResult(body=body, headers=headers)
 
@@ -389,7 +386,7 @@ def _mocked_beacon_node_endpoints(
                 raise NotImplementedError
 
             request_headers = kwargs["headers"]
-            fork_version = ForkVersion(request_headers[ETH_CONSENSUS_VERSION])
+            fork = Fork(request_headers[ETH_CONSENSUS_VERSION])
             builder_index = (
                 BUILDER_INDEX_SELF_BUILD if return_self_built_payload else 123
             )
@@ -406,7 +403,7 @@ def _mocked_beacon_node_endpoints(
             consensus_block_value = random.randint(0, 10_000_000)
             headers = {
                 CONTENT_TYPE: response_content_type.value,
-                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_CONSENSUS_VERSION: fork.value,
                 ETH_EXECUTION_PAYLOAD_INCLUDED: "false",
                 ETH_EXECUTION_PAYLOAD_VALUE: str(exec_payload_value),
                 ETH_CONSENSUS_BLOCK_VALUE: str(consensus_block_value),
@@ -418,7 +415,7 @@ def _mocked_beacon_node_endpoints(
             return CallbackResult(
                 body=_data_response(
                     _data.to_json(),
-                    version=fork_version,
+                    version=fork,
                     execution_payload_included=False,
                     execution_payload_value=str(exec_payload_value),
                     consensus_block_value=str(consensus_block_value),
@@ -428,19 +425,19 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
+            fork = Fork[headers[ETH_CONSENSUS_VERSION].upper()]
 
-            assert fork_version == beacon_chain.current_fork_version
+            assert fork == beacon_chain.current_fork
 
-            if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+            if fork in (Fork.ELECTRA, Fork.FULU):
                 type_name = "SignedBeaconBlockContents"
-            elif fork_version is ForkVersion.GLOAS:
+            elif fork is Fork.GLOAS:
                 type_name = "SignedBeaconBlock"
             else:
-                raise NotImplementedError(f"Unsupported fork version {fork_version}")
+                raise NotImplementedError(f"Unsupported fork {fork}")
 
             signed_block_type = get_type(
-                type_name, fork=fork_version.value, preset=preset_types().preset
+                type_name, fork=fork.value, preset=preset_types().preset
             )
             if headers[CONTENT_TYPE] == ContentType.JSON.value:
                 _ = signed_block_type.from_json(kwargs["data"])
@@ -464,20 +461,20 @@ def _mocked_beacon_node_endpoints(
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
             headers = kwargs["headers"]
-            fork_version = ForkVersion[headers[ETH_CONSENSUS_VERSION].upper()]
+            fork = Fork[headers[ETH_CONSENSUS_VERSION].upper()]
 
-            if fork_version not in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
+            if fork not in (
+                Fork.ELECTRA,
+                Fork.FULU,
             ):
-                raise NotImplementedError(f"Unsupported fork version {fork_version}")
+                raise NotImplementedError(f"Unsupported fork {fork}")
 
-            assert fork_version == beacon_chain.current_fork_version
+            assert fork == beacon_chain.current_fork
 
-            if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+            if fork in (Fork.ELECTRA, Fork.FULU):
                 signed_block_type = get_type(
                     "SignedBlindedBeaconBlock",
-                    fork=fork_version.value,
+                    fork=fork.value,
                     preset=preset_types().preset,
                 )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
@@ -543,10 +540,10 @@ def _mocked_beacon_node_endpoints(
             return _json_response()
 
         if re.match("/eth/v2/beacon/pool/attestations", url.raw_path):
-            if beacon_chain.current_fork_version in (
-                ForkVersion.ELECTRA,
-                ForkVersion.FULU,
-                ForkVersion.GLOAS,
+            if beacon_chain.current_fork in (
+                Fork.ELECTRA,
+                Fork.FULU,
+                Fork.GLOAS,
             ):
                 attestations = msgspec.json.decode(
                     kwargs["data"], type=list[msgspec.Raw]
@@ -556,7 +553,7 @@ def _mocked_beacon_node_endpoints(
                 )
             else:
                 raise NotImplementedError(
-                    f"Unsupported fork version {beacon_chain.current_fork_version}"
+                    f"Unsupported fork {beacon_chain.current_fork}"
                 )
 
             assert (

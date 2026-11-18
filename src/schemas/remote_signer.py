@@ -3,7 +3,7 @@ from typing import Any, TypeVar
 
 import msgspec
 
-from .shared import BuilderRequestAuth, ForkVersion
+from .shared import BuilderRequestAuth, Fork as ConsensusFork
 
 
 class SigningRequestType(Enum):
@@ -92,7 +92,7 @@ class ProposerPreferences(msgspec.Struct):
 
 
 class VersionedProposerPreferences(msgspec.Struct, kw_only=True):
-    version: ForkVersion = ForkVersion.GLOAS
+    version: ConsensusFork = ConsensusFork.GLOAS
     data: ProposerPreferences
 
 
@@ -102,7 +102,7 @@ class ProposerPreferencesSignableMessage(SignableMessageWithForkInfo, kw_only=Tr
 
 
 class VersionedBuilderRequestAuth(msgspec.Struct, kw_only=True):
-    version: ForkVersion = ForkVersion.GLOAS
+    version: ConsensusFork = ConsensusFork.GLOAS
     data: BuilderRequestAuth
 
 
@@ -138,7 +138,7 @@ class ExecutionPayloadEnvelope(msgspec.Struct):
 
 
 class VersionedExecutionPayloadEnvelope(msgspec.Struct, kw_only=True):
-    version: ForkVersion = ForkVersion.GLOAS
+    version: ConsensusFork = ConsensusFork.GLOAS
     data: ExecutionPayloadEnvelope
 
 

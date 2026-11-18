@@ -21,7 +21,7 @@ def event_consumer(
     argvalues=[
         pytest.param(
             SchemaBeaconAPI.HeadV2Event(
-                version=SchemaShared.ForkVersion.GLOAS,
+                version=SchemaShared.Fork.GLOAS,
                 data=SchemaBeaconAPI.HeadV2EventData(
                     slot="10000",
                     block="0xblockroot",
@@ -38,7 +38,7 @@ def event_consumer(
         ),
         pytest.param(
             SchemaBeaconAPI.HeadV2Event(
-                version=SchemaShared.ForkVersion.GLOAS,
+                version=SchemaShared.Fork.GLOAS,
                 data=SchemaBeaconAPI.HeadV2EventData(
                     slot="100",
                     block="0xblockroot",
@@ -131,7 +131,7 @@ async def test_recent_event_keys(
     for i in range(100):
         event_consumer._handle_event(
             event=SchemaBeaconAPI.HeadV2Event(
-                version=SchemaShared.ForkVersion.GLOAS,
+                version=SchemaShared.Fork.GLOAS,
                 data=SchemaBeaconAPI.HeadV2EventData(
                     slot=str(event_consumer.beacon_chain.current_slot + i),
                     block=f"0xblock-{i}",

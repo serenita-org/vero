@@ -5,6 +5,7 @@ import msgspec
 import pytest
 from ssz_z import SSZError, SSZType, get_type
 
+from schemas.shared import Fork
 from spec import Preset
 from spec.ssz import (
     Attestation,
@@ -12,7 +13,6 @@ from spec.ssz import (
     BeaconBlock,
     Checkpoint,
     ExecutionPayloadEnvelope,
-    Fork,
     SyncCommitteeContribution,
     bind_type,
     encode_json_array,
@@ -37,7 +37,10 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
         assert sum(attestation.committee_bits) == 1
 
     sync_codec = bind_type(
-        "SyncCommitteeContribution", SyncCommitteeContribution, fork=fork, preset=preset
+        "SyncCommitteeContribution",
+        SyncCommitteeContribution,
+        fork=fork,
+        preset=preset,
     )
     value = sync_codec.codec.default()
     length = sync_codec.codec.schema["fields"]["aggregation_bits"]["length"]
@@ -115,7 +118,7 @@ def test_block_signing_and_header_roots(preset: Preset, fork: Fork, name: str) -
         body = block_value["body"]
         body["execution_payload"]["transactions"] = [b"\x01\x02\x03"]
         body["blob_kzg_commitments"] = [b"\x34" * 48]
-        value["blobs"] = [get_type("Blob", fork=fork, preset=preset).default()]
+        value["blobs"] = [get_type("Blob", fork=fork.value, preset=preset).default()]
         value["kzg_proofs"] = [b"\x56" * 48] * (128 if fork is Fork.FULU else 1)
     block = codec.from_json(value)
     assert block.slot == 123
@@ -124,7 +127,7 @@ def test_block_signing_and_header_roots(preset: Preset, fork: Fork, name: str) -
     assert codec.from_ssz(block.to_ssz()).header_dict() == block.header_dict()
     signature = b"\x78" * 96
     signed = block.sign(signature)
-    signed_codec = get_type("Signed" + name, fork=fork, preset=preset)
+    signed_codec = get_type("Signed" + name, fork=fork.value, preset=preset)
     restored = signed_codec.deserialize(signed.to_ssz())
     signed_block = (
         restored["signed_block"] if name == "BeaconBlockContents" else restored
@@ -205,5 +208,5 @@ def test_proposal_path_avoids_python_value_conversion(
         assert from_ssz.block_hash_tree_root() == from_json.block_hash_tree_root()
         signed_ssz = from_ssz.sign(bytes(96)).to_ssz()
         signed_json = from_json.sign(bytes(96)).to_json()
-    signed_codec = get_type("Signed" + name, fork=fork, preset="minimal")
+    signed_codec = get_type("Signed" + name, fork=fork.value, preset="minimal")
     assert signed_codec.from_json(signed_json) == signed_codec.deserialize(signed_ssz)

@@ -34,7 +34,7 @@ async def test_produce_block_v3_response(
         block.to_json() if response_content_type == ContentType.JSON else block.to_ssz()
     )
     api_response = SchemaBeaconAPI.ProduceBlockV3Response(
-        version=SchemaShared.ForkVersion.FULU,
+        version=SchemaShared.Fork.FULU,
         # Use different values here vs headers below
         # to test that Vero considers the header
         # values as the source of truth

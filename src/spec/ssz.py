@@ -2,7 +2,6 @@
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import StrEnum
 from functools import cached_property
 from typing import Any, cast
 
@@ -10,11 +9,7 @@ import msgspec
 from ssz_z import NativeValue, SSZType, get_type
 from ssz_z.beacon_api import BlockValue
 
-
-class Fork(StrEnum):
-    ELECTRA = "electra"
-    FULU = "fulu"
-    GLOAS = "gloas"
+from schemas.shared import Fork
 
 
 @dataclass(frozen=True)

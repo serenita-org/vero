@@ -8,7 +8,7 @@ https://ethereum.github.io/builder-specs/
 
 import msgspec
 
-from .shared import ForkVersion, SignedBuilderRequestAuth, SignedExecutionPayloadBid
+from .shared import Fork, SignedBuilderRequestAuth, SignedExecutionPayloadBid
 
 
 class BuilderPreferences(msgspec.Struct):
@@ -21,5 +21,5 @@ class BuilderPreferencesRequest(msgspec.Struct):
 
 
 class GetExecutionPayloadBidResponse(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     data: SignedExecutionPayloadBid

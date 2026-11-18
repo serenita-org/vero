@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Literal
 
+from schemas.shared import Fork
+
 from .ssz import (
     AggregateAndProof as AggregateAndProof,
     Attestation as Attestation,
@@ -8,7 +10,6 @@ from .ssz import (
     BeaconBlock as BeaconBlock,
     Checkpoint as Checkpoint,
     ContributionAndProof as ContributionAndProof,
-    Fork,
     PayloadAttestationData as PayloadAttestationData,
     PayloadAttestationMessage as PayloadAttestationMessage,
     SignedAggregateAndProof as SignedAggregateAndProof,
@@ -53,7 +54,10 @@ def _initialize_fork_types(preset: Preset, fork: Fork) -> PresetTypes:
         ),
         attestation=bind_type("Attestation", Attestation, fork=fork, preset=preset),
         aggregate_and_proof=bind_type(
-            "AggregateAndProof", AggregateAndProof, fork=fork, preset=preset
+            "AggregateAndProof",
+            AggregateAndProof,
+            fork=fork,
+            preset=preset,
         ),
         sync_committee_contribution=bind_type(
             "SyncCommitteeContribution",
@@ -62,7 +66,10 @@ def _initialize_fork_types(preset: Preset, fork: Fork) -> PresetTypes:
             preset=preset,
         ),
         contribution_and_proof=bind_type(
-            "ContributionAndProof", ContributionAndProof, fork=fork, preset=preset
+            "ContributionAndProof",
+            ContributionAndProof,
+            fork=fork,
+            preset=preset,
         ),
         payload_attestation_data=bind_type(
             "PayloadAttestationData",
@@ -77,13 +84,22 @@ def _initialize_fork_types(preset: Preset, fork: Fork) -> PresetTypes:
             preset=preset,
         ),
         single_attestation=bind_type(
-            "SingleAttestation", SingleAttestation, fork=fork, preset=preset
+            "SingleAttestation",
+            SingleAttestation,
+            fork=fork,
+            preset=preset,
         ),
         sync_committee_message=bind_type(
-            "SyncCommitteeMessage", SyncCommitteeMessage, fork=fork, preset=preset
+            "SyncCommitteeMessage",
+            SyncCommitteeMessage,
+            fork=fork,
+            preset=preset,
         ),
         signed_aggregate_and_proof=bind_type(
-            "SignedAggregateAndProof", SignedAggregateAndProof, fork=fork, preset=preset
+            "SignedAggregateAndProof",
+            SignedAggregateAndProof,
+            fork=fork,
+            preset=preset,
         ),
         signed_contribution_and_proof=bind_type(
             "SignedContributionAndProof",

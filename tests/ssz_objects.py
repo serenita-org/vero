@@ -4,6 +4,7 @@ from typing import Any
 import msgspec
 from ssz_z import get_type
 
+from schemas.shared import Fork
 from spec import (
     Attestation,
     AttestationData,
@@ -12,7 +13,7 @@ from spec import (
     preset_types,
 )
 from spec.constants import SYNC_COMMITTEE_SUBNET_COUNT
-from spec.ssz import ExecutionPayloadEnvelope, Fork, SSZCodec, bind_type
+from spec.ssz import ExecutionPayloadEnvelope, SSZCodec, bind_type
 
 BYTES_PER_BLS_SIGNATURE = 96
 BYTES_PER_EXECUTION_ADDRESS = 20
@@ -204,7 +205,10 @@ def make_block_gloas(*, slot: int, builder_index: int) -> BeaconBlock:
         "body": _block_body_gloas(builder_index=builder_index),
     }
     block_type = bind_type(
-        "BeaconBlock", BeaconBlock, fork=Fork.GLOAS, preset=preset_types().preset
+        "BeaconBlock",
+        BeaconBlock,
+        fork=Fork.GLOAS,
+        preset=preset_types().preset,
     )
     return block_type.from_json(block)
 

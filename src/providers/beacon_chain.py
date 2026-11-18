@@ -58,12 +58,12 @@ class BeaconChain:
 
         current_epoch = self.current_slot // self.SLOTS_PER_EPOCH
         if current_epoch >= self.GLOAS_FORK_EPOCH:
-            self.current_fork_version = SchemaShared.ForkVersion.GLOAS
+            self.current_fork = SchemaShared.Fork.GLOAS
         elif current_epoch >= self.FULU_FORK_EPOCH:
             self._log_fork_readiness()
-            self.current_fork_version = SchemaShared.ForkVersion.FULU
+            self.current_fork = SchemaShared.Fork.FULU
         elif current_epoch >= self.ELECTRA_FORK_EPOCH:
-            self.current_fork_version = SchemaShared.ForkVersion.ELECTRA
+            self.current_fork = SchemaShared.Fork.ELECTRA
         else:
             raise NotImplementedError(f"Unsupported fork for epoch {current_epoch}")
 
@@ -148,7 +148,7 @@ class BeaconChain:
             if _current_epoch < self.GLOAS_FORK_EPOCH:
                 self._log_fork_readiness()
             elif _current_epoch == self.GLOAS_FORK_EPOCH:
-                self.current_fork_version = SchemaShared.ForkVersion.GLOAS
+                self.current_fork = SchemaShared.Fork.GLOAS
                 self.logger.info(f"Gloas fork epoch reached! {GLOAS_ASCII_ART}")
 
         for handler in self.new_slot_handlers:

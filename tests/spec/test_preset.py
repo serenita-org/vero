@@ -2,8 +2,8 @@ from typing import get_args
 
 import pytest
 
+from schemas.shared import Fork
 from spec import Preset, initialize_preset, preset_types
-from spec.ssz import Fork
 
 
 @pytest.mark.parametrize("preset", get_args(Preset))

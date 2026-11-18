@@ -17,7 +17,6 @@ from services.validator_duty_service import (
 )
 from spec import preset_types
 from spec.slot_components import get_slot_component_duration_ms
-from spec.ssz import Fork
 
 _PRODUCE_JOB_ID = "PtcService.attest_if_not_yet_attested-slot-{duty_slot}"
 
@@ -198,7 +197,7 @@ class PtcService(ValidatorDutyService):
             duty = pubkey_to_duty[pubkey]
             signed_messages.append(
                 preset_types(
-                    Fork[self.beacon_chain.current_fork_version.name]
+                    self.beacon_chain.current_fork
                 ).payload_attestation_message(
                     validator_index=duty.validator_index,
                     data=payload_att_data,
@@ -208,7 +207,7 @@ class PtcService(ValidatorDutyService):
 
         await self.multi_beacon_node.publish_payload_attestation_messages(
             messages=signed_messages,
-            fork_version=self.beacon_chain.current_fork_version,
+            fork=self.beacon_chain.current_fork,
         )
         self.logger.info(
             f"Published PTC attestations for slot {slot}, count: {len(signed_messages)}",

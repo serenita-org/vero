@@ -28,7 +28,6 @@ from spec.constants import (
     TARGET_AGGREGATORS_PER_SYNC_SUBCOMMITTEE,
 )
 from spec.slot_components import get_slot_component_duration_ms
-from spec.ssz import Fork
 
 _PRODUCE_JOB_ID = "SyncCommitteeService.produce_sync_message-slot-{duty_slot}"
 
@@ -127,7 +126,7 @@ class SyncCommitteeService(ValidatorDutyService):
         # Schedule sync message job at the deadline in case
         # it is not triggered earlier by a new HeadV2Event,
         # aiming to produce it self._sync_message_due_s into the slot at the latest.
-        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork == SchemaShared.Fork.GLOAS:
             sync_message_due_s = self._sync_message_due_s_gloas
         else:
             sync_message_due_s = self._sync_message_due_s
@@ -201,7 +200,7 @@ class SyncCommitteeService(ValidatorDutyService):
             for validator in sync_committee_members
         ]
         message_type = preset_types(
-            Fork[self.beacon_chain.current_fork_version.name]
+            self.beacon_chain.current_fork
         ).sync_committee_message
 
         async for (
@@ -437,7 +436,7 @@ class SyncCommitteeService(ValidatorDutyService):
             )
 
         # Sign and submit aggregated sync committee contributions
-        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork == SchemaShared.Fork.GLOAS:
             contribution_due_s = self._contribution_due_s_gloas
         else:
             contribution_due_s = self._contribution_due_s
@@ -467,7 +466,7 @@ class SyncCommitteeService(ValidatorDutyService):
         identifiers: list[str],
     ) -> None:
         signed_contribution_and_proofs: list[SignedContributionAndProof] = []
-        fork_types = preset_types(Fork[self.beacon_chain.current_fork_version.name])
+        fork_types = preset_types(self.beacon_chain.current_fork)
         contr_and_p_type = fork_types.contribution_and_proof
         s_contr_and_p_type = fork_types.signed_contribution_and_proof
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
@@ -539,7 +538,7 @@ class SyncCommitteeService(ValidatorDutyService):
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         _sign_and_publish_tasks = []
         contr_and_p_type = preset_types(
-            Fork[self.beacon_chain.current_fork_version.name]
+            self.beacon_chain.current_fork
         ).contribution_and_proof
         async for (
             contribution

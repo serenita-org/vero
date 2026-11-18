@@ -35,6 +35,7 @@ from schemas import (
     SchemaValidator,
 )
 from schemas.beacon_api import is_optimistic
+from schemas.shared import Fork
 from spec import (
     Attestation,
     AttestationData,
@@ -45,7 +46,7 @@ from spec import (
 )
 from spec.base import SpecGloas, parse_spec
 from spec.slot_components import get_slot_component_duration_ms
-from spec.ssz import ExecutionPayloadEnvelope, Fork, bind_type
+from spec.ssz import ExecutionPayloadEnvelope, bind_type
 
 from ._api_client import ApiClient
 
@@ -514,13 +515,13 @@ class BeaconNode(ApiClient):
     async def publish_attestations(
         self,
         encoded_attestations: bytes,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/beacon/pool/attestations",
             data=encoded_attestations,
-            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork.value},
         )
 
     async def prepare_beacon_committee_subscriptions(
@@ -577,13 +578,13 @@ class BeaconNode(ApiClient):
     async def publish_aggregate_and_proofs(
         self,
         encoded_signed_aggregate_and_proofs: bytes,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v2/validator/aggregate_and_proofs",
             data=encoded_signed_aggregate_and_proofs,
-            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork.value},
         )
 
     async def get_sync_committee_contribution(
@@ -647,13 +648,13 @@ class BeaconNode(ApiClient):
     async def publish_payload_attestation_messages(
         self,
         encoded_messages: bytes,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/beacon/pool/payload_attestations",
             data=encoded_messages,
-            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork.value},
         )
 
     async def prepare_beacon_proposer(self, data: list[dict[str, str]]) -> None:
@@ -685,12 +686,12 @@ class BeaconNode(ApiClient):
         signed_proposer_preferences: list[
             tuple[SchemaRemoteSigner.ProposerPreferences, str]
         ],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/proposer_preferences",
-            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork.value},
             data=self.json_encoder.encode(
                 [
                     dict(message=preferences, signature=sig)
@@ -702,12 +703,12 @@ class BeaconNode(ApiClient):
     async def submit_builder_preferences(
         self,
         builder_preferences: list[SchemaBeaconAPI.BuilderPreferencesEntry],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._make_request(
             method="POST",
             endpoint="/eth/v1/validator/builder_preferences",
-            headers={ETH_CONSENSUS_VERSION: fork_version.value},
+            headers={ETH_CONSENSUS_VERSION: fork.value},
             data=self.json_encoder.encode(builder_preferences),
         )
 
@@ -776,7 +777,7 @@ class BeaconNode(ApiClient):
                 ) from None
 
             response = SchemaBeaconAPI.ProduceBlockV3Response(
-                version=SchemaShared.ForkVersion(resp.headers[ETH_CONSENSUS_VERSION]),
+                version=SchemaShared.Fork(resp.headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_blinded=resp.headers[
                     ETH_EXECUTION_PAYLOAD_BLINDED
                 ].lower()
@@ -824,7 +825,7 @@ class BeaconNode(ApiClient):
         encoded_request_body: bytes,
         builder_config: SchemaBeaconAPI.BuilderConfig,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> tuple[SchemaBeaconAPI.ProduceBlockV4Response, ContentType, Self]:
         """Requests a beacon node to produce a valid block, which can then be signed by a validator."""
         # Uses the stateful self-build flow: beacon node caches the payload envelope,
@@ -869,7 +870,7 @@ class BeaconNode(ApiClient):
                 ),
                 headers={
                     ACCEPT: accept_header,
-                    ETH_CONSENSUS_VERSION: fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork.value,
                 },
             )
             if (
@@ -897,7 +898,7 @@ class BeaconNode(ApiClient):
                 )
 
             response = SchemaBeaconAPI.ProduceBlockV4Response(
-                version=SchemaShared.ForkVersion(resp.headers[ETH_CONSENSUS_VERSION]),
+                version=SchemaShared.Fork(resp.headers[ETH_CONSENSUS_VERSION]),
                 execution_payload_included=execution_payload_included,
                 execution_payload_value=resp.headers[ETH_EXECUTION_PAYLOAD_VALUE],
                 consensus_block_value=resp.headers[ETH_CONSENSUS_BLOCK_VALUE],
@@ -945,13 +946,13 @@ class BeaconNode(ApiClient):
 
     async def publish_block_v2(
         self,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         data: bytes,
         header_builder_url: str | None,
         content_type: ContentType,
     ) -> None:
         headers = {
-            ETH_CONSENSUS_VERSION: fork_version.value,
+            ETH_CONSENSUS_VERSION: fork.value,
             CONTENT_TYPE: content_type.value,
         }
         if header_builder_url:
@@ -972,7 +973,7 @@ class BeaconNode(ApiClient):
 
     async def publish_blinded_block_v2(
         self,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         signed_blinded_beacon_block: bytes,
         content_type: ContentType,
     ) -> None:
@@ -988,7 +989,7 @@ class BeaconNode(ApiClient):
                 endpoint="/eth/v2/beacon/blinded_blocks",
                 data=signed_blinded_beacon_block,
                 headers={
-                    ETH_CONSENSUS_VERSION: fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork.value,
                     CONTENT_TYPE: content_type.value,
                 },
             )
@@ -997,7 +998,7 @@ class BeaconNode(ApiClient):
         self,
         slot: int,
         beacon_block_root: str,
-    ) -> tuple[SchemaShared.ForkVersion, ExecutionPayloadEnvelope]:
+    ) -> tuple[SchemaShared.Fork, ExecutionPayloadEnvelope]:
         accept_header = (
             ContentType.JSON.value
             if self._force_json_wire_format
@@ -1036,11 +1037,11 @@ class BeaconNode(ApiClient):
                     f"Unsupported content type: {content_type}"
                 ) from None
 
-            fork_version = SchemaShared.ForkVersion(resp.headers[ETH_CONSENSUS_VERSION])
+            fork = SchemaShared.Fork(resp.headers[ETH_CONSENSUS_VERSION])
             payload_cls = bind_type(
                 "ExecutionPayloadEnvelope",
                 ExecutionPayloadEnvelope,
-                fork=Fork[fork_version.name],
+                fork=fork,
                 preset=preset_types().preset,
             )
 
@@ -1052,12 +1053,12 @@ class BeaconNode(ApiClient):
                 raise NotImplementedError(
                     f"Unsupported content type: {response_content_type}"
                 )
-            return fork_version, envelope
+            return fork, envelope
 
     async def publish_execution_payload_envelope(
         self,
         signed_execution_payload_envelope: bytes,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         content_type: ContentType,
     ) -> None:
         with self.tracer.start_as_current_span(
@@ -1071,7 +1072,7 @@ class BeaconNode(ApiClient):
                 method="POST",
                 endpoint="/eth/v1/beacon/execution_payload_envelopes",
                 headers={
-                    ETH_CONSENSUS_VERSION: fork_version.value,
+                    ETH_CONSENSUS_VERSION: fork.value,
                     ETH_BLOB_DATA_INCLUDED: "false",
                     CONTENT_TYPE: content_type.value,
                 },

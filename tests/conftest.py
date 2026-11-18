@@ -7,7 +7,6 @@ from unittest import mock
 
 import prometheus_client
 import pytest
-from spec.ssz import Fork
 
 from args import CLIArgs, _process_attestation_consensus_threshold
 from observability import init_observability
@@ -24,7 +23,7 @@ from providers import (
     MultiBuilder,
 )
 from schemas import SchemaBeaconAPI, SchemaKeymanagerAPI
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from schemas.validator import ACTIVE_STATUSES, ValidatorIndexPubkey
 from services import ValidatorStatusTrackerService
 from spec.base import SpecGloas
@@ -133,20 +132,20 @@ def _init_observability() -> None:
 
 
 @pytest.fixture
-def fork_version(
+def fork(
     request: pytest.FixtureRequest, beacon_chain: BeaconChain
-) -> Generator[ForkVersion, None, None]:
-    requested_fork_version = getattr(request, "param", ForkVersion.GLOAS)
+) -> Generator[Fork, None, None]:
+    requested_fork = getattr(request, "param", Fork.GLOAS)
 
     with (
-        mock.patch.object(beacon_chain, "current_fork_version", requested_fork_version),
+        mock.patch.object(beacon_chain, "current_fork", requested_fork),
         mock.patch.object(
             BeaconNode,
             "_fork_for_slot",
-            return_value=Fork[requested_fork_version.name],
+            return_value=requested_fork,
         ),
     ):
-        yield requested_fork_version
+        yield requested_fork
 
 
 @pytest.fixture(scope="session")

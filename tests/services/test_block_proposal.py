@@ -6,7 +6,7 @@ import pytest
 from observability import HandledRuntimeError
 from providers import BeaconChain, Keymanager, Vero
 from schemas import SchemaBeaconAPI
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from schemas.validator import ValidatorIndexPubkey
 from services import BlockProposalService
 from tests.ssz_objects import ZERO_ROOT
@@ -93,11 +93,11 @@ async def test_register_validators(
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "fork_version",
+    "fork",
     [
-        pytest.param(ForkVersion.ELECTRA, id="Electra"),
-        pytest.param(ForkVersion.FULU, id="Fulu"),
-        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+        pytest.param(Fork.ELECTRA, id="Electra"),
+        pytest.param(Fork.FULU, id="Fulu"),
+        pytest.param(Fork.GLOAS, id="Gloas"),
     ],
     indirect=True,
 )
@@ -114,7 +114,7 @@ async def test_publish_block(
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
     execution_payload_blinded: bool,
-    fork_version: ForkVersion,
+    fork: Fork,
     enable_keymanager_api: bool,
     keymanager: Keymanager,
     vero: Vero,
@@ -172,7 +172,7 @@ async def test_publish_payload_envelope(
     block_proposal_service: BlockProposalService,
     beacon_chain: BeaconChain,
     random_active_validator: ValidatorIndexPubkey,
-    fork_version: ForkVersion,
+    fork: Fork,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
     block_publication_outcome: str,
