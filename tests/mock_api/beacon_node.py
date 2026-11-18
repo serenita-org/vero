@@ -215,7 +215,9 @@ def _mocked_beacon_node_endpoints(
                 blob_data_available=True,
             )
             return _json_response(
-                _data_response(payload_attestation_data.to_json(), version="gloas"),
+                _data_response(
+                    payload_attestation_data.to_json(), version=ForkVersion.GLOAS.value
+                ),
                 headers={
                     ETH_CONSENSUS_VERSION: beacon_chain.current_fork_version.value
                 },
@@ -321,7 +323,7 @@ def _mocked_beacon_node_endpoints(
             body = (
                 envelope.to_ssz()
                 if response_content_type is ContentType.OCTET_STREAM
-                else _data_response(envelope.to_json(), version="gloas")
+                else _data_response(envelope.to_json(), version=ForkVersion.GLOAS.value)
             )
             return CallbackResult(body=body, headers=headers)
 

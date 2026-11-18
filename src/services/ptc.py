@@ -169,7 +169,7 @@ class PtcService(ValidatorDutyService):
             payload_attestation_message=msgspec.Raw(
                 msgspec.json.encode(
                     {
-                        "version": "gloas",
+                        "version": payload_att_data.fork.value,
                         "data": msgspec.Raw(payload_att_data.to_json()),
                     }
                 )

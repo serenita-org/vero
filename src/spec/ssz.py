@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import msgspec
 from ssz_z import NativeValue, SSZType, get_type
+from ssz_z.beacon_api import BlockValue
 
 
 class Fork(StrEnum):
@@ -205,26 +206,30 @@ class SyncCommitteeContribution(SSZObject):
 
 
 class BeaconBlock(NativeSSZObject):
+    @cached_property
+    def _block_value(self) -> BlockValue:
+        return BlockValue(self._native_value)
+
     @property
     def blinded(self) -> bool:
         return self._codec.name == "BlindedBeaconBlock"
 
     @property
     def slot(self) -> int:
-        return self._native_value.slot
+        return self._block_value.slot
 
     @property
     def builder_index(self) -> int:
-        return self._native_value.builder_index
+        return self._block_value.builder_index
 
     def header_dict(self) -> dict[str, str]:
-        return self._native_value.header_dict()
+        return self._block_value.header_dict()
 
     def block_hash_tree_root(self) -> str:
-        return "0x" + self._native_value.block_hash_tree_root().hex()
+        return "0x" + self._block_value.block_hash_tree_root().hex()
 
     def sign(self, signature: str | bytes) -> SSZObject:
-        signed = self._native_value.sign(signature)
+        signed = self._block_value.sign(signature).value
         return SSZObject(signed.codec, signed)
 
 
