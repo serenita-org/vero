@@ -711,7 +711,7 @@ pyyaml==6.0.3 \
     --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
     # via vero
-ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@bbf0260f15f8b57c010a94e64b1d7816265c6e7c
+ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@f7e26c8ffd5bfe439648436f8ea1f876b5222a4f
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \

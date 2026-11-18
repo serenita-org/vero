@@ -3,7 +3,7 @@ from typing import Any, get_args
 
 import msgspec
 import pytest
-from ssz_z import SSZError, SSZType, get_type
+from ssz_z import SSZError, get_type
 
 from schemas.shared import Fork
 from spec import Preset
@@ -13,6 +13,7 @@ from spec.ssz import (
     BeaconBlock,
     Checkpoint,
     ExecutionPayloadEnvelope,
+    SSZObject,
     SyncCommitteeContribution,
     bind_type,
     encode_json_array,
@@ -26,7 +27,7 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
     codec = bind_type("Attestation", Attestation, fork=fork, preset=preset)
     committee_length = codec.codec.schema["fields"]["committee_bits"]["length"]
     for length in (0, 1, 7, 8, 9, 16):
-        value = codec.codec.default()
+        value = msgspec.json.decode(codec.codec.default().to_json())
         value["aggregation_bits"] = bitlist(16, [True] * length)
         value["committee_bits"] = bitvector(committee_length, [True])
         attestation = codec.from_json(value)
@@ -42,7 +43,7 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
         fork=fork,
         preset=preset,
     )
-    value = sync_codec.codec.default()
+    value = msgspec.json.decode(sync_codec.codec.default().to_json())
     length = sync_codec.codec.schema["fields"]["aggregation_bits"]["length"]
     value["aggregation_bits"] = bitvector(length, [True] * length)
     contribution = sync_codec.from_json(value)
@@ -54,7 +55,7 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
 @pytest.mark.parametrize("preset", get_args(Preset))
 def test_attestation_values_and_consensus_json(preset: Preset, fork: Fork) -> None:
     codec = bind_type("AttestationData", AttestationData, fork=fork, preset=preset)
-    value = codec.codec.default()
+    value = msgspec.json.decode(codec.codec.default().to_json())
     value["slot"] = 2**64 - 1
     value["source"] = {"epoch": 10, "root": b"\x12" * 32}
     data = codec(**value)
@@ -111,16 +112,22 @@ def _header_root(header: dict[str, str]) -> str:
 @pytest.mark.parametrize("preset", get_args(Preset))
 def test_block_signing_and_header_roots(preset: Preset, fork: Fork, name: str) -> None:
     codec = bind_type(name, BeaconBlock, fork=fork, preset=preset)
-    value = codec.codec.default()
+    value = msgspec.json.decode(codec.codec.default().to_json())
     block_value = value["block"] if name == "BeaconBlockContents" else value
     block_value.update(slot=123, proposer_index=456, parent_root=b"\x12" * 32)
     if name == "BeaconBlockContents":
         body = block_value["body"]
         body["execution_payload"]["transactions"] = [b"\x01\x02\x03"]
         body["blob_kzg_commitments"] = [b"\x34" * 48]
-        value["blobs"] = [get_type("Blob", fork=fork.value, preset=preset).default()]
+        value["blobs"] = [
+            msgspec.json.decode(
+                get_type("Blob", fork=fork.value, preset=preset).default().to_json()
+            )
+        ]
         value["kzg_proofs"] = [b"\x56" * 48] * (128 if fork is Fork.FULU else 1)
     block = codec.from_json(value)
+    value = block.to_obj()
+    block_value = value["block"] if name == "BeaconBlockContents" else value
     assert block.slot == 123
     assert block.blinded == (name == "BlindedBeaconBlock")
     assert block.block_hash_tree_root() == _header_root(block.header_dict())
@@ -128,17 +135,20 @@ def test_block_signing_and_header_roots(preset: Preset, fork: Fork, name: str) -
     signature = b"\x78" * 96
     signed = block.sign(signature)
     signed_codec = get_type("Signed" + name, fork=fork.value, preset=preset)
-    restored = signed_codec.deserialize(signed.to_ssz())
+    restored = msgspec.json.decode(signed_codec.load_ssz(signed.to_ssz()).to_json())
     signed_block = (
         restored["signed_block"] if name == "BeaconBlockContents" else restored
     )
     assert signed_block["message"] == block_value
-    assert signed_block["signature"] == signature
+    assert signed_block["signature"] == "0x" + signature.hex()
     if name == "BeaconBlockContents":
         assert restored["blobs"] == value["blobs"]
         assert restored["kzg_proofs"] == value["kzg_proofs"]
         assert block.block_hash_tree_root() != "0x" + block.hash_tree_root().hex()
-    assert signed_codec.from_json(signed.to_json()) == restored
+    assert (
+        msgspec.json.decode(signed_codec.load_json(signed.to_json()).to_json())
+        == restored
+    )
     assert codec.from_json(block.to_json()) == block
     with pytest.raises(SSZError):
         block.sign(b"\x00" * 95)
@@ -152,7 +162,7 @@ def test_execution_payload_envelope_signing(preset: Preset) -> None:
         fork=Fork.GLOAS,
         preset=preset,
     )
-    value = codec.codec.default()
+    value = msgspec.json.decode(codec.codec.default().to_json())
     value["payload"]["transactions"] = [b"\x01\x02\x03"]
     value["builder_index"] = 2**64 - 1
     envelope = codec.from_json(value)
@@ -161,9 +171,12 @@ def test_execution_payload_envelope_signing(preset: Preset) -> None:
     signed_codec = get_type(
         "SignedExecutionPayloadEnvelope", fork="gloas", preset=preset
     )
-    restored = signed_codec.deserialize(signed.to_ssz())
-    assert restored == {"message": value, "signature": b"\x34" * 96}
-    assert signed_codec.from_json(signed.to_json()) == restored
+    restored = msgspec.json.decode(signed_codec.load_ssz(signed.to_ssz()).to_json())
+    assert restored == {"message": envelope.to_obj(), "signature": "0x" + "34" * 96}
+    assert (
+        msgspec.json.decode(signed_codec.load_json(signed.to_json()).to_json())
+        == restored
+    )
 
 
 @pytest.mark.parametrize(
@@ -180,22 +193,25 @@ def test_proposal_path_avoids_python_value_conversion(
     fork: Fork, name: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     codec = bind_type(name, BeaconBlock, fork=fork, preset="minimal")
-    value = codec.codec.default()
+    value = msgspec.json.decode(codec.codec.default().to_json())
     block = value["block"] if name == "BeaconBlockContents" else value
     block["slot"] = 123
     if fork is Fork.GLOAS:
         block["body"]["signed_execution_payload_bid"]["message"]["builder_index"] = 456
-    encoded_ssz = codec.codec.serialize(value)
+    encoded_ssz = codec.from_json(value).to_ssz()
     encoded_json = msgspec.json.encode(
-        {"version": fork.value, "data": codec.codec.to_json(value)}
+        {
+            "version": fork.value,
+            "data": msgspec.Raw(codec.from_ssz(encoded_ssz).to_json()),
+        }
     )
 
     def materialize(*args: Any, **kwargs: Any) -> Any:
         pytest.fail("Proposal processing used the dictionary conversion API")
 
     with monkeypatch.context() as patch:
-        for method in ("serialize", "deserialize", "from_json", "to_json"):
-            patch.setattr(SSZType, method, materialize)
+        patch.setattr(SSZObject, "to_obj", materialize)
+        patch.setattr(msgspec.json, "decode", materialize)
         from_ssz = codec.from_ssz(encoded_ssz)
         from_json = codec.from_json(encoded_json, wrapped=True)
         assert from_ssz == from_json
@@ -209,4 +225,4 @@ def test_proposal_path_avoids_python_value_conversion(
         signed_ssz = from_ssz.sign(bytes(96)).to_ssz()
         signed_json = from_json.sign(bytes(96)).to_json()
     signed_codec = get_type("Signed" + name, fork=fork.value, preset="minimal")
-    assert signed_codec.from_json(signed_json) == signed_codec.deserialize(signed_ssz)
+    assert signed_codec.load_json(signed_json).to_ssz() == signed_ssz

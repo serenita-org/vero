@@ -29,7 +29,7 @@ def test_initialize_preset_selects_one_coherent_type_bundle(
             types.signed_contribution_and_proof.preset,
         } == {preset}
 
-        with pytest.raises(ValueError, match="missing fields"):
+        with pytest.raises(ValueError, match="MissingField"):
             types.attestation_data.from_json(b"{}")
     finally:
         initialize_preset("mainnet")

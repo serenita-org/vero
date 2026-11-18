@@ -21,30 +21,28 @@ class Checkpoint:
         return f"Checkpoint(epoch={self.epoch}, root=0x{self.root.hex()})"
 
 
-def _value(value: Any) -> Any:
+def _json_value(value: Any) -> Any:
     if isinstance(value, SSZObject):
-        return value._value  # noqa: SLF001 - unwrap our own value objects
+        return msgspec.Raw(value.to_json())
     if isinstance(value, Checkpoint):
-        return {"epoch": value.epoch, "root": value.root}
+        return {"epoch": str(value.epoch), "root": "0x" + value.root.hex()}
     if isinstance(value, dict):
-        return {key: _value(item) for key, item in value.items()}
+        return {key: _json_value(item) for key, item in value.items()}
     if isinstance(value, (tuple, list)):
-        return [_value(item) for item in value]
+        return [_json_value(item) for item in value]
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return "0x" + bytes(value).hex()
+    if type(value) is int:
+        return str(value)
     return value
 
 
 class SSZObject:
     """An owned consensus value; every exposed projection is immutable or a copy."""
 
-    def __init__(self, codec: SSZType, value: dict[str, Any] | NativeValue) -> None:
+    def __init__(self, codec: SSZType, value: NativeValue) -> None:
         self._codec = codec
         self._data = value
-
-    @cached_property
-    def _value(self) -> dict[str, Any]:
-        if isinstance(self._data, NativeValue):
-            return cast("dict[str, Any]", self._data.to_obj())
-        return self._data
 
     @property
     def fork(self) -> Fork:
@@ -55,55 +53,29 @@ class SSZObject:
         return self._codec.preset
 
     def to_obj(self) -> dict[str, Any]:
-        return cast("dict[str, Any]", self._codec.to_json(self._data))
+        return cast("dict[str, Any]", msgspec.json.decode(self.to_json()))
 
     def to_json(self) -> bytes:
-        if isinstance(self._data, NativeValue):
-            return self._data.to_json()
-        return msgspec.json.encode(self.to_obj())
-
-    @cached_property
-    def _serialized(self) -> bytes:
-        if isinstance(self._data, NativeValue):
-            return self._data.to_ssz()
-        return self._codec.serialize(self._data)
+        return self._data.to_json()
 
     def to_ssz(self) -> bytes:
-        return self._serialized
-
-    @cached_property
-    def _root(self) -> bytes:
-        if isinstance(self._data, NativeValue):
-            return self._data.hash_tree_root()
-        return self._codec.hash_tree_root_from_ssz(self._serialized)
+        return self._data.to_ssz()
 
     def hash_tree_root(self) -> bytes:
-        return self._root
+        return self._data.hash_tree_root()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SSZObject):
             return NotImplemented
         if self._codec != other._codec:
             return False
-        if isinstance(self._data, dict) and isinstance(other._data, dict):
-            return self._data == other._data
         return self.to_ssz() == other.to_ssz()
 
     def __hash__(self) -> int:
-        return hash((self._codec, self._root))
+        return hash((self._codec, self.hash_tree_root()))
 
     def __repr__(self) -> str:
         return f"{self._codec.name}({self._data!r})"
-
-
-class NativeSSZObject(SSZObject):
-    """Keep large consensus values in SSZ form throughout the proposal path."""
-
-    @property
-    def _native_value(self) -> NativeValue:
-        if not isinstance(self._data, NativeValue):
-            raise TypeError("Expected an SSZ-backed value")
-        return self._data
 
 
 @dataclass(frozen=True)
@@ -116,28 +88,17 @@ class SSZCodec[T: SSZObject]:
         return self.codec.preset
 
     def __call__(self, **fields: Any) -> T:
-        return self.from_json(_value(fields))
+        return self.from_json(fields)
 
     def from_json(self, data: Any, *, wrapped: bool = False) -> T:
         if isinstance(data, msgspec.Raw):
             data = bytes(data)
-        if issubclass(self.value_type, NativeSSZObject):
-            value = (
-                self.codec.load_json(data, wrapped=wrapped)
-                if isinstance(data, (str, bytes, bytearray, memoryview))
-                else self.codec.load_obj(data)
-            )
-            return self.value_type(self.codec, value)
-        if wrapped:
-            raise TypeError("Wrapped JSON is only supported for native values")
-        return self.value_type(self.codec, self.codec.from_json(data))
+        if not isinstance(data, (str, bytes, bytearray, memoryview)):
+            data = msgspec.json.encode(_json_value(data))
+        return self.value_type(self.codec, self.codec.load_json(data, wrapped=wrapped))
 
     def from_ssz(self, data: bytes) -> T:
-        if issubclass(self.value_type, NativeSSZObject):
-            return self.value_type(self.codec, self.codec.load_ssz(data))
-        value = self.value_type(self.codec, self.codec.deserialize(data))
-        value.__dict__["_serialized"] = bytes(data)
-        return value
+        return self.value_type(self.codec, self.codec.load_ssz(data))
 
 
 def bind_type[T: SSZObject](
@@ -153,23 +114,27 @@ def encode_json_array(values: Iterable[SSZObject]) -> bytes:
 class AttestationData(SSZObject):
     @property
     def slot(self) -> int:
-        return cast("int", self._value["slot"])
+        return cast("int", self._data.field("slot"))
 
     @property
     def index(self) -> int:
-        return cast("int", self._value["index"])
+        return cast("int", self._data.field("index"))
 
     @property
     def beacon_block_root(self) -> bytes:
-        return cast("bytes", self._value["beacon_block_root"])
+        return cast("bytes", self._data.field("beacon_block_root"))
 
     @property
     def source(self) -> Checkpoint:
-        return Checkpoint(**self._value["source"])
+        return Checkpoint(
+            epoch=self._data.field("source.epoch"), root=self._data.field("source.root")
+        )
 
     @property
     def target(self) -> Checkpoint:
-        return Checkpoint(**self._value["target"])
+        return Checkpoint(
+            epoch=self._data.field("target.epoch"), root=self._data.field("target.root")
+        )
 
 
 def _bits(data: bytes, length: int) -> tuple[bool, ...]:
@@ -179,31 +144,31 @@ def _bits(data: bytes, length: int) -> tuple[bool, ...]:
 class Attestation(SSZObject):
     @property
     def aggregation_bits(self) -> tuple[bool, ...]:
-        data = self._value["aggregation_bits"]
+        data = self._data.field("aggregation_bits")
         # The highest bit is the SSZ bitlist delimiter, including for Gloas.
         return _bits(data, (len(data) - 1) * 8 + data[-1].bit_length() - 1)
 
     @property
     def committee_bits(self) -> tuple[bool, ...]:
         length = self._codec.schema["fields"]["committee_bits"]["length"]
-        return _bits(self._value["committee_bits"], length)
+        return _bits(self._data.field("committee_bits"), length)
 
 
 class SyncCommitteeContribution(SSZObject):
     @property
     def subcommittee_index(self) -> int:
-        return cast("int", self._value["subcommittee_index"])
+        return cast("int", self._data.field("subcommittee_index"))
 
     @property
     def aggregation_bits(self) -> tuple[bool, ...]:
         length = self._codec.schema["fields"]["aggregation_bits"]["length"]
-        return _bits(self._value["aggregation_bits"], length)
+        return _bits(self._data.field("aggregation_bits"), length)
 
 
-class BeaconBlock(NativeSSZObject):
+class BeaconBlock(SSZObject):
     @cached_property
     def _block_value(self) -> BlockValue:
-        return BlockValue(self._native_value)
+        return BlockValue(self._data)
 
     @property
     def blinded(self) -> bool:
@@ -228,9 +193,9 @@ class BeaconBlock(NativeSSZObject):
         return SSZObject(signed.codec, signed)
 
 
-class ExecutionPayloadEnvelope(NativeSSZObject):
+class ExecutionPayloadEnvelope(SSZObject):
     def sign(self, signature: str | bytes) -> SSZObject:
-        signed = self._native_value.sign(signature)
+        signed = self._data.sign(signature)
         return SSZObject(signed.codec, signed)
 
 

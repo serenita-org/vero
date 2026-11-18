@@ -440,9 +440,9 @@ def _mocked_beacon_node_endpoints(
                 type_name, fork=fork.value, preset=preset_types().preset
             )
             if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                _ = signed_block_type.from_json(kwargs["data"])
+                _ = signed_block_type.load_json(kwargs["data"])
             else:
-                _ = signed_block_type.deserialize(kwargs["data"])
+                _ = signed_block_type.load_ssz(kwargs["data"])
 
             return _json_response()
 
@@ -454,9 +454,9 @@ def _mocked_beacon_node_endpoints(
                 preset=preset_types().preset,
             )
             if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                _ = signed_envelope_type.from_json(kwargs["data"])
+                _ = signed_envelope_type.load_json(kwargs["data"])
             else:
-                _ = signed_envelope_type.deserialize(kwargs["data"])
+                _ = signed_envelope_type.load_ssz(kwargs["data"])
             return _json_response()
 
         if re.match("/eth/v2/beacon/blinded_blocks", url.raw_path):
@@ -478,9 +478,9 @@ def _mocked_beacon_node_endpoints(
                     preset=preset_types().preset,
                 )
                 if headers[CONTENT_TYPE] == ContentType.JSON.value:
-                    _ = signed_block_type.from_json(kwargs["data"])
+                    _ = signed_block_type.load_json(kwargs["data"])
                 else:
-                    _ = signed_block_type.deserialize(kwargs["data"])
+                    _ = signed_block_type.load_ssz(kwargs["data"])
 
             return _json_response()
 
