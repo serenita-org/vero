@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ssz_z import get_type
 
-SIGNED_BLOCK = get_type("SignedBeaconBlock", fork="electra")
+SIGNED_BLOCK = get_type("SignedBeaconBlock", fork="electra", preset="mainnet")
 
 BLOCKS_DIR = Path("/tmp/beacon_blocks")  # noqa: S108
 
