@@ -343,9 +343,7 @@ msgspec==0.22.0 \
     --hash=sha256:f7a923bcde480065c8e25967464cfb2a687ee67000bb43157e2d57e40eca7305 \
     --hash=sha256:fa3689b9dfcc663358ef23ba4299d7460f01108515b041a7d30d05908ac9c32f \
     --hash=sha256:feafe612034d49e9144340c0b5168ee4e22c2af4aaa2c1db11ae84e1aac9543b
-    # via
-    #   ssz-z-python
-    #   vero
+    # via vero
 multidict==7.2.1 \
     --hash=sha256:02009b402129a73e1f3da68f48eb999afbacd29f25aef0d5052b84ff5c2786a2 \
     --hash=sha256:02d9c04d395a36eeebe89e45f2269614a4675b8e83fddcba15bba2be903971e5 \
@@ -711,7 +709,7 @@ pyyaml==6.0.3 \
     --hash=sha256:f7057c9a337546edc7973c0d3ba84ddcdf0daa14533c2065749c9075001090e6 \
     --hash=sha256:fc09d0aa354569bc501d4e787133afc08552722d3ab34836a80547331bb5d4a0
     # via vero
-ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@5788045f1f314e189ec67c2369f6b240d6f8a67e
+ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@403bc4bb7084acfbc4c4a0a9b523bbc25204b923
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \

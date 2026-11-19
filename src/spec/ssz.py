@@ -113,13 +113,15 @@ class AttestationData(SSZObject):
     @property
     def source(self) -> Checkpoint:
         return Checkpoint(
-            epoch=self._data.field("source.epoch"), root=self._data.field("source.root")
+            epoch=cast("int", self._data.field("source.epoch")),
+            root=cast("bytes", self._data.field("source.root")),
         )
 
     @property
     def target(self) -> Checkpoint:
         return Checkpoint(
-            epoch=self._data.field("target.epoch"), root=self._data.field("target.root")
+            epoch=cast("int", self._data.field("target.epoch")),
+            root=cast("bytes", self._data.field("target.root")),
         )
 
 
@@ -130,14 +132,14 @@ def _bits(data: bytes, length: int) -> tuple[bool, ...]:
 class Attestation(SSZObject):
     @property
     def aggregation_bits(self) -> tuple[bool, ...]:
-        data = self._data.field("aggregation_bits")
+        data = cast("bytes", self._data.field("aggregation_bits"))
         # The highest bit is the SSZ bitlist delimiter, including for Gloas.
         return _bits(data, (len(data) - 1) * 8 + data[-1].bit_length() - 1)
 
     @property
     def committee_bits(self) -> tuple[bool, ...]:
         length = self._codec.schema["fields"]["committee_bits"]["length"]
-        return _bits(self._data.field("committee_bits"), length)
+        return _bits(cast("bytes", self._data.field("committee_bits")), length)
 
 
 class SyncCommitteeContribution(SSZObject):
@@ -148,7 +150,7 @@ class SyncCommitteeContribution(SSZObject):
     @property
     def aggregation_bits(self) -> tuple[bool, ...]:
         length = self._codec.schema["fields"]["aggregation_bits"]["length"]
-        return _bits(self._data.field("aggregation_bits"), length)
+        return _bits(cast("bytes", self._data.field("aggregation_bits")), length)
 
 
 class BeaconBlock(SSZObject):

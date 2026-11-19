@@ -58,7 +58,7 @@ required-version = "~=0.13.5"
 exclude-newer = "7 days"
 
 [tool.uv.sources]
-ssz-z-python = { git = "https://github.com/eth2353/ssz-z-python", rev = "5788045f1f314e189ec67c2369f6b240d6f8a67e" }
+ssz-z-python = { git = "https://github.com/eth2353/ssz-z-python", rev = "403bc4bb7084acfbc4c4a0a9b523bbc25204b923" }
 
 [tool.uv.pip]
 generate-hashes = true
