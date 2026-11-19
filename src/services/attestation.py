@@ -536,8 +536,6 @@ class AttestationService(ValidatorDutyService):
         _fork = self.beacon_chain.current_fork
         _sign_and_publish_tasks = []
 
-        agg_and_p_type = preset_types(_fork).aggregate_and_proof
-
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data_root=attestation_data_root,
             slot=slot,
@@ -554,18 +552,16 @@ class AttestationService(ValidatorDutyService):
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
                                 version=self.beacon_chain.current_fork.value.upper(),
                                 data=msgspec.Raw(
-                                    agg_and_p_type.from_json(
-                                        msgspec.json.encode(
-                                            {
-                                                "aggregator_index": duty.validator_index,
-                                                "aggregate": msgspec.Raw(
-                                                    aggregate.to_json()
-                                                ),
-                                                "selection_proof": "0x"
-                                                + duty.selection_proof.hex(),
-                                            }
-                                        )
-                                    ).to_json()
+                                    msgspec.json.encode(
+                                        {
+                                            "aggregator_index": duty.validator_index,
+                                            "aggregate": msgspec.Raw(
+                                                aggregate.to_json()
+                                            ),
+                                            "selection_proof": "0x"
+                                            + duty.selection_proof.hex(),
+                                        }
+                                    )
                                 ),
                             ),
                         )

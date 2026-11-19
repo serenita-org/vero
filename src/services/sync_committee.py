@@ -542,9 +542,6 @@ class SyncCommitteeService(ValidatorDutyService):
 
         _fork_info = self.beacon_chain.get_fork_info(slot=duty_slot)
         _sign_and_publish_tasks = []
-        contr_and_p_type = preset_types(
-            self.beacon_chain.current_fork
-        ).contribution_and_proof
         async for (
             contribution
         ) in self.multi_beacon_node.get_sync_committee_contributions(
@@ -565,18 +562,16 @@ class SyncCommitteeService(ValidatorDutyService):
                             SchemaRemoteSigner.SyncCommitteeContributionAndProofSignableMessage(
                                 fork_info=_fork_info,
                                 contribution_and_proof=msgspec.Raw(
-                                    contr_and_p_type.from_json(
-                                        msgspec.json.encode(
-                                            {
-                                                "aggregator_index": duty.validator_index,
-                                                "contribution": msgspec.Raw(
-                                                    contribution.to_json()
-                                                ),
-                                                "selection_proof": "0x"
-                                                + duty_sp.selection_proof.hex(),
-                                            }
-                                        )
-                                    ).to_json()
+                                    msgspec.json.encode(
+                                        {
+                                            "aggregator_index": duty.validator_index,
+                                            "contribution": msgspec.Raw(
+                                                contribution.to_json()
+                                            ),
+                                            "selection_proof": "0x"
+                                            + duty_sp.selection_proof.hex(),
+                                        }
+                                    )
                                 ),
                             )
                         )
