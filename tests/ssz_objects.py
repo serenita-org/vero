@@ -53,8 +53,6 @@ def make_attestation(**overrides: Any) -> Attestation:
         "committee_bits": bitvector(preset_config["max_committees_per_slot"]),
     }
     value.update(overrides)
-    if isinstance(value["data"], AttestationData):
-        value["data"] = msgspec.Raw(value["data"].to_json())
     return attestation_type.from_json(msgspec.json.encode(value))
 
 
@@ -144,8 +142,10 @@ def make_block_electra_fulu(*, slot: int, blinded: bool) -> BeaconBlock:
         preset=block_types.preset,
     )
     if blinded:
-        return block_type.from_json(block)
-    return block_type.from_json({"block": block, "kzg_proofs": [], "blobs": []})
+        return block_type.from_json(msgspec.json.encode(block))
+    return block_type.from_json(
+        msgspec.json.encode({"block": block, "kzg_proofs": [], "blobs": []})
+    )
 
 
 def _block_body_gloas(*, builder_index: int) -> dict[str, Any]:
@@ -210,7 +210,7 @@ def make_block_gloas(*, slot: int, builder_index: int) -> BeaconBlock:
         fork=Fork.GLOAS,
         preset=preset_types().preset,
     )
-    return block_type.from_json(block)
+    return block_type.from_json(msgspec.json.encode(block))
 
 
 def make_execution_payload_envelope_gloas(
@@ -255,7 +255,7 @@ def make_execution_payload_envelope_gloas(
         "beacon_block_root": beacon_block_root,
         "parent_beacon_block_root": ZERO_ROOT,
     }
-    return envelope_type.from_json(envelope)
+    return envelope_type.from_json(msgspec.json.encode(envelope))
 
 
 def preset_constants() -> dict[str, int]:

@@ -21,22 +21,6 @@ class Checkpoint:
         return f"Checkpoint(epoch={self.epoch}, root=0x{self.root.hex()})"
 
 
-def _json_value(value: Any) -> Any:
-    if isinstance(value, SSZObject):
-        return msgspec.Raw(value.to_json())
-    if isinstance(value, Checkpoint):
-        return {"epoch": str(value.epoch), "root": "0x" + value.root.hex()}
-    if isinstance(value, dict):
-        return {key: _json_value(item) for key, item in value.items()}
-    if isinstance(value, (tuple, list)):
-        return [_json_value(item) for item in value]
-    if isinstance(value, (bytes, bytearray, memoryview)):
-        return "0x" + bytes(value).hex()
-    if type(value) is int:
-        return str(value)
-    return value
-
-
 class SSZObject:
     """An owned consensus value; every exposed projection is immutable or a copy."""
 
@@ -87,14 +71,16 @@ class SSZCodec[T: SSZObject]:
     def preset(self) -> str:
         return self.codec.preset
 
-    def __call__(self, **fields: Any) -> T:
-        return self.from_json(fields)
-
-    def from_json(self, data: Any, *, wrapped: bool = False) -> T:
+    def from_json(
+        self,
+        data: str | bytes | bytearray | memoryview | msgspec.Raw,
+        *,
+        wrapped: bool = False,
+    ) -> T:
         if isinstance(data, msgspec.Raw):
             data = bytes(data)
         if not isinstance(data, (str, bytes, bytearray, memoryview)):
-            data = msgspec.json.encode(_json_value(data))
+            raise TypeError("Expected JSON text or bytes-like data")
         return self.value_type(self.codec, self.codec.load_json(data, wrapped=wrapped))
 
     def from_ssz(self, data: bytes) -> T:

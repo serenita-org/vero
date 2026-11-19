@@ -410,11 +410,15 @@ async def test_get_sync_committee_contribution(
 class TestProducePayloadAttestationData:
     @pytest.fixture
     def payload_data(self) -> PayloadAttestationData:
-        return preset_types(Fork.GLOAS).payload_attestation_data(
-            slot=123,
-            beacon_block_root="0x" + "12" * 32,
-            payload_present=True,
-            blob_data_available=True,
+        return preset_types(Fork.GLOAS).payload_attestation_data.from_json(
+            msgspec.json.encode(
+                {
+                    "slot": str(123),
+                    "beacon_block_root": "0x" + "12" * 32,
+                    "payload_present": True,
+                    "blob_data_available": True,
+                }
+            )
         )
 
     @pytest.fixture
@@ -449,11 +453,15 @@ class TestProducePayloadAttestationData:
         blob_data_available: bool,
     ) -> None:
         first_request, emitter_request, third_request = node_requests
-        emitter_response = preset_types(Fork.GLOAS).payload_attestation_data(
-            slot=123,
-            beacon_block_root="0x" + "12" * 32,
-            payload_present=payload_present,
-            blob_data_available=blob_data_available,
+        emitter_response = preset_types(Fork.GLOAS).payload_attestation_data.from_json(
+            msgspec.json.encode(
+                {
+                    "slot": str(123),
+                    "beacon_block_root": "0x" + "12" * 32,
+                    "payload_present": payload_present,
+                    "blob_data_available": blob_data_available,
+                }
+            )
         )
         emitter_request.return_value = emitter_response
 
@@ -531,11 +539,15 @@ class TestProducePayloadAttestationData:
         node_requests: tuple[AsyncMock, AsyncMock, AsyncMock],
     ) -> None:
         first_request, _, _ = node_requests
-        negative_data = preset_types(Fork.GLOAS).payload_attestation_data(
-            slot=123,
-            beacon_block_root="0x" + "12" * 32,
-            payload_present=False,
-            blob_data_available=False,
+        negative_data = preset_types(Fork.GLOAS).payload_attestation_data.from_json(
+            msgspec.json.encode(
+                {
+                    "slot": str(123),
+                    "beacon_block_root": "0x" + "12" * 32,
+                    "payload_present": False,
+                    "blob_data_available": False,
+                }
+            )
         )
         first_request.return_value = negative_data
 

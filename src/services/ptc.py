@@ -198,10 +198,14 @@ class PtcService(ValidatorDutyService):
             signed_messages.append(
                 preset_types(
                     self.beacon_chain.current_fork
-                ).payload_attestation_message(
-                    validator_index=duty.validator_index,
-                    data=payload_att_data,
-                    signature=sig,
+                ).payload_attestation_message.from_json(
+                    msgspec.json.encode(
+                        {
+                            "validator_index": duty.validator_index,
+                            "data": msgspec.Raw(payload_att_data.to_json()),
+                            "signature": sig,
+                        }
+                    )
                 ),
             )
 

@@ -279,11 +279,15 @@ class AttestationService(ValidatorDutyService):
 
                 duty = pubkey_to_duty[pubkey]
                 signed_attestations_batch.append(
-                    single_attestation_type(
-                        committee_index=int(duty.committee_index),
-                        attester_index=int(duty.validator_index),
-                        data=att_data,
-                        signature=signature,
+                    single_attestation_type.from_json(
+                        msgspec.json.encode(
+                            {
+                                "committee_index": duty.committee_index,
+                                "attester_index": duty.validator_index,
+                                "data": msgspec.Raw(att_data.to_json()),
+                                "signature": signature,
+                            }
+                        )
                     ),
                 )
 
@@ -470,16 +474,16 @@ class AttestationService(ValidatorDutyService):
     ) -> None:
         signed_aggregate_and_proofs: list[SignedAggregateAndProof] = []
         fork_types = preset_types(fork)
-        agg_and_p_type = fork_types.aggregate_and_proof
         s_agg_and_p_type = fork_types.signed_aggregate_and_proof
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
             signed_aggregate_and_proofs.append(
-                s_agg_and_p_type(
-                    message=agg_and_p_type.from_json(msg.aggregate_and_proof.data),
-                    signature=sig,
+                s_agg_and_p_type.from_json(
+                    msgspec.json.encode(
+                        {"message": msg.aggregate_and_proof.data, "signature": sig}
+                    )
                 )
             )
 
@@ -550,10 +554,17 @@ class AttestationService(ValidatorDutyService):
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
                                 version=self.beacon_chain.current_fork.value.upper(),
                                 data=msgspec.Raw(
-                                    agg_and_p_type(
-                                        aggregator_index=int(duty.validator_index),
-                                        aggregate=aggregate,
-                                        selection_proof=duty.selection_proof,
+                                    agg_and_p_type.from_json(
+                                        msgspec.json.encode(
+                                            {
+                                                "aggregator_index": duty.validator_index,
+                                                "aggregate": msgspec.Raw(
+                                                    aggregate.to_json()
+                                                ),
+                                                "selection_proof": "0x"
+                                                + duty.selection_proof.hex(),
+                                            }
+                                        )
                                     ).to_json()
                                 ),
                             ),

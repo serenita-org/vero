@@ -30,7 +30,7 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
         value = msgspec.json.decode(codec.codec.default().to_json())
         value["aggregation_bits"] = bitlist(16, [True] * length)
         value["committee_bits"] = bitvector(committee_length, [True])
-        attestation = codec.from_json(value)
+        attestation = codec.from_json(msgspec.json.encode(value))
         assert len(attestation.aggregation_bits) == length
         assert sum(attestation.aggregation_bits) == length
         assert len(attestation.committee_bits) == committee_length
@@ -46,7 +46,7 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
     value = msgspec.json.decode(sync_codec.codec.default().to_json())
     length = sync_codec.codec.schema["fields"]["aggregation_bits"]["length"]
     value["aggregation_bits"] = bitvector(length, [True] * length)
-    contribution = sync_codec.from_json(value)
+    contribution = sync_codec.from_json(msgspec.json.encode(value))
     assert len(contribution.aggregation_bits) == length
     assert sum(contribution.aggregation_bits) == length
 
@@ -56,9 +56,9 @@ def test_bitfield_projections(preset: Preset, fork: Fork) -> None:
 def test_attestation_values_and_consensus_json(preset: Preset, fork: Fork) -> None:
     codec = bind_type("AttestationData", AttestationData, fork=fork, preset=preset)
     value = msgspec.json.decode(codec.codec.default().to_json())
-    value["slot"] = 2**64 - 1
-    value["source"] = {"epoch": 10, "root": b"\x12" * 32}
-    data = codec(**value)
+    value["slot"] = str(2**64 - 1)
+    value["source"] = {"epoch": "10", "root": "0x" + "12" * 32}
+    data = codec.from_json(msgspec.json.encode(value))
     assert data.slot == 2**64 - 1
     assert data.source == Checkpoint(epoch=10, root=b"\x12" * 32)
     assert data.index == 0
@@ -78,7 +78,7 @@ def test_attestation_values_and_consensus_json(preset: Preset, fork: Fork) -> No
     with pytest.raises(SSZError):
         codec.from_ssz(data.to_ssz()[:-1])
     with pytest.raises(SSZError):
-        codec.from_json({**data.to_obj(), "slot": str(2**64)})
+        codec.from_json(msgspec.json.encode({**data.to_obj(), "slot": str(2**64)}))
 
 
 def _header_root(header: dict[str, str]) -> str:
@@ -114,18 +114,18 @@ def test_block_signing_and_header_roots(preset: Preset, fork: Fork, name: str) -
     codec = bind_type(name, BeaconBlock, fork=fork, preset=preset)
     value = msgspec.json.decode(codec.codec.default().to_json())
     block_value = value["block"] if name == "BeaconBlockContents" else value
-    block_value.update(slot=123, proposer_index=456, parent_root=b"\x12" * 32)
+    block_value.update(slot="123", proposer_index="456", parent_root="0x" + "12" * 32)
     if name == "BeaconBlockContents":
         body = block_value["body"]
-        body["execution_payload"]["transactions"] = [b"\x01\x02\x03"]
-        body["blob_kzg_commitments"] = [b"\x34" * 48]
+        body["execution_payload"]["transactions"] = ["0x010203"]
+        body["blob_kzg_commitments"] = ["0x" + "34" * 48]
         value["blobs"] = [
             msgspec.json.decode(
                 get_type("Blob", fork=fork.value, preset=preset).default().to_json()
             )
         ]
-        value["kzg_proofs"] = [b"\x56" * 48] * (128 if fork is Fork.FULU else 1)
-    block = codec.from_json(value)
+        value["kzg_proofs"] = ["0x" + "56" * 48] * (128 if fork is Fork.FULU else 1)
+    block = codec.from_json(msgspec.json.encode(value))
     value = block.to_obj()
     block_value = value["block"] if name == "BeaconBlockContents" else value
     assert block.slot == 123
@@ -163,9 +163,9 @@ def test_execution_payload_envelope_signing(preset: Preset) -> None:
         preset=preset,
     )
     value = msgspec.json.decode(codec.codec.default().to_json())
-    value["payload"]["transactions"] = [b"\x01\x02\x03"]
-    value["builder_index"] = 2**64 - 1
-    envelope = codec.from_json(value)
+    value["payload"]["transactions"] = ["0x010203"]
+    value["builder_index"] = str(2**64 - 1)
+    envelope = codec.from_json(msgspec.json.encode(value))
     assert codec.from_ssz(envelope.to_ssz()) == envelope
     signed = envelope.sign("0x" + "34" * 96)
     signed_codec = get_type(
@@ -195,10 +195,12 @@ def test_proposal_path_avoids_python_value_conversion(
     codec = bind_type(name, BeaconBlock, fork=fork, preset="minimal")
     value = msgspec.json.decode(codec.codec.default().to_json())
     block = value["block"] if name == "BeaconBlockContents" else value
-    block["slot"] = 123
+    block["slot"] = "123"
     if fork is Fork.GLOAS:
-        block["body"]["signed_execution_payload_bid"]["message"]["builder_index"] = 456
-    encoded_ssz = codec.from_json(value).to_ssz()
+        block["body"]["signed_execution_payload_bid"]["message"]["builder_index"] = (
+            "456"
+        )
+    encoded_ssz = codec.from_json(msgspec.json.encode(value)).to_ssz()
     encoded_json = msgspec.json.encode(
         {
             "version": fork.value,
@@ -226,3 +228,28 @@ def test_proposal_path_avoids_python_value_conversion(
         signed_json = from_json.sign(bytes(96)).to_json()
     signed_codec = get_type("Signed" + name, fork=fork.value, preset="minimal")
     assert signed_codec.load_json(signed_json).to_ssz() == signed_ssz
+
+
+@pytest.mark.parametrize("data", [{}, [], 1, None])
+def test_from_json_rejects_decoded_objects(data: Any) -> None:
+    codec = bind_type(
+        "AttestationData", AttestationData, fork=Fork.GLOAS, preset="minimal"
+    )
+    with pytest.raises(TypeError, match="Expected JSON text or bytes-like data"):
+        codec.from_json(data)
+
+
+def test_from_json_accepts_wire_representations() -> None:
+    codec = bind_type(
+        "AttestationData", AttestationData, fork=Fork.GLOAS, preset="minimal"
+    )
+    value = codec.from_ssz(codec.codec.default().to_ssz())
+    encoded = value.to_json()
+    for data in (
+        encoded,
+        encoded.decode(),
+        bytearray(encoded),
+        memoryview(encoded),
+        msgspec.Raw(encoded),
+    ):
+        assert codec.from_json(data) == value

@@ -207,11 +207,15 @@ def _mocked_beacon_node_endpoints(
         if re.match("/eth/v1/validator/payload_attestation_data", url.raw_path):
             payload_attestation_data = preset_types(
                 Fork.GLOAS
-            ).payload_attestation_data(
-                beacon_block_root="0x" + os.urandom(32).hex(),
-                slot=int(url.query["slot"]),
-                payload_present=True,
-                blob_data_available=True,
+            ).payload_attestation_data.from_json(
+                msgspec.json.encode(
+                    {
+                        "beacon_block_root": "0x" + os.urandom(32).hex(),
+                        "slot": url.query["slot"],
+                        "payload_present": True,
+                        "blob_data_available": True,
+                    }
+                )
             )
             return _json_response(
                 _data_response(
