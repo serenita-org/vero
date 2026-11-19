@@ -43,17 +43,10 @@ from typing import TYPE_CHECKING, Any, Self, cast
 
 import msgspec
 from opentelemetry import trace
-from spy_ssz import (
-    Fork,
-    ObjectKind,
-    Preset,
-    encode_json_array,
-    get_ssz_type,
-)
 
 from observability import ErrorType
 from schemas import SchemaBeaconAPI, SchemaShared, SchemaValidator
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from spec import (
     Attestation,
     AttestationData,
@@ -69,6 +62,7 @@ from spec import (
 )
 from spec.configs import Network
 from spec.preset import PayloadAttestationMessage
+from spec.ssz import bind_type, encode_json_array
 
 from ._headers import ContentType
 from .beacon_node import BeaconNode
@@ -309,34 +303,23 @@ class MultiBeaconNode:
         ),
         content_type: ContentType,
     ) -> BeaconBlock:
-        # TODO perf
-        #  profiling indicates this function takes a bit of time
-        #  Maybe we don't need to actually fully parse the full block though?
-        #  (similar thing applies to to_obj when publishing the block).
-        #  (No need to SSZ (de)serialize all of it)
-        #  Another idea - add the param local_blinded / blinded_local
-        #  to the request, that way all returned blocks are blinded
-        #  and much smaller! See https://github.com/ChainSafe/lodestar/issues/6219
-        #  (probably not all CLs support this but still...)
-        #  That would help a bit since we wouldn't be deserializing
-        #  the execution payload - transactions.
-
         try:
-            object_kind = ObjectKind.BEACON_BLOCK
+            name = "BeaconBlock"
             if isinstance(response, SchemaBeaconAPI.ProduceBlockV3Response):
-                object_kind = (
-                    ObjectKind.BLINDED_BEACON_BLOCK
+                name = (
+                    "BlindedBeaconBlock"
                     if response.execution_payload_blinded
-                    else ObjectKind.BEACON_BLOCK_CONTENTS
+                    else "BeaconBlockContents"
                 )
-            block_cls = get_ssz_type(
-                Fork[response.version.name],
-                object_kind,
-                Preset[preset_types().preset.upper()],
+            block_codec = bind_type(
+                name,
+                BeaconBlock,
+                fork=response.version,
+                preset=preset_types().preset,
             )
             if content_type == ContentType.JSON:
-                return cast("BeaconBlock", block_cls.from_json(response.data))
-            return cast("BeaconBlock", block_cls.from_ssz(response.data))
+                return block_codec.from_json(response.data, wrapped=True)
+            return block_codec.from_ssz(response.data)
         except (KeyError, NotImplementedError) as e:
             raise ValueError(
                 f"Unsupported block version {response.version} in response {response}"
@@ -349,7 +332,7 @@ class MultiBeaconNode:
         builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         soft_timeout: float,
     ) -> tuple[
         SchemaBeaconAPI.ProduceBlockV3Response | SchemaBeaconAPI.ProduceBlockV4Response,
@@ -374,7 +357,7 @@ class MultiBeaconNode:
             beacon_nodes_to_use = self.beacon_nodes_proposal
 
         tasks: set[asyncio.Task[Any]]
-        if fork_version in (ForkVersion.ELECTRA, ForkVersion.FULU):
+        if fork in (Fork.ELECTRA, Fork.FULU):
             tasks = {
                 asyncio.create_task(
                     bn.produce_block_v3(
@@ -386,7 +369,7 @@ class MultiBeaconNode:
                 )
                 for bn in beacon_nodes_to_use
             }
-        elif fork_version == ForkVersion.GLOAS:
+        elif fork == Fork.GLOAS:
             request_body: (
                 SchemaShared.SignedExecutionPayloadBid | SchemaBeaconAPI.BuilderConfig
             )
@@ -404,13 +387,13 @@ class MultiBeaconNode:
                         encoded_request_body=encoded_request_body,
                         builder_config=builder_config,
                         signed_payload_bid=signed_payload_bid,
-                        fork_version=fork_version,
+                        fork=fork,
                     ),
                 )
                 for bn in beacon_nodes_to_use
             }
         else:
-            raise NotImplementedError(f"Unsupported fork version {fork_version=}")
+            raise NotImplementedError(f"Unsupported fork {fork=}")
         pending = tasks
 
         best_block_value = -1
@@ -506,7 +489,7 @@ class MultiBeaconNode:
         builder_config: SchemaBeaconAPI.BuilderConfig,
         randao_reveal: str,
         signed_payload_bid: SchemaShared.SignedExecutionPayloadBid | None,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         soft_timeout: float,
     ) -> tuple[BeaconBlock, BeaconNode, str | None]:
         best_block_response, content_type, beacon_node = await self._produce_best_block(
@@ -515,7 +498,7 @@ class MultiBeaconNode:
             builder_config=builder_config,
             randao_reveal=randao_reveal,
             signed_payload_bid=signed_payload_bid,
-            fork_version=fork_version,
+            fork=fork,
             soft_timeout=soft_timeout,
         )
 
@@ -700,12 +683,12 @@ class MultiBeaconNode:
     async def publish_attestations(
         self,
         attestations: list[SingleAttestation],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_attestations",
             encoded_attestations=encode_json_array(attestations),
-            fork_version=fork_version,
+            fork=fork,
         )
 
     async def get_aggregate_attestation_v2(
@@ -769,13 +752,13 @@ class MultiBeaconNode:
     async def publish_aggregate_and_proofs(
         self,
         signed_aggregate_and_proofs: list[SignedAggregateAndProof],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         encoded = encode_json_array(signed_aggregate_and_proofs)
         await self._get_all_beacon_node_responses(
             func_name="publish_aggregate_and_proofs",
             encoded_signed_aggregate_and_proofs=encoded,
-            fork_version=fork_version,
+            fork=fork,
         )
 
     async def get_sync_duties(
@@ -900,10 +883,10 @@ class MultiBeaconNode:
     async def publish_payload_attestation_messages(
         self,
         messages: list[PayloadAttestationMessage],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         await self._get_all_beacon_node_responses(
             func_name="publish_payload_attestation_messages",
             encoded_messages=encode_json_array(messages),
-            fork_version=fork_version,
+            fork=fork,
         )

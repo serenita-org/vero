@@ -10,7 +10,6 @@ from uuid import uuid4
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from spy_ssz import Fork
 
 from observability import ErrorType, HandledRuntimeError
 from providers import AttestationDataProvider
@@ -123,7 +122,7 @@ class AttestationService(ValidatorDutyService):
         # Schedule attestation job at the attestation deadline in case
         # it is not triggered earlier by a new HeadV2Event,
         # aiming to attest self._attestation_due_s into the slot at the latest.
-        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork == SchemaShared.Fork.GLOAS:
             attestation_due_s = self._attestation_due_s_gloas
         else:
             attestation_due_s = self._attestation_due_s
@@ -250,7 +249,7 @@ class AttestationService(ValidatorDutyService):
             for duty in duties
         ]
         single_attestation_type = preset_types(
-            Fork[self.beacon_chain.current_fork_version.name]
+            self.beacon_chain.current_fork
         ).single_attestation
         async for (
             is_slow_batch,
@@ -280,11 +279,15 @@ class AttestationService(ValidatorDutyService):
 
                 duty = pubkey_to_duty[pubkey]
                 signed_attestations_batch.append(
-                    single_attestation_type(
-                        committee_index=int(duty.committee_index),
-                        attester_index=int(duty.validator_index),
-                        data=att_data,
-                        signature=signature,
+                    single_attestation_type.from_json(
+                        msgspec.json.encode(
+                            {
+                                "committee_index": duty.committee_index,
+                                "attester_index": duty.validator_index,
+                                "data": msgspec.Raw(att_data.to_json()),
+                                "signature": signature,
+                            }
+                        )
                     ),
                 )
 
@@ -307,7 +310,7 @@ class AttestationService(ValidatorDutyService):
         try:
             await self.multi_beacon_node.publish_attestations(
                 attestations=signed_attestations,
-                fork_version=self.beacon_chain.current_fork_version,
+                fork=self.beacon_chain.current_fork,
             )
         except Exception as e:
             self.logger.exception(
@@ -431,7 +434,7 @@ class AttestationService(ValidatorDutyService):
         aggregator_duties: list[SchemaBeaconAPI.AttesterDutyWithSelectionProof],
     ) -> None:
         # Schedule aggregated attestation
-        if self.beacon_chain.current_fork_version == SchemaShared.ForkVersion.GLOAS:
+        if self.beacon_chain.current_fork == SchemaShared.Fork.GLOAS:
             aggregate_due_s = self._aggregate_due_s_gloas
         else:
             aggregate_due_s = self._aggregate_due_s
@@ -467,20 +470,20 @@ class AttestationService(ValidatorDutyService):
         slot: int,
         messages: list[SchemaRemoteSigner.AggregateAndProofV2SignableMessage],
         identifiers: list[str],
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         signed_aggregate_and_proofs: list[SignedAggregateAndProof] = []
-        fork_types = preset_types(Fork[fork_version.name])
-        agg_and_p_type = fork_types.aggregate_and_proof
+        fork_types = preset_types(fork)
         s_agg_and_p_type = fork_types.signed_aggregate_and_proof
         for msg, sig, _identifier in await self.signature_provider.sign_in_batches(
             messages=messages,
             identifiers=identifiers,
         ):
             signed_aggregate_and_proofs.append(
-                s_agg_and_p_type(
-                    message=agg_and_p_type.from_json(msg.aggregate_and_proof.data),
-                    signature=sig,
+                s_agg_and_p_type.from_json(
+                    msgspec.json.encode(
+                        {"message": msg.aggregate_and_proof.data, "signature": sig}
+                    )
                 )
             )
 
@@ -491,7 +494,7 @@ class AttestationService(ValidatorDutyService):
         try:
             await self.multi_beacon_node.publish_aggregate_and_proofs(
                 signed_aggregate_and_proofs=signed_aggregate_and_proofs,
-                fork_version=fork_version,
+                fork=fork,
             )
             self.metrics.vc_published_aggregate_attestations_c.inc(
                 amount=len(signed_aggregate_and_proofs),
@@ -530,10 +533,8 @@ class AttestationService(ValidatorDutyService):
         )
 
         _fork_info = self.beacon_chain.get_fork_info(slot=slot)
-        _fork_version = self.beacon_chain.current_fork_version
+        _fork = self.beacon_chain.current_fork
         _sign_and_publish_tasks = []
-
-        agg_and_p_type = preset_types(Fork[_fork_version.name]).aggregate_and_proof
 
         async for aggregate in self.multi_beacon_node.get_aggregate_attestations_v2(
             attestation_data_root=attestation_data_root,
@@ -549,13 +550,18 @@ class AttestationService(ValidatorDutyService):
                         SchemaRemoteSigner.AggregateAndProofV2SignableMessage(
                             fork_info=_fork_info,
                             aggregate_and_proof=SchemaRemoteSigner.AggregateAndProofV2(
-                                version=self.beacon_chain.current_fork_version.value.upper(),
+                                version=self.beacon_chain.current_fork.value.upper(),
                                 data=msgspec.Raw(
-                                    agg_and_p_type(
-                                        aggregator_index=int(duty.validator_index),
-                                        aggregate=aggregate,
-                                        selection_proof=duty.selection_proof,
-                                    ).to_json()
+                                    msgspec.json.encode(
+                                        {
+                                            "aggregator_index": duty.validator_index,
+                                            "aggregate": msgspec.Raw(
+                                                aggregate.to_json()
+                                            ),
+                                            "selection_proof": "0x"
+                                            + duty.selection_proof.hex(),
+                                        }
+                                    )
                                 ),
                             ),
                         )
@@ -568,7 +574,7 @@ class AttestationService(ValidatorDutyService):
                         slot=slot,
                         messages=messages,
                         identifiers=identifiers,
-                        fork_version=_fork_version,
+                        fork=_fork,
                     )
                 )
             )

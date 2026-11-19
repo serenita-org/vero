@@ -5,7 +5,7 @@ import pytest
 from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ValidatorStatus
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from schemas.validator import ValidatorIndexPubkey
 from services import PtcService
 
@@ -18,11 +18,11 @@ async def test_update_duties(ptc_service: PtcService) -> None:
 
 
 @pytest.mark.parametrize(
-    "fork_version",
+    "fork",
     [
-        pytest.param(ForkVersion.ELECTRA, id="Electra"),
-        pytest.param(ForkVersion.FULU, id="Fulu"),
-        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+        pytest.param(Fork.ELECTRA, id="Electra"),
+        pytest.param(Fork.FULU, id="Fulu"),
+        pytest.param(Fork.GLOAS, id="Gloas"),
     ],
     indirect=True,
 )
@@ -38,7 +38,7 @@ async def test_attest_if_not_yet_attested(
     ptc_service: PtcService,
     beacon_chain: BeaconChain,
     validators: list[ValidatorIndexPubkey],
-    fork_version: ForkVersion,
+    fork: Fork,
     enable_keymanager_api: bool,
     vero: Vero,
     caplog: pytest.LogCaptureFixture,

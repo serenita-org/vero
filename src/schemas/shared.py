@@ -3,7 +3,7 @@ from enum import Enum
 import msgspec
 
 
-class ForkVersion(Enum):
+class Fork(Enum):
     ELECTRA = "electra"
     FULU = "fulu"
     GLOAS = "gloas"

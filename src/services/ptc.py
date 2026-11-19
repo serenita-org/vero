@@ -7,7 +7,6 @@ from typing import Self, Unpack
 
 import msgspec
 from apscheduler.jobstores.base import JobLookupError
-from spy_ssz import Fork
 
 from observability import ErrorType
 from providers import BeaconNode
@@ -166,7 +165,14 @@ class PtcService(ValidatorDutyService):
         # Sign and publish as signed messages become available.
         message = SchemaRemoteSigner.PayloadAttestationSignableMessage(
             fork_info=self.beacon_chain.get_fork_info(slot=slot),
-            payload_attestation_message=msgspec.Raw(payload_att_data.to_json()),
+            payload_attestation_message=msgspec.Raw(
+                msgspec.json.encode(
+                    {
+                        "version": payload_att_data.fork.value,
+                        "data": msgspec.Raw(payload_att_data.to_json()),
+                    }
+                )
+            ),
         )
         signing_coros = [
             self.signature_provider.sign(
@@ -191,17 +197,21 @@ class PtcService(ValidatorDutyService):
             duty = pubkey_to_duty[pubkey]
             signed_messages.append(
                 preset_types(
-                    Fork[self.beacon_chain.current_fork_version.name]
-                ).payload_attestation_message(
-                    validator_index=duty.validator_index,
-                    data=payload_att_data,
-                    signature=sig,
+                    self.beacon_chain.current_fork
+                ).payload_attestation_message.from_json(
+                    msgspec.json.encode(
+                        {
+                            "validator_index": duty.validator_index,
+                            "data": msgspec.Raw(payload_att_data.to_json()),
+                            "signature": sig,
+                        }
+                    )
                 ),
             )
 
         await self.multi_beacon_node.publish_payload_attestation_messages(
             messages=signed_messages,
-            fork_version=self.beacon_chain.current_fork_version,
+            fork=self.beacon_chain.current_fork,
         )
         self.logger.info(
             f"Published PTC attestations for slot {slot}, count: {len(signed_messages)}",

@@ -15,7 +15,7 @@ from typing import Any, Self
 import msgspec
 
 from schemas.shared import (
-    ForkVersion,
+    Fork,
     SignedBuilderRequestAuth,
     SignedExecutionPayloadBid,
 )
@@ -84,7 +84,7 @@ class SubscribeToSyncCommitteeSubnetRequestBody(msgspec.Struct):
 
 
 class GetAggregatedAttestationV2Response(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     data: msgspec.Raw
 
 
@@ -177,7 +177,7 @@ class GetPtcDutiesResponse(ExecutionOptimisticResponse):
 
 # Block production
 class ProduceBlockV3Response(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     execution_payload_blinded: bool
     execution_payload_value: str
     consensus_block_value: str
@@ -207,7 +207,7 @@ class BuilderPreferencesEntry(msgspec.Struct):
 
 
 class ProduceBlockV4Response(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     execution_payload_included: bool
     execution_payload_value: str
     consensus_block_value: str
@@ -216,7 +216,7 @@ class ProduceBlockV4Response(msgspec.Struct):
 
 
 class GetExecutionPayloadEnvelopeResponse(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     data: bytes
 
 
@@ -249,7 +249,7 @@ class HeadV2EventData(msgspec.Struct):
 
 
 class HeadV2Event(BeaconNodeEvent):
-    version: ForkVersion
+    version: Fork
     data: HeadV2EventData
 
     @property
@@ -314,7 +314,7 @@ class ProposerSlashingEvent(BeaconNodeEvent):
 
 
 class ExecutionPayloadBidEvent(BeaconNodeEvent):
-    version: ForkVersion
+    version: Fork
     data: SignedExecutionPayloadBid
 
     @property
@@ -331,7 +331,7 @@ class PayloadAttributesData(msgspec.Struct):
 
 
 class PayloadAttributes(msgspec.Struct):
-    version: ForkVersion
+    version: Fork
     data: PayloadAttributesData
 
 

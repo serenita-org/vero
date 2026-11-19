@@ -50,19 +50,19 @@ def _create_bid(
             [
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=123),
                     ),
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=234),
                     ),
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=321),
                     ),
                 ),
@@ -98,7 +98,7 @@ def _create_bid(
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=123),
                     ),
                 ),
@@ -128,21 +128,21 @@ def _create_bid(
             [
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=4),
                     ),
                     delay=0.2,
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=5),
                     ),
                     delay=0.2,
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=1),
                     ),
                     delay=0.1,
@@ -155,21 +155,21 @@ def _create_bid(
             [
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=1),
                     ),
                     delay=0.21,
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=2),
                     ),
                     delay=0.21,
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=3),
                     ),
                     delay=0.21,
@@ -182,19 +182,19 @@ def _create_bid(
             [
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=2),
                     ),
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=3),
                     ),
                 ),
                 BuilderResponse(
                     response=SchemaBuilderAPI.GetExecutionPayloadBidResponse(
-                        version=SchemaShared.ForkVersion.GLOAS,
+                        version=SchemaShared.Fork.GLOAS,
                         data=_create_bid(value=1, execution_payment=3),
                     ),
                 ),
@@ -267,7 +267,7 @@ async def test_bid_selection_builders(
         parent_hash="0x" + "aa" * 32,
         parent_root="0x" + "bb" * 32,
         proposer_pubkey="0x9abc",
-        fork_version=beacon_chain.current_fork_version,
+        fork=beacon_chain.current_fork,
         soft_timeout=0.1,
         hard_timeout=0.2,
     )

@@ -163,7 +163,7 @@ class BidSelector:
             parent_hash=payload_attributes_data.parent_block_hash,
             parent_root=payload_attributes_data.parent_block_root,
             proposer_pubkey=proposer_duty.pubkey,
-            fork_version=self.beacon_chain.current_fork_version,
+            fork=self.beacon_chain.current_fork,
             soft_timeout=self._get_bid_soft_timeout,
             hard_timeout=self._get_bid_soft_timeout + 0.1,
         )
