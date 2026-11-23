@@ -1352,7 +1352,7 @@ rpds-py==2026.9.1 \
     # via
     #   jsonschema
     #   referencing
-ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@403bc4bb7084acfbc4c4a0a9b523bbc25204b923
+ssz-z-python @ git+https://github.com/eth2353/ssz-z-python@ffc6d14ddf524ab3c66391e7f9c836f0995a1f1a
     # via vero
 typing-extensions==4.16.0 \
     --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8 \
