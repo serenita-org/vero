@@ -23,6 +23,7 @@ def load_spec(cli_args: CLIArgs) -> SpecGloas:
     spec, preset = get_network_spec(
         network=cli_args.network,
         network_custom_config_path=cli_args.network_custom_config_path,
+        ignore_spec_mismatch=cli_args.ignore_spec_mismatch,
     )
     initialize_preset(preset)
 
