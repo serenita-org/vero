@@ -73,14 +73,10 @@ class SSZCodec[T: SSZObject]:
 
     def from_json(
         self,
-        data: bytes | bytearray | memoryview | msgspec.Raw,
+        data: bytes | bytearray | memoryview,
         *,
         wrapped: bool = False,
     ) -> T:
-        if isinstance(data, msgspec.Raw):
-            data = bytes(data)
-        if not isinstance(data, (bytes, bytearray, memoryview)):
-            raise TypeError("Expected bytes-like JSON data")
         return self.value_type(self.codec, self.codec.load_json(data, wrapped=wrapped))
 
     def from_ssz(self, data: bytes) -> T:

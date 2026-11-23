@@ -267,12 +267,7 @@ def _mocked_beacon_node_endpoints(
             )
 
             return _json_response(
-                msgspec.json.encode(
-                    SchemaBeaconAPI.GetAggregatedAttestationV2Response(
-                        version=fork,
-                        data=msgspec.Raw(aggregate_attestation.to_json()),
-                    )
-                ),
+                _data_response(aggregate_attestation.to_json(), version=fork.value),
                 headers={ETH_CONSENSUS_VERSION: fork.value},
             )
 
@@ -553,7 +548,7 @@ def _mocked_beacon_node_endpoints(
                     kwargs["data"], type=list[msgspec.Raw]
                 )
                 attestation = preset_types().single_attestation.from_json(
-                    attestations[0]
+                    bytes(attestations[0])
                 )
             else:
                 raise NotImplementedError(

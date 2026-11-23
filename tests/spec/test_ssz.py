@@ -230,12 +230,12 @@ def test_proposal_path_avoids_python_value_conversion(
     assert signed_codec.load_json(signed_json).to_ssz() == signed_ssz
 
 
-@pytest.mark.parametrize("data", [{}, [], 1, None, "{}"])
+@pytest.mark.parametrize("data", [{}, [], 1, None, msgspec.Raw(b"{}")])
 def test_from_json_rejects_unsupported_inputs(data: Any) -> None:
     codec = bind_type(
         "AttestationData", AttestationData, fork=Fork.GLOAS, preset="minimal"
     )
-    with pytest.raises(TypeError, match="Expected bytes-like JSON data"):
+    with pytest.raises(TypeError, match="SSZ data must be bytes-like"):
         codec.from_json(data)
 
 
@@ -245,10 +245,5 @@ def test_from_json_accepts_wire_representations() -> None:
     )
     value = codec.from_ssz(codec.codec.default().to_ssz())
     encoded = value.to_json()
-    for data in (
-        encoded,
-        bytearray(encoded),
-        memoryview(encoded),
-        msgspec.Raw(encoded),
-    ):
+    for data in (encoded, bytearray(encoded), memoryview(encoded)):
         assert codec.from_json(data) == value

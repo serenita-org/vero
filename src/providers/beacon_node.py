@@ -321,11 +321,10 @@ class BeaconNode(ApiClient):
             ),
         )
 
-        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
         return (
             self.netloc,
             preset_types(self._fork_for_slot(slot)).attestation_data.from_json(
-                response.data
+                resp_bytes, wrapped=True
             ),
         )
 
@@ -562,12 +561,8 @@ class BeaconNode(ApiClient):
             ),
         )
 
-        response = msgspec.json.decode(
-            resp_bytes, type=SchemaBeaconAPI.GetAggregatedAttestationV2Response
-        )
-
         att = preset_types(self._fork_for_slot(slot)).attestation.from_json(
-            response.data
+            resp_bytes, wrapped=True
         )
 
         self.metrics.beacon_node_aggregate_attestation_participant_count_h.labels(
@@ -607,10 +602,9 @@ class BeaconNode(ApiClient):
             ),
         )
 
-        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
         contribution = preset_types(
             self._fork_for_slot(slot)
-        ).sync_committee_contribution.from_json(response.data)
+        ).sync_committee_contribution.from_json(resp_bytes, wrapped=True)
         self.metrics.beacon_node_sync_contribution_participant_count_h.labels(
             netloc=self.netloc
         ).observe(sum(contribution.aggregation_bits))
@@ -640,10 +634,9 @@ class BeaconNode(ApiClient):
             # Used to signal validator to not cast any payload attestation.
             return None
 
-        response = msgspec.json.decode(resp_bytes, type=SchemaBeaconAPI.RawDataResponse)
         return preset_types(
             self._fork_for_slot(slot)
-        ).payload_attestation_data.from_json(response.data)
+        ).payload_attestation_data.from_json(resp_bytes, wrapped=True)
 
     async def publish_payload_attestation_messages(
         self,

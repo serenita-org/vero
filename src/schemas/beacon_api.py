@@ -83,15 +83,6 @@ class SubscribeToSyncCommitteeSubnetRequestBody(msgspec.Struct):
     until_epoch: str
 
 
-class GetAggregatedAttestationV2Response(msgspec.Struct):
-    version: Fork
-    data: msgspec.Raw
-
-
-class RawDataResponse(msgspec.Struct):
-    data: msgspec.Raw
-
-
 # Duty endpoints responses
 class ProposerDuty(msgspec.Struct, frozen=True):
     pubkey: str
