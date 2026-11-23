@@ -132,14 +132,14 @@ class Builder(ApiClient):
         self,
         slot: int,
         proposer_pubkey: str,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         if self.bid_selection_disabled:
             return
 
         endpoint = "/eth/v1/builder/builder_preferences/{proposer_pubkey}"
         headers = {
-            ETH_CONSENSUS_VERSION: fork_version.value,
+            ETH_CONSENSUS_VERSION: fork.value,
         }
 
         data = SchemaBuilderAPI.BuilderPreferencesRequest(
@@ -168,7 +168,7 @@ class Builder(ApiClient):
         parent_hash: str,
         parent_root: str,
         proposer_pubkey: str,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         soft_timeout: float,
         hard_timeout: float,
     ) -> tuple[Self, SchemaShared.SignedExecutionPayloadBid] | None:
@@ -202,7 +202,7 @@ class Builder(ApiClient):
                 return None
 
             headers = {
-                ETH_CONSENSUS_VERSION: fork_version.value,
+                ETH_CONSENSUS_VERSION: fork.value,
                 DATE_MILLISECONDS: str(time_ns() // 1_000_000),
                 X_TIMEOUT_MS: str(int(soft_timeout * 1_000)),
             }
@@ -234,9 +234,9 @@ class Builder(ApiClient):
             bid_response = msgspec.json.decode(
                 resp_bytes, type=SchemaBuilderAPI.GetExecutionPayloadBidResponse
             )
-            if bid_response.version != fork_version:
+            if bid_response.version != fork:
                 raise ValueError(
-                    f"Fork version mismatch in bid from {self.base_url}: {bid_response.version} != {fork_version}"
+                    f"Fork mismatch in bid from {self.base_url}: {bid_response.version} != {fork}"
                 )
 
             bid = bid_response.data
@@ -288,13 +288,13 @@ class Builder(ApiClient):
 
     async def submit_signed_beacon_block(
         self,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         data: bytes,
         content_type: ContentType,
     ) -> None:
         endpoint = "/eth/v1/builder/beacon_blocks"
         headers = {
-            ETH_CONSENSUS_VERSION: fork_version.value,
+            ETH_CONSENSUS_VERSION: fork.value,
             CONTENT_TYPE: content_type.value,
         }
         try:
@@ -372,14 +372,14 @@ class MultiBuilder:
         self,
         slot: int,
         proposer_pubkey: str,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
     ) -> None:
         results = await asyncio.gather(
             *(
                 b.submit_builder_preferences(
                     slot=slot,
                     proposer_pubkey=proposer_pubkey,
-                    fork_version=fork_version,
+                    fork=fork,
                 )
                 for b in self.builders
             ),
@@ -403,7 +403,7 @@ class MultiBuilder:
         parent_hash: str,
         parent_root: str,
         proposer_pubkey: str,
-        fork_version: SchemaShared.ForkVersion,
+        fork: SchemaShared.Fork,
         soft_timeout: float,
         hard_timeout: float,
     ) -> tuple[Builder, SchemaShared.SignedExecutionPayloadBid] | None:
@@ -421,7 +421,7 @@ class MultiBuilder:
         if len(self.builders) == 0:
             return None
 
-        if fork_version != SchemaShared.ForkVersion.GLOAS:
+        if fork != SchemaShared.Fork.GLOAS:
             raise NotImplementedError
 
         with self.tracer.start_as_current_span(
@@ -435,7 +435,7 @@ class MultiBuilder:
                         parent_hash=parent_hash,
                         parent_root=parent_root,
                         proposer_pubkey=proposer_pubkey,
-                        fork_version=fork_version,
+                        fork=fork,
                         soft_timeout=soft_timeout,
                         hard_timeout=hard_timeout,
                     )

@@ -9,7 +9,7 @@ import pytest
 
 from main import main
 from providers import Vero
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 
 
 @pytest.fixture
@@ -44,30 +44,30 @@ def _profile_program_run() -> Generator[None, None, None]:
     indirect=True,
 )
 @pytest.mark.parametrize(
-    ("fork_version", "return_self_built_payload"),
+    ("fork", "return_self_built_payload"),
     [
         pytest.param(
-            ForkVersion.ELECTRA,
+            Fork.ELECTRA,
             False,
             id="Electra",
         ),
         pytest.param(
-            ForkVersion.FULU,
+            Fork.FULU,
             False,
             id="Fulu",
         ),
         pytest.param(
-            ForkVersion.GLOAS,
+            Fork.GLOAS,
             False,
             id="Gloas-External-builder-payload",
         ),
         pytest.param(
-            ForkVersion.GLOAS,
+            Fork.GLOAS,
             True,
             id="Gloas-Self-built-payload",
         ),
     ],
-    indirect=["fork_version", "return_self_built_payload"],
+    indirect=["fork", "return_self_built_payload"],
 )
 @pytest.mark.usefixtures("_mocked_beacon_node_endpoints")
 @pytest.mark.usefixtures("_mocked_remote_signer_endpoints")
@@ -76,7 +76,7 @@ def _profile_program_run() -> Generator[None, None, None]:
 async def test_lifecycle(
     vero: Vero,
     enable_keymanager_api: bool,
-    fork_version: ForkVersion,
+    fork: Fork,
     return_self_built_payload: bool,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -110,7 +110,7 @@ async def test_lifecycle(
             ]
         )
 
-        if fork_version == ForkVersion.GLOAS:
+        if fork == Fork.GLOAS:
             required_log_lines.append("Published PTC attestations for slot")
             if return_self_built_payload:
                 required_log_lines.append("Published payload envelope for slot")

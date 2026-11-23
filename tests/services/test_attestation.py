@@ -6,7 +6,7 @@ import pytest
 from providers import BeaconChain, Vero
 from schemas import SchemaBeaconAPI
 from schemas.beacon_api import ValidatorStatus
-from schemas.shared import ForkVersion
+from schemas.shared import Fork
 from schemas.validator import ValidatorIndexPubkey
 from services import AttestationService
 from tests.ssz_objects import make_attestation_data
@@ -144,11 +144,11 @@ async def test_update_duties_refreshes_due_soon_first_without_emptying_slot(
 
 
 @pytest.mark.parametrize(
-    "fork_version",
+    "fork",
     [
-        pytest.param(ForkVersion.ELECTRA, id="Electra"),
-        pytest.param(ForkVersion.FULU, id="Fulu"),
-        pytest.param(ForkVersion.GLOAS, id="Gloas"),
+        pytest.param(Fork.ELECTRA, id="Electra"),
+        pytest.param(Fork.FULU, id="Fulu"),
+        pytest.param(Fork.GLOAS, id="Gloas"),
     ],
     indirect=True,
 )
@@ -164,7 +164,7 @@ async def test_attest_if_not_yet_attested(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
     validators: list[ValidatorIndexPubkey],
-    fork_version: ForkVersion,
+    fork: Fork,
     enable_keymanager_api: bool,
     vero: Vero,
     caplog: pytest.LogCaptureFixture,
@@ -231,10 +231,10 @@ async def test_attest_to_invalid_slot(
 
 
 @pytest.mark.parametrize(
-    "fork_version",
+    "fork",
     [
-        pytest.param(ForkVersion.ELECTRA, id="Electra"),
-        pytest.param(ForkVersion.FULU, id="Fulu"),
+        pytest.param(Fork.ELECTRA, id="Electra"),
+        pytest.param(Fork.FULU, id="Fulu"),
     ],
     indirect=True,
 )
@@ -249,7 +249,7 @@ async def test_attest_to_invalid_slot(
 async def test_aggregate_attestations(
     attestation_service: AttestationService,
     beacon_chain: BeaconChain,
-    fork_version: ForkVersion,
+    fork: Fork,
     enable_keymanager_api: bool,
     validators: list[ValidatorIndexPubkey],
     vero: Vero,

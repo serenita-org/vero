@@ -44,7 +44,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -61,7 +61,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -78,7 +78,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(120),
                                 consensus_block_value=str(50),
@@ -102,7 +102,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -119,7 +119,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -153,7 +153,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(100),
                                 consensus_block_value=str(50),
@@ -234,7 +234,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(150),
                                 consensus_block_value=str(50),
@@ -251,7 +251,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(200),
                                 consensus_block_value=str(50),
@@ -268,7 +268,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value=str(1000),
                                 consensus_block_value=str(500),
@@ -292,7 +292,7 @@ class BeaconNodeResponseSequence(TypedDict):
                     responses=[
                         BeaconNodeResponse(
                             response=SchemaBeaconAPI.ProduceBlockV4Response(
-                                version=SchemaShared.ForkVersion.GLOAS,
+                                version=SchemaShared.Fork.GLOAS,
                                 execution_payload_included=False,
                                 execution_payload_value="",
                                 consensus_block_value="",
@@ -387,7 +387,7 @@ async def test_produce_best_block(
             ),
             randao_reveal="randao",
             signed_payload_bid=None,
-            fork_version=beacon_chain.current_fork_version,
+            fork=beacon_chain.current_fork,
             soft_timeout=0.1666,
         )
         assert content_type == ContentType.JSON
@@ -412,6 +412,6 @@ async def test_produce_best_block(
                 ),
                 randao_reveal="randao",
                 signed_payload_bid=None,
-                fork_version=beacon_chain.current_fork_version,
+                fork=beacon_chain.current_fork,
                 soft_timeout=0.1666,
             )
