@@ -12,9 +12,12 @@ from spec.configs import Network, get_network_spec
     argvalues=[network for network in Network if network != Network.CUSTOM],
 )
 def test_get_network_spec(network: Network) -> None:
+    kwargs: dict[str, Any] = dict(network=network)
     if network in (Network.MAINNET, Network.HOODI, Network.GNOSIS, Network.CHIADO):
-        pytest.skip("Gloas configs not yet available yet for these networks")
-    spec, preset = get_network_spec(network=network)
+        # Gloas configs not yet available yet for these networks -> need to use
+        # ignore_spec_mismatch flag
+        kwargs["ignore_spec_mismatch"] = True
+    spec, preset = get_network_spec(**kwargs)
     assert isinstance(spec, SpecGloas)
     # There are only two presets Vero supports
     assert preset in ("mainnet", "gnosis")

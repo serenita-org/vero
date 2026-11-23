@@ -1,3 +1,4 @@
+import logging
 import time
 from enum import Enum
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Any, get_args
 from yaml import BaseLoader, load
 
 from spec.base import Genesis, SpecGloas, parse_spec
+from spec.constants import FAR_FUTURE_EPOCH
 from spec.preset import Preset
 
 
@@ -71,7 +73,10 @@ def parse_yaml_file(fp: Path) -> dict[str, Any]:
 
 
 def get_network_spec(
-    network: Network, network_custom_config_path: str | None = None
+    network: Network,
+    *,
+    network_custom_config_path: str | None = None,
+    ignore_spec_mismatch: bool = False,
 ) -> tuple[SpecGloas, Preset]:
     spec_dict = {}
 
@@ -98,4 +103,34 @@ def get_network_spec(
             )
         )
 
-    return parse_spec(data=spec_dict), preset_name
+    try:
+        parsed = parse_spec(data=spec_dict)
+    except ValueError as e:
+        if not ignore_spec_mismatch or "Required field" not in str(e):
+            raise
+
+        _fallbacks = {
+            "GLOAS_FORK_EPOCH": str(FAR_FUTURE_EPOCH),
+            "GLOAS_FORK_VERSION": "0x00000000",
+            "SLOT_DURATION_MS": spec_dict["SECONDS_PER_SLOT"] + "000",
+            # pre-Gloas BPS
+            "ATTESTATION_DUE_BPS": "3333",
+            "AGGREGATE_DUE_BPS": "6667",
+            "SYNC_MESSAGE_DUE_BPS": "3333",
+            "CONTRIBUTION_DUE_BPS": "6667",
+            # Gloas BPS
+            "ATTESTATION_DUE_BPS_GLOAS": "2500",
+            "AGGREGATE_DUE_BPS_GLOAS": "5000",
+            "SYNC_MESSAGE_DUE_BPS_GLOAS": "2500",
+            "CONTRIBUTION_DUE_BPS_GLOAS": "5000",
+            "PAYLOAD_ATTESTATION_DUE_BPS": "7500",
+        }
+        for key, fallback_value in _fallbacks.items():
+            if key not in spec_dict:
+                logging.getLogger("get-network-spec").warning(
+                    f"{key!r} undefined, using fallback value: {fallback_value!r}"
+                )
+                spec_dict[key] = fallback_value
+        parsed = parse_spec(data=spec_dict)
+
+    return parsed, preset_name

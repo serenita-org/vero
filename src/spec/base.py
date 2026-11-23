@@ -129,7 +129,6 @@ class SpecGloas:
     SYNC_MESSAGE_DUE_BPS_GLOAS: Uint64
     CONTRIBUTION_DUE_BPS_GLOAS: Uint64
     PAYLOAD_ATTESTATION_DUE_BPS: Uint64
-    PTC_SIZE: Uint64
 
     # Advisory and optional: beacon nodes need not support this parameter.
     GAS_LIMIT_SCHEDULE: list[GasLimitScheduleEntry] = field(compare=False)
