@@ -54,11 +54,11 @@ def benchmark_ssz(ssz_blocks: list[bytes]) -> None:
         assert block_ssz == encoded  # noqa: S101
 
     logger.info(
-        "Lodestar-Z SSZ load/validate: %.2f ms/block",
+        "Lodestar-Z SSZ decode: %.2f ms/block",
         1000 * decode_seconds / len(ssz_blocks),
     )
     logger.info(
-        "Lodestar-Z SSZ export: %.2f ms/block",
+        "Lodestar-Z SSZ encode: %.2f ms/block",
         1000 * encode_seconds / len(ssz_blocks),
     )
 
